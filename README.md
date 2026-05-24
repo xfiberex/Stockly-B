@@ -218,7 +218,7 @@ connectionTimeoutMillis: 5 000 ms
 
 ### Seed de ejemplo
 
-El seed carga **8 productos** en las categorías: `electronics`, `peripherals`, `furniture`, `audio`.
+El seed carga **8 productos** distribuidos en las categorías: `Electrónica`, `Periféricos`, `Audio` y `Muebles`.
 
 ---
 
@@ -262,7 +262,7 @@ El seed carga **8 productos** en las categorías: `electronics`, `peripherals`, 
 | `page` | `number` | Página actual (default: 1) | `?page=2` |
 | `limit` | `number` | Registros por página (default: 10) | `?limit=20` |
 | `search` | `string` | Búsqueda por nombre o descripción | `?search=laptop` |
-| `category` | `string` | Filtrar por categoría | `?category=electronics` |
+| `category` | `string` | Filtrar por categoría | `?category=Electrónica` |
 | `isActive` | `boolean` | Filtrar por estado activo/inactivo | `?isActive=true` |
 
 **Respuesta paginada:**
@@ -292,7 +292,7 @@ Acepta `multipart/form-data` para subir imagen.
 |---|---|---|---|
 | `name` | `string` | ✅ | Nombre del producto |
 | `price` | `number` | ✅ | Precio (decimal, ej: `99.99`) |
-| `category` | `string` | ✅ | Categoría del producto |
+| `category` | `string` | ✅ | Categoría: `Electrónica`, `Periféricos`, `Audio`, `Accesorios`, `Muebles`, `Otros` |
 | `stock` | `number` | ❌ | Unidades en stock (default: 0) |
 | `description` | `string` | ❌ | Descripción del producto |
 | `image` | `file` | ❌ | Imagen del producto (jpg, png, webp) |
@@ -327,6 +327,21 @@ model Product {
 - **`price`** — `Decimal(10,2)` para evitar errores de punto flotante
 - **`isActive`** — Soft delete: el registro nunca se borra físicamente
 - **`imagePublicId`** — Necesario para eliminar la imagen de Cloudinary al hacer DELETE
+
+### 🏷️ Categorías válidas
+
+El campo `category` es validado por `express-validator` contra una lista fija definida en `product.validator.ts`:
+
+| Categoría | Descripción |
+|---|---|
+| `Electrónica` | Laptops, monitores, computadoras |
+| `Periféricos` | Teclados, mouse, webcams |
+| `Audio` | Auriculares, altavoces, micrófonos |
+| `Accesorios` | Cables, hubs, soportes y complementos |
+| `Muebles` | Sillas, escritorios, estantes |
+| `Otros` | Productos sin categoría específica |
+
+> Enviar un valor fuera de esta lista devuelve **HTTP 422** con el mensaje de error correspondiente.
 
 ---
 
@@ -387,7 +402,7 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 | 🪖 **Headers seguros** | `helmet` | Activado por defecto en todas las rutas |
 | 🌐 **CORS** | `cors` | `*` en desarrollo, `FRONTEND_URL` en producción |
 | ⏱️ **Rate Limiting** | `express-rate-limit` | 100 peticiones cada 15 minutos por IP |
-| ✅ **Validación de inputs** | `express-validator` | Valida y sanitiza todos los campos de entrada |
+| ✅ **Validación de inputs** | `express-validator` | Valida campos de entrada; `category` restringida a 6 valores permitidos |
 | 🔍 **Validación de env** | `src/config/env.ts` | Falla en arranque si falta alguna variable crítica |
 | 🗑️ **Soft Delete** | Campo `isActive` | Los productos nunca se borran físicamente |
 

@@ -5,6 +5,7 @@ const VALID_CATEGORIES = [
     "Periféricos",
     "Audio",
     "Accesorios",
+    "Muebles",
     "Otros",
 ];
 
