@@ -90,31 +90,32 @@ Backend/
 - Servidor corriendo en `http://localhost:3000`
 - Health check: `GET /api/v1/health`
 
-### Sesión 4 — Pasos 8–9 ⬅ PENDIENTE (siguiente sesión)
-- [ ] `src/common/middlewares/upload.middleware.ts` (multer + Cloudinary helpers)
-- [ ] `src/common/middlewares/validate.middleware.ts` (validationResult → 422)
+### Sesión 4 — Pasos 8–9 ✅
+- [x] `src/common/middlewares/upload.middleware.ts` (multer + Cloudinary helpers)
+- [x] `src/common/middlewares/validate.middleware.ts` (validationResult → 422)
 
-### Sesión 5 — Pasos 10–11
-- [ ] `src/modules/products/product.types.ts`
-- [ ] `src/modules/products/product.validator.ts`
-- [ ] `src/modules/products/product.controller.ts`
+### Sesión 5 — Pasos 10–11 ✅
+- [x] `src/modules/products/product.types.ts`
+- [x] `src/modules/products/product.validator.ts`
+- [x] `src/modules/products/product.controller.ts`
 
-### Sesión 6 — Pasos 12–14
-- [ ] `src/modules/products/product.routes.ts`
-- [ ] `src/modules/products/index.ts`
-- [ ] `src/routes/index.ts` (montar módulo)
-- [ ] `src/common/middlewares/error.middleware.ts`
+### Sesión 6 — Pasos 12–14 ✅
+- [x] `src/modules/products/product.routes.ts`
+- [x] `src/modules/products/index.ts`
+- [x] `src/routes/index.ts` (montar módulo)
+- [x] `src/common/middlewares/error.middleware.ts`
 
-### Sesión 7 — Pasos 15–16
-- [ ] Scripts finales en `package.json`
-- [ ] Verificación completa con Thunder Client / Postman
+### Sesión 7 — Pasos 15–16 ✅
+- [x] Scripts en `package.json` (ya estaban completos)
+- [x] Verificación completa con Postman — todos los endpoints exitosos
 
 ---
 
-## Endpoints finales previstos
+## Endpoints implementados y verificados ✅
 
 | Método | Ruta | Descripción |
 |---|---|---|
+| GET | `/api/v1/health` | Health check |
 | GET | `/api/v1/products` | Listar con paginación, filtros, búsqueda |
 | GET | `/api/v1/products/:id` | Obtener uno por ID |
 | POST | `/api/v1/products` | Crear (con imagen opcional) |

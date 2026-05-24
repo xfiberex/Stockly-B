@@ -12,7 +12,7 @@
 **Servidor corriendo:** `http://localhost:3000`
 **Health check:** `GET http://localhost:3000/api/v1/health` → `{ success: true, message: "API corriendo correctamente" }`
 
-**Próximos pasos:** Sesión 4 — Pasos 8 y 9 (middlewares de upload y validación)
+**Estado:** BACKEND COMPLETO ✅ — Todos los endpoints verificados con Postman.
 
 ---
 
@@ -220,6 +220,7 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import { env } from "./config/env";
 import { router } from "./routes";
+import { errorHandler } from "./common/middlewares/error.middleware";
 
 const app = express();
 
@@ -247,22 +248,25 @@ app.use(rateLimit({
 }));
 
 app.use("/api/v1", router);
+app.use(errorHandler);
 
 export default app;
 ```
-> **Pendiente de revisar:** el import del router usa `"../src/routes"` en vez de `"./routes"`. Corrígelo cuando retomes.
 
 ---
 
 ### `src/routes/index.ts`
 ```typescript
 import { Router } from "express";
+import { productRouter } from "../modules/products";
 
 export const router = Router();
 
 router.get("/health", (_req, res) => {
   res.json({ success: true, message: "API corriendo correctamente" });
 });
+
+router.use("/products", productRouter);
 ```
 
 ---
@@ -346,7 +350,7 @@ main().catch((error) => {
 
 ---
 
-## Problemas resueltos en esta sesión
+## Problemas resueltos (histórico completo)
 
 | Problema | Causa | Solución |
 |---|---|---|
@@ -359,71 +363,6 @@ main().catch((error) => {
 
 ---
 
-## Pendiente para la próxima sesión
+## Proyecto completado ✅
 
-### Paso 8 — `src/common/middlewares/upload.middleware.ts`
-```typescript
-import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-import "../../shared/lib/cloudinary";
-import { Request } from "express";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE_MB = 2;
-
-export const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_SIZE_MB * 1024 * 1024 },
-  fileFilter: (_req: Request, file, cb) => {
-    if (ALLOWED_TYPES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Tipo de archivo no permitido. Usa: ${ALLOWED_TYPES.join(", ")}`));
-    }
-  },
-});
-
-export async function uploadToCloudinary(
-  buffer: Buffer,
-  folder: string
-): Promise<{ url: string; publicId: string }> {
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream({ folder, resource_type: "image" }, (error, result) => {
-        if (error || !result) return reject(error ?? new Error("Upload failed"));
-        resolve({ url: result.secure_url, publicId: result.public_id });
-      })
-      .end(buffer);
-  });
-}
-
-export async function deleteFromCloudinary(publicId: string): Promise<void> {
-  await cloudinary.uploader.destroy(publicId);
-}
-```
-
-### Paso 9 — `src/common/middlewares/validate.middleware.ts`
-```typescript
-import { Request, Response, NextFunction } from "express";
-import { validationResult } from "express-validator";
-
-export function validateRequest(req: Request, res: Response, next: NextFunction): void {
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    res.status(422).json({
-      success: false,
-      message: "Error de validación",
-      errors: errors.array().map((err) => ({
-        field: err.type === "field" ? err.path : err.type,
-        message: err.msg,
-      })),
-    });
-    return;
-  }
-
-  next();
-}
-```
-
-Luego de esos dos archivos, seguimos con **Sesión 5: módulo de productos** (types, validator, controller).
+Todos los archivos implementados y verificados con Postman. Ver `PlanInventario.md` para el detalle completo de endpoints.

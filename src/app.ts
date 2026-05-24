@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import { env } from "./config/env";
 import { router } from "../src/routes";
+import { errorHandler } from "./common/middlewares/error.middleware";
 
 const app = express();
 
@@ -38,5 +39,8 @@ app.use(rateLimit({
 
 // Rutas de la API
 app.use("/api/v1", router);
+
+// Middleware de manejo de errores
+app.use(errorHandler);
 
 export default app;
