@@ -1,8 +1,8 @@
 import "dotenv/config";
 import colors from "colors";
-import app from "./app";
-import { prisma } from "./shared/lib/prisma";
-import { env } from "./config/env";
+import app from "@/app";
+import { prisma } from "@/shared/lib/prisma";
+import { env } from "@/config/env";
 
 async function main() {
     await prisma.$connect();

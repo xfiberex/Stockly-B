@@ -1,8 +1,15 @@
 import { Router } from "express";
-import { upload } from "../../common/middlewares/upload.middleware";
-import { validateRequest } from "../../common/middlewares/validate.middleware";
-import { createProductValidators, updateProductValidators } from "./product.validator";
-import { getProducts, getProductById, createProduct, updateProduct, deleteProduct, restoreProduct } from "./product.controller";
+import { upload } from "@/shared/middlewares/upload.middleware";
+import { validate } from "@/shared/middlewares/validate.middleware";
+import { createProductSchema, updateProductSchema } from "@/modules/products/product.validator";
+import {
+    getProducts,
+    getProductById,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    restoreProduct,
+} from "@/modules/products/product.controller";
 
 export const productRouter = Router();
 
@@ -13,18 +20,16 @@ productRouter.get("/", getProducts);
 productRouter.get("/:id", getProductById);
 
 // Ruta para crear un producto (con validación y manejo de archivos)
-productRouter.post("/", 
+productRouter.post("/",
     upload.single("image"),
-    createProductValidators,
-    validateRequest,
+    validate(createProductSchema),
     createProduct
 );
 
 // Ruta para actualizar un producto (con validación y manejo de archivos)
-productRouter.put("/:id", 
+productRouter.put("/:id",
     upload.single("image"),
-    updateProductValidators,
-    validateRequest,
+    validate(updateProductSchema),
     updateProduct
 );
 

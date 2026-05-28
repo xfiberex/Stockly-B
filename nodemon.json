@@ -2,5 +2,5 @@
   "watch": ["src", "prisma"],
   "ext": "ts,json",
   "ignore": ["dist"],
-  "exec": "ts-node --project tsconfig.json"
+  "exec": "tsx"
 }

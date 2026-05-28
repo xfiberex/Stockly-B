@@ -1,15 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { prisma } from "../../shared/lib/prisma";
-import {
-    uploadToCloudinary,
-    deleteFromCloudinary,
-} from "../../common/middlewares/upload.middleware";
-import type {
-    CreateProductDto,
-    UpdateProductDto,
-    ProductQuery,
-} from "./product.types";
-import type { ApiResponse, PaginatedResponse } from "../../common/types";
+import { prisma } from "@/shared/lib/prisma";
+import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
+import type { CreateProductDto, UpdateProductDto, ProductQuery } from "@/modules/products/product.types";
+import type { ApiResponse, PaginatedResponse } from "@/shared/types";
 
 // Controlador para obtener productos con paginación y filtrado
 export async function getProducts(
@@ -88,7 +81,6 @@ export async function getProductById(
     next: NextFunction,
 ): Promise<void> {
     try {
-        // Validar que el ID es un número entero positivo
         const product = await prisma.product.findUnique({
             where: { id: req.params.id },
         });
@@ -122,11 +114,9 @@ export async function createProduct(
     try {
         // Manejar la subida de imagen a Cloudinary si se proporciona un archivo
         let imageUrl: string | undefined;
-
-        // Si se sube una imagen, subirla a Cloudinary y obtener la URL y el publicId para almacenarlos en la base de datos
         let imagePublicId: string | undefined;
 
-        // Validar que el archivo es una imagen y no excede el tamaño máximo permitido (ej. 5MB)
+        // Si se sube una imagen, subirla a Cloudinary y obtener la URL y el publicId para almacenarlos en la base de datos
         if (req.file) {
             const uploaded = await uploadToCloudinary(
                 req.file.buffer,
@@ -188,7 +178,6 @@ export async function updateProduct(
         let imageUrl: string | null | undefined = existing.imageUrl;
         let imagePublicId: string | null | undefined = existing.imagePublicId;
 
-        // Validar que el archivo es una imagen y no excede el tamaño máximo permitido (ej. 5MB)
         if (req.file) {
             if (existing.imagePublicId) {
                 await deleteFromCloudinary(existing.imagePublicId);

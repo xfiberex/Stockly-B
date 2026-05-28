@@ -1,6 +1,6 @@
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
-import "../../shared/lib/cloudinary";
+import "@/shared/lib/cloudinary";
 import { Request } from "express";
 
 // Configuración de multer para aceptar solo imágenes y limitar el tamaño a 2MB

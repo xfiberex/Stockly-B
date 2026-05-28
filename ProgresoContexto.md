@@ -9,7 +9,7 @@ Continúa la mentoría desde donde quedamos. El usuario escribe el código guiad
 ## Perfil del usuario
 
 - Desarrollador aprendiendo el stack PERN (PostgreSQL, Express, React, Node.js)
-- Tiene experiencia práctica con: Prisma, express-validator, TanStack Query, TypeScript, Cloudinary, bcryptjs, jsonwebtoken
+- Tiene experiencia práctica con: Prisma, Zod, TanStack Query, TypeScript, Cloudinary, bcryptjs, jsonwebtoken
 - Prefiere que se le explique el "por qué" antes del "cómo"
 - Agrega comentarios al código deliberadamente — los usa como documentación personal para reutilizar lógica en proyectos futuros. **No señalar esto como algo a corregir.**
 - Prefiere respuestas en español
@@ -31,12 +31,13 @@ Continúa la mentoría desde donde quedamos. El usuario escribe el código guiad
 
 ## Convenciones del proyecto (importantes para la IA)
 
-- Imports usan **rutas relativas** (`../../shared/lib/...`), NO el alias `@/`
+- Imports usan el **alias `@/`** que mapea a `src/` (`@/shared/lib/...`, `@/config/env`, etc.)
 - Parámetros en **camelCase** (`currentPassword`, no `current_password`)
-- Validación con **express-validator** (no Zod — Zod es del proyecto Cuadre)
+- Validación con **Zod** (schemas en `*.validator.ts`; middleware `validate(schema)` en rutas)
 - JWT guardado en **cookie httpOnly** (no localStorage)
 - Variables de entorno agrupadas: `env.jwt.secret`, `env.smtp.host`, etc.
 - Tokens de expiración en schema: `verifyExpires`, `resetExpires` (no `verifyTokenExpires`)
+- Runtime de desarrollo usa **tsx** (resuelve el alias `@/` de tsconfig automáticamente)
 
 ---
 
@@ -60,64 +61,46 @@ model User {
 
 ---
 
-## Estado actual — Fase 1: Backend (Stockly-B)
+## Patrón de validación con Zod
 
-| #  | Archivo                                | Estado |
-|----|----------------------------------------|--------|
-| 1  | Instalar dependencias (nodemailer etc) | ✅     |
-| 2  | `src/config/env.ts`                    | ✅     |
-| 3  | `prisma/schema.prisma` (User model)    | ✅     |
-| 4  | `src/shared/lib/httpError.ts`          | ✅     |
-| 5  | `src/shared/middlewares/error.middleware.ts`      | ✅     |
-| 6  | `src/shared/lib/jwt.ts`                | ✅     |
-| 7  | `src/shared/lib/hash.ts`               | ✅     |
-| 8  | `src/shared/lib/nodemailer.ts`         | ✅     |
-| 9  | `src/shared/middlewares/auth.middleware.ts`       | ✅     |
-| 10 | `src/shared/middlewares/rateLimiter.middleware.ts`| ✅     |
-| 11 | `src/modules/auth/auth.validator.ts`   | ✅     |
-| 12 | `src/modules/auth/auth.service.ts`     | ✅     |
-| 13 | `src/modules/auth/auth.controller.ts`  | ⏳ EN PROGRESO |
-| 14 | `src/modules/auth/auth.routes.ts`      | ⬜     |
-| 15 | `src/modules/auth/index.ts`            | ⬜     |
-| 16 | `src/routes/index.ts` (registrar auth) | ⬜     |
+El `validate.middleware.ts` exporta una factory `validate(schema)` que:
+1. Llama a `schema.safeParse(req.body)`
+2. Si hay errores, responde 422 con `{ field, message }[]` usando `result.error.issues`
+3. Si es válido, reemplaza `req.body` con los datos parseados/coercionados por Zod
+
+En las rutas se usa directamente:
+```ts
+router.post("/register", authRegisterLimiter, validate(registerSchema), authController.register);
+```
+
+Los schemas viven en `*.validator.ts` y también exportan los tipos inferidos (`z.infer<typeof schema>`).
 
 ---
 
-## Paso actual — Paso 13: auth.controller.ts
+## Estado actual — Fase 1: Backend (Stockly-B)
 
-El controller es el puente entre HTTP y el servicio. No contiene lógica de negocio — solo recibe el request, llama al servicio, y envía la respuesta.
-
-### Handlers requeridos
-
-| Handler            | Método HTTP | Qué hace                                                                 |
-|--------------------|-------------|--------------------------------------------------------------------------|
-| `register`         | POST        | Llama a `authService.register`, responde 201                             |
-| `verifyEmail`      | POST        | Llama a `authService.verifyEmail`, responde 200                          |
-| `resendVerification` | POST      | Llama a `authService.resendVerification`, responde 200                   |
-| `login`            | POST        | Llama a `authService.login`, firma JWT, setea cookie, responde 200       |
-| `logout`           | POST        | Limpia la cookie, responde 200                                           |
-| `forgotPassword`   | POST        | Llama a `authService.forgotPassword`, responde 200                       |
-| `resetPassword`    | POST        | Llama a `authService.resetPassword`, responde 200                        |
-| `getMe`            | GET         | Llama a `authService.getById(req.userId!)`, responde 200                 |
-| `updateProfile`    | PUT         | Llama a `authService.updateProfile`, responde 200                        |
-| `updatePassword`   | PUT         | Llama a `authService.updatePassword`, responde 200                       |
-
-### Punto crítico — handler login
-
-```ts
-res.cookie("token", jwt, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días en ms
-});
-```
-
-El `logout` usa `res.clearCookie("token")`.
-
-Todos los handlers envueltos en `try/catch` que pasen el error a `next(err)`.
-
-**Referencia:** `Cuadre/Backend/src/modules/auth/auth.controller.ts`
+| #  | Archivo                                                   | Estado |
+|----|-----------------------------------------------------------|--------|
+| 1  | Instalar dependencias (zod, nodemailer etc)               | ✅     |
+| 2  | `src/config/env.ts`                                       | ✅     |
+| 3  | `prisma/schema.prisma` (User model)                       | ✅     |
+| 4  | `src/shared/lib/httpError.ts`                             | ✅     |
+| 5  | `src/shared/middlewares/error.middleware.ts`               | ✅     |
+| 6  | `src/shared/lib/jwt.ts`                                   | ✅     |
+| 7  | `src/shared/lib/hash.ts`                                  | ✅     |
+| 8  | `src/shared/lib/nodemailer.ts`                            | ✅     |
+| 9  | `src/shared/middlewares/auth.middleware.ts`                | ✅     |
+| 10 | `src/shared/middlewares/rateLimiter.middleware.ts`         | ✅     |
+| 11 | `src/shared/middlewares/validate.middleware.ts` (Zod)     | ✅     |
+| 12 | `src/modules/auth/auth.validator.ts` (Zod schemas)        | ✅     |
+| 13 | `src/modules/auth/auth.service.ts`                        | ✅     |
+| 14 | `src/modules/auth/auth.controller.ts`                     | ✅     |
+| 15 | `src/modules/auth/auth.routes.ts`                         | ✅     |
+| 16 | `src/modules/auth/index.ts`                               | ✅     |
+| 17 | `src/modules/products/product.validator.ts` (Zod schemas) | ✅     |
+| 18 | `src/modules/products/product.controller.ts`              | ✅     |
+| 19 | `src/modules/products/product.routes.ts`                  | ✅     |
+| 20 | `src/routes/index.ts`                                     | ✅     |
 
 ---
 

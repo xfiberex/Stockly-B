@@ -1,71 +1,48 @@
-import { body } from 'express-validator';
+import { z } from "zod";
 
-// Validadores para el registro de usuarios
-export const registerValidators = [
-    body("name")
-        .trim()
-        .notEmpty()
-        .withMessage("El nombre es obligatorio")
-        .isLength({ max: 80 })
-        .withMessage("El nombre no puede superar 80 caracteres"),
+// Schema para el registro de usuarios
+export const registerSchema = z.object({
+    name: z.string().trim().min(1, "El nombre es obligatorio").max(80, "El nombre no puede superar 80 caracteres"),
+    email: z.string().trim().email("El correo electrónico no es válido"),
+    password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+});
 
-    body("email")
-        .trim()
-        .notEmpty()
-        .withMessage("El correo electrónico es obligatorio")
-        .isEmail()
-        .withMessage("El correo electrónico no es válido")
-        .normalizeEmail(),
+// Schema para el inicio de sesión
+export const loginSchema = z.object({
+    email: z.string().trim().email("El correo electrónico no es válido"),
+    password: z.string().min(1, "La contraseña es obligatoria"),
+});
 
-    body("password")
-        .notEmpty()
-        .withMessage("La contraseña es obligatoria")
-        .isLength({ min: 8 })
-        .withMessage("La contraseña debe tener al menos 8 caracteres"),
-]
+// Schema para validar solo el correo (reenvío de verificación, forgot-password)
+export const emailSchema = z.object({
+    email: z.string().trim().email("El correo electrónico no es válido"),
+});
 
-// Validadores para el inicio de sesión
-export const loginValidators = [
-    body("email")
-        .trim()
-        .notEmpty()
-        .withMessage("El correo electrónico es obligatorio")
-        .isEmail()
-        .withMessage("El correo electrónico no es válido")
-        .normalizeEmail(),
+// Schema para la verificación del correo electrónico
+export const verifyEmailSchema = z.object({
+    token: z.string().min(1, "El token es obligatorio"),
+});
 
-    body("password")
-        .notEmpty()
-        .withMessage("La contraseña es obligatoria"),
-]
+// Schema para el restablecimiento de contraseña
+export const resetPasswordSchema = z.object({
+    token: z.string().min(1, "El token es obligatorio"),
+    password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+});
 
-// Validadores para la actualización del perfil
-export const emailValidators = [
-    body("email")
-        .trim()
-        .notEmpty()
-        .withMessage("El correo electrónico es obligatorio")
-        .isEmail()
-        .withMessage("El correo electrónico no es válido")
-        .normalizeEmail(),
-]
+// Schema para la actualización de perfil (nombre y correo)
+export const updateProfileSchema = z.object({
+    name: z.string().trim().min(1, "El nombre es obligatorio").max(80, "El nombre no puede superar 80 caracteres"),
+    email: z.string().trim().email("El correo electrónico no es válido"),
+});
 
-// Validadores para la verificación del correo electrónico
-export const verifyEmailValidators = [
-    body("token")
-        .notEmpty()
-        .withMessage("El token es obligatorio"),
-]
+// Schema para el cambio de contraseña (requiere contraseña actual)
+export const updatePasswordSchema = z.object({
+    currentPassword: z.string().min(1, "La contraseña actual es obligatoria"),
+    password: z.string().min(8, "La nueva contraseña debe tener al menos 8 caracteres"),
+});
 
-// Validadores para el restablecimiento de contraseña
-export const resetPasswordValidators = [
-    body("token")
-        .notEmpty()
-        .withMessage("El token es obligatorio"),
-
-    body("password")
-        .notEmpty()
-        .withMessage("La contraseña es obligatoria")
-        .isLength({ min: 8 })
-        .withMessage("La contraseña debe tener al menos 8 caracteres"),
-]
+// Tipos inferidos para usar en controllers/services
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;

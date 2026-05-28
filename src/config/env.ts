@@ -17,11 +17,69 @@ const required = [
     'FRONTEND_URL'
 ] as const;
 
-// Verifica que todas las variables de entorno requeridas estén definidas
-for (const key of required) {
-    if (!process.env[key]) {
-        throw new Error(`Variable(s) de entorno faltante(s): ${key}`);
+// Validar que NODE_ENV tenga un valor permitido
+const validNodeEnvs = new Set(['development', 'test', 'production']);
+
+// Mínimo recomendado para JWT_SECRET es de 32 caracteres para garantizar seguridad
+const MIN_JWT_SECRET_LENGTH = 32;
+
+// Función para validar que DATABASE_URL sea una URL válida de PostgreSQL
+function isValidDatabaseUrl(value: string): boolean {
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === "postgres:" || parsed.protocol === "postgresql:";
+    } catch {
+        return false;
     }
+}
+
+// Función para validar que un valor de puerto sea un número entero válido entre 1 y 65535
+function parsePort(value: string | undefined, envName: string, fallback: number): number {
+    const parsed = Number(value ?? fallback);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+        throw new Error(`❌ ${envName} debe ser un número entero válido entre 1 y 65535`);
+    }
+    return parsed;
+}
+
+// Función para validar todas las variables de entorno requeridas
+export function validateEnv(): void {
+    const missing: string[] = [];
+
+    for (const envVar of required) {
+        if (!process.env[envVar]) {
+            missing.push(envVar);
+        }
+    }
+
+    if (missing.length > 0) {
+        throw new Error(
+            `❌ Variables de entorno no definidas: ${missing.join(", ")}\nConfigura un archivo .env con los valores requeridos antes de iniciar el backend.`,
+        );
+    }
+
+    if (!process.env["NODE_ENV"]) {
+        process.env["NODE_ENV"] = "development";
+    }
+
+    if (!validNodeEnvs.has(process.env["NODE_ENV"] as string)) {
+        throw new Error("❌ NODE_ENV debe ser development, test o production");
+    }
+
+    if (!isValidDatabaseUrl(process.env["DATABASE_URL"] as string)) {
+        throw new Error(
+            "❌ DATABASE_URL debe ser una URL válida de PostgreSQL (postgresql://user:pass@host:port/db)",
+        );
+    }
+
+    if ((process.env["JWT_SECRET"] as string).length < MIN_JWT_SECRET_LENGTH) {
+        throw new Error(
+            `❌ JWT_SECRET debe tener al menos ${MIN_JWT_SECRET_LENGTH} caracteres para ser seguro`,
+        );
+    }
+
+    parsePort(process.env["PORT"], "PORT", 3000);
+    parsePort(process.env["SMTP_PORT"], "SMTP_PORT", 587);
 }
 
 // Exporta las variables de entorno de forma tipada

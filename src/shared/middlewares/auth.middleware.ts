@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { verifyToken } from "../../shared/lib/jwt.js";
+import { verifyToken } from "@/shared/lib/jwt";
 
 // Middleware para proteger rutas que requieren autenticación
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

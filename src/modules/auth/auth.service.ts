@@ -1,8 +1,8 @@
-import { prisma } from "../../shared/lib/prisma.js";
-import { HttpError } from "../../shared/lib/httpError.js";
-import { hashPassword, comparePassword } from "../../shared/lib/hash.js";
+import { prisma } from "@/shared/lib/prisma";
+import { HttpError } from "@/shared/lib/httpError";
+import { hashPassword, comparePassword } from "@/shared/lib/hash";
 import crypto from "crypto";
-import { sendPasswordResetEmail, sendVerificationEmail } from "../../shared/lib/nodemailer.js";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/shared/lib/nodemailer";
 
 // Servicio de autenticación y validación de usuarios
 export const authService = {
@@ -176,7 +176,7 @@ export const authService = {
 
             // Enviar correo de verificación al nuevo correo electrónico
             await sendVerificationEmail(email, name, token);
-            return { 
+            return {
                 emailChanged: true,
                 message: "Correo actualizado. Revisa tu bandeja para confirmar tu nueva dirección.",
             };
@@ -191,13 +191,13 @@ export const authService = {
     },
 
     // Actualizar contraseña de usuario
-    async updatePassword( userId: string, currentpassword: string, password: string ) {
+    async updatePassword(userId: string, currentPassword: string, password: string) {
         // Buscar el usuario por ID
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user || !user.password) throw new HttpError(404, "Usuario no encontrado");
 
         // Verificar la contraseña actual
-        const valid = await comparePassword(currentpassword, user.password);
+        const valid = await comparePassword(currentPassword, user.password);
         if (!valid) throw new HttpError(403, "La contraseña actual es incorrecta");
 
         // Hashear la nueva contraseña y actualizar el usuario

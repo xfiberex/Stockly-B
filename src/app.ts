@@ -4,9 +4,9 @@ import cors from "cors";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
-import { env } from "./config/env";
-import { router } from "../src/routes";
-import { errorHandler } from "./common/middlewares/error.middleware";
+import { env } from "@/config/env";
+import { router } from "@/routes";
+import { errorHandler } from "@/shared/middlewares/error.middleware";
 
 const app = express();
 

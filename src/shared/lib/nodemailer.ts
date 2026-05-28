@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { env } from "../../config/env.js";
+import { env } from "@/config/env";
 
 // Función para escapar caracteres HTML en el nombre del usuario
 function escapeHtml(str: string): string {
