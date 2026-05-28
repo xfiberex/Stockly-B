@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 
-// Middleware factory para validar req.body con un schema de Zod
 export function validate(schema: z.ZodTypeAny) {
     return (req: Request, res: Response, next: NextFunction): void => {
         const result = schema.safeParse(req.body);
@@ -18,7 +17,6 @@ export function validate(schema: z.ZodTypeAny) {
             return;
         }
 
-        // Reemplaza req.body con los datos parseados y coercionados por Zod
         req.body = result.data;
         next();
     };

@@ -12,23 +12,20 @@ const app = express();
 
 app.use(helmet());
 
-// Configuración de CORS
 app.use(cors({
-    origin: env.nodeEnv === "production" ? process.env.FRONTEND_URL : "*",
+    origin: env.frontendUrl,
     credentials: true,
 }));
 
-// Registro de peticiones en desarrollo
 if (env.nodeEnv === "development") {
     app.use(morgan("dev"));
 }
 
-// Middleware para parsear JSON y URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Limitador de tasa para prevenir abuso
+// Rate limit global — los limitadores específicos de auth se aplican adicionalmente
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -37,10 +34,8 @@ app.use(rateLimit({
     message: { success: false, message: "Demasiadas peticiones, intenta más tarde." },
 }));
 
-// Rutas de la API
 app.use("/api/v1", router);
 
-// Middleware de manejo de errores
 app.use(errorHandler);
 
 export default app;

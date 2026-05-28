@@ -2,7 +2,6 @@ import { z } from "zod";
 
 const VALID_CATEGORIES = ["Electrónica", "Periféricos", "Audio", "Accesorios", "Muebles", "Otros"] as const;
 
-// Schema para la creación de productos
 export const createProductSchema = z.object({
     name: z.string().trim().min(1, "El nombre es obligatorio").max(200, "El nombre no puede superar 200 caracteres"),
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
@@ -12,7 +11,6 @@ export const createProductSchema = z.object({
     category: z.enum(VALID_CATEGORIES, `Categoría inválida. Opciones: ${VALID_CATEGORIES.join(", ")}`),
 });
 
-// Schema para la actualización de productos (todos los campos opcionales)
 export const updateProductSchema = z.object({
     name: z.string().trim().min(1, "El nombre no puede estar vacío").max(200, "El nombre no puede superar 200 caracteres").optional(),
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
