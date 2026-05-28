@@ -26,13 +26,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Rate limit global — los limitadores específicos de auth se aplican adicionalmente
-app.use(rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: "Demasiadas peticiones, intenta más tarde." },
-}));
+// Se omite en test para no bloquear ejecuciones repetidas del suite
+if (env.nodeEnv !== "test") {
+    app.use(rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { success: false, message: "Demasiadas peticiones, intenta más tarde." },
+    }));
+}
 
 app.use("/api/v1", router);
 

@@ -10,6 +10,7 @@ export const authStrictLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     handler: json429,
+    skip: () => process.env.NODE_ENV === "test",
 });
 
 // 5 intentos / hora — register y resend-verification
@@ -19,4 +20,5 @@ export const authRegisterLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     handler: json429,
+    skip: () => process.env.NODE_ENV === "test",
 });
