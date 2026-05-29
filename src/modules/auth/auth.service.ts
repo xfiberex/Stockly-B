@@ -13,11 +13,16 @@ export const authService = {
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+        // El primer usuario registrado obtiene rol ADMIN
+        const userCount = await prisma.user.count();
+        const role = userCount === 0 ? "ADMIN" : "USER";
+
         await prisma.user.create({
             data: {
                 name,
                 email,
                 password: hashed,
+                role,
                 verifyToken: hash,
                 verifyExpires: expires,
             },
@@ -103,6 +108,7 @@ export const authService = {
                 id: true,
                 email: true,
                 name: true,
+                role: true,
                 isVerified: true,
                 createdAt: true,
             },

@@ -3,6 +3,7 @@ import { signToken } from "@/shared/lib/jwt";
 import { hashPassword } from "@/shared/lib/hash";
 
 export async function cleanDb() {
+    await prisma.stockMovement.deleteMany();
     await prisma.product.deleteMany();
     await prisma.user.deleteMany();
 }
@@ -12,6 +13,7 @@ interface CreateUserOptions {
     email?: string;
     password?: string;
     isVerified?: boolean;
+    role?: string;
 }
 
 export async function createUser(options: CreateUserOptions = {}) {
@@ -20,11 +22,12 @@ export async function createUser(options: CreateUserOptions = {}) {
         email = `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}@test.com`,
         password = "Test1234!",
         isVerified = true,
+        role = "USER",
     } = options;
 
     const hashed = await hashPassword(password);
     return prisma.user.create({
-        data: { name, email, password: hashed, isVerified },
+        data: { name, email, password: hashed, isVerified, role },
     });
 }
 

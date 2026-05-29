@@ -80,6 +80,19 @@ export async function restoreProduct(
     }
 }
 
+export async function getProductMovements(
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const result = await productService.getMovements(req.params.id);
+        res.json({ success: true, message: "Movimientos obtenidos exitosamente", data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function exportProducts(
     _req: Request,
     res: Response,

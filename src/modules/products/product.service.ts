@@ -1,7 +1,20 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
-import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto } from "@/modules/products/product.types";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, StockMovementType } from "@/modules/products/product.types";
+
+async function recordMovement(
+    productId: string,
+    type: StockMovementType,
+    delta: number,
+    stockAfter: number,
+    note?: string,
+) {
+    if (delta === 0) return;
+    await prisma.stockMovement.create({
+        data: { productId, type, delta, stockAfter, note },
+    });
+}
 
 export const productService = {
     async getProducts(query: ProductQuery) {
@@ -48,17 +61,23 @@ export const productService = {
             imagePublicId = uploaded.publicId;
         }
 
-        return prisma.product.create({
+        const stock = dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0;
+
+        const product = await prisma.product.create({
             data: {
                 name: dto.name,
                 description: dto.description,
                 price: dto.price !== undefined ? parseFloat(String(dto.price)) : 0,
-                stock: dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0,
+                stock,
                 category: dto.category,
                 imageUrl,
                 imagePublicId,
             },
         });
+
+        await recordMovement(product.id, "IN", stock, stock, "Stock inicial");
+
+        return product;
     },
 
     async update(id: string, dto: UpdateProductDto, file?: Express.Multer.File) {
@@ -79,7 +98,7 @@ export const productService = {
             imagePublicId = null;
         }
 
-        return prisma.product.update({
+        const updated = await prisma.product.update({
             where: { id },
             data: {
                 ...(dto.name !== undefined && { name: dto.name }),
@@ -91,6 +110,16 @@ export const productService = {
                 imagePublicId,
             },
         });
+
+        if (dto.stock !== undefined) {
+            const newStock = parseInt(String(dto.stock), 10);
+            const oldStock = existing.stock;
+            const delta = newStock - oldStock;
+            const type = delta >= 0 ? "IN" : "OUT";
+            await recordMovement(id, type, delta, newStock, "Ajuste manual");
+        }
+
+        return updated;
     },
 
     async delete(id: string) {
@@ -129,18 +158,21 @@ export const productService = {
             const batch = products.slice(i, i + BATCH_SIZE);
 
             const results = await Promise.allSettled(
-                batch.map((dto) =>
-                    prisma.product.create({
+                batch.map(async (dto) => {
+                    const stock = dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0;
+                    const product = await prisma.product.create({
                         data: {
                             name: dto.name,
                             description: dto.description,
                             price: parseFloat(String(dto.price)),
-                            stock: dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0,
+                            stock,
                             category: dto.category,
                             isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : true,
                         },
-                    }),
-                ),
+                    });
+                    await recordMovement(product.id, "IMPORT", stock, stock, "Importación masiva");
+                    return product;
+                }),
             );
 
             results.forEach((result, batchIndex) => {
@@ -154,5 +186,17 @@ export const productService = {
         }
 
         return { created, errors };
+    },
+
+    async getMovements(productId: string) {
+        const product = await prisma.product.findUnique({ where: { id: productId } });
+        if (!product) throw new HttpError(404, "Producto no encontrado");
+
+        const movements = await prisma.stockMovement.findMany({
+            where: { productId },
+            orderBy: { createdAt: "asc" },
+        });
+
+        return { product, movements };
     },
 };

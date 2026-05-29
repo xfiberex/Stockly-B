@@ -7,6 +7,7 @@ import { rateLimit } from "express-rate-limit";
 import { env } from "@/config/env";
 import { router } from "@/routes";
 import { errorHandler } from "@/shared/middlewares/error.middleware";
+import { registerSwagger } from "@/swagger";
 
 const app = express();
 
@@ -38,6 +39,10 @@ if (env.nodeEnv !== "test") {
 }
 
 app.use("/api/v1", router);
+
+if (env.nodeEnv !== "production") {
+    registerSwagger(app);
+}
 
 app.use(errorHandler);
 

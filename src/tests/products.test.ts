@@ -36,7 +36,7 @@ describe("Products API", () => {
 
     beforeAll(async () => {
         await cleanDb();
-        const user = await createUser({ email: "products_user@example.com" });
+        const user = await createUser({ email: "products_user@example.com", role: "ADMIN" });
         authCookie = getAuthCookie(user.id);
     });
 
@@ -330,7 +330,9 @@ describe("Products API", () => {
             expect(res.body.data.created).toBe(2);
             expect(res.body.data.errors).toHaveLength(0);
 
-            // Limpia los productos importados
+            // Limpia movimientos y productos importados (FK constraint)
+            const imported = await prisma.product.findMany({ where: { name: { startsWith: "Producto Import" } } });
+            await prisma.stockMovement.deleteMany({ where: { productId: { in: imported.map((p) => p.id) } } });
             await prisma.product.deleteMany({ where: { name: { startsWith: "Producto Import" } } });
         });
 
