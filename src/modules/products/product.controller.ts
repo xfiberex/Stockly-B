@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
-import type { CreateProductDto, UpdateProductDto, ProductQuery } from "@/modules/products/product.types";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto } from "@/modules/products/product.types";
 
 export async function getProducts(
     req: Request<{}, {}, {}, ProductQuery>,
@@ -75,6 +75,32 @@ export async function restoreProduct(
     try {
         const product = await productService.restore(req.params.id);
         res.json({ success: true, message: "Producto restaurado correctamente", data: product });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function exportProducts(
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const products = await productService.exportAll();
+        res.json({ success: true, message: "Productos exportados exitosamente", data: products });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function importProducts(
+    req: Request<{}, {}, { products: ImportProductDto[] }>,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const result = await productService.importBulk(req.body.products);
+        res.status(201).json({ success: true, message: `${result.created} productos importados`, data: result });
     } catch (error) {
         next(error);
     }

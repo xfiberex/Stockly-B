@@ -1,7 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
-import type { CreateProductDto, UpdateProductDto, ProductQuery } from "@/modules/products/product.types";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto } from "@/modules/products/product.types";
 
 export const productService = {
     async getProducts(query: ProductQuery) {
@@ -111,5 +111,48 @@ export const productService = {
         if (existing.isActive) throw new HttpError(400, "El producto ya está activo");
 
         return prisma.product.update({ where: { id }, data: { isActive: true } });
+    },
+
+    async exportAll() {
+        return prisma.product.findMany({
+            orderBy: { createdAt: "desc" },
+            select: { name: true, description: true, price: true, stock: true, category: true, isActive: true },
+        });
+    },
+
+    async importBulk(products: ImportProductDto[]) {
+        const BATCH_SIZE = 50;
+        const errors: Array<{ row: number; error: string }> = [];
+        let created = 0;
+
+        for (let i = 0; i < products.length; i += BATCH_SIZE) {
+            const batch = products.slice(i, i + BATCH_SIZE);
+
+            const results = await Promise.allSettled(
+                batch.map((dto) =>
+                    prisma.product.create({
+                        data: {
+                            name: dto.name,
+                            description: dto.description,
+                            price: parseFloat(String(dto.price)),
+                            stock: dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0,
+                            category: dto.category,
+                            isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : true,
+                        },
+                    }),
+                ),
+            );
+
+            results.forEach((result, batchIndex) => {
+                const globalRow = i + batchIndex + 1;
+                if (result.status === "fulfilled") {
+                    created++;
+                } else {
+                    errors.push({ row: globalRow, error: result.reason?.message ?? "Error desconocido" });
+                }
+            });
+        }
+
+        return { created, errors };
     },
 };

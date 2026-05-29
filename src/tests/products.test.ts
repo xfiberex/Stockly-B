@@ -289,6 +289,92 @@ describe("Products API", () => {
     });
 
     // -----------------------------------------------------------------------
+    describe("GET /products/export", () => {
+        it("200: devuelve array de productos con campos de exportación", async () => {
+            const res = await request(app).get(`${BASE}/export`).set("Cookie", authCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(Array.isArray(res.body.data)).toBe(true);
+
+            const first = res.body.data[0];
+            expect(first).toHaveProperty("name");
+            expect(first).toHaveProperty("price");
+            expect(first).toHaveProperty("stock");
+            expect(first).toHaveProperty("category");
+            expect(first).toHaveProperty("isActive");
+            expect(first).not.toHaveProperty("id");
+            expect(first).not.toHaveProperty("imagePublicId");
+        });
+
+        it("401: sin cookie", async () => {
+            const res = await request(app).get(`${BASE}/export`);
+            expect(res.status).toBe(401);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("POST /products/import", () => {
+        it("201: importa múltiples productos válidos", async () => {
+            const res = await request(app)
+                .post(`${BASE}/import`)
+                .set("Cookie", authCookie)
+                .send({
+                    products: [
+                        { name: "Producto Import A", price: 99.99, stock: 10, category: "Electrónica" },
+                        { name: "Producto Import B", price: 49.99, stock: 5, category: "Audio" },
+                    ],
+                });
+
+            expect(res.status).toBe(201);
+            expect(res.body.data.created).toBe(2);
+            expect(res.body.data.errors).toHaveLength(0);
+
+            // Limpia los productos importados
+            await prisma.product.deleteMany({ where: { name: { startsWith: "Producto Import" } } });
+        });
+
+        it("422: array vacío es rechazado", async () => {
+            const res = await request(app)
+                .post(`${BASE}/import`)
+                .set("Cookie", authCookie)
+                .send({ products: [] });
+
+            expect(res.status).toBe(422);
+        });
+
+        it("422: producto con categoría inválida es rechazado", async () => {
+            const res = await request(app)
+                .post(`${BASE}/import`)
+                .set("Cookie", authCookie)
+                .send({
+                    products: [{ name: "Producto malo", price: 10, category: "Deportes" }],
+                });
+
+            expect(res.status).toBe(422);
+        });
+
+        it("422: producto sin precio es rechazado", async () => {
+            const res = await request(app)
+                .post(`${BASE}/import`)
+                .set("Cookie", authCookie)
+                .send({
+                    products: [{ name: "Sin precio", category: "Audio" }],
+                });
+
+            expect(res.status).toBe(422);
+        });
+
+        it("401: sin cookie", async () => {
+            const res = await request(app)
+                .post(`${BASE}/import`)
+                .send({ products: [{ name: "X", price: 10, category: "Audio" }] });
+
+            expect(res.status).toBe(401);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     describe("PATCH /products/:id/restore", () => {
         let inactiveId: string;
 

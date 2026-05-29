@@ -2,6 +2,22 @@ import { z } from "zod";
 
 const VALID_CATEGORIES = ["Electrónica", "Periféricos", "Audio", "Accesorios", "Muebles", "Otros"] as const;
 
+export const importProductsSchema = z.object({
+    products: z
+        .array(
+            z.object({
+                name: z.string().trim().min(1, "El nombre es obligatorio").max(200),
+                description: z.string().trim().max(1000).optional(),
+                price: z.coerce.number().positive("El precio debe ser mayor a 0"),
+                stock: z.coerce.number().int().min(0).optional(),
+                category: z.enum(VALID_CATEGORIES, `Categoría inválida. Opciones: ${VALID_CATEGORIES.join(", ")}`),
+                isActive: z.boolean().optional(),
+            }),
+        )
+        .min(1, "Se requiere al menos un producto")
+        .max(1000, "Máximo 1000 productos por importación"),
+});
+
 export const createProductSchema = z.object({
     name: z.string().trim().min(1, "El nombre es obligatorio").max(200, "El nombre no puede superar 200 caracteres"),
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),

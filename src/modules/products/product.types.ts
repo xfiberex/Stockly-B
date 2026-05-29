@@ -23,3 +23,17 @@ export interface ProductQuery {
     category?: string;
     isActive?: string;
 }
+
+export interface ImportProductDto {
+    name: string;
+    description?: string;
+    price: number;
+    stock?: number;
+    category: string;
+    isActive?: boolean;
+}
+
+export interface ImportResult {
+    created: number;
+    errors: Array<{ row: number; error: string }>;
+}
