@@ -68,7 +68,44 @@ export const authService = {
         if (!valid) throw new HttpError(401, "Credenciales inválidas");
 
         if (!user.isVerified) throw new HttpError(403, "Confirma tu correo antes de iniciar sesión");
-        return user;
+
+        const { raw, hash } = generateToken();
+        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken: hash, refreshExpires: expires },
+        });
+
+        return { user, rawRefreshToken: raw };
+    },
+
+    async refresh(rawToken: string) {
+        const hash = hashToken(rawToken);
+        const user = await prisma.user.findFirst({ where: { refreshToken: hash } });
+
+        if (!user || !user.refreshExpires || user.refreshExpires < new Date()) {
+            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
+        }
+
+        // Rotación: el token anterior queda inválido, se emite uno nuevo
+        const { raw, hash: newHash } = generateToken();
+        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken: newHash, refreshExpires: expires },
+        });
+
+        return { user, rawRefreshToken: raw };
+    },
+
+    async revokeRefreshToken(rawToken: string) {
+        const hash = hashToken(rawToken);
+        await prisma.user.updateMany({
+            where: { refreshToken: hash },
+            data: { refreshToken: null, refreshExpires: null },
+        });
     },
 
     async forgotPassword(email: string) {
@@ -160,10 +197,12 @@ export const authService = {
         if (!valid) throw new HttpError(403, "La contraseña actual es incorrecta");
 
         const hashed = await hashPassword(password);
-        await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+        await prisma.user.update({
+            where: { id: userId },
+            data: { password: hashed, refreshToken: null, refreshExpires: null },
+        });
         return {
             passwordChanged: true,
-            // La cookie se limpia en el controller; otros dispositivos mantienen sesión hasta que expire el JWT
             message: "Contraseña actualizada exitosamente. Inicia sesión nuevamente.",
         };
     },

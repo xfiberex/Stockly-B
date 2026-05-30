@@ -43,18 +43,20 @@ model StockMovement {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  name          String
-  email         String    @unique
-  password      String
-  role          String    @default("USER")
-  isVerified    Boolean   @default(false)
-  verifyToken   String?   @unique
-  verifyExpires DateTime?
-  resetToken    String?   @unique
-  resetExpires  DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  name           String
+  email          String    @unique
+  password       String
+  role           String    @default("USER")
+  isVerified     Boolean   @default(false)
+  verifyToken    String?   @unique
+  verifyExpires  DateTime?
+  resetToken     String?   @unique
+  resetExpires   DateTime?
+  refreshToken   String?   @unique
+  refreshExpires DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@map("users")
 }

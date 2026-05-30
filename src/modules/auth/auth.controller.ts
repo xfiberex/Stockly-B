@@ -6,12 +6,20 @@ import { HttpError } from "@/shared/lib/httpError";
 
 const isProd = env.nodeEnv === "production";
 
-// httpOnly evita acceso por JS; secure + sameSite none para cross-domain en producción
 const COOKIE_OPTS = {
     httpOnly: true,
     secure: isProd,
     sameSite: (isProd ? "none" : "lax") as "none" | "lax",
+    maxAge: 15 * 60 * 1000, // 15 minutos — debe coincidir con JWT_EXPIRES_IN=15m en .env
+};
+
+// Path restringido: el navegador solo envía esta cookie al endpoint /refresh
+const REFRESH_COOKIE_OPTS = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: (isProd ? "none" : "lax") as "none" | "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/api/v1/auth/refresh",
 };
 
 export const authController = {
@@ -35,15 +43,35 @@ export const authController = {
 
     async login(req: Request, res: Response) {
         const { email, password } = req.body as { email: string; password: string };
-        const user = await authService.login(email, password);
+        const { user, rawRefreshToken } = await authService.login(email, password);
         const token = signToken({ userId: user.id });
         res
             .cookie("token", token, COOKIE_OPTS)
+            .cookie("refreshToken", rawRefreshToken, REFRESH_COOKIE_OPTS)
             .json({ message: "Sesión iniciada", data: { id: user.id, email: user.email, name: user.name } });
     },
 
-    async logout(_req: Request, res: Response) {
-        res.clearCookie("token").json({ message: "Sesión cerrada" });
+    async logout(req: Request, res: Response) {
+        const rawRefreshToken = req.cookies?.["refreshToken"] as string | undefined;
+        if (rawRefreshToken) {
+            await authService.revokeRefreshToken(rawRefreshToken).catch(() => {});
+        }
+        res
+            .clearCookie("token")
+            .clearCookie("refreshToken", { path: "/api/v1/auth/refresh" })
+            .json({ message: "Sesión cerrada" });
+    },
+
+    async refresh(req: Request, res: Response) {
+        const rawRefreshToken = req.cookies?.["refreshToken"] as string | undefined;
+        if (!rawRefreshToken) throw new HttpError(401, "No autenticado");
+
+        const { user, rawRefreshToken: newRawToken } = await authService.refresh(rawRefreshToken);
+        const token = signToken({ userId: user.id });
+        res
+            .cookie("token", token, COOKIE_OPTS)
+            .cookie("refreshToken", newRawToken, REFRESH_COOKIE_OPTS)
+            .json({ message: "Token renovado", data: { id: user.id, email: user.email, name: user.name } });
     },
 
     async me(req: Request, res: Response) {
@@ -73,7 +101,9 @@ export const authController = {
     async updatePassword(req: Request, res: Response) {
         const { currentPassword, password } = req.body as { currentPassword: string; password: string };
         const result = await authService.updatePassword(req.userId!, currentPassword, password);
-        // Limpia la cookie del dispositivo actual; el JWT en otros dispositivos expira por su propio TTL
-        res.clearCookie("token").json(result);
+        res
+            .clearCookie("token")
+            .clearCookie("refreshToken", { path: "/api/v1/auth/refresh" })
+            .json(result);
     },
 };

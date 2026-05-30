@@ -173,7 +173,7 @@ describe("Auth API", () => {
             await createUser({ email: "login@example.com", password: "Test1234!", isVerified: true });
         });
 
-        it("200: login correcto devuelve datos de usuario y setea cookie", async () => {
+        it("200: login correcto devuelve datos de usuario y setea cookies de sesión", async () => {
             const res = await request(app)
                 .post(`${BASE}/login`)
                 .send({ email: "login@example.com", password: "Test1234!" });
@@ -184,7 +184,8 @@ describe("Auth API", () => {
 
             const cookies: string[] = res.headers["set-cookie"] as unknown as string[];
             expect(cookies).toBeDefined();
-            expect(cookies[0]).toMatch(/^token=/);
+            expect(cookies.some((c) => c.startsWith("token="))).toBe(true);
+            expect(cookies.some((c) => c.startsWith("refreshToken="))).toBe(true);
         });
 
         it("401: contraseña incorrecta", async () => {
@@ -232,7 +233,7 @@ describe("Auth API", () => {
 
     // -----------------------------------------------------------------------
     describe("POST /logout", () => {
-        it("200: limpia la cookie de sesión", async () => {
+        it("200: limpia las cookies de sesión", async () => {
             const user = await createUser();
             const cookie = getAuthCookie(user.id);
 
@@ -242,8 +243,8 @@ describe("Auth API", () => {
 
             expect(res.status).toBe(200);
             const cookies: string[] = res.headers["set-cookie"] as unknown as string[];
-            // Cookie borrada: valor vacío o Max-Age=0
-            expect(cookies[0]).toMatch(/token=;|token=$/);
+            const tokenCookie = cookies.find((c) => /^token=/.test(c));
+            expect(tokenCookie).toMatch(/token=;|Max-Age=0/);
         });
     });
 
@@ -437,7 +438,7 @@ describe("Auth API", () => {
             authCookie = getAuthCookie(user.id);
         });
 
-        it("200: cambia contraseña y limpia la cookie", async () => {
+        it("200: cambia contraseña y limpia las cookies de sesión", async () => {
             const res = await request(app)
                 .patch(`${BASE}/me/password`)
                 .set("Cookie", authCookie)
@@ -447,7 +448,8 @@ describe("Auth API", () => {
             expect(res.body.passwordChanged).toBe(true);
 
             const cookies: string[] = res.headers["set-cookie"] as unknown as string[];
-            expect(cookies[0]).toMatch(/token=;|token=$/);
+            const tokenCookie = cookies.find((c) => /^token=/.test(c));
+            expect(tokenCookie).toMatch(/token=;|Max-Age=0/);
         });
 
         it("403: contraseña actual incorrecta", async () => {
@@ -472,6 +474,59 @@ describe("Auth API", () => {
             const res = await request(app)
                 .patch(`${BASE}/me/password`)
                 .send({ currentPassword: "OldPass1234!", password: "NewPass5678!" });
+
+            expect(res.status).toBe(401);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("POST /refresh", () => {
+        let refreshCookieValue: string;
+
+        beforeAll(async () => {
+            await createUser({ email: "refresh@example.com", password: "Test1234!", isVerified: true });
+
+            const loginRes = await request(app)
+                .post(`${BASE}/login`)
+                .send({ email: "refresh@example.com", password: "Test1234!" });
+
+            const setCookieHeader = loginRes.headers["set-cookie"] as unknown as string[];
+            const raw = setCookieHeader.find((c) => c.startsWith("refreshToken="));
+            // Extrae solo el valor (sin atributos del cookie como Path, HttpOnly, etc.)
+            refreshCookieValue = raw?.split(";")[0] ?? "";
+        });
+
+        it("200: renueva el access token y rota el refresh token", async () => {
+            const res = await request(app)
+                .post(`${BASE}/refresh`)
+                .set("Cookie", refreshCookieValue);
+
+            expect(res.status).toBe(200);
+            expect(res.body.message).toBe("Token renovado");
+            expect(res.body.data).toMatchObject({ email: "refresh@example.com" });
+
+            const cookies: string[] = res.headers["set-cookie"] as unknown as string[];
+            expect(cookies.some((c) => c.startsWith("token=") && !c.includes("token=;"))).toBe(true);
+            expect(cookies.some((c) => c.startsWith("refreshToken=") && !c.includes("refreshToken=;"))).toBe(true);
+        });
+
+        it("401: el refresh token anterior ya no es válido después de la rotación", async () => {
+            const res = await request(app)
+                .post(`${BASE}/refresh`)
+                .set("Cookie", refreshCookieValue); // token ya fue rotado arriba
+
+            expect(res.status).toBe(401);
+        });
+
+        it("401: sin cookie de refresh", async () => {
+            const res = await request(app).post(`${BASE}/refresh`);
+            expect(res.status).toBe(401);
+        });
+
+        it("401: refresh token inválido", async () => {
+            const res = await request(app)
+                .post(`${BASE}/refresh`)
+                .set("Cookie", "refreshToken=token-falso-abc123");
 
             expect(res.status).toBe(401);
         });
