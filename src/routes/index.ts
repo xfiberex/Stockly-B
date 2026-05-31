@@ -4,6 +4,8 @@ import { authRouter } from "@/modules/auth";
 import { categoriesRouter } from "@/modules/categories";
 import { brandsRouter } from "@/modules/brands";
 import { suppliersRouter } from "@/modules/suppliers";
+import { purchaseOrdersRouter } from "@/modules/purchase-orders";
+import { reportsRouter } from "@/modules/reports";
 
 export const router = Router();
 
@@ -16,3 +18,5 @@ router.use("/products", productRouter);
 router.use("/categories", categoriesRouter);
 router.use("/brands", brandsRouter);
 router.use("/suppliers", suppliersRouter);
+router.use("/purchase-orders", purchaseOrdersRouter);
+router.use("/reports", reportsRouter);

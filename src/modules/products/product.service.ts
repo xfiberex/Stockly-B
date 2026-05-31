@@ -1,9 +1,16 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
-import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, StockMovementType } from "@/modules/products/product.types";
+import type {
+    CreateProductDto,
+    UpdateProductDto,
+    ProductQuery,
+    ImportProductDto,
+    StockMovementType,
+    CreateManualMovementDto,
+    BulkStockDto,
+} from "@/modules/products/product.types";
 
-// Incluye categoría, marca y proveedor en todas las consultas de productos
 const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true } },
     brand: { select: { id: true, name: true } },
@@ -70,13 +77,16 @@ export const productService = {
         }
 
         const stock = dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0;
+        const minStock = dto.minStock !== undefined ? parseInt(String(dto.minStock), 10) : 0;
 
         const product = await prisma.product.create({
             data: {
                 name: dto.name,
                 description: dto.description,
+                sku: dto.sku || null,
                 price: dto.price !== undefined ? parseFloat(String(dto.price)) : 0,
                 stock,
+                minStock,
                 categoryId: dto.categoryId ?? null,
                 brandId: dto.brandId ?? null,
                 supplierId: dto.supplierId ?? null,
@@ -109,13 +119,19 @@ export const productService = {
             imagePublicId = null;
         }
 
+        const newPrice = dto.price !== undefined ? parseFloat(String(dto.price)) : undefined;
+        const existingPrice = parseFloat(String(existing.price));
+        const priceChanged = newPrice !== undefined && newPrice !== existingPrice;
+
         const updated = await prisma.product.update({
             where: { id },
             data: {
                 ...(dto.name !== undefined && { name: dto.name }),
                 ...(dto.description !== undefined && { description: dto.description }),
-                ...(dto.price !== undefined && { price: parseFloat(String(dto.price)) }),
+                ...(dto.sku !== undefined && { sku: dto.sku || null }),
+                ...(newPrice !== undefined && { price: newPrice }),
                 ...(dto.stock !== undefined && { stock: parseInt(String(dto.stock), 10) }),
+                ...(dto.minStock !== undefined && { minStock: parseInt(String(dto.minStock), 10) }),
                 ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
                 ...(dto.brandId !== undefined && { brandId: dto.brandId }),
                 ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
@@ -124,6 +140,16 @@ export const productService = {
             },
             include: PRODUCT_INCLUDE,
         });
+
+        if (priceChanged) {
+            await prisma.priceHistory.create({
+                data: {
+                    productId: id,
+                    oldPrice: existingPrice,
+                    newPrice: newPrice!,
+                },
+            });
+        }
 
         if (dto.stock !== undefined) {
             const newStock = parseInt(String(dto.stock), 10);
@@ -161,8 +187,10 @@ export const productService = {
             select: {
                 name: true,
                 description: true,
+                sku: true,
                 price: true,
                 stock: true,
+                minStock: true,
                 isActive: true,
                 category: { select: { name: true } },
                 brand: { select: { name: true } },
@@ -170,12 +198,13 @@ export const productService = {
             },
         });
 
-        // Aplanar las relaciones para compatibilidad con importaciones CSV/JSON
         return products.map((p) => ({
             name: p.name,
             description: p.description,
+            sku: p.sku,
             price: p.price,
             stock: p.stock,
+            minStock: p.minStock,
             isActive: p.isActive,
             categoryName: p.category?.name ?? null,
             brandName: p.brand?.name ?? null,
@@ -188,7 +217,6 @@ export const productService = {
         const errors: Array<{ row: number; error: string }> = [];
         let created = 0;
 
-        // Precarga todas las categorías y marcas para evitar N+1 en el bucle
         const [categories, brands] = await Promise.all([
             prisma.category.findMany({ select: { id: true, name: true } }),
             prisma.brand.findMany({ select: { id: true, name: true } }),
@@ -243,5 +271,84 @@ export const productService = {
         });
 
         return { product, movements };
+    },
+
+    async createManualMovement(productId: string, dto: CreateManualMovementDto) {
+        const product = await prisma.product.findUnique({ where: { id: productId } });
+        if (!product) throw new HttpError(404, "Producto no encontrado");
+        if (!product.isActive) throw new HttpError(400, "No se puede registrar movimientos en un producto inactivo");
+
+        let delta: number;
+        let newStock: number;
+
+        if (dto.type === "ADJUSTMENT") {
+            // quantity es el stock objetivo en ajustes
+            newStock = dto.quantity;
+            delta = newStock - product.stock;
+        } else if (dto.type === "OUT") {
+            delta = -dto.quantity;
+            newStock = product.stock + delta;
+            if (newStock < 0) throw new HttpError(400, "El stock no puede quedar negativo");
+        } else {
+            delta = dto.quantity;
+            newStock = product.stock + delta;
+        }
+
+        const note = dto.note ? `${dto.reason} — ${dto.note}` : dto.reason;
+
+        await prisma.$transaction([
+            prisma.product.update({ where: { id: productId }, data: { stock: newStock } }),
+            prisma.stockMovement.create({
+                data: { productId, type: dto.type, delta, stockAfter: newStock, note },
+            }),
+        ]);
+
+        return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
+    },
+
+    async bulkUpdateStock(dto: BulkStockDto) {
+        const results: Array<{ productId: string; success: boolean; error?: string }> = [];
+
+        await Promise.all(
+            dto.items.map(async ({ productId, stock }) => {
+                try {
+                    const product = await prisma.product.findUnique({ where: { id: productId } });
+                    if (!product) {
+                        results.push({ productId, success: false, error: "Producto no encontrado" });
+                        return;
+                    }
+
+                    const delta = stock - product.stock;
+                    const type: StockMovementType = delta >= 0 ? "ADJUSTMENT" : "ADJUSTMENT";
+                    const note = dto.reason ?? "Ajuste masivo de inventario";
+
+                    await prisma.$transaction([
+                        prisma.product.update({ where: { id: productId }, data: { stock } }),
+                        prisma.stockMovement.create({
+                            data: { productId, type, delta, stockAfter: stock, note },
+                        }),
+                    ]);
+
+                    results.push({ productId, success: true });
+                } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : "Error desconocido";
+                    results.push({ productId, success: false, error: message });
+                }
+            }),
+        );
+
+        return results;
+    },
+
+    async getPriceHistory(productId: string) {
+        const product = await prisma.product.findUnique({ where: { id: productId } });
+        if (!product) throw new HttpError(404, "Producto no encontrado");
+
+        const history = await prisma.priceHistory.findMany({
+            where: { productId },
+            orderBy: { createdAt: "asc" },
+        });
+
+        return { product, history };
     },
 };

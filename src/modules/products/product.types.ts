@@ -1,8 +1,10 @@
 export interface CreateProductDto {
     name: string;
     description?: string;
+    sku?: string;
     price: number;
     stock?: number;
+    minStock?: number;
     categoryId?: string;
     brandId?: string;
     supplierId?: string;
@@ -11,8 +13,10 @@ export interface CreateProductDto {
 export interface UpdateProductDto {
     name?: string;
     description?: string;
+    sku?: string;
     price?: number;
     stock?: number;
+    minStock?: number;
     categoryId?: string;
     brandId?: string;
     supplierId?: string;
@@ -29,7 +33,6 @@ export interface ProductQuery {
     isActive?: string;
 }
 
-// Formato plano aceptado en importaciones masivas (usa nombres, no UUIDs)
 export interface ImportProductDto {
     name: string;
     description?: string;
@@ -55,4 +58,16 @@ export interface StockMovement {
     stockAfter: number;
     note?: string | null;
     createdAt: string;
+}
+
+export interface CreateManualMovementDto {
+    type: "IN" | "OUT" | "ADJUSTMENT";
+    quantity: number;
+    reason: string;
+    note?: string;
+}
+
+export interface BulkStockDto {
+    items: Array<{ productId: string; stock: number }>;
+    reason?: string;
 }

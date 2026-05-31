@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
-import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto } from "@/modules/products/product.types";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
 export async function getProducts(
     req: Request<{}, {}, {}, ProductQuery>,
@@ -114,6 +114,45 @@ export async function importProducts(
     try {
         const result = await productService.importBulk(req.body.products);
         res.status(201).json({ success: true, message: `${result.created} productos importados`, data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function createManualMovement(
+    req: Request<{ id: string }, {}, CreateManualMovementDto>,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const product = await productService.createManualMovement(req.params.id, req.body);
+        res.status(201).json({ success: true, message: "Movimiento registrado correctamente", data: product });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function bulkUpdateStock(
+    req: Request<{}, {}, BulkStockDto>,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const results = await productService.bulkUpdateStock(req.body);
+        res.json({ success: true, message: "Ajuste masivo completado", data: results });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getPriceHistory(
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+): Promise<void> {
+    try {
+        const result = await productService.getPriceHistory(req.params.id);
+        res.json({ success: true, message: "Historial de precios obtenido", data: result });
     } catch (error) {
         next(error);
     }

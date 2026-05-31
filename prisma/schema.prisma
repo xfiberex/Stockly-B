@@ -35,14 +35,15 @@ model Brand {
 }
 
 model Supplier {
-  id        String    @id @default(uuid())
-  name      String
-  email     String?   @unique
-  phone     String?
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  products  Product[]
+  id             String          @id @default(uuid())
+  name           String
+  email          String?         @unique
+  phone          String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
 
   @@map("suppliers")
 }
@@ -51,8 +52,10 @@ model Product {
   id            String     @id @default(uuid())
   name          String
   description   String?
+  sku           String?    @unique
   price         Decimal    @db.Decimal(10, 2)
   stock         Int        @default(0)
+  minStock      Int        @default(0)
   categoryId    String?
   category      Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   brandId       String?
@@ -65,8 +68,48 @@ model Product {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   movements     StockMovement[]
+  priceHistory  PriceHistory[]
+  purchaseItems PurchaseOrderItem[]
 
   @@map("products")
+}
+
+model PriceHistory {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  oldPrice  Decimal  @db.Decimal(10, 2)
+  newPrice  Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@map("price_history")
+}
+
+model PurchaseOrder {
+  id         String              @id @default(uuid())
+  supplierId String?
+  supplier   Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  status     String              @default("PENDING")
+  notes      String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  items      PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName     String
+  quantity        Int
+  unitPrice       Decimal       @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now())
+
+  @@map("purchase_order_items")
 }
 
 model StockMovement {
