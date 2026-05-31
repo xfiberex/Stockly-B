@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const VALID_CATEGORIES = ["Electrónica", "Periféricos", "Audio", "Accesorios", "Muebles", "Otros"] as const;
+const uuidOptional = z.string().uuid("Debe ser un UUID válido").optional();
 
 export const importProductsSchema = z.object({
     products: z
@@ -10,7 +10,9 @@ export const importProductsSchema = z.object({
                 description: z.string().trim().max(1000).optional(),
                 price: z.coerce.number().positive("El precio debe ser mayor a 0"),
                 stock: z.coerce.number().int().min(0).optional(),
-                category: z.enum(VALID_CATEGORIES, `Categoría inválida. Opciones: ${VALID_CATEGORIES.join(", ")}`),
+                // Acepta nombre de categoría/marca para importaciones amigables (se resuelve a ID en el servicio)
+                categoryName: z.string().trim().max(100).optional(),
+                brandName: z.string().trim().max(100).optional(),
                 isActive: z.boolean().optional(),
             }),
         )
@@ -21,10 +23,11 @@ export const importProductsSchema = z.object({
 export const createProductSchema = z.object({
     name: z.string().trim().min(1, "El nombre es obligatorio").max(200, "El nombre no puede superar 200 caracteres"),
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
-    // z.coerce convierte strings de FormData a números automáticamente
     price: z.coerce.number({ error: "El precio es obligatorio" }).positive("El precio debe ser mayor a 0"),
     stock: z.coerce.number().int("El stock debe ser un entero").min(0, "El stock debe ser mayor o igual a 0").optional(),
-    category: z.enum(VALID_CATEGORIES, `Categoría inválida. Opciones: ${VALID_CATEGORIES.join(", ")}`),
+    categoryId: uuidOptional,
+    brandId: uuidOptional,
+    supplierId: uuidOptional,
 });
 
 export const updateProductSchema = z.object({
@@ -32,7 +35,9 @@ export const updateProductSchema = z.object({
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
     price: z.coerce.number().positive("El precio debe ser mayor a 0").optional(),
     stock: z.coerce.number().int("El stock debe ser un entero").min(0, "El stock debe ser mayor o igual a 0").optional(),
-    category: z.enum(VALID_CATEGORIES, `Categoría inválida. Opciones: ${VALID_CATEGORIES.join(", ")}`).optional(),
+    categoryId: uuidOptional,
+    brandId: uuidOptional,
+    supplierId: uuidOptional,
     removeImage: z.string().optional(),
 });
 

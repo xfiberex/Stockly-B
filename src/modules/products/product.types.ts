@@ -3,7 +3,9 @@ export interface CreateProductDto {
     description?: string;
     price: number;
     stock?: number;
-    category: string;
+    categoryId?: string;
+    brandId?: string;
+    supplierId?: string;
 }
 
 export interface UpdateProductDto {
@@ -11,8 +13,9 @@ export interface UpdateProductDto {
     description?: string;
     price?: number;
     stock?: number;
-    category?: string;
-    image?: File;
+    categoryId?: string;
+    brandId?: string;
+    supplierId?: string;
     removeImage?: boolean;
 }
 
@@ -20,16 +23,20 @@ export interface ProductQuery {
     page?: string;
     limit?: string;
     search?: string;
-    category?: string;
+    categoryId?: string;
+    brandId?: string;
+    supplierId?: string;
     isActive?: string;
 }
 
+// Formato plano aceptado en importaciones masivas (usa nombres, no UUIDs)
 export interface ImportProductDto {
     name: string;
     description?: string;
     price: number;
     stock?: number;
-    category: string;
+    categoryName?: string;
+    brandName?: string;
     isActive?: boolean;
 }
 

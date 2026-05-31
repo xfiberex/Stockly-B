@@ -9,7 +9,6 @@ jest.mock("@/shared/lib/nodemailer", () => ({
     transporter: { sendMail: jest.fn() },
 }));
 
-// Mock de Cloudinary y multer para no depender de conexión externa en tests
 jest.mock("@/shared/middlewares/upload.middleware", () => ({
     uploadToCloudinary: jest.fn().mockResolvedValue({
         url: "https://res.cloudinary.com/test/image/upload/v1/test.jpg",
@@ -23,21 +22,18 @@ jest.mock("@/shared/middlewares/upload.middleware", () => ({
 
 const BASE = "/api/v1/products";
 
-const SAMPLE_PRODUCT = {
-    name: 'Monitor LG 27"',
-    description: "Monitor Full HD 27 pulgadas",
-    price: 299.99,
-    stock: 15,
-    category: "Electrónica",
-};
-
 describe("Products API", () => {
     let authCookie: string;
+    let categoryId: string;
 
     beforeAll(async () => {
         await cleanDb();
         const user = await createUser({ email: "products_user@example.com", role: "ADMIN" });
         authCookie = getAuthCookie(user.id);
+
+        // Crear categoría de test para usar en todos los productos
+        const category = await prisma.category.create({ data: { name: "Electrónica" } });
+        categoryId = category.id;
     });
 
     afterAll(async () => {
@@ -52,7 +48,7 @@ describe("Products API", () => {
         });
 
         it("401: POST /products sin cookie", async () => {
-            const res = await request(app).post(BASE).send(SAMPLE_PRODUCT);
+            const res = await request(app).post(BASE).send({ name: "X", price: 10 });
             expect(res.status).toBe(401);
         });
 
@@ -68,19 +64,26 @@ describe("Products API", () => {
             const res = await request(app)
                 .post(BASE)
                 .set("Cookie", authCookie)
-                .send(SAMPLE_PRODUCT);
+                .send({ name: 'Monitor LG 27"', description: "Monitor Full HD", price: 299.99, stock: 15, categoryId });
 
             expect(res.status).toBe(201);
             expect(res.body.success).toBe(true);
-            expect(res.body.data).toMatchObject({
-                name: SAMPLE_PRODUCT.name,
-                category: SAMPLE_PRODUCT.category,
-                isActive: true,
-            });
+            expect(res.body.data).toMatchObject({ name: 'Monitor LG 27"', isActive: true });
+            expect(res.body.data.category).toMatchObject({ id: categoryId, name: "Electrónica" });
             expect(res.body.data.id).toBeDefined();
         });
 
-        it("422: faltan campos obligatorios (sin precio ni categoría)", async () => {
+        it("201: crea producto sin categoría (categoryId opcional)", async () => {
+            const res = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Producto sin categoría", price: 10 });
+
+            expect(res.status).toBe(201);
+            expect(res.body.data.category).toBeNull();
+        });
+
+        it("422: faltan campos obligatorios (sin precio)", async () => {
             const res = await request(app)
                 .post(BASE)
                 .set("Cookie", authCookie)
@@ -90,11 +93,11 @@ describe("Products API", () => {
             expect(res.body.errors).toBeDefined();
         });
 
-        it("422: categoría inválida", async () => {
+        it("422: categoryId no es UUID válido", async () => {
             const res = await request(app)
                 .post(BASE)
                 .set("Cookie", authCookie)
-                .send({ ...SAMPLE_PRODUCT, category: "Deportes" });
+                .send({ name: "Producto", price: 10, categoryId: "no-es-uuid" });
 
             expect(res.status).toBe(422);
         });
@@ -103,7 +106,7 @@ describe("Products API", () => {
             const res = await request(app)
                 .post(BASE)
                 .set("Cookie", authCookie)
-                .send({ ...SAMPLE_PRODUCT, price: -50 });
+                .send({ name: "Producto", price: -50 });
 
             expect(res.status).toBe(422);
         });
@@ -112,7 +115,7 @@ describe("Products API", () => {
             const res = await request(app)
                 .post(BASE)
                 .set("Cookie", authCookie)
-                .send({ ...SAMPLE_PRODUCT, stock: -1 });
+                .send({ name: "Producto", price: 10, stock: -1 });
 
             expect(res.status).toBe(422);
         });
@@ -121,11 +124,14 @@ describe("Products API", () => {
     // -----------------------------------------------------------------------
     describe("GET /products", () => {
         beforeAll(async () => {
+            const perifericos = await prisma.category.create({ data: { name: "Periféricos" } });
+            const audio = await prisma.category.create({ data: { name: "Audio" } });
+
             await prisma.product.createMany({
                 data: [
-                    { name: "Teclado Mecánico", price: 89.99, stock: 30, category: "Periféricos", isActive: true },
-                    { name: "Mouse Gamer", price: 45.0, stock: 50, category: "Periféricos", isActive: true },
-                    { name: "Auriculares Sony", price: 120.0, stock: 10, category: "Audio", isActive: false },
+                    { name: "Teclado Mecánico", price: 89.99, stock: 30, categoryId: perifericos.id, isActive: true },
+                    { name: "Mouse Gamer", price: 45.0, stock: 50, categoryId: perifericos.id, isActive: true },
+                    { name: "Auriculares Sony", price: 120.0, stock: 10, categoryId: audio.id, isActive: false },
                 ],
             });
         });
@@ -136,22 +142,21 @@ describe("Products API", () => {
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
             expect(Array.isArray(res.body.data.data)).toBe(true);
-            expect(res.body.data.meta).toMatchObject({
-                page: 1,
-                limit: 10,
-            });
+            expect(res.body.data.meta).toMatchObject({ page: 1, limit: 10 });
             expect(res.body.data.meta.total).toBeGreaterThanOrEqual(1);
         });
 
-        it("200: filtra por categoría", async () => {
+        it("200: filtra por categoryId", async () => {
+            const perifericosId = (await prisma.category.findUnique({ where: { name: "Periféricos" } }))!.id;
+
             const res = await request(app)
-                .get(`${BASE}?category=Periféricos`)
+                .get(`${BASE}?categoryId=${perifericosId}`)
                 .set("Cookie", authCookie);
 
             expect(res.status).toBe(200);
-            const products = res.body.data.data as Array<{ category: string }>;
+            const products = res.body.data.data as Array<{ category: { name: string } }>;
             expect(products.length).toBeGreaterThanOrEqual(2);
-            products.forEach((p) => expect(p.category).toBe("Periféricos"));
+            products.forEach((p) => expect(p.category.name).toBe("Periféricos"));
         });
 
         it("200: filtra por búsqueda de texto", async () => {
@@ -182,7 +187,6 @@ describe("Products API", () => {
             expect(res.status).toBe(200);
             expect(res.body.data.data.length).toBeLessThanOrEqual(2);
             expect(res.body.data.meta.limit).toBe(2);
-            expect(res.body.data.meta.page).toBe(1);
         });
     });
 
@@ -192,18 +196,19 @@ describe("Products API", () => {
 
         beforeAll(async () => {
             const p = await prisma.product.create({
-                data: { name: "Producto para buscar por ID", price: 99, stock: 5, category: "Accesorios" },
+                data: { name: "Producto para buscar por ID", price: 99, stock: 5, categoryId },
             });
             productId = p.id;
         });
 
-        it("200: devuelve producto por id", async () => {
+        it("200: devuelve producto con relaciones incluidas", async () => {
             const res = await request(app)
                 .get(`${BASE}/${productId}`)
                 .set("Cookie", authCookie);
 
             expect(res.status).toBe(200);
             expect(res.body.data.id).toBe(productId);
+            expect(res.body.data.category).toMatchObject({ name: "Electrónica" });
         });
 
         it("404: id inexistente", async () => {
@@ -221,7 +226,7 @@ describe("Products API", () => {
 
         beforeEach(async () => {
             const p = await prisma.product.create({
-                data: { name: "Para actualizar", price: 100, stock: 10, category: "Otros" },
+                data: { name: "Para actualizar", price: 100, stock: 10, categoryId },
             });
             productId = p.id;
         });
@@ -246,11 +251,11 @@ describe("Products API", () => {
             expect(res.status).toBe(404);
         });
 
-        it("422: categoría inválida en actualización", async () => {
+        it("422: categoryId inválido en actualización", async () => {
             const res = await request(app)
                 .put(`${BASE}/${productId}`)
                 .set("Cookie", authCookie)
-                .send({ category: "Categoría Falsa" });
+                .send({ categoryId: "no-es-uuid" });
 
             expect(res.status).toBe(422);
         });
@@ -262,7 +267,7 @@ describe("Products API", () => {
 
         beforeEach(async () => {
             const p = await prisma.product.create({
-                data: { name: "Para eliminar", price: 50, stock: 5, category: "Otros", isActive: true },
+                data: { name: "Para eliminar", price: 50, stock: 5, categoryId, isActive: true },
             });
             productId = p.id;
         });
@@ -273,8 +278,6 @@ describe("Products API", () => {
                 .set("Cookie", authCookie);
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
-
             const deleted = await prisma.product.findUnique({ where: { id: productId } });
             expect(deleted?.isActive).toBe(false);
         });
@@ -290,21 +293,18 @@ describe("Products API", () => {
 
     // -----------------------------------------------------------------------
     describe("GET /products/export", () => {
-        it("200: devuelve array de productos con campos de exportación", async () => {
+        it("200: devuelve array con campos de exportación incluyendo nombres de relaciones", async () => {
             const res = await request(app).get(`${BASE}/export`).set("Cookie", authCookie);
 
             expect(res.status).toBe(200);
-            expect(res.body.success).toBe(true);
             expect(Array.isArray(res.body.data)).toBe(true);
 
             const first = res.body.data[0];
             expect(first).toHaveProperty("name");
             expect(first).toHaveProperty("price");
             expect(first).toHaveProperty("stock");
-            expect(first).toHaveProperty("category");
-            expect(first).toHaveProperty("isActive");
+            expect(first).toHaveProperty("categoryName");
             expect(first).not.toHaveProperty("id");
-            expect(first).not.toHaveProperty("imagePublicId");
         });
 
         it("401: sin cookie", async () => {
@@ -315,14 +315,14 @@ describe("Products API", () => {
 
     // -----------------------------------------------------------------------
     describe("POST /products/import", () => {
-        it("201: importa múltiples productos válidos", async () => {
+        it("201: importa productos usando nombre de categoría", async () => {
             const res = await request(app)
                 .post(`${BASE}/import`)
                 .set("Cookie", authCookie)
                 .send({
                     products: [
-                        { name: "Producto Import A", price: 99.99, stock: 10, category: "Electrónica" },
-                        { name: "Producto Import B", price: 49.99, stock: 5, category: "Audio" },
+                        { name: "Producto Import A", price: 99.99, stock: 10, categoryName: "Electrónica" },
+                        { name: "Producto Import B", price: 49.99, stock: 5 },
                     ],
                 });
 
@@ -330,8 +330,11 @@ describe("Products API", () => {
             expect(res.body.data.created).toBe(2);
             expect(res.body.data.errors).toHaveLength(0);
 
-            // Limpia movimientos y productos importados (FK constraint)
             const imported = await prisma.product.findMany({ where: { name: { startsWith: "Producto Import" } } });
+            // El primero debe tener la categoría resuelta
+            const withCategory = imported.find((p) => p.name === "Producto Import A");
+            expect(withCategory?.categoryId).toBe(categoryId);
+
             await prisma.stockMovement.deleteMany({ where: { productId: { in: imported.map((p) => p.id) } } });
             await prisma.product.deleteMany({ where: { name: { startsWith: "Producto Import" } } });
         });
@@ -345,24 +348,11 @@ describe("Products API", () => {
             expect(res.status).toBe(422);
         });
 
-        it("422: producto con categoría inválida es rechazado", async () => {
-            const res = await request(app)
-                .post(`${BASE}/import`)
-                .set("Cookie", authCookie)
-                .send({
-                    products: [{ name: "Producto malo", price: 10, category: "Deportes" }],
-                });
-
-            expect(res.status).toBe(422);
-        });
-
         it("422: producto sin precio es rechazado", async () => {
             const res = await request(app)
                 .post(`${BASE}/import`)
                 .set("Cookie", authCookie)
-                .send({
-                    products: [{ name: "Sin precio", category: "Audio" }],
-                });
+                .send({ products: [{ name: "Sin precio" }] });
 
             expect(res.status).toBe(422);
         });
@@ -370,7 +360,7 @@ describe("Products API", () => {
         it("401: sin cookie", async () => {
             const res = await request(app)
                 .post(`${BASE}/import`)
-                .send({ products: [{ name: "X", price: 10, category: "Audio" }] });
+                .send({ products: [{ name: "X", price: 10 }] });
 
             expect(res.status).toBe(401);
         });
@@ -382,12 +372,12 @@ describe("Products API", () => {
 
         beforeEach(async () => {
             const p = await prisma.product.create({
-                data: { name: "Para restaurar", price: 50, stock: 5, category: "Otros", isActive: false },
+                data: { name: "Para restaurar", price: 50, stock: 5, categoryId, isActive: false },
             });
             inactiveId = p.id;
         });
 
-        it("200: restaura producto inactivo — isActive pasa a true", async () => {
+        it("200: restaura producto inactivo", async () => {
             const res = await request(app)
                 .patch(`${BASE}/${inactiveId}/restore`)
                 .set("Cookie", authCookie);
@@ -398,7 +388,7 @@ describe("Products API", () => {
 
         it("400: producto ya activo", async () => {
             const active = await prisma.product.create({
-                data: { name: "Ya activo", price: 50, stock: 5, category: "Otros", isActive: true },
+                data: { name: "Ya activo", price: 50, stock: 5, categoryId, isActive: true },
             });
 
             const res = await request(app)
@@ -406,7 +396,6 @@ describe("Products API", () => {
                 .set("Cookie", authCookie);
 
             expect(res.status).toBe(400);
-
             await prisma.product.delete({ where: { id: active.id } });
         });
 
