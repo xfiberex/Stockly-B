@@ -1,6 +1,8 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
+import { settingsService } from "@/modules/settings/settings.service";
+import { sendLowStockAlertEmail } from "@/shared/lib/nodemailer";
 import type {
     CreateProductDto,
     UpdateProductDto,
@@ -15,6 +17,7 @@ const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true } },
     brand: { select: { id: true, name: true } },
     supplier: { select: { id: true, name: true } },
+    tags: { select: { id: true, name: true, color: true } },
 } as const;
 
 async function recordMovement(
@@ -28,6 +31,23 @@ async function recordMovement(
     await prisma.stockMovement.create({
         data: { productId, type, delta, stockAfter, note },
     });
+}
+
+async function checkLowStockAlert(productId: string, productName: string, newStock: number, minStock: number) {
+    if (newStock > minStock) return;
+    const enabled = await settingsService.get("lowStockAlertEnabled");
+    if (!enabled) return;
+
+    const admins = await prisma.user.findMany({
+        where: { role: "ADMIN", isActive: true, isVerified: true },
+        select: { email: true, name: true },
+    });
+
+    await Promise.allSettled(
+        admins.map((admin) =>
+            sendLowStockAlertEmail(admin.email, admin.name, productName, newStock, minStock),
+        ),
+    );
 }
 
 export const productService = {
@@ -47,6 +67,7 @@ export const productService = {
             ...(query.categoryId && { categoryId: query.categoryId }),
             ...(query.brandId && { brandId: query.brandId }),
             ...(query.supplierId && { supplierId: query.supplierId }),
+            ...(query.tagId && { tags: { some: { id: query.tagId } } }),
         };
 
         const [products, total] = await prisma.$transaction([
@@ -92,6 +113,7 @@ export const productService = {
                 supplierId: dto.supplierId ?? null,
                 imageUrl,
                 imagePublicId,
+                ...(dto.tagIds?.length && { tags: { connect: dto.tagIds.map((id) => ({ id })) } }),
             },
             include: PRODUCT_INCLUDE,
         });
@@ -123,6 +145,10 @@ export const productService = {
         const existingPrice = parseFloat(String(existing.price));
         const priceChanged = newPrice !== undefined && newPrice !== existingPrice;
 
+        const tagsUpdate = dto.tagIds !== undefined
+            ? { tags: { set: dto.tagIds.map((tid) => ({ id: tid })) } }
+            : {};
+
         const updated = await prisma.product.update({
             where: { id },
             data: {
@@ -137,6 +163,7 @@ export const productService = {
                 ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
                 imageUrl,
                 imagePublicId,
+                ...tagsUpdate,
             },
             include: PRODUCT_INCLUDE,
         });
@@ -156,6 +183,10 @@ export const productService = {
             const delta = newStock - existing.stock;
             const type = delta >= 0 ? "IN" : "OUT";
             await recordMovement(id, type, delta, newStock, "Ajuste manual");
+
+            if (delta < 0) {
+                await checkLowStockAlert(id, updated.name, newStock, updated.minStock);
+            }
         }
 
         return updated;
@@ -195,6 +226,7 @@ export const productService = {
                 category: { select: { name: true } },
                 brand: { select: { name: true } },
                 supplier: { select: { name: true } },
+                tags: { select: { name: true } },
             },
         });
 
@@ -209,6 +241,7 @@ export const productService = {
             categoryName: p.category?.name ?? null,
             brandName: p.brand?.name ?? null,
             supplierName: p.supplier?.name ?? null,
+            tags: p.tags.map((t) => t.name).join(";"),
         }));
     },
 
@@ -273,6 +306,26 @@ export const productService = {
         return { product, movements };
     },
 
+    async exportMovements(productId: string) {
+        const product = await prisma.product.findUnique({ where: { id: productId } });
+        if (!product) throw new HttpError(404, "Producto no encontrado");
+
+        const movements = await prisma.stockMovement.findMany({
+            where: { productId },
+            orderBy: { createdAt: "asc" },
+        });
+
+        return movements.map((m) => ({
+            productName: product.name,
+            sku: product.sku ?? "",
+            type: m.type,
+            delta: m.delta,
+            stockAfter: m.stockAfter,
+            note: m.note ?? "",
+            createdAt: m.createdAt.toISOString(),
+        }));
+    },
+
     async createManualMovement(productId: string, dto: CreateManualMovementDto) {
         const product = await prisma.product.findUnique({ where: { id: productId } });
         if (!product) throw new HttpError(404, "Producto no encontrado");
@@ -282,7 +335,6 @@ export const productService = {
         let newStock: number;
 
         if (dto.type === "ADJUSTMENT") {
-            // quantity es el stock objetivo en ajustes
             newStock = dto.quantity;
             delta = newStock - product.stock;
         } else if (dto.type === "OUT") {
@@ -303,6 +355,10 @@ export const productService = {
             }),
         ]);
 
+        if (delta < 0) {
+            await checkLowStockAlert(productId, product.name, newStock, product.minStock);
+        }
+
         return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
     },
 
@@ -319,15 +375,18 @@ export const productService = {
                     }
 
                     const delta = stock - product.stock;
-                    const type: StockMovementType = delta >= 0 ? "ADJUSTMENT" : "ADJUSTMENT";
                     const note = dto.reason ?? "Ajuste masivo de inventario";
 
                     await prisma.$transaction([
                         prisma.product.update({ where: { id: productId }, data: { stock } }),
                         prisma.stockMovement.create({
-                            data: { productId, type, delta, stockAfter: stock, note },
+                            data: { productId, type: "ADJUSTMENT", delta, stockAfter: stock, note },
                         }),
                     ]);
+
+                    if (delta < 0) {
+                        await checkLowStockAlert(productId, product.name, stock, product.minStock);
+                    }
 
                     results.push({ productId, success: true });
                 } catch (err: unknown) {

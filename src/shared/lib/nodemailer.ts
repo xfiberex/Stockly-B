@@ -47,3 +47,42 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
         `,
     });
 }
+
+export async function sendLowStockAlertEmail(
+    to: string,
+    adminName: string,
+    productName: string,
+    currentStock: number,
+    minStock: number,
+) {
+    const safeAdmin = escapeHtml(adminName);
+    const safeProduct = escapeHtml(productName);
+    await transporter.sendMail({
+        from: env.smtp.from,
+        to,
+        subject: `⚠️ Alerta de bajo stock: ${safeProduct} — Stockly`,
+        html: `
+            <p>Hola ${safeAdmin},</p>
+            <p>El producto <strong>${safeProduct}</strong> ha alcanzado un nivel de stock bajo.</p>
+            <table style="border-collapse:collapse;margin-top:12px;">
+                <tr>
+                    <td style="padding:4px 12px 4px 0;color:#555;">Stock actual:</td>
+                    <td style="padding:4px 0;font-weight:bold;color:#e53e3e;">${currentStock}</td>
+                </tr>
+                <tr>
+                    <td style="padding:4px 12px 4px 0;color:#555;">Stock mínimo:</td>
+                    <td style="padding:4px 0;">${minStock}</td>
+                </tr>
+            </table>
+            <p style="margin-top:16px;">
+                <a href="${env.frontendUrl}/products" target="_blank"
+                   style="background:#3182ce;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">
+                    Ver productos
+                </a>
+            </p>
+            <p style="margin-top:16px;color:#888;font-size:12px;">
+                Puedes desactivar estas alertas en la sección <strong>Configuración</strong> de Stockly.
+            </p>
+        `,
+    });
+}

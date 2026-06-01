@@ -16,6 +16,7 @@ API REST modular para el sistema de gestión de inventario Stockly.
 | Subida de imágenes | Cloudinary + Multer |
 | Correo | Nodemailer (SMTP) |
 | Validación | Zod 4 |
+| PDFs | PDFKit 0.18 |
 | Documentación | Swagger UI (`/api-docs`) |
 | Tests | Jest + Supertest |
 | Package manager | PNPM 11+ |
@@ -38,12 +39,17 @@ Stockly-B/
     │   ├── auth/               # Registro, login, logout, JWT, perfil, contraseña, verificación
     │   ├── brands/             # CRUD de marcas
     │   ├── categories/         # CRUD de categorías
-    │   ├── products/           # CRUD de productos, movimientos de stock, importación CSV
+    │   ├── products/           # CRUD de productos, movimientos de stock, exportación CSV
     │   ├── purchase-orders/    # Órdenes de compra (PENDING → RECEIVED / CANCELLED)
-    │   ├── reports/            # KPIs y datos agregados para dashboards
+    │   ├── sale-orders/        # Órdenes de venta (PENDING → SHIPPED / CANCELLED)
+    │   ├── tags/               # Etiquetas de productos (many-to-many)
+    │   ├── users/              # Panel admin: listar, cambiar rol, activar/desactivar
+    │   ├── settings/           # Configuración de la app (key-value)
+    │   ├── audit-logs/         # Registro de auditoría de acciones
+    │   ├── reports/            # KPIs, métricas de rotación, exportación PDF
     │   └── suppliers/          # CRUD de proveedores
     ├── shared/
-    │   ├── lib/                # Prisma, JWT, bcrypt, Cloudinary, Nodemailer, tokens
+    │   ├── lib/                # Prisma, JWT, bcrypt, Cloudinary, Nodemailer, CSV, tokens
     │   └── middlewares/        # auth, validate, error, upload, rateLimiter
     ├── routes/
     │   └── index.ts            # Montaje central de todos los módulos
@@ -57,15 +63,20 @@ Stockly-B/
 
 | Modelo | Descripción |
 |---|---|
-| `User` | Usuarios con roles `ADMIN` / `USER`, tokens de verificación, reset y refresh |
-| `Product` | Producto con SKU, precio, stock, stock mínimo, imagen, categoría, marca, proveedor |
+| `User` | Usuarios con roles `ADMIN` / `USER`, `isActive`, tokens de verificación, reset y refresh |
+| `Product` | Producto con SKU, precio, stock, stock mínimo, imagen, categoría, marca, proveedor, etiquetas |
 | `Category` | Categoría de producto |
 | `Brand` | Marca de producto |
 | `Supplier` | Proveedor |
+| `Tag` | Etiqueta de producto (relación many-to-many con Product) |
 | `StockMovement` | Historial de movimientos (`IN`, `OUT`, `ADJUSTMENT`, `IMPORT`) |
 | `PriceHistory` | Registro automático de cambios de precio |
 | `PurchaseOrder` | Orden de compra con ítems y estado |
 | `PurchaseOrderItem` | Ítem de una orden de compra |
+| `SaleOrder` | Orden de venta con ítems y estado |
+| `SaleOrderItem` | Ítem de una orden de venta |
+| `AppSetting` | Configuración clave-valor de la aplicación |
+| `AuditLog` | Registro de auditoría de acciones del sistema |
 
 ---
 
@@ -140,15 +151,82 @@ La documentación interactiva completa está en `http://localhost:3000/api-docs`
 
 | Método | Ruta | Descripción | Rol |
 |---|---|---|---|
-| `GET` | `/` | Listar (paginado, filtros, búsqueda) | USER+ |
+| `GET` | `/` | Listar (paginado, filtros: búsqueda, categoría, tag, estado) | USER+ |
 | `GET` | `/:id` | Obtener por ID | USER+ |
-| `POST` | `/` | Crear producto (imagen opcional) | ADMIN |
+| `POST` | `/` | Crear producto (imagen + tags opcionales) | ADMIN |
 | `PUT` | `/:id` | Actualizar producto | ADMIN |
 | `DELETE` | `/:id` | Soft delete | ADMIN |
 | `PATCH` | `/:id/restore` | Restaurar producto | ADMIN |
 | `POST` | `/import` | Importación masiva por CSV | ADMIN |
+| `GET` | `/export` | Exportar todos como JSON (default) | USER+ |
+| `GET` | `/export?format=csv` | Exportar todos como CSV | USER+ |
+| `PATCH` | `/bulk-stock` | Ajuste masivo de stock | ADMIN |
 | `GET` | `/:id/movements` | Historial de movimientos | USER+ |
 | `POST` | `/:id/movements` | Registrar movimiento manual | ADMIN |
+| `GET` | `/:id/movements/export?format=csv` | Exportar movimientos como CSV | USER+ |
+| `GET` | `/:id/price-history` | Historial de precios | USER+ |
+
+### Etiquetas — `/api/tags`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar etiquetas | USER+ |
+| `GET` | `/:id` | Obtener etiqueta | USER+ |
+| `POST` | `/` | Crear etiqueta | ADMIN |
+| `PUT` | `/:id` | Actualizar etiqueta | ADMIN |
+| `DELETE` | `/:id` | Eliminar etiqueta | ADMIN |
+
+### Usuarios — `/api/users`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar usuarios (paginado, filtros) | ADMIN |
+| `PATCH` | `/:id/role` | Cambiar rol | ADMIN |
+| `PATCH` | `/:id/activate` | Activar usuario | ADMIN |
+| `PATCH` | `/:id/deactivate` | Desactivar usuario | ADMIN |
+
+### Configuración — `/api/settings`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Obtener todas las configuraciones | ADMIN |
+| `PATCH` | `/` | Actualizar configuraciones en lote | ADMIN |
+
+**Configuraciones disponibles:**
+
+| Clave | Tipo | Default | Descripción |
+|---|---|---|---|
+| `lowStockAlertEnabled` | boolean | `false` | Envía correo a admins cuando el stock baja del mínimo |
+
+### Auditoría — `/api/audit-logs`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar registros (paginado, filtros) | ADMIN |
+
+### Órdenes de venta — `/api/sale-orders`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar órdenes (paginado) | USER+ |
+| `POST` | `/` | Crear orden de venta | ADMIN |
+| `GET` | `/:id` | Ver detalle | USER+ |
+| `PATCH` | `/:id` | Actualizar (cambiar estado, campos cliente) | ADMIN |
+| `DELETE` | `/:id` | Eliminar orden PENDING | ADMIN |
+| `GET` | `/export?format=csv` | Exportar todas como CSV | ADMIN |
+
+> Al cambiar el estado a `SHIPPED`, el backend descuenta el stock de cada ítem y dispara alertas de bajo stock si corresponde.
+
+### Órdenes de compra — `/api/purchase-orders`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar órdenes | USER+ |
+| `POST` | `/` | Crear orden | ADMIN |
+| `GET` | `/:id` | Ver detalle | USER+ |
+| `PATCH` | `/:id` | Actualizar (estado, proveedor, notas) | ADMIN |
+| `DELETE` | `/:id` | Eliminar orden PENDING | ADMIN |
+| `GET` | `/export?format=csv` | Exportar todas como CSV | ADMIN |
 
 ### Categorías, Marcas, Proveedores
 
@@ -159,22 +237,12 @@ La documentación interactiva completa está en `http://localhost:3000/api-docs`
 | `PUT` | `.../:id` | ADMIN |
 | `DELETE` | `.../:id` | ADMIN |
 
-### Órdenes de compra — `/api/purchase-orders`
-
-| Método | Ruta | Descripción | Rol |
-|---|---|---|---|
-| `GET` | `/` | Listar órdenes | USER+ |
-| `POST` | `/` | Crear orden | ADMIN |
-| `GET` | `/:id` | Ver detalle | USER+ |
-| `PATCH` | `/:id/receive` | Marcar como recibida (actualiza stock) | ADMIN |
-| `PATCH` | `/:id/cancel` | Cancelar orden | ADMIN |
-| `DELETE` | `/:id` | Eliminar orden PENDING | ADMIN |
-
 ### Reportes — `/api/reports`
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/` | KPIs, stock por categoría, top productos, movimientos por mes, alertas de bajo stock |
+| `GET` | `/` | KPIs, stock por categoría, top productos, movimientos por mes, bajo stock, **métricas de rotación** |
+| `GET` | `/?format=pdf` | Descargar reporte completo en PDF |
 
 ---
 
@@ -189,6 +257,7 @@ La documentación interactiva completa está en `http://localhost:3000/api-docs`
 | Roles | Middleware `requireRole("ADMIN")` en rutas de escritura |
 | Contraseñas | `bcryptjs` con salt 12 |
 | Soft delete | Los productos nunca se borran físicamente |
+| Cuentas inactivas | `isActive: false` bloquea el login |
 
 ---
 

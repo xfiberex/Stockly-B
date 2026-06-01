@@ -67,6 +67,7 @@ export const authService = {
         const valid = await comparePassword(password, user.password);
         if (!valid) throw new HttpError(401, "Credenciales inválidas");
 
+        if (!user.isActive) throw new HttpError(403, "Tu cuenta ha sido desactivada. Contacta al administrador");
         if (!user.isVerified) throw new HttpError(403, "Confirma tu correo antes de iniciar sesión");
 
         const { raw, hash } = generateToken();
@@ -146,6 +147,7 @@ export const authService = {
                 email: true,
                 name: true,
                 role: true,
+                isActive: true,
                 isVerified: true,
                 createdAt: true,
             },

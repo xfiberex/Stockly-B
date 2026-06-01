@@ -97,4 +97,32 @@ export const purchaseOrderService = {
 
         await prisma.purchaseOrder.delete({ where: { id } });
     },
+
+    async exportAll() {
+        const orders = await prisma.purchaseOrder.findMany({
+            orderBy: { createdAt: "desc" },
+            include: {
+                supplier: { select: { name: true } },
+                items: { include: { product: { select: { sku: true } } } },
+            },
+        });
+
+        const rows: Record<string, unknown>[] = [];
+        for (const o of orders) {
+            for (const item of o.items) {
+                rows.push({
+                    orderId: o.id,
+                    status: o.status,
+                    supplierName: o.supplier?.name ?? "",
+                    createdAt: o.createdAt.toISOString(),
+                    productName: item.productName,
+                    productSku: item.product?.sku ?? "",
+                    quantity: item.quantity,
+                    unitPrice: Number(item.unitPrice),
+                    totalLine: item.quantity * Number(item.unitPrice),
+                });
+            }
+        }
+        return rows;
+    },
 };

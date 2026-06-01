@@ -70,6 +70,8 @@ model Product {
   movements     StockMovement[]
   priceHistory  PriceHistory[]
   purchaseItems PurchaseOrderItem[]
+  saleItems     SaleOrderItem[]
+  tags          Tag[]
 
   @@map("products")
 }
@@ -131,6 +133,7 @@ model User {
   email          String    @unique
   password       String
   role           String    @default("USER")
+  isActive       Boolean   @default(true)
   isVerified     Boolean   @default(false)
   verifyToken    String?   @unique
   verifyExpires  DateTime?
@@ -142,4 +145,64 @@ model User {
   updatedAt      DateTime  @updatedAt
 
   @@map("users")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userEmail String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  color     String?
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("tags")
+}
+
+model SaleOrder {
+  id            String          @id @default(uuid())
+  status        String          @default("PENDING")
+  customerName  String?
+  customerEmail String?
+  customerPhone String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  items         SaleOrderItem[]
+
+  @@map("sale_orders")
+}
+
+model SaleOrderItem {
+  id          String    @id @default(uuid())
+  saleOrderId String
+  saleOrder   SaleOrder @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName String
+  quantity    Int
+  unitPrice   Decimal   @db.Decimal(10, 2)
+  createdAt   DateTime  @default(now())
+
+  @@map("sale_order_items")
 }

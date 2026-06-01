@@ -19,6 +19,7 @@ import {
     exportProducts,
     importProducts,
     getProductMovements,
+    exportProductMovements,
     createManualMovement,
     bulkUpdateStock,
     getPriceHistory,
@@ -33,6 +34,7 @@ productRouter.get("/", getProducts);
 productRouter.get("/export", exportProducts);
 productRouter.get("/:id", getProductById);
 productRouter.get("/:id/movements", getProductMovements);
+productRouter.get("/:id/movements/export", exportProductMovements);
 productRouter.get("/:id/price-history", getPriceHistory);
 
 // Escritura — solo ADMIN

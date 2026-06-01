@@ -8,6 +8,7 @@ export interface CreateProductDto {
     categoryId?: string;
     brandId?: string;
     supplierId?: string;
+    tagIds?: string[];
 }
 
 export interface UpdateProductDto {
@@ -21,6 +22,7 @@ export interface UpdateProductDto {
     brandId?: string;
     supplierId?: string;
     removeImage?: boolean;
+    tagIds?: string[];
 }
 
 export interface ProductQuery {
@@ -31,6 +33,7 @@ export interface ProductQuery {
     brandId?: string;
     supplierId?: string;
     isActive?: string;
+    tagId?: string;
 }
 
 export interface ImportProductDto {
