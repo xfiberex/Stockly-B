@@ -7,6 +7,7 @@ import { rateLimit } from "express-rate-limit";
 import { env } from "@/config/env";
 import { router } from "@/routes";
 import { errorHandler } from "@/shared/middlewares/error.middleware";
+import { csrfProtection } from "@/shared/middlewares/csrf.middleware";
 import { registerSwagger } from "@/swagger";
 
 const app = express();
@@ -37,6 +38,9 @@ if (env.nodeEnv !== "test") {
         message: { success: false, message: "Demasiadas peticiones, intenta más tarde." },
     }));
 }
+
+// Protección CSRF (double-submit) antes de las rutas mutantes
+app.use(csrfProtection);
 
 app.use("/api/v1", router);
 

@@ -3,14 +3,19 @@ import { signToken } from "@/shared/lib/jwt";
 import { hashPassword } from "@/shared/lib/hash";
 
 export async function cleanDb() {
+    await prisma.saleOrderItem.deleteMany();
+    await prisma.saleOrder.deleteMany();
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.priceHistory.deleteMany();
     await prisma.stockMovement.deleteMany();
     await prisma.product.deleteMany();
+    await prisma.tag.deleteMany();
     await prisma.category.deleteMany();
     await prisma.brand.deleteMany();
     await prisma.supplier.deleteMany();
+    await prisma.appSetting.deleteMany();
+    await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany();
 }
 

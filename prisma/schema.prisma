@@ -12,6 +12,25 @@ datasource db {
   provider = "postgresql"
 }
 
+enum PurchaseOrderStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+enum SaleOrderStatus {
+  PENDING
+  SHIPPED
+  CANCELLED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  IMPORT
+}
+
 model Category {
   id          String    @id @default(uuid())
   name        String    @unique
@@ -91,7 +110,7 @@ model PurchaseOrder {
   id         String              @id @default(uuid())
   supplierId String?
   supplier   Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  status     String              @default("PENDING")
+  status     PurchaseOrderStatus @default(PENDING)
   notes      String?
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
@@ -115,14 +134,14 @@ model PurchaseOrderItem {
 }
 
 model StockMovement {
-  id         String   @id @default(uuid())
+  id         String            @id @default(uuid())
   productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  type       String   // "IN" | "OUT" | "ADJUSTMENT" | "IMPORT"
-  delta      Int      // positivo = entrada, negativo = salida
-  stockAfter Int      // stock resultante tras el movimiento
+  product    Product           @relation(fields: [productId], references: [id])
+  type       StockMovementType
+  delta      Int               // positivo = entrada, negativo = salida
+  stockAfter Int               // stock resultante tras el movimiento
   note       String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime          @default(now())
 
   @@map("stock_movements")
 }
@@ -181,7 +200,7 @@ model Tag {
 
 model SaleOrder {
   id            String          @id @default(uuid())
-  status        String          @default("PENDING")
+  status        SaleOrderStatus @default(PENDING)
   customerName  String?
   customerEmail String?
   customerPhone String?

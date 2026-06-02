@@ -252,10 +252,12 @@ La documentación interactiva completa está en `http://localhost:3000/api-docs`
 |---|---|
 | Headers | `helmet` activado en todas las rutas |
 | CORS | Restringido a `FRONTEND_URL` en producción |
-| Rate limiting | 100 peticiones / 15 min por IP |
-| Autenticación | JWT en header `Authorization: Bearer` |
+| CSRF | Patrón double-submit: cookie `csrfToken` + cabecera `x-csrf-token` en métodos mutantes |
+| Rate limiting | 100 peticiones / 15 min por IP (10/15 min en login, 5/h en registro) |
+| Autenticación | JWT en cookie `httpOnly` (15 min) + refresh token rotativo y hasheado |
 | Roles | Middleware `requireRole("ADMIN")` en rutas de escritura |
 | Contraseñas | `bcryptjs` con salt 12 |
+| Integridad de stock | Ajustes con transacciones atómicas (decremento condicional, sin race conditions) |
 | Soft delete | Los productos nunca se borran físicamente |
 | Cuentas inactivas | `isActive: false` bloquea el login |
 

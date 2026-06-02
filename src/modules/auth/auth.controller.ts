@@ -1,26 +1,51 @@
 import type { Request, Response } from "express";
+import crypto from "crypto";
 import { authService } from "@/modules/auth/auth.service";
 import { signToken } from "@/shared/lib/jwt";
 import { env } from "@/config/env";
 import { HttpError } from "@/shared/lib/httpError";
+import { CSRF_COOKIE_NAME } from "@/shared/middlewares/csrf.middleware";
 
 const isProd = env.nodeEnv === "production";
+const sameSite = (isProd ? "none" : "lax") as "none" | "lax";
 
 const COOKIE_OPTS = {
     httpOnly: true,
     secure: isProd,
-    sameSite: (isProd ? "none" : "lax") as "none" | "lax",
-    maxAge: 15 * 60 * 1000, // 15 minutos — debe coincidir con JWT_EXPIRES_IN=15m en .env
+    sameSite,
+    maxAge: env.jwt.expiresInMs, // derivado de JWT_EXPIRES_IN — una sola fuente de verdad
 };
 
 // Path restringido: el navegador solo envía esta cookie al endpoint /refresh
 const REFRESH_COOKIE_OPTS = {
     httpOnly: true,
     secure: isProd,
-    sameSite: (isProd ? "none" : "lax") as "none" | "lax",
+    sameSite,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/api/v1/auth/refresh",
 };
+
+// Cookie del token CSRF: legible por JS (no httpOnly) para que el frontend la reenvíe
+// como cabecera. Protección double-submit contra peticiones cross-site.
+const CSRF_COOKIE_OPTS = {
+    httpOnly: false,
+    secure: isProd,
+    sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+function issueSessionCookies(
+    res: Response,
+    userId: string,
+    rawRefreshToken: string,
+): void {
+    const token = signToken({ userId });
+    const csrfToken = crypto.randomBytes(32).toString("hex");
+    res
+        .cookie("token", token, COOKIE_OPTS)
+        .cookie("refreshToken", rawRefreshToken, REFRESH_COOKIE_OPTS)
+        .cookie(CSRF_COOKIE_NAME, csrfToken, CSRF_COOKIE_OPTS);
+}
 
 export const authController = {
     async register(req: Request, res: Response) {
@@ -44,11 +69,8 @@ export const authController = {
     async login(req: Request, res: Response) {
         const { email, password } = req.body as { email: string; password: string };
         const { user, rawRefreshToken } = await authService.login(email, password);
-        const token = signToken({ userId: user.id });
-        res
-            .cookie("token", token, COOKIE_OPTS)
-            .cookie("refreshToken", rawRefreshToken, REFRESH_COOKIE_OPTS)
-            .json({ message: "Sesión iniciada", data: { id: user.id, email: user.email, name: user.name } });
+        issueSessionCookies(res, user.id, rawRefreshToken);
+        res.json({ message: "Sesión iniciada", data: { id: user.id, email: user.email, name: user.name } });
     },
 
     async logout(req: Request, res: Response) {
@@ -59,6 +81,7 @@ export const authController = {
         res
             .clearCookie("token")
             .clearCookie("refreshToken", { path: "/api/v1/auth/refresh" })
+            .clearCookie(CSRF_COOKIE_NAME)
             .json({ message: "Sesión cerrada" });
     },
 
@@ -67,11 +90,8 @@ export const authController = {
         if (!rawRefreshToken) throw new HttpError(401, "No autenticado");
 
         const { user, rawRefreshToken: newRawToken } = await authService.refresh(rawRefreshToken);
-        const token = signToken({ userId: user.id });
-        res
-            .cookie("token", token, COOKIE_OPTS)
-            .cookie("refreshToken", newRawToken, REFRESH_COOKIE_OPTS)
-            .json({ message: "Token renovado", data: { id: user.id, email: user.email, name: user.name } });
+        issueSessionCookies(res, user.id, newRawToken);
+        res.json({ message: "Token renovado", data: { id: user.id, email: user.email, name: user.name } });
     },
 
     async me(req: Request, res: Response) {
@@ -104,6 +124,7 @@ export const authController = {
         res
             .clearCookie("token")
             .clearCookie("refreshToken", { path: "/api/v1/auth/refresh" })
+            .clearCookie(CSRF_COOKIE_NAME)
             .json(result);
     },
 };

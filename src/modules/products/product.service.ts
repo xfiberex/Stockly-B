@@ -1,8 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
-import { settingsService } from "@/modules/settings/settings.service";
-import { sendLowStockAlertEmail } from "@/shared/lib/nodemailer";
+import { checkLowStockAlert } from "@/shared/lib/stockAlerts";
 import type {
     CreateProductDto,
     UpdateProductDto,
@@ -31,23 +30,6 @@ async function recordMovement(
     await prisma.stockMovement.create({
         data: { productId, type, delta, stockAfter, note },
     });
-}
-
-async function checkLowStockAlert(productId: string, productName: string, newStock: number, minStock: number) {
-    if (newStock > minStock) return;
-    const enabled = await settingsService.get("lowStockAlertEnabled");
-    if (!enabled) return;
-
-    const admins = await prisma.user.findMany({
-        where: { role: "ADMIN", isActive: true, isVerified: true },
-        select: { email: true, name: true },
-    });
-
-    await Promise.allSettled(
-        admins.map((admin) =>
-            sendLowStockAlertEmail(admin.email, admin.name, productName, newStock, minStock),
-        ),
-    );
 }
 
 export const productService = {
@@ -149,44 +131,55 @@ export const productService = {
             ? { tags: { set: dto.tagIds.map((tid) => ({ id: tid })) } }
             : {};
 
-        const updated = await prisma.product.update({
-            where: { id },
-            data: {
-                ...(dto.name !== undefined && { name: dto.name }),
-                ...(dto.description !== undefined && { description: dto.description }),
-                ...(dto.sku !== undefined && { sku: dto.sku || null }),
-                ...(newPrice !== undefined && { price: newPrice }),
-                ...(dto.stock !== undefined && { stock: parseInt(String(dto.stock), 10) }),
-                ...(dto.minStock !== undefined && { minStock: parseInt(String(dto.minStock), 10) }),
-                ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
-                ...(dto.brandId !== undefined && { brandId: dto.brandId }),
-                ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
-                imageUrl,
-                imagePublicId,
-                ...tagsUpdate,
-            },
-            include: PRODUCT_INCLUDE,
+        const hasStockChange = dto.stock !== undefined;
+        const newStock = hasStockChange ? parseInt(String(dto.stock), 10) : undefined;
+        const stockDelta = hasStockChange ? newStock! - existing.stock : 0;
+
+        // Producto, historial de precio y movimiento de stock se escriben en una sola
+        // transacción para que nunca queden inconsistentes entre sí.
+        const updated = await prisma.$transaction(async (tx) => {
+            const product = await tx.product.update({
+                where: { id },
+                data: {
+                    ...(dto.name !== undefined && { name: dto.name }),
+                    ...(dto.description !== undefined && { description: dto.description }),
+                    ...(dto.sku !== undefined && { sku: dto.sku || null }),
+                    ...(newPrice !== undefined && { price: newPrice }),
+                    ...(hasStockChange && { stock: newStock }),
+                    ...(dto.minStock !== undefined && { minStock: parseInt(String(dto.minStock), 10) }),
+                    ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
+                    ...(dto.brandId !== undefined && { brandId: dto.brandId }),
+                    ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
+                    imageUrl,
+                    imagePublicId,
+                    ...tagsUpdate,
+                },
+                include: PRODUCT_INCLUDE,
+            });
+
+            if (priceChanged) {
+                await tx.priceHistory.create({
+                    data: { productId: id, oldPrice: existingPrice, newPrice: newPrice! },
+                });
+            }
+
+            if (hasStockChange && stockDelta !== 0) {
+                await tx.stockMovement.create({
+                    data: {
+                        productId: id,
+                        type: stockDelta >= 0 ? "IN" : "OUT",
+                        delta: stockDelta,
+                        stockAfter: newStock!,
+                        note: "Ajuste manual",
+                    },
+                });
+            }
+
+            return product;
         });
 
-        if (priceChanged) {
-            await prisma.priceHistory.create({
-                data: {
-                    productId: id,
-                    oldPrice: existingPrice,
-                    newPrice: newPrice!,
-                },
-            });
-        }
-
-        if (dto.stock !== undefined) {
-            const newStock = parseInt(String(dto.stock), 10);
-            const delta = newStock - existing.stock;
-            const type = delta >= 0 ? "IN" : "OUT";
-            await recordMovement(id, type, delta, newStock, "Ajuste manual");
-
-            if (delta < 0) {
-                await checkLowStockAlert(id, updated.name, newStock, updated.minStock);
-            }
+        if (hasStockChange && stockDelta < 0) {
+            await checkLowStockAlert(updated.name, newStock!, updated.minStock);
         }
 
         return updated;
@@ -331,32 +324,50 @@ export const productService = {
         if (!product) throw new HttpError(404, "Producto no encontrado");
         if (!product.isActive) throw new HttpError(400, "No se puede registrar movimientos en un producto inactivo");
 
-        let delta: number;
-        let newStock: number;
-
-        if (dto.type === "ADJUSTMENT") {
-            newStock = dto.quantity;
-            delta = newStock - product.stock;
-        } else if (dto.type === "OUT") {
-            delta = -dto.quantity;
-            newStock = product.stock + delta;
-            if (newStock < 0) throw new HttpError(400, "El stock no puede quedar negativo");
-        } else {
-            delta = dto.quantity;
-            newStock = product.stock + delta;
-        }
-
         const note = dto.note ? `${dto.reason} — ${dto.note}` : dto.reason;
 
-        await prisma.$transaction([
-            prisma.product.update({ where: { id: productId }, data: { stock: newStock } }),
-            prisma.stockMovement.create({
-                data: { productId, type: dto.type, delta, stockAfter: newStock, note },
-            }),
-        ]);
+        // Transacción interactiva: el ajuste de stock y su movimiento son atómicos.
+        // Para OUT se usa un decremento condicional (stock >= cantidad) que evita la
+        // race condition de leer-calcular-escribir bajo peticiones concurrentes.
+        const newStock = await prisma.$transaction(async (tx) => {
+            let resultingStock: number;
+            let delta: number;
 
-        if (delta < 0) {
-            await checkLowStockAlert(productId, product.name, newStock, product.minStock);
+            if (dto.type === "ADJUSTMENT") {
+                const updated = await tx.product.update({
+                    where: { id: productId },
+                    data: { stock: dto.quantity },
+                });
+                resultingStock = updated.stock;
+                delta = updated.stock - product.stock;
+            } else if (dto.type === "OUT") {
+                const res = await tx.product.updateMany({
+                    where: { id: productId, stock: { gte: dto.quantity } },
+                    data: { stock: { decrement: dto.quantity } },
+                });
+                if (res.count === 0) throw new HttpError(400, "El stock no puede quedar negativo");
+                const refreshed = await tx.product.findUniqueOrThrow({ where: { id: productId } });
+                resultingStock = refreshed.stock;
+                delta = -dto.quantity;
+            } else {
+                const updated = await tx.product.update({
+                    where: { id: productId },
+                    data: { stock: { increment: dto.quantity } },
+                });
+                resultingStock = updated.stock;
+                delta = dto.quantity;
+            }
+
+            await tx.stockMovement.create({
+                data: { productId, type: dto.type, delta, stockAfter: resultingStock, note },
+            });
+
+            return resultingStock;
+        });
+
+        // Solo alerta si el stock disminuyó respecto al valor previo.
+        if (newStock < product.stock) {
+            await checkLowStockAlert(product.name, newStock, product.minStock);
         }
 
         return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
@@ -368,24 +379,29 @@ export const productService = {
         await Promise.all(
             dto.items.map(async ({ productId, stock }) => {
                 try {
-                    const product = await prisma.product.findUnique({ where: { id: productId } });
-                    if (!product) {
+                    const note = dto.reason ?? "Ajuste masivo de inventario";
+
+                    // Lee, ajusta y registra el movimiento dentro de una única transacción
+                    // para mantener stock y movimiento consistentes ante concurrencia.
+                    const outcome = await prisma.$transaction(async (tx) => {
+                        const product = await tx.product.findUnique({ where: { id: productId } });
+                        if (!product) return null;
+
+                        const delta = stock - product.stock;
+                        await tx.product.update({ where: { id: productId }, data: { stock } });
+                        await tx.stockMovement.create({
+                            data: { productId, type: "ADJUSTMENT", delta, stockAfter: stock, note },
+                        });
+                        return { name: product.name, minStock: product.minStock, delta };
+                    });
+
+                    if (!outcome) {
                         results.push({ productId, success: false, error: "Producto no encontrado" });
                         return;
                     }
 
-                    const delta = stock - product.stock;
-                    const note = dto.reason ?? "Ajuste masivo de inventario";
-
-                    await prisma.$transaction([
-                        prisma.product.update({ where: { id: productId }, data: { stock } }),
-                        prisma.stockMovement.create({
-                            data: { productId, type: "ADJUSTMENT", delta, stockAfter: stock, note },
-                        }),
-                    ]);
-
-                    if (delta < 0) {
-                        await checkLowStockAlert(productId, product.name, stock, product.minStock);
+                    if (outcome.delta < 0) {
+                        await checkLowStockAlert(outcome.name, stock, outcome.minStock);
                     }
 
                     results.push({ productId, success: true });

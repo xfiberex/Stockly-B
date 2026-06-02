@@ -48,46 +48,52 @@ export const purchaseOrderService = {
 
         const wasReceived = existing.status !== "RECEIVED" && dto.status === "RECEIVED";
 
-        const updated = await prisma.purchaseOrder.update({
-            where: { id },
-            data: {
-                ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
-                ...(dto.notes !== undefined && { notes: dto.notes }),
-                ...(dto.status !== undefined && { status: dto.status }),
-            },
-            include: ORDER_INCLUDE,
-        });
+        const orderData = {
+            ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
+            ...(dto.notes !== undefined && { notes: dto.notes }),
+        };
 
-        // Al marcar como RECEIVED, incrementa stock de cada producto vinculado
-        if (wasReceived) {
-            const items = await prisma.purchaseOrderItem.findMany({
+        // Sin recepción: actualización simple de campos / estado.
+        if (!wasReceived) {
+            return prisma.purchaseOrder.update({
+                where: { id },
+                data: { ...orderData, ...(dto.status !== undefined && { status: dto.status }) },
+                include: ORDER_INCLUDE,
+            });
+        }
+
+        // Recepción: el cambio de estado y el incremento atómico de stock de cada producto
+        // vinculado ocurren en una sola transacción (todo o nada).
+        return prisma.$transaction(async (tx) => {
+            const items = await tx.purchaseOrderItem.findMany({
                 where: { purchaseOrderId: id, productId: { not: null } },
             });
 
-            await Promise.all(
-                items.map(async (item) => {
-                    if (!item.productId) return;
-                    const product = await prisma.product.findUnique({ where: { id: item.productId } });
-                    if (!product) return;
+            for (const item of items) {
+                if (!item.productId) continue;
 
-                    const newStock = product.stock + item.quantity;
-                    await prisma.$transaction([
-                        prisma.product.update({ where: { id: item.productId }, data: { stock: newStock } }),
-                        prisma.stockMovement.create({
-                            data: {
-                                productId: item.productId,
-                                type: "IN",
-                                delta: item.quantity,
-                                stockAfter: newStock,
-                                note: `Orden de compra #${id.slice(0, 8)}`,
-                            },
-                        }),
-                    ]);
-                }),
-            );
-        }
+                const product = await tx.product.update({
+                    where: { id: item.productId },
+                    data: { stock: { increment: item.quantity } },
+                });
 
-        return updated;
+                await tx.stockMovement.create({
+                    data: {
+                        productId: item.productId,
+                        type: "IN",
+                        delta: item.quantity,
+                        stockAfter: product.stock,
+                        note: `Orden de compra #${id.slice(0, 8)}`,
+                    },
+                });
+            }
+
+            return tx.purchaseOrder.update({
+                where: { id },
+                data: { ...orderData, status: "RECEIVED" },
+                include: ORDER_INCLUDE,
+            });
+        });
     },
 
     async delete(id: string) {

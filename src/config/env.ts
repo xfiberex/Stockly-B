@@ -38,6 +38,21 @@ function parsePort(value: string | undefined, envName: string, fallback: number)
     return parsed;
 }
 
+// Convierte una duración estilo jsonwebtoken ("15m", "7d", "3600", "1h") a milisegundos.
+// Permite derivar el maxAge de la cookie del mismo JWT_EXPIRES_IN (una sola fuente de verdad).
+export function durationToMs(value: string): number {
+    const trimmed = value.trim();
+    if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10) * 1000; // segundos
+    const match = /^(\d+)\s*(s|m|h|d)$/.exec(trimmed);
+    if (!match) {
+        throw new Error(`❌ JWT_EXPIRES_IN inválido: "${value}". Usa formatos como 15m, 1h, 7d o segundos.`);
+    }
+    const amount = parseInt(match[1]!, 10);
+    const unit = match[2] as "s" | "m" | "h" | "d";
+    const factor = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }[unit];
+    return amount * factor;
+}
+
 export function validateEnv(): void {
     const missing: string[] = [];
 
@@ -81,6 +96,8 @@ export const env = {
     jwt: {
         secret: process.env.JWT_SECRET!,
         expiresIn: process.env.JWT_EXPIRES_IN!,
+        // Derivado: duración del access token en ms, reutilizado por el maxAge de la cookie.
+        expiresInMs: durationToMs(process.env.JWT_EXPIRES_IN ?? "15m"),
     },
     smtp: {
         host: process.env.SMTP_HOST!,
