@@ -1,5 +1,35 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-.env
-*.log
+
+# Prisma generated client
 /src/generated/prisma
+
+# Environment (se ignora .env y variantes, pero se mantiene .env.example)
+.env
+.env.*
+!.env.example
+*.local
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.sw?
