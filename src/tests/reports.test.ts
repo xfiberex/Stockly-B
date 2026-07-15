@@ -40,6 +40,7 @@ describe("Reports API", () => {
         expect(totals.totalProducts).toBe(2);
         expect(totals.activeProducts).toBe(2);
         expect(totals.inventoryValue).toBe(70); // 5*10 + 20*1
+        expect(totals.lowStockCount).toBe(1); // solo RAM (stock 1 <= minStock 5)
     });
 
     it("incluye los productos en stock bajo", async () => {

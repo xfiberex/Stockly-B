@@ -68,6 +68,7 @@ export const reportsService = {
         ]);
 
         const inventoryValue = products.reduce((sum, p) => sum + Number(p.price) * p.stock, 0);
+        const lowStockCount = products.filter((p) => p.stock <= p.minStock).length;
 
         // Agrupar stock por categoría
         const stockByCategory: Record<string, number> = {};
@@ -104,6 +105,7 @@ export const reportsService = {
                 activeProducts,
                 inactiveProducts: totalProducts - activeProducts,
                 inventoryValue,
+                lowStockCount,
             },
             stockByCategory: Object.entries(stockByCategory).map(([name, stock]) => ({ name, stock, value: valueByCategory[name] ?? 0 })),
             topByValue: topByValue.map((p) => ({

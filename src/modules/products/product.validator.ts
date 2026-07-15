@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const uuidOptional = z.string().uuid("Debe ser un UUID válido").optional();
+// Normaliza "" → undefined: los formularios envían "" para "sin categoría/marca/proveedor".
+const uuidOptional = z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().uuid("Debe ser un UUID válido").optional(),
+);
 
 export const importProductsSchema = z.object({
     products: z
