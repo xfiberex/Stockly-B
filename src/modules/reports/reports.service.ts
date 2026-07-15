@@ -1,5 +1,8 @@
 import { prisma } from "@/shared/lib/prisma";
 
+// Forma del resumen que consumen tanto el JSON como el generador de PDF.
+export type ReportSummary = Awaited<ReturnType<typeof reportsService.getSummary>>;
+
 export const reportsService = {
     async getSummary() {
         const [
