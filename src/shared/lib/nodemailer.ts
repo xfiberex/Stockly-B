@@ -1,5 +1,12 @@
 import nodemailer from "nodemailer";
 import { env } from "@/config/env";
+import {
+    BRAND,
+    renderEmail,
+    emailButton,
+    emailParagraph,
+    emailNote,
+} from "@/shared/lib/emailTemplates";
 
 function escapeHtml(str: string): string {
     return str
@@ -19,32 +26,44 @@ export const transporter = nodemailer.createTransport({
 export async function sendVerificationEmail(to: string, name: string, token: string) {
     const url = `${env.frontendUrl}/auth/confirm-account?token=${token}`;
     const safeName = escapeHtml(name);
+
+    const bodyHtml =
+        emailParagraph(`Hola <strong>${safeName}</strong>,`) +
+        emailParagraph("Gracias por registrarte en Stockly. Confirma tu cuenta para empezar a gestionar tu inventario.") +
+        emailButton(url, "Verificar cuenta") +
+        emailNote("El enlace expira en 24 horas. Si no creaste esta cuenta, puedes ignorar este correo.");
+
     await transporter.sendMail({
         from: env.smtp.from,
         to,
         subject: "Verifica tu cuenta — Stockly",
-        html: `
-            <p>Hola ${safeName},</p>
-            <p>Por favor, haz clic en el siguiente enlace para verificar tu cuenta:</p>
-            <a href="${url}" target="_blank">Verificar cuenta</a>
-            <p>El enlace expira en 24 horas.</p>
-        `,
+        html: renderEmail({
+            preheader: "Confirma tu cuenta de Stockly para empezar.",
+            heading: "Verifica tu cuenta",
+            bodyHtml,
+        }),
     });
 }
 
 export async function sendPasswordResetEmail(to: string, name: string, token: string) {
     const url = `${env.frontendUrl}/auth/reset-password?token=${token}`;
     const safeName = escapeHtml(name);
+
+    const bodyHtml =
+        emailParagraph(`Hola <strong>${safeName}</strong>,`) +
+        emailParagraph("Recibimos una solicitud para restablecer la contraseña de tu cuenta. Haz clic en el botón para elegir una nueva.") +
+        emailButton(url, "Restablecer contraseña") +
+        emailNote("El enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo y tu contraseña seguirá siendo la misma.");
+
     await transporter.sendMail({
         from: env.smtp.from,
         to,
         subject: "Restablecer contraseña — Stockly",
-        html: `
-            <p>Hola ${safeName},</p>
-            <p>Por favor, haz clic en el siguiente enlace para restablecer tu contraseña:</p>
-            <a href="${url}" target="_blank">Restablecer contraseña</a>
-            <p>El enlace expira en 1 hora.</p>
-        `,
+        html: renderEmail({
+            preheader: "Restablece la contraseña de tu cuenta de Stockly.",
+            heading: "Restablecer contraseña",
+            bodyHtml,
+        }),
     });
 }
 
@@ -57,32 +76,40 @@ export async function sendLowStockAlertEmail(
 ) {
     const safeAdmin = escapeHtml(adminName);
     const safeProduct = escapeHtml(productName);
+    const url = `${env.frontendUrl}/products`;
+
+    // Tabla de datos con estilos inline (email-safe).
+    const stockTable = `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:4px 0 8px;border:1px solid ${BRAND.border};border-radius:8px;">
+        <tr>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">Producto</td>
+            <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${BRAND.text};border-bottom:1px solid ${BRAND.border};">${safeProduct}</td>
+        </tr>
+        <tr>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">Stock actual</td>
+            <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#b91c1c;border-bottom:1px solid ${BRAND.border};">${currentStock}</td>
+        </tr>
+        <tr>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};">Stock mínimo</td>
+            <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${BRAND.text};">${minStock}</td>
+        </tr>
+    </table>`;
+
+    const bodyHtml =
+        emailParagraph(`Hola <strong>${safeAdmin}</strong>,`) +
+        emailParagraph(`El producto <strong>${safeProduct}</strong> alcanzó un nivel de stock bajo y podría requerir reabastecimiento.`) +
+        stockTable +
+        emailButton(url, "Ver productos") +
+        emailNote("Puedes desactivar estas alertas en la sección <strong>Configuración</strong> de Stockly.");
+
     await transporter.sendMail({
         from: env.smtp.from,
         to,
-        subject: `⚠️ Alerta de bajo stock: ${safeProduct} — Stockly`,
-        html: `
-            <p>Hola ${safeAdmin},</p>
-            <p>El producto <strong>${safeProduct}</strong> ha alcanzado un nivel de stock bajo.</p>
-            <table style="border-collapse:collapse;margin-top:12px;">
-                <tr>
-                    <td style="padding:4px 12px 4px 0;color:#555;">Stock actual:</td>
-                    <td style="padding:4px 0;font-weight:bold;color:#e53e3e;">${currentStock}</td>
-                </tr>
-                <tr>
-                    <td style="padding:4px 12px 4px 0;color:#555;">Stock mínimo:</td>
-                    <td style="padding:4px 0;">${minStock}</td>
-                </tr>
-            </table>
-            <p style="margin-top:16px;">
-                <a href="${env.frontendUrl}/products" target="_blank"
-                   style="background:#3182ce;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">
-                    Ver productos
-                </a>
-            </p>
-            <p style="margin-top:16px;color:#888;font-size:12px;">
-                Puedes desactivar estas alertas en la sección <strong>Configuración</strong> de Stockly.
-            </p>
-        `,
+        subject: `⚠️ Alerta de bajo stock: ${productName} — Stockly`,
+        html: renderEmail({
+            preheader: `${safeProduct} está en ${currentStock} unidades (mínimo ${minStock}).`,
+            heading: "Alerta de bajo stock",
+            bodyHtml,
+        }),
     });
 }

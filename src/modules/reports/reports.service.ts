@@ -17,12 +17,14 @@ export const reportsService = {
                 where: { isActive: true },
                 select: { id: true, name: true, sku: true, price: true, stock: true, minStock: true, category: { select: { name: true } } },
             }),
-            prisma.product.findMany({
-                where: { isActive: true },
-                orderBy: [{ stock: "desc" }],
-                take: 10,
-                select: { id: true, name: true, sku: true, price: true, stock: true },
-            }),
+            // Top 10 por valor de inventario (precio × stock), no por cantidad.
+            prisma.$queryRaw<Array<{ id: string; name: string; sku: string | null; price: string; stock: number }>>`
+                SELECT id, name, sku, price, stock
+                FROM products
+                WHERE "isActive" = true
+                ORDER BY price * stock DESC
+                LIMIT 10
+            `,
             // Movimientos agrupados por mes (últimos 6 meses)
             prisma.$queryRaw<Array<{ month: string; type: string; total: bigint }>>`
                 SELECT

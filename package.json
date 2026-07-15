@@ -1,5 +1,5 @@
 {
-  "name": "product-inventary-b",
+  "name": "product-inventory-b",
   "version": "1.0.0",
   "description": "Inventario de Productos Simple",
   "main": "dist/server.js",

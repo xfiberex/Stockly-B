@@ -1,9 +1,13 @@
 function escapeCsvCell(value: unknown): string {
     const str = value === null || value === undefined ? "" : String(value);
-    if (str.includes('"') || str.includes(",") || str.includes("\n")) {
-        return `"${str.replace(/"/g, '""')}"`;
+    // Previene inyección de fórmulas (CSV injection): una celda que empieza con
+    // = + - @ tab o retorno de carro puede ejecutarse como fórmula en Excel/Sheets.
+    // Se antepone un apóstrofo para que el gestor la trate como texto literal.
+    const guarded = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+    if (guarded.includes('"') || guarded.includes(",") || guarded.includes("\n")) {
+        return `"${guarded.replace(/"/g, '""')}"`;
     }
-    return str;
+    return guarded;
 }
 
 export function buildCsv(rows: Record<string, unknown>[]): string {
