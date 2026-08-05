@@ -341,6 +341,40 @@ describe("Auth API", () => {
             expect(res.status).toBe(400);
         });
 
+        it("revoca las sesiones activas: el refresh token previo deja de servir", async () => {
+            const password = "Test1234!";
+            const user = await createUser({ email: `reset_sesion_${Date.now()}@example.com`, password });
+
+            // Sesión iniciada antes del reset (simula la del atacante)
+            const login = await request(app).post(`${BASE}/login`).send({ email: user.email, password });
+            expect(login.status).toBe(200);
+            const loginCookies = login.headers["set-cookie"] as unknown as string[];
+            const refreshCookie = loginCookies.find((c) => c.startsWith("refreshToken="))!.split(";")[0]!;
+
+            // El refresh funciona mientras la sesión sigue viva
+            const antes = await request(app).post(`${BASE}/refresh`).set("Cookie", refreshCookie);
+            expect(antes.status).toBe(200);
+            const rotada = (antes.headers["set-cookie"] as unknown as string[])
+                .find((c) => c.startsWith("refreshToken="))!.split(";")[0]!;
+
+            // La víctima recupera su cuenta
+            (sendPasswordResetEmail as jest.Mock).mockClear();
+            await request(app).post(`${BASE}/forgot-password`).send({ email: user.email });
+            const token = getLastCapturedToken(sendPasswordResetEmail as jest.Mock);
+            const reset = await request(app)
+                .post(`${BASE}/reset-password`)
+                .send({ token, password: "OtraPass1234!" });
+            expect(reset.status).toBe(200);
+
+            // La sesión anterior queda invalidada de inmediato
+            const despues = await request(app).post(`${BASE}/refresh`).set("Cookie", rotada);
+            expect(despues.status).toBe(401);
+
+            const stored = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+            expect(stored.refreshToken).toBeNull();
+            expect(stored.refreshExpires).toBeNull();
+        });
+
         it("422: contraseña nueva demasiado débil", async () => {
             const res = await request(app)
                 .post(`${BASE}/reset-password`)

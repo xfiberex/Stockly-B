@@ -91,6 +91,83 @@ describe("Purchase Orders API", () => {
         });
     });
 
+    describe("Cancelación de una orden ya recibida (reversión de stock)", () => {
+        it("descuenta el stock y registra un movimiento OUT compensatorio", async () => {
+            const product = await createProduct("Teclado", 100);
+
+            const created = await request(app)
+                .post(BASE)
+                .set("Cookie", adminCookie)
+                .send({ items: [{ productId: product.id, productName: "Teclado", quantity: 40, unitPrice: 8 }] });
+            const orderId = created.body.data.id;
+
+            await request(app).patch(`${BASE}/${orderId}`).set("Cookie", adminCookie).send({ status: "RECEIVED" });
+            expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(140);
+
+            const cancelled = await request(app)
+                .patch(`${BASE}/${orderId}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+            expect(cancelled.status).toBe(200);
+            expect(cancelled.body.data.status).toBe("CANCELLED");
+
+            const after = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+            expect(after.stock).toBe(100);
+
+            const movements = await prisma.stockMovement.findMany({
+                where: { productId: product.id },
+                orderBy: { createdAt: "asc" },
+            });
+            expect(movements).toHaveLength(2);
+            expect(movements[1]!.type).toBe("OUT");
+            expect(movements[1]!.delta).toBe(-40);
+            expect(movements[1]!.stockAfter).toBe(100);
+        });
+
+        it("400 y sin cambios si las unidades recibidas ya se consumieron", async () => {
+            const product = await createProduct("Ratón", 0);
+
+            const created = await request(app)
+                .post(BASE)
+                .set("Cookie", adminCookie)
+                .send({ items: [{ productId: product.id, productName: "Ratón", quantity: 10, unitPrice: 8 }] });
+            const orderId = created.body.data.id;
+
+            await request(app).patch(`${BASE}/${orderId}`).set("Cookie", adminCookie).send({ status: "RECEIVED" });
+            // Se vende todo lo recibido antes de intentar cancelar la compra
+            await prisma.product.update({ where: { id: product.id }, data: { stock: 3 } });
+
+            const res = await request(app)
+                .patch(`${BASE}/${orderId}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+            expect(res.status).toBe(400);
+            expect(res.body.message).toMatch(/ya se consumieron/i);
+
+            // La transacción se revierte entera: ni el stock ni el estado cambian
+            expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(3);
+            const order = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: orderId } });
+            expect(order.status).toBe("RECEIVED");
+        });
+
+        it("cancelar una orden PENDING no toca el stock", async () => {
+            const product = await createProduct("Alfombrilla", 7);
+            const created = await request(app)
+                .post(BASE)
+                .set("Cookie", adminCookie)
+                .send({ items: [{ productId: product.id, productName: "Alfombrilla", quantity: 5, unitPrice: 3 }] });
+
+            const res = await request(app)
+                .patch(`${BASE}/${created.body.data.id}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+            expect(res.status).toBe(200);
+
+            expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(7);
+            expect(await prisma.stockMovement.count({ where: { productId: product.id } })).toBe(0);
+        });
+    });
+
     describe("Reglas de estado", () => {
         it("400 al modificar una orden cancelada", async () => {
             const created = await request(app)

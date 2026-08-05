@@ -51,6 +51,79 @@ describe("Sale Orders API", () => {
     });
 
     // -----------------------------------------------------------------------
+    describe("Cancelación de una orden ya enviada (reposición de stock)", () => {
+        it("repone el stock y registra un movimiento IN compensatorio", async () => {
+            const product = await createProduct("Monitor", 100);
+
+            const created = await request(app)
+                .post(BASE)
+                .set("Cookie", adminCookie)
+                .send({ items: [{ productId: product.id, productName: "Monitor", quantity: 30, unitPrice: 10 }] });
+            const orderId = created.body.data.id;
+
+            await request(app).patch(`${BASE}/${orderId}`).set("Cookie", adminCookie).send({ status: "SHIPPED" });
+            expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(70);
+
+            const cancelled = await request(app)
+                .patch(`${BASE}/${orderId}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+            expect(cancelled.status).toBe(200);
+            expect(cancelled.body.data.status).toBe("CANCELLED");
+
+            const after = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+            expect(after.stock).toBe(100);
+
+            const movements = await prisma.stockMovement.findMany({
+                where: { productId: product.id },
+                orderBy: { createdAt: "asc" },
+            });
+            expect(movements).toHaveLength(2);
+            expect(movements[1]!.type).toBe("IN");
+            expect(movements[1]!.delta).toBe(30);
+            expect(movements[1]!.stockAfter).toBe(100);
+        });
+
+        it("cancelar una orden PENDING no toca el stock", async () => {
+            const product = await createProduct("Webcam", 12);
+            const created = await request(app)
+                .post(BASE)
+                .set("Cookie", adminCookie)
+                .send({ items: [{ productId: product.id, productName: "Webcam", quantity: 4, unitPrice: 10 }] });
+
+            const res = await request(app)
+                .patch(`${BASE}/${created.body.data.id}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+            expect(res.status).toBe(200);
+
+            expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(12);
+            expect(await prisma.stockMovement.count({ where: { productId: product.id } })).toBe(0);
+        });
+
+        it("no repone dos veces si ya estaba cancelada", async () => {
+            const product = await createProduct("Auriculares", 20);
+            const created = await request(app)
+                .post(BASE)
+                .set("Cookie", adminCookie)
+                .send({ items: [{ productId: product.id, productName: "Auriculares", quantity: 5, unitPrice: 10 }] });
+            const orderId = created.body.data.id;
+
+            await request(app).patch(`${BASE}/${orderId}`).set("Cookie", adminCookie).send({ status: "SHIPPED" });
+            await request(app).patch(`${BASE}/${orderId}`).set("Cookie", adminCookie).send({ status: "CANCELLED" });
+
+            // Una orden cancelada ya no admite modificaciones
+            const again = await request(app)
+                .patch(`${BASE}/${orderId}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+            expect(again.status).toBe(400);
+
+            expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).stock).toBe(20);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     describe("Envío de orden (descuento de stock)", () => {
         it("descuenta stock y registra un movimiento OUT al marcar SHIPPED", async () => {
             const product = await createProduct("Teclado", 10);

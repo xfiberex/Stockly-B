@@ -5,7 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
-    "build": "tsc",
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc && tsc-alias",
     "check": "tsc --noEmit",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
@@ -19,16 +20,18 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "packageManager": "pnpm@11.2.2",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "^11.2.2",
+      "version": "11.2.2",
       "onFail": "download"
     }
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "prisma": "^7.8.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "colors": "^1.4.0",
@@ -62,9 +65,9 @@
     "@types/swagger-ui-express": "^4.1.8",
     "jest": "^30.4.2",
     "nodemon": "^3.1.14",
-    "prisma": "^7.8.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.11",
+    "tsc-alias": "^1.9.1",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   }

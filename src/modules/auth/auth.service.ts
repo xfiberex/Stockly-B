@@ -133,9 +133,18 @@ export const authService = {
         }
 
         const hashed = await hashPassword(newPassword);
+        // El reset es el flujo de recuperación de una cuenta potencialmente comprometida:
+        // se revocan también las sesiones activas para que un refresh token robado deje
+        // de servir de inmediato (mismo criterio que updatePassword).
         await prisma.user.update({
             where: { id: user.id },
-            data: { password: hashed, resetToken: null, resetExpires: null },
+            data: {
+                password: hashed,
+                resetToken: null,
+                resetExpires: null,
+                refreshToken: null,
+                refreshExpires: null,
+            },
         });
     },
 

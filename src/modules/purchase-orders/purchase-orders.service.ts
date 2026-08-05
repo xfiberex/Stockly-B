@@ -47,18 +47,64 @@ export const purchaseOrderService = {
         if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada");
 
         const wasReceived = existing.status !== "RECEIVED" && dto.status === "RECEIVED";
+        // Cancelar una orden ya recibida debe retirar del inventario lo que entró con ella.
+        const beingCancelled = existing.status === "RECEIVED" && dto.status === "CANCELLED";
 
         const orderData = {
             ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
             ...(dto.notes !== undefined && { notes: dto.notes }),
         };
 
-        // Sin recepción: actualización simple de campos / estado.
-        if (!wasReceived) {
+        // Sin recepción ni cancelación de una recepción: actualización simple de campos / estado.
+        if (!wasReceived && !beingCancelled) {
             return prisma.purchaseOrder.update({
                 where: { id },
                 data: { ...orderData, ...(dto.status !== undefined && { status: dto.status }) },
                 include: ORDER_INCLUDE,
+            });
+        }
+
+        // Cancelación de una orden recibida: se revierte el incremento de stock en una sola
+        // transacción. El decremento es condicional (stock >= cantidad) para no dejar stock
+        // negativo si esas unidades ya salieron por una venta; en ese caso se rechaza entera.
+        if (beingCancelled) {
+            return prisma.$transaction(async (tx) => {
+                const items = await tx.purchaseOrderItem.findMany({
+                    where: { purchaseOrderId: id, productId: { not: null } },
+                    include: { product: true },
+                });
+
+                for (const item of items) {
+                    if (!item.productId || !item.product) continue;
+
+                    const res = await tx.product.updateMany({
+                        where: { id: item.productId, stock: { gte: item.quantity } },
+                        data: { stock: { decrement: item.quantity } },
+                    });
+                    if (res.count === 0) {
+                        throw new HttpError(
+                            400,
+                            `No se puede cancelar: las unidades recibidas de "${item.product.name}" ya se consumieron. Disponible: ${item.product.stock}, requerido: ${item.quantity}`,
+                        );
+                    }
+
+                    const refreshed = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
+                    await tx.stockMovement.create({
+                        data: {
+                            productId: item.productId,
+                            type: "OUT",
+                            delta: -item.quantity,
+                            stockAfter: refreshed.stock,
+                            note: `Cancelación de orden de compra #${id.slice(0, 8)}`,
+                        },
+                    });
+                }
+
+                return tx.purchaseOrder.update({
+                    where: { id },
+                    data: { ...orderData, status: "CANCELLED" },
+                    include: ORDER_INCLUDE,
+                });
             });
         }
 

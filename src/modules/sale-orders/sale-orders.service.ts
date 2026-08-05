@@ -77,13 +77,50 @@ export const saleOrderService = {
         };
 
         const beingShipped = existing.status !== "SHIPPED" && dto.status === "SHIPPED";
+        // Cancelar una orden ya enviada debe devolver al inventario lo que salió con ella.
+        const beingCancelled = existing.status === "SHIPPED" && dto.status === "CANCELLED";
 
-        // Sin envío: actualización simple de campos del cliente / estado.
-        if (!beingShipped) {
+        // Sin envío ni cancelación de un envío: actualización simple de campos / estado.
+        if (!beingShipped && !beingCancelled) {
             return prisma.saleOrder.update({
                 where: { id },
                 data: { ...customerData, ...(dto.status !== undefined && { status: dto.status }) },
                 include: ORDER_INCLUDE,
+            });
+        }
+
+        // Cancelación de una orden enviada: reposición de stock, movimientos compensatorios
+        // y cambio de estado en UNA sola transacción, simétrica al envío.
+        if (beingCancelled) {
+            return prisma.$transaction(async (tx) => {
+                const items = await tx.saleOrderItem.findMany({
+                    where: { saleOrderId: id, productId: { not: null } },
+                });
+
+                for (const item of items) {
+                    if (!item.productId) continue;
+
+                    const product = await tx.product.update({
+                        where: { id: item.productId },
+                        data: { stock: { increment: item.quantity } },
+                    });
+
+                    await tx.stockMovement.create({
+                        data: {
+                            productId: item.productId,
+                            type: "IN",
+                            delta: item.quantity,
+                            stockAfter: product.stock,
+                            note: `Cancelación de orden de venta #${id.slice(0, 8)}`,
+                        },
+                    });
+                }
+
+                return tx.saleOrder.update({
+                    where: { id },
+                    data: { ...customerData, status: "CANCELLED" },
+                    include: ORDER_INCLUDE,
+                });
             });
         }
 
