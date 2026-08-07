@@ -89,6 +89,14 @@ export const authService = {
             throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
         }
 
+        // Defensa en profundidad: `setActive(false)` ya anula el refresh token
+        // (`users.service.ts`), pero comprobarlo aquí cubre cualquier otra vía de
+        // desactivación —una edición directa en base de datos, un flujo futuro— sin
+        // depender de que esa otra vía se acuerde de limpiar el token.
+        if (!user.isActive) {
+            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
+        }
+
         // Rotación: el token anterior queda inválido, se emite uno nuevo
         const { raw, hash: newHash } = generateToken();
         const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

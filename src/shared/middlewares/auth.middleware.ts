@@ -11,9 +11,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     try {
         const payload = verifyToken(token);
+        // `email` se carga aquí para que los controladores no repitan la consulta en
+        // cada mutación al registrar la auditoría (ver `req.userEmail`).
         const user = await prisma.user.findUnique({
             where: { id: payload.userId },
-            select: { id: true, role: true },
+            select: { id: true, role: true, isActive: true, email: true },
         });
 
         if (!user) {
@@ -21,8 +23,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
             return;
         }
 
+        // Sin esta comprobación, desactivar una cuenta no surtía efecto hasta que
+        // expirase su access token: hasta 15 minutos de acceso con la cuenta cerrada.
+        if (!user.isActive) {
+            res.status(403).json({ success: false, message: "Tu cuenta está desactivada" });
+            return;
+        }
+
         req.userId = user.id;
         req.userRole = user.role;
+        req.userEmail = user.email;
         next();
     } catch {
         res.status(401).json({ success: false, message: "Token inválido o expirado" });
@@ -44,6 +54,7 @@ declare global {
         interface Request {
             userId?: string;
             userRole?: string;
+            userEmail?: string;
         }
     }
 }

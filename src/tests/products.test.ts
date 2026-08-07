@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { updateProductSchema } from "@/modules/products/product.validator";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -405,6 +406,155 @@ describe("Products API", () => {
                 .set("Cookie", authCookie);
 
             expect(res.status).toBe(404);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // T1-04. Antes de T1-03 los esquemas no declaraban `tagIds`, así que Zod los
+    // descartaba y `validate.middleware.ts:20` entregaba al servicio un cuerpo sin
+    // etiquetas: la petición respondía 201 con 0 etiquetas asignadas. Estos tests
+    // vuelven a fallar si se revierte aquel cambio.
+    describe("Etiquetas de producto", () => {
+        let tagA: { id: string };
+        let tagB: { id: string };
+
+        // No se borran productos: los de otros bloques tienen movimientos de stock
+        // asociados y la FK lo impide. Basta con etiquetas nuevas en cada test, que
+        // además aíslan el filtro por `?tagId=`.
+        beforeEach(async () => {
+            await prisma.tag.deleteMany();
+            tagA = await prisma.tag.create({ data: { name: "Oferta", color: "#ef4444" } });
+            tagB = await prisma.tag.create({ data: { name: "Novedad", color: "#22c55e" } });
+        });
+
+        afterAll(async () => {
+            await prisma.tag.deleteMany();
+        });
+
+        it("201: crea un producto con las etiquetas asociadas", async () => {
+            const res = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Teclado", price: 49.99, categoryId, tagIds: [tagA.id, tagB.id] });
+
+            expect(res.status).toBe(201);
+            expect(res.body.data.tags.map((t: { id: string }) => t.id).sort()).toEqual([tagA.id, tagB.id].sort());
+
+            const persistido = await prisma.product.findUnique({
+                where: { id: res.body.data.id as string },
+                include: { tags: true },
+            });
+            expect(persistido?.tags).toHaveLength(2);
+        });
+
+        it("200: al actualizar, `set` sustituye el conjunto de etiquetas", async () => {
+            const creado = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Ratón", price: 19.99, categoryId, tagIds: [tagA.id] });
+
+            const res = await request(app)
+                .put(`${BASE}/${creado.body.data.id}`)
+                .set("Cookie", authCookie)
+                .send({ tagIds: [tagB.id] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.tags).toHaveLength(1);
+            expect(res.body.data.tags[0].id).toBe(tagB.id);
+        });
+
+        it("422: un `tagIds` con un UUID inválido se rechaza", async () => {
+            const res = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Inválido", price: 10, categoryId, tagIds: ["no-es-un-uuid"] });
+
+            expect(res.status).toBe(422);
+            expect(await prisma.product.count({ where: { name: "Inválido" } })).toBe(0);
+        });
+
+        it("200: el catálogo se puede filtrar por `?tagId=`", async () => {
+            const conEtiqueta = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Con etiqueta", price: 10, categoryId, tagIds: [tagA.id] });
+            await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Sin etiqueta", price: 10, categoryId });
+
+            const res = await request(app).get(`${BASE}?tagId=${tagA.id}`).set("Cookie", authCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.data).toHaveLength(1);
+            expect(res.body.data.data[0].id).toBe(conEtiqueta.body.data.id);
+        });
+
+        it("200: un `tagIds` vacío quita todas las etiquetas", async () => {
+            const creado = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Para vaciar", price: 10, categoryId, tagIds: [tagA.id, tagB.id] });
+            expect(creado.body.data.tags).toHaveLength(2);
+
+            const res = await request(app)
+                .put(`${BASE}/${creado.body.data.id}`)
+                .set("Cookie", authCookie)
+                .send({ tagIds: [] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.tags).toHaveLength(0);
+        });
+    });
+
+    // T1-13. El email del actor ya no sale de una consulta extra por mutación en cada
+    // controlador, sino de `req.userEmail`, que `requireAuth` carga junto al usuario.
+    describe("Auditoría del actor", () => {
+        it("el registro de auditoría conserva el email de quien hizo el cambio", async () => {
+            const res = await request(app)
+                .post(BASE)
+                .set("Cookie", authCookie)
+                .send({ name: "Auditado", price: 25, categoryId });
+
+            expect(res.status).toBe(201);
+
+            const registro = await prisma.auditLog.findFirst({
+                where: { entityId: res.body.data.id as string, action: "CREATE" },
+            });
+            expect(registro?.userEmail).toBe("products_user@example.com");
+        });
+    });
+
+    // El formato que produce `multipart/form-data` no puede ejercitarse por HTTP en
+    // esta suite: `upload.middleware` está mockeado y multer, que es quien parsea el
+    // cuerpo multipart, nunca corre. Se valida el esquema directamente, que es donde
+    // vive la normalización.
+    describe("Normalización de `tagIds` (formato multipart)", () => {
+        const UUID_A = "11111111-1111-4111-8111-111111111111";
+        const UUID_B = "22222222-2222-4222-8222-222222222222";
+
+        it("una sola etiqueta llega como cadena y se normaliza a array", () => {
+            const parsed = updateProductSchema.parse({ tagIds: UUID_A });
+            expect(parsed.tagIds).toEqual([UUID_A]);
+        });
+
+        it("varias etiquetas llegan como array y se conservan", () => {
+            const parsed = updateProductSchema.parse({ tagIds: [UUID_A, UUID_B] });
+            expect(parsed.tagIds).toEqual([UUID_A, UUID_B]);
+        });
+
+        it("la cadena vacía significa «ninguna etiqueta», no «no tocar»", () => {
+            const parsed = updateProductSchema.parse({ tagIds: "" });
+            expect(parsed.tagIds).toEqual([]);
+        });
+
+        it("la clave ausente deja las etiquetas intactas", () => {
+            const parsed = updateProductSchema.parse({ name: "Sin tocar etiquetas" });
+            expect(parsed.tagIds).toBeUndefined();
+        });
+
+        it("un UUID inválido dentro del array se rechaza", () => {
+            expect(() => updateProductSchema.parse({ tagIds: [UUID_A, "no-es-uuid"] })).toThrow();
         });
     });
 });

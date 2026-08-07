@@ -138,19 +138,24 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Etiquetas de producto (funcionalidad rota)
 
-- [ ] **[T1-03] Declarar `tagIds` en los esquemas de validación de producto**
+- [x] **[T1-03] Declarar `tagIds` en los esquemas de validación de producto** ✅ *(2026-08-07)*
   - **Área:** Arquitectura / funcionalidad
-  - **Ubicación:** `Stockly-B/src/modules/products/product.validator.ts:26-49`
+  - **Ubicación:** `Stockly-B/src/modules/products/product.validator.ts:9-24,44,58`, `Stockly-F/src/modules/products/api/product.api.ts:21-30`
   - **Qué hacer:** Ni `createProductSchema` ni `updateProductSchema` declaran `tagIds`; Zod descarta las claves desconocidas y `validate.middleware.ts:20` reemplaza `req.body` con el resultado parseado, por lo que el servicio nunca las recibe. Añadir un campo `tagIds` con `preprocess` que normalice a array (multipart envía un string cuando hay un solo valor) y valide UUIDs.
+    **Implementado.** El servicio ya sabía manejar etiquetas (`connect` al crear, `set` al actualizar); solo el validador las descartaba. `tagIdsOptional` normaliza cadena → array, filtra vacíos y valida UUIDs.
+    **Un hueco adicional que salió al hacerlo:** con `FormData`, una lista vacía no se puede expresar —la clave simplemente no viaja, y eso significa «no tocar las etiquetas»—, así que **quitar todas era imposible**. El cliente envía ahora `tagIds: ""` explícito y el validador lo traduce a `[]`.
   - **Criterio de aceptación:** `POST /api/v1/products` con `tagIds` en el `FormData` crea el producto con las etiquetas asociadas. Verificado hoy: 201 con 0 etiquetas asignadas.
+  - **Verificado localmente (2026-08-07):** ver T1-04.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T1-04] Tests de asignación de etiquetas a productos**
+- [x] **[T1-04] Tests de asignación de etiquetas a productos** ✅ *(2026-08-07)*
   - **Área:** QA
   - **Ubicación:** `Stockly-B/src/tests/products.test.ts`
   - **Qué hacer:** Crear un producto con una etiqueta y verificar la relación persistida; actualizar un producto sustituyendo el conjunto de etiquetas (`set`); enviar un `tagIds` con un UUID inválido y esperar 422; filtrar el catálogo por `?tagId=` y comprobar que devuelve el producto.
   - **Criterio de aceptación:** los 4 tests pasan y fallan si se revierte T1-03.
+  - **Verificado localmente (2026-08-07):** **10 tests**, los 4 pedidos más uno de vaciado y cinco de normalización. Los 4 de HTTP fallan si se revierte T1-03.
+    El formato real de `multipart/form-data` **no puede ejercitarse por HTTP en esta suite**: `upload.middleware` está mockeado y multer, que es quien parsea ese cuerpo, nunca llega a correr — un `.field()` acaba en 422 por un `req.body` sin parsear. La normalización se valida entonces contra el esquema directamente, que es donde vive: cadena → array, array → array, `""` → `[]`, clave ausente → `undefined`, UUID inválido → error.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-03
 
@@ -227,27 +232,30 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Autenticación y autorización
 
-- [ ] **[T1-11] Comprobar `isActive` en `requireAuth`**
+- [x] **[T1-11] Comprobar `isActive` en `requireAuth`** ✅ *(2026-08-07)*
   - **Área:** Seguridad
-  - **Ubicación:** `Stockly-B/src/shared/middlewares/auth.middleware.ts:14-17`
+  - **Ubicación:** `Stockly-B/src/shared/middlewares/auth.middleware.ts:14-38`
   - **Qué hacer:** El middleware solo selecciona `id` y `role`, por lo que un usuario desactivado conserva acceso durante toda la vida de su access token (15 min). Añadir `isActive` al `select` y devolver 403 si es falso. Aprovechar el mismo cambio para incluir `email` (ver T1-13).
   - **Criterio de aceptación:** desactivar un usuario desde el panel de administración invalida inmediatamente sus peticiones (403), sin esperar a que expire el token.
+  - **Verificado localmente (2026-08-07):** test nuevo — `GET /auth/me` responde 200, se desactiva la cuenta en base de datos y **la misma cookie pasa a devolver 403** al instante, con el mensaje «Tu cuenta está desactivada».
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T1-12] Comprobar `isActive` también en el endpoint de refresh**
+- [x] **[T1-12] Comprobar `isActive` también en el endpoint de refresh** ✅ *(2026-08-07)*
   - **Área:** Seguridad
-  - **Ubicación:** `Stockly-B/src/modules/auth/auth.service.ts:84-102`
+  - **Ubicación:** `Stockly-B/src/modules/auth/auth.service.ts:88-99`
   - **Qué hacer:** Defensa en profundidad: `refresh` no valida `isActive` ni `isVerified`. Aunque `setActive(false)` ya anula el refresh token (`users.service.ts:63-68`), la comprobación explícita cubre cualquier ruta futura de desactivación.
   - **Criterio de aceptación:** un refresh token válido de un usuario con `isActive: false` (modificado directamente en base de datos) devuelve 401.
+  - **Verificado localmente (2026-08-07):** test nuevo que desactiva la cuenta **por una vía que no limpia el refresh token** —una escritura directa en base de datos, justo el hueco que cubre esta defensa— y comprueba que `POST /auth/refresh` devuelve 401.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T1-13] Centralizar `getActorEmail` y eliminar la consulta redundante**
+- [x] **[T1-13] Centralizar `getActorEmail` y eliminar la consulta redundante** ✅ *(2026-08-07)*
   - **Área:** Refactorización / Rendimiento
   - **Ubicación:** `Stockly-B/src/modules/products/product.controller.ts:7-13`, `sale-orders/sale-orders.controller.ts:7-13`, `purchase-orders/purchase-orders.controller.ts:7-13`
   - **Qué hacer:** La misma función está copiada literalmente tres veces, usa un `await import()` dinámico innecesario y ejecuta una consulta extra a la base de datos en **cada mutación**. Cargar el email en `requireAuth`, exponerlo como `req.userEmail` (declarándolo en la interfaz global de `Request`) y borrar las tres copias.
   - **Criterio de aceptación:** las tres funciones locales desaparecen; los registros de `AuditLog` siguen conteniendo `userEmail`; los tests de auditoría siguen pasando.
+  - **Verificado localmente (2026-08-07):** las tres copias eliminadas y **12 llamadas** sustituidas por `req.userEmail` — eran 12 consultas extra a base de datos, una por cada mutación. Test nuevo: crear un producto por HTTP deja el `AuditLog` con el email correcto del actor. Los tests de auditoría siguen pasando.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-11
 
@@ -279,19 +287,22 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Interfaz
 
-- [ ] **[T1-17] Reinicializar el formulario al editar una etiqueta**
+- [x] **[T1-17] Reinicializar el formulario al editar una etiqueta** ✅ *(2026-08-07)*
   - **Área:** UI/UX
-  - **Ubicación:** `Stockly-F/src/modules/tags/components/TagsPage.tsx:151`
+  - **Ubicación:** `Stockly-F/src/modules/tags/components/TagsPage.tsx:157`
   - **Qué hacer:** `TagFormModal` está montado de forma permanente y `useForm` solo aplica `defaultValues` en el primer montaje, por lo que editar una etiqueta abre el modal con el nombre vacío. Añadir `key={editingTag?.id ?? "new"}`, el mismo patrón que ya usan `ProductsPage:255`, `SuppliersPage:183` y `CatalogItemSection:180`.
   - **Criterio de aceptación:** pulsar «Editar» en una etiqueta abre el modal con su nombre y su color precargados; pulsar «Nueva etiqueta» a continuación abre el modal vacío.
+  - **Verificado localmente (2026-08-07):** `TagsPage.test.tsx` nuevo con 3 tests — precarga al editar, cambio de una etiqueta a otra sin arrastrar datos de la anterior, y modal vacío al crear después de editar.
+    **De paso:** los botones de editar y eliminar eran solo icono, sin nombre accesible — un lector de pantalla anunciaba «botón» sin decir sobre qué etiqueta. Añadido `aria-label` («Editar Oferta», «Eliminar Oferta»), que además era la única forma de localizarlos de manera robusta en el test.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T1-18] Guardia de rol en las rutas de administración del frontend**
+- [x] **[T1-18] Guardia de rol en las rutas de administración del frontend** ✅ *(2026-08-07)*
   - **Área:** UI/UX
-  - **Ubicación:** `Stockly-F/src/shared/components/ProtectedRoute.tsx:9-22`, `Stockly-F/src/routes/index.tsx:70-77`
+  - **Ubicación:** `Stockly-F/src/shared/components/ProtectedRoute.tsx:9-33`, `Stockly-F/src/routes/index.tsx:70-79`
   - **Qué hacer:** `ProtectedRoute` solo comprueba que exista sesión. Un usuario con rol `USER` que abra `/settings`, `/audit-logs` o `/admin/users` por URL directa ve una página rota con toasts de 403 (el backend sí protege correctamente). Añadir una prop `requireRole` que redirija a `/` cuando el rol no coincida, y aplicarla a las tres rutas.
   - **Criterio de aceptación:** un usuario `USER` que navegue a `/admin/users` es redirigido al dashboard sin peticiones fallidas; un `ADMIN` accede con normalidad.
+  - **Verificado localmente (2026-08-07):** 3 tests nuevos en `ProtectedRoute.test.tsx` — un `USER` en `/admin/users` acaba en el dashboard, un `ADMIN` ve la página, y sin `requireRole` sigue bastando con tener sesión. La redirección va al **dashboard, no al login**: la sesión es válida, lo que falta es el permiso. Aplicado a `/audit-logs`, `/settings` y `/admin/users`.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
@@ -1067,6 +1078,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-06 | **Decisión: sin CI** | `Stockly-B/.github/` y `Stockly-F/.github/` eliminados | Se descarta GitHub Actions y cualquier pipeline. Toda la verificación (tipos, lint, tests, cobertura, build, E2E) se ejecuta en local. T1-01 y T1-02 se reformulan como guiones de verificación local. También se quitó la dependencia de `process.env.CI` en `playwright.config.ts:11-12`. |
 | 2026-08-07 | **T1-01** Script `verify` del backend — **completada** | `pnpm verify` entero en verde contra el PostgreSQL local (5433): `generate` ✅, `migrate deploy` ✅, `check` ✅, `test:coverage` ✅ 205/205, `build` ✅, smoke ✅ `/api/v1/health` → 200, salida **0**. Camino de fallo comprobado: con `dist/server.js` renombrado sale **1** | Nuevo `scripts/smoke.js`. Usa `SMOKE_PORT` (3100) para no chocar con el `dev`, y `process.exitCode` en vez de `process.exit()`: en Windows, salir con el hijo aún cerrándose aborta libuv (`UV_HANDLE_CLOSING`) y devuelve un código basura pese a haber pasado la comprobación. |
 | 2026-08-07 | **T1-05** Payload de `PATCH /settings` — **completada** | Contra el backend real: el payload antiguo `{updates:{…}}` responde **200 con `data` vacío y no persiste**; el objeto plano persiste `true`. Ajuste restaurado a `false` | El 200 mudo es lo que hizo invisible el fallo. Convertirlo en 422 es T1-07. |
+| 2026-08-07 | **T1-03 + T1-04** Etiquetas de producto — **completadas** | 10 tests nuevos: crear con etiquetas, `set` al actualizar, 422 con UUID inválido, filtro `?tagId=`, vaciado, y 5 de normalización del esquema | El servicio ya sabía manejarlas; solo el validador las descartaba. **Hueco extra encontrado:** con `FormData` una lista vacía no viaja, así que quitar todas las etiquetas era imposible — ahora el cliente manda `tagIds: ""` y el validador lo traduce a `[]`. El formato multipart no es ejercitable por HTTP en la suite (multer está mockeado), así que esa parte se valida contra el esquema. |
+| 2026-08-07 | **T1-17** Formulario de etiquetas al editar — **completada** | `TagsPage.test.tsx` nuevo, 3 tests: precarga, cambio entre etiquetas y modal vacío al crear | `key={editingTag?.id ?? "new"}`. De paso, `aria-label` en los botones de editar y eliminar, que eran solo icono y no tenían nombre accesible. |
+| 2026-08-07 | **T1-11 + T1-12 + T1-13** `isActive` y actor de auditoría — **completadas** | Tests nuevos: la misma cookie pasa de 200 a **403** al desactivar la cuenta; refresh de cuenta desactivada → **401**; el `AuditLog` conserva el email del actor. Backend **222/222** | Un solo cambio en el `select` de `requireAuth` resuelve las tres: `isActive` cierra la ventana de 15 min de una cuenta desactivada y `email` elimina **12 consultas redundantes**, una por mutación. Las tres copias de `getActorEmail` borradas. |
+| 2026-08-07 | **T1-18** Guardia de rol en el frontend — **completada** | 3 tests: `USER` en `/admin/users` → dashboard, `ADMIN` accede, y sin `requireRole` basta la sesión | Redirige al dashboard, no al login: la sesión es válida, falta el permiso. Aplicado a `/audit-logs`, `/settings` y `/admin/users`. |
 | 2026-08-07 | **T1-07** Validación Zod en `PATCH /settings` — **completada** | 5 tests de integración nuevos: clave desconocida, payload `{updates:{…}}`, tipo equivocado, cuerpo no-objeto y cuerpo vacío → **422** en los cinco. `verify` backend ✅ **209/209** | Esquema generado desde `SETTINGS_CATALOG`: un ajuste nuevo se valida solo. Cierra el 200 mudo que dejó vivir a T1-05. **Cambio de contrato:** el endpoint deja de tolerar claves desconocidas. |
 | 2026-08-07 | **T1-06** Tipo de `SettingEntry.value` — **completada** | `GET /settings` real devuelve `"value":false` (boolean) y **sin** `defaultValue`: los dos desajustes confirmados | Nuevo `SettingValue = boolean \| string \| number` y `esVerdadero()`. Se eliminó `defaultValue` del tipo, que el backend nunca envía. El mock del test se corrigió: era el ejemplo canónico del informe. |
 | 2026-08-07 | **T1-08** Efecto de sincronización de `SettingsPage` — **completada** | `eslint` limpio en el archivo ✅ · 7/7 tests (4 existentes + 3 nuevos) | Estado `cambios` solo con lo tocado y valores derivados en render. De paso, el guardado envía únicamente los ajustes modificados. Sin verificar: el recuento de renders con el Profiler. |
@@ -1080,11 +1095,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
-| Tier 1 | 8 | 26 | 31 % |
+| Tier 1 | 15 | 26 | 58 % |
 | Tier 2 | 0 | 41 | 0 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **17** | **100** | **17 %** |
+| **Total** | **24** | **100** | **24 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1092,10 +1107,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-07) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **209/209** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **87.12 %** | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **190/190** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **23.98 %** | ≥ 45 % |
+| Tests backend | 198/198 ✅ | **222/222** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **87.41 %** | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **196/196** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **25.71 %** | ≥ 45 % |
+| Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |
 | Conflictos de merge sin resolver en el árbol | 1 *(no detectado en la auditoría)* | **0** ✅ | 0 |
 | `pnpm check` (ambos) | ✅ sin errores | ✅ sin errores | mantener |

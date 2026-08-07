@@ -565,4 +565,46 @@ describe("Auth API", () => {
             expect(res.status).toBe(401);
         });
     });
+
+    // -----------------------------------------------------------------------
+    // T1-11 y T1-12. `requireAuth` solo seleccionaba `id` y `role`, así que una
+    // cuenta desactivada conservaba acceso hasta que expirase su access token:
+    // 15 minutos de margen. Y `refresh` tampoco miraba `isActive`.
+    describe("Cuenta desactivada", () => {
+        it("403: un access token válido deja de servir en cuanto la cuenta se desactiva", async () => {
+            const usuario = await createUser({ email: "desactivable@example.com" });
+            const cookie = getAuthCookie(usuario.id);
+
+            const antes = await request(app).get(`${BASE}/me`).set("Cookie", cookie);
+            expect(antes.status).toBe(200);
+
+            await prisma.user.update({ where: { id: usuario.id }, data: { isActive: false } });
+
+            // Mismo token, sin esperar a que caduque.
+            const despues = await request(app).get(`${BASE}/me`).set("Cookie", cookie);
+            expect(despues.status).toBe(403);
+            expect(despues.body.message).toMatch(/desactivada/i);
+        });
+
+        it("401: el refresh de una cuenta desactivada directamente en base de datos se rechaza", async () => {
+            await createUser({ email: "desactivada_refresh@example.com", password: "Test1234!" });
+
+            const login = await request(app)
+                .post(`${BASE}/login`)
+                .send({ email: "desactivada_refresh@example.com", password: "Test1234!" });
+
+            const cookies: string[] = login.headers["set-cookie"] as unknown as string[];
+            const refreshCookie = cookies.find((c) => c.startsWith("refreshToken="))!.split(";")[0]!;
+
+            // Desactivación por una vía que NO limpia el refresh token, que es
+            // justo el hueco que cubre la comprobación explícita.
+            await prisma.user.update({
+                where: { email: "desactivada_refresh@example.com" },
+                data: { isActive: false },
+            });
+
+            const res = await request(app).post(`${BASE}/refresh`).set("Cookie", refreshCookie);
+            expect(res.status).toBe(401);
+        });
+    });
 });

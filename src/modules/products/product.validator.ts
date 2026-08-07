@@ -6,6 +6,20 @@ const uuidOptional = z.preprocess(
     z.string().uuid("Debe ser un UUID válido").optional(),
 );
 
+// `multipart/form-data` no tiene arrays: el cliente repite la clave `tagIds` una vez
+// por etiqueta, así que llega como cadena cuando hay una sola y como array cuando hay
+// varias. La cadena vacía es la forma de decir «ninguna etiqueta» — sin ella no se
+// podrían quitar todas, porque una clave ausente significa «no tocar las etiquetas».
+const tagIdsOptional = z.preprocess(
+    (v) => {
+        if (v === undefined || v === null) return undefined;
+        if (v === "") return [];
+        const lista = Array.isArray(v) ? v : [v];
+        return lista.filter((id) => id !== "");
+    },
+    z.array(z.string().uuid("Cada etiqueta debe ser un UUID válido")).optional(),
+);
+
 export const importProductsSchema = z.object({
     products: z
         .array(
@@ -33,6 +47,7 @@ export const createProductSchema = z.object({
     categoryId: uuidOptional,
     brandId: uuidOptional,
     supplierId: uuidOptional,
+    tagIds: tagIdsOptional,
 });
 
 export const updateProductSchema = z.object({
@@ -45,6 +60,7 @@ export const updateProductSchema = z.object({
     categoryId: uuidOptional,
     brandId: uuidOptional,
     supplierId: uuidOptional,
+    tagIds: tagIdsOptional,
     removeImage: z.string().optional(),
 });
 

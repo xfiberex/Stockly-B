@@ -4,14 +4,6 @@ import { auditService } from "@/modules/audit-logs";
 import { buildCsv } from "@/shared/lib/csv";
 import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
-async function getActorEmail(userId: string): Promise<string | undefined> {
-    try {
-        const { prisma } = await import("@/shared/lib/prisma");
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-        return user?.email;
-    } catch { return undefined; }
-}
-
 export async function getProducts(
     req: Request<{}, {}, {}, ProductQuery>,
     res: Response,
@@ -46,7 +38,7 @@ export async function createProduct(
     try {
         const product = await productService.create(req.body, req.file);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "CREATE", "Product", product.id, { name: product.name },
         );
         res.status(201).json({ success: true, message: "Producto creado exitosamente", data: product });
@@ -63,7 +55,7 @@ export async function updateProduct(
     try {
         const product = await productService.update(req.params.id, req.body, req.file);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "UPDATE", "Product", req.params.id,
         );
         res.json({ success: true, message: "Producto actualizado exitosamente", data: product });
@@ -80,7 +72,7 @@ export async function deleteProduct(
     try {
         await productService.delete(req.params.id);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "DELETE", "Product", req.params.id,
         );
         res.json({ success: true, message: "Producto eliminado correctamente" });
@@ -97,7 +89,7 @@ export async function restoreProduct(
     try {
         const product = await productService.restore(req.params.id);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "RESTORE", "Product", req.params.id,
         );
         res.json({ success: true, message: "Producto restaurado correctamente", data: product });
@@ -186,7 +178,7 @@ export async function createManualMovement(
     try {
         const product = await productService.createManualMovement(req.params.id, req.body);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "STOCK_MOVEMENT", "Product", req.params.id,
             { type: req.body.type, quantity: req.body.quantity, reason: req.body.reason },
         );
@@ -204,7 +196,7 @@ export async function bulkUpdateStock(
     try {
         const results = await productService.bulkUpdateStock(req.body);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "BULK_STOCK", "Product", undefined,
             { items: req.body.items.length, reason: req.body.reason },
         );

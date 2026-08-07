@@ -4,14 +4,6 @@ import { auditService } from "@/modules/audit-logs";
 import { buildCsv } from "@/shared/lib/csv";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
-async function getActorEmail(userId: string): Promise<string | undefined> {
-    try {
-        const { prisma } = await import("@/shared/lib/prisma");
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-        return user?.email;
-    } catch { return undefined; }
-}
-
 export async function getAllSaleOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const result = await saleOrderService.getAll(req.query as Record<string, string>);
@@ -34,7 +26,7 @@ export async function createSaleOrder(
     try {
         const order = await saleOrderService.create(req.body);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "CREATE", "SaleOrder", order.id,
         );
         res.status(201).json({ success: true, message: "Orden de venta creada exitosamente", data: order });
@@ -52,7 +44,7 @@ export async function updateSaleOrder(
             : req.body.status === "CANCELLED" ? "SALE_CANCEL"
             : "UPDATE";
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             action, "SaleOrder", req.params.id,
         );
         res.json({ success: true, message: "Orden de venta actualizada", data: order });
@@ -63,7 +55,7 @@ export async function deleteSaleOrder(req: Request<{ id: string }>, res: Respons
     try {
         await saleOrderService.delete(req.params.id);
         await auditService.log(
-            { userId: req.userId, userEmail: await getActorEmail(req.userId!) },
+            { userId: req.userId, userEmail: req.userEmail },
             "DELETE", "SaleOrder", req.params.id,
         );
         res.json({ success: true, message: "Orden de venta eliminada" });
