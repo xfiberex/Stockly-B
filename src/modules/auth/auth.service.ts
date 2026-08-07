@@ -13,16 +13,19 @@ export const authService = {
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-        // El primer usuario registrado obtiene rol ADMIN
-        const userCount = await prisma.user.count();
-        const role = userCount === 0 ? "ADMIN" : "USER";
-
+        // El registro público SIEMPRE crea usuarios con rol USER. Antes el primero
+        // se convertía en ADMIN, lo que en un despliegue sin seed regalaba el panel
+        // de administración al primer visitante que pasara por la página de registro
+        // — y con una carrera de propina: dos registros simultáneos leían ambos
+        // `count() === 0` y salían los dos ADMIN. El administrador inicial se crea
+        // por seed (`prisma/seed.ts`), que es explícito y no depende de quién llegue
+        // antes. Para promover a alguien está `PATCH /users/:id/role`.
         await prisma.user.create({
             data: {
                 name,
                 email,
                 password: hashed,
-                role,
+                role: "USER",
                 verifyToken: hash,
                 verifyExpires: expires,
             },

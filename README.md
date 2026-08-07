@@ -267,7 +267,7 @@ La documentación interactiva completa está en `http://localhost:3000/api-docs`
 
 El seed crea:
 
-- **2 usuarios** (`admin@stockly.app` / `laura@stockly.app`)
+- **3 usuarios** (`admin@stockly.app`, `carlos@stockly.app` y `laura@stockly.app`)
 - **6 categorías** y **8 marcas**
 - **3 proveedores**
 - **~30 productos** con precios, stock y stock mínimo variados
@@ -278,4 +278,7 @@ El seed crea:
 | Rol | Email | Contraseña |
 |---|---|---|
 | ADMIN | `admin@stockly.app` | `Admin1234!` |
+| ADMIN | `carlos@stockly.app` | `Admin1234!` |
 | USER | `laura@stockly.app` | `User1234!` |
+
+> **El administrador inicial sale de aquí.** El registro público (`POST /auth/register`) crea **siempre** usuarios con rol `USER`. En un despliegue nuevo hay que ejecutar `pnpm db:seed` —o promover a alguien con `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN— porque ningún registro se convierte en administrador por sí solo.

@@ -46,6 +46,17 @@ describe("Auth API", () => {
             );
         });
 
+        // T1-22. `ana@example.com` es el primer registro sobre la base que limpia el
+        // `beforeAll`: exactamente el caso en el que antes se otorgaba rol ADMIN al
+        // primer visitante que pasara por la página de registro.
+        it("el primer usuario registrado NO recibe rol ADMIN", async () => {
+            const total = await prisma.user.count();
+            expect(total).toBe(1); // es realmente el primero
+
+            const primero = await prisma.user.findUnique({ where: { email: "ana@example.com" } });
+            expect(primero?.role).toBe("USER");
+        });
+
         it("409: email ya registrado", async () => {
             const res = await request(app).post(`${BASE}/register`).send({
                 name: "Ana Dup",

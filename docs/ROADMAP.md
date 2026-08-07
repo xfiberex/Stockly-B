@@ -259,11 +259,13 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** T1-11
 
-- [ ] **[T1-14] Vincular los mensajes de error de formulario a sus campos**
+- [x] **[T1-14] Vincular los mensajes de error de formulario a sus campos** ✅ *(2026-08-07)*
   - **Área:** Accesibilidad
-  - **Ubicación:** `Stockly-F/src/shared/components/Input.tsx:18-29`, `Stockly-F/src/shared/components/Select.tsx:22-47`
+  - **Ubicación:** `Stockly-F/src/shared/components/Input.tsx:9-42`, `Stockly-F/src/shared/components/Select.tsx:12-58`
   - **Qué hacer:** El error se pinta en un `<p>` sin relación programática con el campo, y el único indicador visual es el color del borde. Añadir `aria-invalid`, `aria-describedby` apuntando a un `<p id={`${id}-error`} role="alert">`. Estos dos componentes son la base de **todos** los formularios de la aplicación, así que la corrección se propaga sola.
   - **Criterio de aceptación:** enviar un formulario inválido hace que el lector de pantalla anuncie el mensaje de error asociado al campo enfocado; `Input.test.tsx` y `Select.test.tsx` incluyen aserciones de `aria-invalid` y `aria-describedby`.
+  - **Verificado localmente (2026-08-07):** 6 tests nuevos (3 por componente) con `aria-invalid`, `aria-describedby`, `toHaveAccessibleDescription` y `role="alert"`, más el caso negativo: **sin error no queda ningún atributo ARIA residual**, que es tan importante como el positivo — un `aria-invalid="false"` permanente confunde igual. El `id` del mensaje se deriva del `id` del campo (`${id}-error`), así que la corrección se propaga sola a todos los formularios de la aplicación.
+    **No verificado:** el anuncio real en un lector de pantalla; se comprueba la semántica que lo hace posible, no la locución.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
@@ -332,11 +334,14 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** T0-02
 
-- [ ] **[T1-22] Retirar la promoción automática a ADMIN del primer usuario**
+- [x] **[T1-22] Retirar la promoción automática a ADMIN del primer usuario** ✅ *(2026-08-07)*
   - **Área:** Seguridad
-  - **Ubicación:** `Stockly-B/src/modules/auth/auth.service.ts:16-18`
+  - **Ubicación:** `Stockly-B/src/modules/auth/auth.service.ts:16-30`, `Stockly-B/README.md` (sección Seed)
   - **Qué hacer:** `userCount === 0 ? "ADMIN" : "USER"` convierte en administrador al primer visitante que se registre en un despliegue sin seed, y tiene una condición de carrera (dos registros concurrentes leen ambos `count() === 0`). Crear el administrador inicial exclusivamente por seed o por un comando de bootstrap explícito. Si se conserva, envolver comprobación y creación en una transacción `Serializable`.
+    **Implementado por la vía limpia:** el rol se fija a `"USER"` y desaparece el `count()`. Sin consulta previa no hay carrera que resolver, así que no hizo falta la transacción `Serializable`. El administrador inicial sale del seed, que ya creaba dos (`admin@` y `carlos@`), y para promover a alguien existe `PATCH /api/v1/users/:id/role` — ambos verificados antes de escribirlo.
   - **Criterio de aceptación:** el registro público siempre crea usuarios con rol `USER`; el seed sigue generando el administrador; hay un test que verifica el rol del primer usuario registrado.
+  - **Verificado localmente (2026-08-07):** test nuevo sobre el **primer** registro de una base recién limpiada —el caso exacto que antes daba ADMIN— comprobando `count() === 1` y `role === "USER"`. Backend **223/223**.
+  - **Consecuencia operativa:** en un despliegue nuevo **nadie es administrador hasta ejecutar el seed**. Documentado en el README del backend, donde de paso se corrigió que el seed crea 3 usuarios y no 2 (dato erróneo, del ámbito de T1-25).
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
@@ -1078,6 +1083,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-06 | **Decisión: sin CI** | `Stockly-B/.github/` y `Stockly-F/.github/` eliminados | Se descarta GitHub Actions y cualquier pipeline. Toda la verificación (tipos, lint, tests, cobertura, build, E2E) se ejecuta en local. T1-01 y T1-02 se reformulan como guiones de verificación local. También se quitó la dependencia de `process.env.CI` en `playwright.config.ts:11-12`. |
 | 2026-08-07 | **T1-01** Script `verify` del backend — **completada** | `pnpm verify` entero en verde contra el PostgreSQL local (5433): `generate` ✅, `migrate deploy` ✅, `check` ✅, `test:coverage` ✅ 205/205, `build` ✅, smoke ✅ `/api/v1/health` → 200, salida **0**. Camino de fallo comprobado: con `dist/server.js` renombrado sale **1** | Nuevo `scripts/smoke.js`. Usa `SMOKE_PORT` (3100) para no chocar con el `dev`, y `process.exitCode` en vez de `process.exit()`: en Windows, salir con el hijo aún cerrándose aborta libuv (`UV_HANDLE_CLOSING`) y devuelve un código basura pese a haber pasado la comprobación. |
 | 2026-08-07 | **T1-05** Payload de `PATCH /settings` — **completada** | Contra el backend real: el payload antiguo `{updates:{…}}` responde **200 con `data` vacío y no persiste**; el objeto plano persiste `true`. Ajuste restaurado a `false` | El 200 mudo es lo que hizo invisible el fallo. Convertirlo en 422 es T1-07. |
+| 2026-08-07 | **T1-14** Errores de formulario atados a su campo — **completada** | 6 tests nuevos en `Input` y `Select`: `aria-invalid`, `aria-describedby`, `toHaveAccessibleDescription`, `role="alert"` y el caso negativo sin atributos residuales | El `id` del mensaje se deriva del `id` del campo, así que la corrección se propaga a **todos** los formularios. Sin verificar: la locución real en un lector de pantalla. |
+| 2026-08-07 | **T1-22** Sin promoción automática a ADMIN — **completada** | Test sobre el primer registro de una base limpia: `count() === 1` y `role === "USER"`. Backend **223/223** | Se fija `role: "USER"` y desaparece el `count()`: sin consulta previa no hay carrera, así que no hizo falta la transacción `Serializable`. **Consecuencia operativa:** en un despliegue nuevo nadie es admin hasta ejecutar el seed — documentado en el README, donde además el recuento de usuarios del seed estaba mal (2 en vez de 3). |
 | 2026-08-07 | **T1-03 + T1-04** Etiquetas de producto — **completadas** | 10 tests nuevos: crear con etiquetas, `set` al actualizar, 422 con UUID inválido, filtro `?tagId=`, vaciado, y 5 de normalización del esquema | El servicio ya sabía manejarlas; solo el validador las descartaba. **Hueco extra encontrado:** con `FormData` una lista vacía no viaja, así que quitar todas las etiquetas era imposible — ahora el cliente manda `tagIds: ""` y el validador lo traduce a `[]`. El formato multipart no es ejercitable por HTTP en la suite (multer está mockeado), así que esa parte se valida contra el esquema. |
 | 2026-08-07 | **T1-17** Formulario de etiquetas al editar — **completada** | `TagsPage.test.tsx` nuevo, 3 tests: precarga, cambio entre etiquetas y modal vacío al crear | `key={editingTag?.id ?? "new"}`. De paso, `aria-label` en los botones de editar y eliminar, que eran solo icono y no tenían nombre accesible. |
 | 2026-08-07 | **T1-11 + T1-12 + T1-13** `isActive` y actor de auditoría — **completadas** | Tests nuevos: la misma cookie pasa de 200 a **403** al desactivar la cuenta; refresh de cuenta desactivada → **401**; el `AuditLog` conserva el email del actor. Backend **222/222** | Un solo cambio en el `select` de `requireAuth` resuelve las tres: `isActive` cierra la ventana de 15 min de una cuenta desactivada y `email` elimina **12 consultas redundantes**, una por mutación. Las tres copias de `getActorEmail` borradas. |
@@ -1095,11 +1102,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
-| Tier 1 | 15 | 26 | 58 % |
+| Tier 1 | 17 | 26 | 65 % |
 | Tier 2 | 0 | 41 | 0 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **24** | **100** | **24 %** |
+| **Total** | **26** | **100** | **26 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1107,10 +1114,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-07) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **222/222** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **87.41 %** | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **196/196** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **25.71 %** | ≥ 45 % |
+| Tests backend | 198/198 ✅ | **223/223** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **87.39 %** | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **202/202** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **25.81 %** | ≥ 45 % |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |
 | Conflictos de merge sin resolver en el árbol | 1 *(no detectado en la auditoría)* | **0** ✅ | 0 |
