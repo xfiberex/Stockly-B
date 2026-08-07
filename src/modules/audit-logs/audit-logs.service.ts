@@ -1,4 +1,5 @@
 import { prisma } from "@/shared/lib/prisma";
+import { parsePagination } from "@/shared/lib/pagination";
 import type { Prisma } from "@/generated/prisma/client";
 
 export type AuditAction =
@@ -40,9 +41,7 @@ export const auditService = {
     },
 
     async getAll(query: { page?: string; limit?: string; entity?: string; action?: string; userId?: string }) {
-        const page = Math.max(1, parseInt(query.page ?? "1", 10));
-        const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "50", 10)));
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 50 });
 
         const where = {
             ...(query.entity && { entity: query.entity }),

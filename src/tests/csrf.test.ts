@@ -28,6 +28,32 @@ describe("Protección CSRF (double-submit)", () => {
         expect(res.status).not.toBe(403);
     });
 
+    // T1-19: la exención por prefijo `/api/v1/auth/` cubría también estas tres rutas,
+    // que son autenticadas y mutantes. `logout` era explotable por formulario cross-site.
+    it.each([
+        ["POST", "/api/v1/auth/logout"],
+        ["PUT", "/api/v1/auth/me"],
+        ["PATCH", "/api/v1/auth/me/password"],
+    ])("exige token CSRF en %s %s", async (method, path) => {
+        const res = await request(app)[method.toLowerCase() as "post" | "put" | "patch"](path).send({});
+        expect(res.status).toBe(403);
+        expect(res.body.message).toMatch(/CSRF/i);
+    });
+
+    it.each([
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/verify-email",
+        "/api/v1/auth/resend-verification",
+        "/api/v1/auth/forgot-password",
+        "/api/v1/auth/reset-password",
+    ])("no exige token CSRF en la ruta pública %s", async (path) => {
+        const res = await request(app).post(path).send({});
+        // Puede fallar por validación o credenciales, pero nunca por CSRF.
+        expect(res.status).not.toBe(403);
+    });
+
     it("rechaza una petición mutante sin token CSRF", async () => {
         const res = await request(app).post("/api/v1/products").send({ name: "X", price: 1 });
         expect(res.status).toBe(403);

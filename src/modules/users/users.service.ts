@@ -1,5 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
+import { parsePagination } from "@/shared/lib/pagination";
 
 const USER_SELECT = {
     id: true,
@@ -14,9 +15,7 @@ const USER_SELECT = {
 
 export const usersService = {
     async getAll(query: { page?: string; limit?: string; search?: string; role?: string; isActive?: string }) {
-        const page = Math.max(1, parseInt(query.page ?? "1", 10));
-        const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "20", 10)));
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 20 });
 
         const isActiveFilter =
             query.isActive === "false" ? false

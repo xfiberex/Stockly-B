@@ -92,6 +92,12 @@ model Product {
   saleItems     SaleOrderItem[]
   tags          Tag[]
 
+  // PostgreSQL no indexa las claves foráneas por sí solo: sin esto, filtrar por
+  // categoría, marca o proveedor recorre la tabla entera.
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([supplierId])
+  @@index([isActive])
   @@map("products")
 }
 
@@ -103,6 +109,7 @@ model PriceHistory {
   newPrice  Decimal  @db.Decimal(10, 2)
   createdAt DateTime @default(now())
 
+  @@index([productId])
   @@map("price_history")
 }
 
@@ -116,6 +123,7 @@ model PurchaseOrder {
   updatedAt  DateTime            @updatedAt
   items      PurchaseOrderItem[]
 
+  @@index([status, createdAt])
   @@map("purchase_orders")
 }
 
@@ -130,6 +138,8 @@ model PurchaseOrderItem {
   unitPrice       Decimal       @db.Decimal(10, 2)
   createdAt       DateTime      @default(now())
 
+  @@index([purchaseOrderId])
+  @@index([productId])
   @@map("purchase_order_items")
 }
 
@@ -143,6 +153,10 @@ model StockMovement {
   note       String?
   createdAt  DateTime          @default(now())
 
+  // El histórico de un producto se lee siempre ordenado por fecha: el índice
+  // compuesto sirve el filtro y el orden de una sola pasada.
+  @@index([productId, createdAt])
+  @@index([createdAt])
   @@map("stock_movements")
 }
 
@@ -184,6 +198,8 @@ model AuditLog {
   details   Json?
   createdAt DateTime @default(now())
 
+  @@index([createdAt])
+  @@index([entity, action])
   @@map("audit_logs")
 }
 
@@ -209,6 +225,7 @@ model SaleOrder {
   updatedAt     DateTime        @updatedAt
   items         SaleOrderItem[]
 
+  @@index([status, createdAt])
   @@map("sale_orders")
 }
 
@@ -223,5 +240,7 @@ model SaleOrderItem {
   unitPrice   Decimal   @db.Decimal(10, 2)
   createdAt   DateTime  @default(now())
 
+  @@index([saleOrderId])
+  @@index([productId])
   @@map("sale_order_items")
 }

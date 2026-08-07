@@ -2,6 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { checkLowStockAlert } from "@/shared/lib/stockAlerts";
+import { parsePagination } from "@/shared/lib/pagination";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 const ORDER_INCLUDE = {
@@ -20,9 +21,7 @@ function parseStatusFilter(status?: string): $Enums.SaleOrderStatus | undefined 
 
 export const saleOrderService = {
     async getAll(query: { page?: string; limit?: string; status?: string }) {
-        const page = Math.max(1, parseInt(query.page ?? "1", 10));
-        const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10", 10)));
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
         const where = statusFilter ? { status: statusFilter } : {};

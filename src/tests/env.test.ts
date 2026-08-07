@@ -72,4 +72,42 @@ describe("validateEnv", () => {
         process.env["PORT"] = "70000";
         expect(() => validateEnv()).toThrow(/PORT/);
     });
+
+    // T1-26: Cloudinary y SMTP dejan de ser obligatorias para arrancar. El README
+    // decía que eran opcionales y `validateEnv()` las exigía: era un bloqueador real
+    // de puesta en marcha desde un checkout limpio.
+    it("no lanza sin credenciales de Cloudinary ni de SMTP", () => {
+        for (const key of [
+            "CLOUDINARY_CLOUD_NAME",
+            "CLOUDINARY_API_KEY",
+            "CLOUDINARY_API_SECRET",
+            "SMTP_HOST",
+            "SMTP_PORT",
+            "SMTP_USER",
+            "SMTP_PASS",
+            "SMTP_FROM",
+        ]) {
+            delete process.env[key];
+        }
+        expect(() => validateEnv()).not.toThrow();
+    });
+
+    it("avisa cuando un grupo opcional queda a medias", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        delete process.env["SMTP_PASS"];
+
+        validateEnv();
+
+        expect(warn).toHaveBeenCalledWith(expect.stringMatching(/smtp.*SMTP_PASS/s));
+        warn.mockRestore();
+    });
+
+    it("no avisa cuando el grupo está completo", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        validateEnv();
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
 });

@@ -1,20 +1,20 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-const required = [
-    "DATABASE_URL",
-    "CLOUDINARY_CLOUD_NAME",
-    "CLOUDINARY_API_KEY",
-    "CLOUDINARY_API_SECRET",
-    "JWT_SECRET",
-    "JWT_EXPIRES_IN",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "SMTP_FROM",
-    "FRONTEND_URL",
-] as const;
+// Imprescindibles: sin ellas el servidor no puede arrancar de forma útil.
+const required = ["DATABASE_URL", "JWT_SECRET", "JWT_EXPIRES_IN", "FRONTEND_URL"] as const;
+
+// Opcionales por grupo: su ausencia no impide arrancar, solo desactiva una función
+// concreta, que falla con un mensaje explícito cuando se invoca. Antes estaban en
+// `required` y bloqueaban la puesta en marcha desde un checkout limpio.
+const optionalGroups = {
+    cloudinary: ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"],
+    smtp: ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"],
+} as const;
+
+function groupIsConfigured(group: keyof typeof optionalGroups): boolean {
+    return optionalGroups[group].every((name) => Boolean(process.env[name]));
+}
 
 const validNodeEnvs = new Set(["development", "test", "production"]);
 
@@ -82,16 +82,30 @@ export function validateEnv(): void {
 
     parsePort(process.env["PORT"], "PORT", 3000);
     parsePort(process.env["SMTP_PORT"], "SMTP_PORT", 587);
+
+    // Un grupo a medias casi siempre es un despiste, no una decisión: se avisa.
+    for (const group of Object.keys(optionalGroups) as Array<keyof typeof optionalGroups>) {
+        const faltan = optionalGroups[group].filter((name) => !process.env[name]);
+        if (faltan.length > 0 && faltan.length < optionalGroups[group].length) {
+            console.warn(
+                `⚠️  Configuración de ${group} incompleta: faltan ${faltan.join(", ")}. La función quedará desactivada.`,
+            );
+        }
+    }
 }
 
 export const env = {
     port: parseInt(process.env.PORT ?? "3000", 10),
     nodeEnv: process.env.NODE_ENV ?? "development",
+    // Techo global de peticiones por IP cada 15 min. Configurable para el E2E.
+    rateLimitMax: Number.parseInt(process.env.RATE_LIMIT_MAX ?? "", 10) || 100,
     databaseUrl: process.env.DATABASE_URL!,
     cloudinary: {
-        cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
-        apiKey: process.env.CLOUDINARY_API_KEY!,
-        apiSecret: process.env.CLOUDINARY_API_SECRET!,
+        // `configured` distingue «no hay credenciales» de «las credenciales fallan».
+        configured: groupIsConfigured("cloudinary"),
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        apiSecret: process.env.CLOUDINARY_API_SECRET,
     },
     jwt: {
         secret: process.env.JWT_SECRET!,
@@ -100,11 +114,12 @@ export const env = {
         expiresInMs: durationToMs(process.env.JWT_EXPIRES_IN ?? "15m"),
     },
     smtp: {
-        host: process.env.SMTP_HOST!,
-        port: parseInt(process.env.SMTP_PORT!, 10),
-        user: process.env.SMTP_USER!,
-        pass: process.env.SMTP_PASS!,
-        from: process.env.SMTP_FROM!,
+        configured: groupIsConfigured("smtp"),
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT ?? "587", 10),
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+        from: process.env.SMTP_FROM,
     },
     frontendUrl: process.env.FRONTEND_URL!,
 } as const;

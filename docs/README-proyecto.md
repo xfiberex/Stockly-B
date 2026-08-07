@@ -98,7 +98,7 @@ En el backend encadena `prisma generate → migrate deploy → check → test:co
 
 ## Documentación
 
-- Backend API (Swagger): `http://localhost:3000/api-docs`
+- Backend API (Swagger): `http://localhost:3000/api/v1/docs` — no se monta con `NODE_ENV=production`
 - README Backend: [../README.md](../README.md)
 - README Frontend: [../../Stockly-F/README.md](../../Stockly-F/README.md)
 - Roadmap: [ROADMAP.md](ROADMAP.md)

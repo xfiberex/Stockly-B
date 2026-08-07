@@ -2,6 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
 import { checkLowStockAlert } from "@/shared/lib/stockAlerts";
+import { parsePagination } from "@/shared/lib/pagination";
 import type {
     CreateProductDto,
     UpdateProductDto,
@@ -34,9 +35,7 @@ async function recordMovement(
 
 export const productService = {
     async getProducts(query: ProductQuery) {
-        const page = Math.max(1, parseInt(query.page ?? "1", 10));
-        const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? "10", 10)));
-        const skip = (page - 1) * limit;
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const isActiveFilter =
             query.isActive === "false" ? false

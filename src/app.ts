@@ -27,12 +27,14 @@ app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 app.use(cookieParser());
 
-// Rate limit global — los limitadores específicos de auth se aplican adicionalmente
-// Se omite en test para no bloquear ejecuciones repetidas del suite
+// Rate limit global — los limitadores específicos de auth se aplican adicionalmente.
+// Se omite en test para no bloquear ejecuciones repetidas del suite.
+// `RATE_LIMIT_MAX` existe por el E2E: una sola pasada del navegador supera con
+// holgura las 100 peticiones y el 429 hacía fallar pruebas que no iban de eso.
 if (env.nodeEnv !== "test") {
     app.use(rateLimit({
         windowMs: 15 * 60 * 1000,
-        max: 100,
+        max: env.rateLimitMax,
         standardHeaders: true,
         legacyHeaders: false,
         message: { success: false, message: "Demasiadas peticiones, intenta más tarde." },

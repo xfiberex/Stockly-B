@@ -32,15 +32,25 @@ RUN corepack enable && corepack prepare pnpm@11.2.2 --activate
 
 # Solo dependencias de producción — `prisma` está entre ellas porque el CMD
 # ejecuta `prisma migrate deploy` al arrancar el contenedor
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 # Copia build y archivos necesarios
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/generated ./src/generated
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=builder --chown=node:node /app/src/generated ./src/generated
+COPY --from=builder --chown=node:node /app/prisma ./prisma
 # schema.prisma declara el datasource sin `url`: la URL vive en prisma.config.ts
-COPY --from=builder /app/prisma.config.ts ./
+COPY --from=builder --chown=node:node /app/prisma.config.ts ./
+
+# `pnpm install` corre como root y deja node_modules y su caché a nombre de root.
+# El proceso solo necesita leerlos, pero prisma y pnpm escriben en /app/.cache y
+# similares, así que se cede el árbol entero al usuario sin privilegios.
+RUN chown -R node:node /app
+
+# La imagen `node` ya trae el usuario `node` (uid 1000). Sin esto, el proceso
+# corre como root: una ejecución arbitraria de código dentro del contenedor
+# tendría todos los privilegios sobre él.
+USER node
 
 EXPOSE 3000
 

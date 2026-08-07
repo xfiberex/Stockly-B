@@ -38,7 +38,7 @@ El paso `smoke` ([scripts/smoke.js](scripts/smoke.js)) arranca `dist/server.js` 
 Requisitos para que `verify` pase:
 
 - **PostgreSQL accesible** y `DATABASE_URL` apuntando a él. Sirve Docker (`docker compose up db -d`, desde este directorio) o un PostgreSQL instalado en la máquina — el puerto varía según el equipo, ajústalo en el `.env`.
-- **Las doce variables de `validateEnv()`** presentes en `.env`. Cloudinary y SMTP admiten valores ficticios: los tests los mockean, pero su ausencia impide arrancar.
+- **Las cuatro variables imprescindibles** en `.env`: `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN` y `FRONTEND_URL`. Desde T1-26, Cloudinary y SMTP son opcionales de verdad: sin ellas el servidor arranca y solo la función correspondiente responde 503.
 - `prisma generate` **antes** de `check` y `build`: el cliente se emite en `src/generated/prisma`, que está en `.gitignore`.
 
 `jest.setup.js` reescribe el nombre de la base de `DATABASE_URL` a `Stockly_test`. Los tests nunca tocan la base de desarrollo.

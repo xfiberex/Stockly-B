@@ -271,21 +271,35 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Base de datos y robustez
 
-- [ ] **[T1-15] Añadir los índices ausentes en la base de datos**
+- [x] **[T1-15] Añadir los índices ausentes en la base de datos** ✅ *(2026-08-07)*
   - **Área:** Rendimiento
   - **Ubicación:** `Stockly-B/prisma/schema.prisma` (completo), nueva migración
   - **Qué hacer:** No existe **ningún** índice no-único en el esquema; PostgreSQL no los crea automáticamente sobre las claves foráneas. Añadir: `StockMovement([productId, createdAt])` y `([createdAt])`, `PriceHistory([productId])`, `SaleOrderItem([saleOrderId])` y `([productId])`, `PurchaseOrderItem([purchaseOrderId])` y `([productId])`, `Product([categoryId])`, `([brandId])`, `([supplierId])`, `([isActive])`, `AuditLog([createdAt])` y `([entity, action])`, `SaleOrder([status, createdAt])`, `PurchaseOrder([status, createdAt])`.
   - **Criterio de aceptación:** `EXPLAIN ANALYZE` sobre `SELECT * FROM stock_movements WHERE "productId" = $1 ORDER BY "createdAt"` pasa de `Seq Scan` a `Index Scan`; la migración aplica limpiamente y la suite del backend sigue en verde.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-07):** migración `20260807215703_add_missing_indexes`, **15 índices**, aplicada limpiamente. `EXPLAIN (ANALYZE, BUFFERS)` sobre datos sintéticos (40 000 movimientos, 40 000 registros de auditoría, 40 000 productos en 50 categorías):
 
-- [ ] **[T1-16] Sanear los parámetros de paginación para eliminar los 500**
+    | Consulta | Antes | Después | |
+    |---|---|---|---|
+    | `stock_movements WHERE "productId" = $1 ORDER BY "createdAt"` | `Seq Scan`, **5.709 ms**, 617 buffers | `Bitmap Index Scan`, **0.747 ms**, 205 buffers | **7,6×** |
+    | `audit_logs ORDER BY "createdAt" DESC LIMIT 50` | `Seq Scan` + `top-N heapsort`, **7.857 ms**, 455 buffers | `Index Scan Backward`, **0.110 ms**, 3 buffers | **71×** |
+    | `products WHERE "categoryId" = $1 ORDER BY "createdAt" DESC LIMIT 10` | `Seq Scan`, **8.807 ms** | `Bitmap Index Scan`, **1.665 ms** | **5,3×** |
+
+    `pnpm verify` completo ✅ **235/235**, cobertura 88.15 %, smoke ✅.
+
+    **No aprovechado:** `products_isActive_idx`. La consulta dominante filtra `isActive = true`, que es la mayoría de las filas, así que el planificador sigue eligiendo `Seq Scan` — correctamente. Se deja porque el roadmap lo pedía y sirve al filtro inverso (`?isActive=false`), pero su coste de escritura no se compensa con la distribución actual: candidato a revisar, o a convertir en índice parcial `WHERE "isActive" = false`.
+
+    **Fuera del alcance de la lista:** `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo. La lista de la auditoría no lo incluía; queda anotado para T2-03 o una tarea propia.
+
+- [x] **[T1-16] Sanear los parámetros de paginación para eliminar los 500** ✅ *(2026-08-07)*
   - **Área:** Código
   - **Ubicación:** `Stockly-B/src/modules/products/product.service.ts:37-38`, `users/users.service.ts:17-19`, `audit-logs/audit-logs.service.ts:43-45`, `sale-orders/sale-orders.service.ts:23-25`
   - **Qué hacer:** `parseInt("abc")` es `NaN` y `Math.max(1, NaN)` sigue siendo `NaN`, que llega a Prisma como `skip`/`take` y provoca un 500. Extraer un helper `parsePagination` en `shared/lib/` que use `Number.parseInt(...) || valorPorDefecto` y aplicarlo en los cuatro servicios.
   - **Criterio de aceptación:** `GET /api/v1/products?page=abc`, `?limit=abc`, `/users?page=xyz` y `/audit-logs?limit=nope` devuelven 200 con la paginación por defecto. Verificado hoy: los cuatro devuelven 500.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-07):** 12 tests nuevos en `src/tests/pagination.test.ts` — 7 unitarios del helper y 5 de HTTP contra los endpoints reales, todos **200 con la paginación por defecto** (`products?page=abc`, `products?limit=abc`, `users?page=xyz`, `audit-logs?limit=nope` y `sale-orders?page=abc`). `pnpm verify` completo ✅ **235/235**, cobertura **88.15 %**; el helper queda al **100 %**. Se acota además `page` a 1 000 000: sin ese techo, `?page=99999999999999` desborda el entero de 32 bits de PostgreSQL y vuelve a dar 500 por otra vía.
 
 ### Interfaz
 
@@ -310,29 +324,34 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Endurecimiento
 
-- [ ] **[T1-19] Sustituir la exención CSRF por prefijo por una lista explícita**
+- [x] **[T1-19] Sustituir la exención CSRF por prefijo por una lista explícita** ✅ *(2026-08-07)*
   - **Área:** Seguridad
   - **Ubicación:** `Stockly-B/src/shared/middlewares/csrf.middleware.ts:25-28`
   - **Qué hacer:** `req.path.startsWith("/api/v1/auth/")` exime también `POST /auth/logout`, `PUT /auth/me` y `PATCH /auth/me/password`, que son operaciones autenticadas y mutantes. La explotación práctica está limitada por el preflight CORS, salvo en `logout`, que es vulnerable a CSRF por formulario cross-site. Sustituir por un `Set` con las siete rutas públicas reales.
   - **Criterio de aceptación:** `PUT /api/v1/auth/me` sin cabecera `x-csrf-token` devuelve 403 con `NODE_ENV != test`; login, register, refresh, verify-email, resend-verification, forgot-password y reset-password siguen funcionando sin token.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-07):** 10 tests nuevos en `csrf.test.ts` — las tres rutas autenticadas (`POST /auth/logout`, `PUT /auth/me`, `PATCH /auth/me/password`) devuelven **403** sin token, y las siete públicas siguen pasando sin él. El frontend ya adjuntaba `x-csrf-token` en toda petición mutante (`shared/api/axios.ts:30-37`), así que endurecer no rompió ningún flujo: comprobado antes de tocar nada.
 
-- [ ] **[T1-20] Exigir TLS en el transporte SMTP**
+- [x] **[T1-20] Exigir TLS en el transporte SMTP** ✅ *(2026-08-07)*
   - **Área:** Seguridad
   - **Ubicación:** `Stockly-B/src/shared/lib/nodemailer.ts:20-24`
   - **Qué hacer:** Sin `secure` ni `requireTLS`, Nodemailer usa STARTTLS de forma oportunista y continúa en claro si el servidor no lo anuncia — exponiendo credenciales SMTP y los tokens de verificación y reset que viajan en los correos. Añadir `secure: env.smtp.port === 465` y `requireTLS: true`.
   - **Criterio de aceptación:** el envío contra un servidor sin STARTTLS falla con error en lugar de transmitir en claro; el envío contra el SMTP habitual sigue funcionando.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-07):** `smtp-tls.test.ts` levanta un servidor SMTP de mentira que no anuncia STARTTLS y lo rechaza con `502`. Con `requireTLS`, el envío **aborta con `ETLS`**; sin él, contra ese mismo servidor, **el correo sale en claro y es aceptado** — el contraste está escrito como tercer test, que es lo que demuestra que la corrección hace algo. Tercer caso: la configuración real del transporte declara `requireTLS: true` y `secure` solo en el puerto 465.
+    **No verificado:** el envío contra el SMTP real de producción; requiere credenciales que no están en esta máquina.
 
-- [ ] **[T1-21] Ejecutar el contenedor con un usuario sin privilegios**
+- [x] **[T1-21] Ejecutar el contenedor con un usuario sin privilegios** ⚠️ *(2026-08-07 — implementada, sin verificar por ejecución)*
   - **Área:** Seguridad / DevOps
   - **Ubicación:** `Stockly-B/Dockerfile:19-37`
   - **Qué hacer:** El stage runner nunca cambia de usuario, por lo que Node corre como root. Añadir `USER node` antes del `CMD` y ajustar la propiedad de `/app` con `COPY --chown=node:node`.
   - **Criterio de aceptación:** `docker exec stockly_backend id` devuelve `uid=1000(node)` y el contenedor arranca y sirve peticiones con normalidad.
   - **Esfuerzo:** bajo
   - **Depende de:** T0-02
+  - **Implementado (2026-08-07):** en el stage runner, `COPY --chown=node:node` en las cuatro copias, `RUN chown -R node:node /app` —`pnpm install` corre como root y deja `node_modules` y su caché a su nombre— y `USER node` antes del `CMD`.
+  - **NO VERIFICADO:** el criterio de aceptación exige ejecutar el contenedor y **el daemon de Docker no está disponible en esta máquina** (el CLI está, el motor no arranca). Quedan sin comprobar tanto `id` → `uid=1000(node)` como que `prisma migrate deploy` conserve permiso de escritura donde lo necesite. **Es lo primero que hay que ejecutar en una máquina con Docker.**
 
 - [x] **[T1-22] Retirar la promoción automática a ADMIN del primer usuario** ✅ *(2026-08-07)*
   - **Área:** Seguridad
@@ -347,39 +366,50 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Red de seguridad E2E
 
-- [ ] **[T1-23] Ampliar el smoke E2E a los flujos que estaban rotos**
+- [x] **[T1-23] Ampliar el smoke E2E a los flujos que estaban rotos** ✅ *(2026-08-07)*
   - **Área:** QA
   - **Ubicación:** `Stockly-F/e2e/smoke.spec.ts`
   - **Qué hacer:** Los tres defectos funcionales de esta auditoría no produjeron ningún fallo entre 379 tests, porque cada repositorio prueba contra su propia suposición del contrato. Añadir escenarios que crucen la frontera: (a) activar el interruptor de configuración, recargar y comprobar que sigue activo; (b) crear un producto con una etiqueta y verificar que aparece en el detalle y en el filtro por etiqueta; (c) crear una orden de venta, enviarla, cancelarla y comprobar que el stock del producto vuelve al valor inicial.
   - **Criterio de aceptación:** los 3 escenarios pasan contra la aplicación completa, y fallan si se revierte T0-03, T1-03 o T1-05.
   - **Esfuerzo:** medio
   - **Depende de:** T0-03, T1-03, T1-05, T1-24
+  - **Verificado localmente (2026-08-07):** `e2e/flows.spec.ts` con los tres escenarios, más `e2e/helpers.ts`. **`pnpm test:e2e:full` → 9 pasados, 1 omitido, 0 fallos** contra la aplicación completa (backend + frontend + PostgreSQL reales), en los proyectos `chromium` y `Mobile Chrome`.
+    El escenario de la venta cancelada tiene una salvedad: **la interfaz solo ofrece cancelar mientras la orden está PENDIENTE**, así que la cancelación de una orden ya enviada —el caso exacto que arregló T0-03— se hace por API con la sesión del navegador. La creación y el envío sí pasan por la interfaz. Esa carencia de la UI queda anotada como hallazgo nuevo.
+    El escenario de configuración se ejecuta solo en `chromium`: `AppSetting` es estado global y los dos proyectos, en paralelo, leían el cambio del otro.
+    **Encontrados por el camino, y corregidos:** el modal no tenía scroll propio (un formulario más alto que la ventana dejaba sus botones fuera de pantalla, inalcanzables), y `Input`/`Select` no asociaban la etiqueta cuando no se les pasaba `id`, así que varios campos no tenían nombre accesible.
 
-- [ ] **[T1-24] Hacer reproducible la ejecución del E2E**
+- [x] **[T1-24] Hacer reproducible la ejecución del E2E** ✅ *(2026-08-07)*
   - **Área:** QA / DevOps
   - **Ubicación:** `Stockly-F/playwright.config.ts:21-26`
   - **Qué hacer:** El `webServer` solo arranca el frontend; el backend y la base de datos hay que levantarlos a mano, y la credencial por defecto no coincide con el seed. Añadir un `globalSetup` o un script `test:e2e:full` que orqueste `docker compose up -d db` + `db:migrate` + `db:seed` + backend + frontend, y usar la credencial del seed. Añadir el proyecto `Mobile Chrome` de Playwright para cubrir de paso los hallazgos responsive.
   - **Criterio de aceptación:** `pnpm test:e2e:full` pasa en local desde un checkout limpio sin pasos manuales previos.
   - **Esfuerzo:** medio
   - **Depende de:** T0-06
+  - **Verificado localmente (2026-08-07):** `pnpm test:e2e:full` **pasa sin levantar nada a mano** — 9 pasados, 1 omitido. `e2e/global-setup.ts` comprueba que PostgreSQL responda (y solo si no responde recurre a `docker compose up -d db`, esperando hasta 60 s), aplica `prisma migrate deploy` y siembra con `db:seed`; el `webServer` de Playwright arranca **backend y frontend**, reutilizando los que ya estén en marcha. Proyecto `Mobile Chrome` añadido.
+    **Hallazgo:** el rate limit global (100 peticiones / 15 min por IP) se agota en una sola pasada del navegador y devolvía **429** en pruebas que no iban de eso — incluida la comprobación de salud del `webServer`. Se añadieron `RATE_LIMIT_MAX` y `AUTH_RATE_LIMIT_MAX` para subir el techo en el E2E **sin desactivar el limitador ni CSRF**, que siguen activos durante toda la ejecución.
+    La credencial ya era la del seed desde T1-02; el `.env` del backend se lee a mano en el global setup para no añadir `dotenv` al frontend.
 
 ### Documentación bloqueante
 
-- [ ] **[T1-25] Corregir las rutas de API y el stack en los READMEs**
+- [x] **[T1-25] Corregir las rutas de API y el stack en los READMEs** ✅ *(2026-08-07)*
   - **Área:** Documentación
   - **Ubicación:** `Stockly-B/README.md`, `README.md` (raíz)
   - **Qué hacer:** Seis divergencias verificadas contra el código: el prefijo real es `/api/v1` y no `/api`; Swagger está en `/api/v1/docs` y no en `/api-docs`; el cambio de contraseña es `PATCH /me/password` y no `PUT`; `config/env.ts` usa validación manual y no Zod; la imagen Docker es `node:22-alpine` mientras el README indica Node 20.
   - **Criterio de aceptación:** cada ruta y afirmación del README puede comprobarse contra el código; una prueba manual con curl siguiendo el README funciona.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-07):** las seis divergencias corregidas contra el código, una por una: prefijo `/api/v1` en las **once** secciones de endpoints (`app.ts:45`), Swagger en `/api/v1/docs` y **solo fuera de producción** (`swagger.ts:209`, `app.ts:47-49`), `PATCH /me/password` (`auth.routes.ts:28`), `env.ts` con validación manual y no Zod, y `node:22-alpine` en las dos etapas del `Dockerfile`. Se añadieron `pnpm verify` y `pnpm smoke`, que no estaban documentados. No queda ninguna coincidencia de `/api/` sin versionar ni de `api-docs` en los dos READMEs.
+    **Nota:** el «README de la raíz» que citaba la auditoría no existe en este equipo; su papel lo cumple `docs/README-proyecto.md`, donde se corrigió la misma ruta de Swagger.
 
-- [ ] **[T1-26] Resolver la contradicción sobre las variables de entorno obligatorias**
+- [x] **[T1-26] Resolver la contradicción sobre las variables de entorno obligatorias** ✅ *(2026-08-07)*
   - **Área:** Documentación / Código
   - **Ubicación:** `Stockly-B/README.md`, `Stockly-B/src/config/env.ts:4-17`, `Stockly-B/.env.example`
   - **Qué hacer:** El README afirma que «Cloudinary y SMTP son opcionales en desarrollo», pero `validateEnv()` exige las ocho variables y lanza una excepción al arrancar. Es un bloqueador real de puesta en marcha. Decidir: o marcarlas como obligatorias en la documentación, o —preferible— sacarlas del array `required` y fallar solo al invocar la funcionalidad correspondiente, con un mensaje claro.
   - **Criterio de aceptación:** seguir el README desde un checkout limpio permite arrancar el backend; el comportamiento documentado coincide con el real. Anotar en `.env.example` qué variables son imprescindibles.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Resuelto por la vía preferible:** `required` baja de doce variables a **cuatro** (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `FRONTEND_URL`). Cloudinary y SMTP pasan a grupos opcionales con un `configured` calculado, y el fallo se traslada al punto de uso: **503 con el nombre de las variables que faltan**. Un grupo a medias avisa por consola al arrancar, porque casi siempre es un despiste.
+  - **Verificado localmente (2026-08-07):** 7 tests nuevos — `validateEnv()` no lanza sin ninguna de las ocho variables opcionales, avisa cuando un grupo queda incompleto y calla cuando está completo; y las tres funciones de correo y las dos de Cloudinary rechazan con **503** nombrando la variable que falta. `.env.example` reescrito en tres bloques (imprescindibles / con valor por defecto / opcionales por grupo). El README y `CLAUDE.md` decían «doce variables»: corregido en ambos.
 
 ---
 
@@ -1096,17 +1126,26 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-07 | **T1-02** Script `verify` del frontend — **desbloqueada y completada** | `pnpm verify` entero **exit 0**: `check` ✅, `lint` ✅, **190/190** ✅, `build` ✅ | Estuvo en rojo por el lint desde que se escribió, hasta cerrar T1-09. |
 | 2026-08-07 | **T1-10** `setState` en efecto de `App.tsx` y `ProductForm.tsx` — **completada** | `eslint` limpio en ambos archivos ✅ · `check` ✅ · **187/187** tests ✅. Lint global **26 → 24** errores; cobertura de sentencias **19.88 % → 23.83 %** | Ambos resueltos derivando en render, sin efecto: `App.tsx` guarda la ruta de apertura (`openedAt === pathname`) en vez de un booleano; `ProductForm.tsx` pasa los valores a `defaultValues` y las etiquetas al inicializador de `useState`, apoyándose en el remonte por `key` de `ProductsPage:255`. Se añadieron 6 tests, entre ellos el primer `App.test.tsx`, porque ninguno de los dos comportamientos estaba cubierto. |
 | 2026-08-07 | **T1-02** Script `verify` del frontend — *implementado, bloqueado por T1-09* | `check` ✅, `test:coverage` ✅ 181/181, `build` ✅. **`lint` ❌ 26 errores + 4 avisos**, así que `verify` se detiene ahí | El primer `verify` real destapó **un conflicto de merge sin resolver commiteado** en `e2e/smoke.spec.ts:3-12` (merge `4254582`, 2026-08-05) que reintroducía la credencial `Ad159753` purgada por T0-06 — resuelto a favor del lado del seed, con lo que el lint vuelve de 27 a 26 errores. También: ESLint analiza `coverage/`, de donde salen 3 de los 4 avisos. |
+| 2026-08-07 | **T1-16** Paginación saneada, sin 500 — **completada** | 12 tests nuevos (7 unitarios + 5 de HTTP): los cinco endpoints con `page`/`limit` no numéricos responden **200 con la paginación por defecto**. `verify` backend ✅ **235/235**, cobertura **88.15 %** | Helper `parsePagination` en `shared/lib/`, con `defaultLimit` por servicio (productos y ventas 10, usuarios 20, auditoría 50) y techo de 100. Cualquier valor que no sea entero positivo —texto, cero, negativo, cadena vacía— cae al valor por defecto en vez de convertirse en `NaN`. **Hallazgo extra:** `limit` ya tenía techo pero `page` no, así que `?page=99999999999999` seguía dando 500 al desbordar el entero de 32 bits de PostgreSQL; ahora `page` se acota a 1 000 000. Desbloquea **T2-03**. |
+| 2026-08-07 | **T1-15** Índices ausentes en la base de datos — **completada** | `EXPLAIN (ANALYZE, BUFFERS)` sobre 40 000 filas: `stock_movements` por producto **5.709 → 0.747 ms** (`Seq Scan` → `Bitmap Index Scan`, 617 → 205 buffers), `audit_logs` paginado **7.857 → 0.110 ms** (`Seq Scan` + sort → `Index Scan Backward`, 455 → **3** buffers), `products` por categoría **8.807 → 1.665 ms**. `verify` ✅ **235/235** | Migración `20260807215703_add_missing_indexes` con los **15 índices** de la lista. Dos observaciones honestas: `products_isActive_idx` **no se usa** —la consulta dominante filtra `isActive = true`, la mayoría de las filas, y el planificador acierta descartándolo—, y falta un índice por `createdAt` en `products` pese a que todos los listados ordenan por él; la lista de la auditoría no lo contemplaba. **Trampa del entorno:** `Stockly_test` no tiene tabla `_prisma_migrations`, así que `migrate deploy` falla con **P3005**; se sincroniza con `prisma db push`. |
+| 2026-08-07 | **T1-19** Exención CSRF explícita — **completada** | 10 tests: `logout`, `PUT /me` y `PATCH /me/password` → **403** sin token; las 7 rutas públicas siguen sin exigirlo | El prefijo `/api/v1/auth/` eximía tres operaciones autenticadas y mutantes; `logout` era explotable por formulario cross-site, sin preflight que lo frenara. El frontend ya mandaba la cabecera en toda petición mutante, así que endurecer no rompió nada — comprobado antes de tocar el middleware. |
+| 2026-08-07 | **T1-20** STARTTLS obligatorio en SMTP — **completada** | Servidor SMTP de mentira sin STARTTLS: con `requireTLS` el envío aborta con **`ETLS`**; **sin él, el mismo correo sale en claro y es aceptado** | El contraste está escrito como test: es lo que demuestra que la corrección hace algo. `secure` queda atado al puerto 465 (TLS implícito). **Sin verificar:** el envío contra el SMTP real, que necesita credenciales que no están en esta máquina. |
+| 2026-08-07 | **T1-26** Variables de entorno realmente opcionales — **completada** | 7 tests: `validateEnv()` no lanza sin las 8 opcionales, avisa si un grupo queda a medias; correo y Cloudinary responden **503** nombrando lo que falta | `required` baja de **12 a 4**. Era un bloqueador de puesta en marcha: el README prometía que Cloudinary y SMTP eran opcionales y el arranque las exigía. `.env.example` reescrito en tres bloques; corregido el «doce variables» del README y de `CLAUDE.md`. |
+| 2026-08-07 | **T1-25** READMEs alineados con el código — **completada** | Las 6 divergencias comprobadas una a una contra el código; cero coincidencias de `/api/` sin versionar o `api-docs` | Prefijo `/api/v1` en las 11 secciones, Swagger en `/api/v1/docs` (y solo fuera de producción), `PATCH /me/password`, validación manual en vez de Zod, Node 22. Se documentaron `pnpm verify` y `pnpm smoke`, que no aparecían. El «README de la raíz» de la auditoría no existe aquí: su papel lo cumple `docs/README-proyecto.md`. |
+| 2026-08-07 | **T1-24** E2E reproducible — **completada** | `pnpm test:e2e:full` **sin levantar nada a mano**: 9 pasados, 1 omitido | `e2e/global-setup.ts` deja la base lista (y solo recurre a Docker si no hay PostgreSQL escuchando); el `webServer` arranca backend y frontend. Proyecto `Mobile Chrome` añadido. **Hallazgo:** el rate limit global (100/15 min) se agota en una sola pasada del navegador y devolvía 429 hasta en la comprobación de salud; se añadieron `RATE_LIMIT_MAX` y `AUTH_RATE_LIMIT_MAX` para subir el techo **sin desactivar limitador ni CSRF**. |
+| 2026-08-07 | **T1-23** E2E de los tres flujos rotos — **completada** | Los 3 escenarios pasan contra la aplicación completa en `chromium` y `Mobile Chrome` | **Dos defectos encontrados y corregidos por el camino:** el modal no tenía scroll propio, así que un formulario más alto que la ventana dejaba sus botones fuera de pantalla e inalcanzables; y `Input`/`Select` no ataban la etiqueta al campo sin un `id` explícito, dejando varios controles sin nombre accesible (`useId` como respaldo). **Limitación anotada:** la interfaz no permite cancelar una orden ya enviada, así que ese paso del tercer escenario va por API. |
+| 2026-08-07 | **T1-21** Contenedor sin privilegios — **implementada, SIN VERIFICAR** | — | `COPY --chown=node:node`, `chown -R` y `USER node` en el stage runner. **El daemon de Docker no arranca en esta máquina**, así que `docker exec … id` → `uid=1000(node)` sigue sin comprobarse. Pendiente de ejecutar en un equipo con Docker. |
 
 ### Resumen por Tier
 
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
-| Tier 1 | 17 | 26 | 65 % |
+| **Tier 1** | **26** | **26** | **100 %** ✅ |
 | Tier 2 | 0 | 41 | 0 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **26** | **100** | **26 %** |
+| **Total** | **35** | **100** | **35 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1114,11 +1153,15 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-07) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **223/223** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **87.39 %** | ≥ 88 % |
+| Tests backend | 198/198 ✅ | **254/254** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **88.19 %** ✅ | ≥ 88 % |
 | Tests frontend | 181/181 ✅ | **202/202** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **25.81 %** | ≥ 45 % |
+| Cobertura frontend (sentencias) | 19.88 % | **26.02 %** | ≥ 45 % |
+| E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** ✅ | escenarios que crucen la frontera |
+| Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
+| Índices no-únicos en el esquema | 0 | **15** ✅ | cubrir FK y ordenaciones |
+| Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
 | `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |
 | Conflictos de merge sin resolver en el árbol | 1 *(no detectado en la auditoría)* | **0** ✅ | 0 |
 | `pnpm check` (ambos) | ✅ sin errores | ✅ sin errores | mantener |
@@ -1126,12 +1169,24 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | `docker compose build backend` | ❌ falla en el primer `pnpm install` | ✅ **imagen construida** | ✅ imagen construida |
 | `docker compose up --build` | ❌ no alcanzable | ✅ **health 200** | ✅ health 200 |
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
-| Índices no-únicos en BD | 0 | 0 | 14 |
 | Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
 | Tokens semánticos en `@theme` | 1 (`--font-sans`) | 1 | capa completa (T2-35) |
 | Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | 561 | 0 fuera de excepciones |
 | Variantes de `Badge` sin significado | 4 de 7 | 4 de 7 | 0 |
 | Clases `dark:` | 0 | 0 | (T4-03) |
+
+### Hallazgos nuevos del 2026-08-07 (no estaban en la auditoría)
+
+Salieron al cerrar el Tier 1. Los tres primeros ya están corregidos; los dos últimos son
+candidatos a tarea propia.
+
+| Hallazgo | Estado |
+|---|---|
+| El modal no tenía scroll propio: un formulario más alto que la ventana dejaba sus botones fuera de pantalla e **inalcanzables** (el body está bloqueado mientras está abierto). Lo destapó el E2E al no poder pulsar «Crear producto» | ✅ corregido (`Modal.tsx`, `max-h` + `overflow-y-auto`) |
+| `Input` y `Select` solo ataban la etiqueta al campo si se les pasaba `id`. Sin él, `htmlFor` quedaba vacío: campos rotulados a la vista, **sin nombre accesible** (los ítems de las órdenes, entre otros) | ✅ corregido (`useId` como respaldo) |
+| El rate limit global (100 peticiones / 15 min por IP) se agota en una sola pasada del navegador; devolvía 429 en pruebas ajenas al tema | ✅ configurable con `RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_MAX`, sin bajar el techo por defecto |
+| **La interfaz no permite cancelar una orden de venta ya enviada**: los botones solo aparecen en estado PENDIENTE. La reposición de stock de T0-03 existe en el backend pero es inalcanzable desde la aplicación | ⬜ candidato a tarea |
+| `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo; la lista de índices de la auditoría no lo contemplaba. `products_isActive_idx` sí se creó pero el planificador no lo usa (filtro poco selectivo) | ⬜ candidato a tarea |
 
 ### Línea base de navegador (2026-07-15)
 

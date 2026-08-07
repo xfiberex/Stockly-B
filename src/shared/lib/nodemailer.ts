@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { env } from "@/config/env";
+import { HttpError } from "@/shared/lib/httpError";
 import {
     BRAND,
     renderEmail,
@@ -17,14 +18,33 @@ function escapeHtml(str: string): string {
         .replace(/'/g, "&#039;");
 }
 
+// Sin `secure` ni `requireTLS`, Nodemailer negocia STARTTLS de forma oportunista y
+// sigue en claro si el servidor no lo anuncia: por ahí se irían las credenciales SMTP
+// y los tokens de verificación y de reset que viajan en el cuerpo del correo.
+// `secure: true` es TLS implícito (puerto 465); en los demás puertos `requireTLS`
+// obliga a STARTTLS y aborta el envío si el servidor no lo ofrece.
 export const transporter = nodemailer.createTransport({
     host: env.smtp.host,
     port: env.smtp.port,
+    secure: env.smtp.port === 465,
+    requireTLS: true,
     auth: { user: env.smtp.user, pass: env.smtp.pass },
 });
 
+// Sin credenciales SMTP el servidor arranca igual (T1-26). El fallo se produce aquí,
+// al intentar enviar, con un mensaje que dice qué falta.
+function requireSmtp(): void {
+    if (!env.smtp.configured) {
+        throw new HttpError(
+            503,
+            "El envío de correo no está configurado. Define SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS y SMTP_FROM en el .env.",
+        );
+    }
+}
+
 export async function sendVerificationEmail(to: string, name: string, token: string) {
-    const url = `${env.frontendUrl}/auth/confirm-account?token=${token}`;
+    requireSmtp();
+    const url =`${env.frontendUrl}/auth/confirm-account?token=${token}`;
     const safeName = escapeHtml(name);
 
     const bodyHtml =
@@ -46,7 +66,8 @@ export async function sendVerificationEmail(to: string, name: string, token: str
 }
 
 export async function sendPasswordResetEmail(to: string, name: string, token: string) {
-    const url = `${env.frontendUrl}/auth/reset-password?token=${token}`;
+    requireSmtp();
+    const url =`${env.frontendUrl}/auth/reset-password?token=${token}`;
     const safeName = escapeHtml(name);
 
     const bodyHtml =
@@ -74,7 +95,8 @@ export async function sendLowStockAlertEmail(
     currentStock: number,
     minStock: number,
 ) {
-    const safeAdmin = escapeHtml(adminName);
+    requireSmtp();
+    const safeAdmin =escapeHtml(adminName);
     const safeProduct = escapeHtml(productName);
     const url = `${env.frontendUrl}/products`;
 
