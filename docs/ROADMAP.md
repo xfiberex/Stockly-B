@@ -18,7 +18,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 10 | 0 / 5 / 5 |
 | | **Total** | **100** | **71 / 24 / 5** |
 
-**Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
+**Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
 **Trazabilidad:** los 70 hallazgos del informe tienen al menos una tarea aquí. La correspondencia inversa está en la tabla del final. Los hallazgos con prefijo `DS-` no proceden de la auditoría sino de la consultoría de diseño del 2026-08-05.
 
@@ -122,14 +122,14 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** T0-01
 
-- [ ] **[T1-02] Guion de verificación local del frontend**
+- [x] **[T1-02] Guion de verificación local del frontend** ✅ *(2026-08-07)*
   - **Área:** QA / DevOps
   - **Ubicación:** `Stockly-F/package.json` (script `verify`)
   - **Qué hacer:** Encadenar `pnpm install --frozen-lockfile`, `pnpm check` (`tsc -b`), `pnpm lint`, `pnpm test:coverage` y `pnpm build`. Dos añadidos que el repositorio necesitaba y que ya están hechos:
     1. **No existía script `check`.** A diferencia del backend, `Stockly-F/package.json` no lo declaraba pese a que este roadmap lo da por hecho. Añadido `"check": "tsc -b"` — no emite, porque `tsconfig.app.json` tiene `noEmit: true`.
     2. **No existía campo `packageManager`.** Sin él, `--frozen-lockfile` deja de ser reproducible entre máquinas. Fijado a `pnpm@11.2.2`, el mismo que el backend.
   - **Criterio de aceptación:** `pnpm verify` pasa entero y falla ante errores de lint, tipos o tests.
-  - **Verificado localmente (2026-08-07):** el script existe y encadena bien. `check` ✅ · `test:coverage` ✅ **181/181, 19.88 %** · `build` ✅. **`pnpm lint` ❌ — 26 errores y 4 avisos, que es exactamente T1-09.** El guion es correcto; el repositorio todavía no, y por eso `verify` se detiene en el lint. Se deja **sin marcar** hasta cerrar T1-09.
+  - **Verificado localmente (2026-08-07):** `pnpm verify` completo **en verde, exit code 0** — `check` ✅ · `lint` ✅ **0 errores** · `test:coverage` ✅ **190/190, 23.98 %** · `build` ✅. Estuvo bloqueado por el lint hasta cerrar T1-09 ese mismo día, que es justo el comportamiento buscado: el guion se negaba a pasar mientras el repositorio no lo mereciera.
     Dos cosas que el primer `verify` real destapó:
     - **Un conflicto de merge sin resolver commiteado** en `e2e/smoke.spec.ts:3-12` desde el merge `4254582` (2026-08-05), que reintroducía la credencial `Ad159753` purgada por T0-06. Elevaba el lint a 27 errores. Resuelto a favor del lado del seed; el recuento vuelve a los 26 de la auditoría.
     - **ESLint analiza `coverage/`**, que son artefactos generados. De ahí salen 3 de los 4 avisos. Añadirlo a los `ignores` de `eslint.config.js` es parte de T1-09.
@@ -156,53 +156,72 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Configuración de la aplicación (funcionalidad rota)
 
-- [ ] **[T1-05] Alinear el payload de `PATCH /settings` con el contrato del backend**
+- [x] **[T1-05] Alinear el payload de `PATCH /settings` con el contrato del backend** ✅ *(2026-08-07)*
   - **Área:** Arquitectura / funcionalidad
-  - **Ubicación:** `Stockly-F/src/modules/settings/api/settings.api.ts:11`
+  - **Ubicación:** `Stockly-F/src/modules/settings/api/settings.api.ts:10-16`
   - **Qué hacer:** El frontend envía `{ updates: {...} }` y el backend espera el objeto plano (`settings.controller.ts:14` → `Object.entries(req.body)`), por lo que la clave `updates` se descarta por no estar en el catálogo y no se persiste nada. Enviar el objeto plano: `api.patch("/settings", updates)`.
   - **Criterio de aceptación:** guardar el interruptor de alertas desde la UI escribe la fila en `app_settings`. Verificado hoy: HTTP 200, `data: []`, cero filas persistidas.
+  - **Verificado localmente (2026-08-07):** contra el backend real (`node dist/server.js`, PostgreSQL local), autenticado como admin y con token CSRF. Los dos payloads, uno detrás de otro:
+    | Payload | Respuesta | Valor persistido |
+    |---|---|---|
+    | `{"updates":{"lowStockAlertEnabled":true}}` | **200**, `data` vacío | `false` — **no persiste** |
+    | `{"lowStockAlertEnabled":true}` | **200**, `data: {key, value:true}` | `true` ✅ |
+    El ajuste se dejó de nuevo en `false` al terminar. El 200 con `data` vacío es exactamente lo que hacía invisible el fallo, y es lo que T1-07 debe convertir en un 422.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T1-06] Corregir el tipo de `SettingEntry.value` en el frontend**
+- [x] **[T1-06] Corregir el tipo de `SettingEntry.value` en el frontend** ✅ *(2026-08-07)*
   - **Área:** Arquitectura / funcionalidad
-  - **Ubicación:** `Stockly-F/src/modules/settings/types/settings.types.ts:8`, `SettingsPage.tsx:8`
+  - **Ubicación:** `Stockly-F/src/modules/settings/types/settings.types.ts`, `SettingsPage.tsx`
   - **Qué hacer:** El backend devuelve `value` ya parseado (boolean para los ajustes de tipo `boolean`), pero el frontend lo tipa como `string` y compara `entry.value === "true"`, por lo que el interruptor siempre se pinta apagado y `isDirty` siempre da verdadero. Cambiar el tipo a `boolean | string | number` y normalizar la comparación.
+    **Implementado.** Nuevo tipo `SettingValue = boolean | string | number` y un `esVerdadero()` que acepta tanto el boolean del backend como la cadena que produce un input. Además se **eliminó `defaultValue` de `SettingEntry`**: el backend nunca lo envía (`settings.service.ts:21-27`), solo existía en el tipo y en el mock del test — la misma clase de mentira en el contrato que causó esta tarea.
   - **Criterio de aceptación:** con `lowStockAlertEnabled` en `true` en base de datos, la página muestra el interruptor encendido y el botón «Guardar cambios» aparece deshabilitado hasta que haya un cambio real.
+  - **Verificado localmente (2026-08-07):** el `GET /settings` real devuelve `"value":false` sin `defaultValue`, confirmando ambos desajustes. Tests nuevos: interruptor encendido con `value: true` y Guardar deshabilitado; y Guardar vuelve a deshabilitarse si el ajuste regresa a su valor original.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-05
 
-- [ ] **[T1-07] Añadir validación Zod al endpoint de configuración**
+- [x] **[T1-07] Añadir validación Zod al endpoint de configuración** ✅ *(2026-08-07)*
   - **Área:** Código / Seguridad
-  - **Ubicación:** `Stockly-B/src/modules/settings/settings.routes.ts:10`
+  - **Ubicación:** `Stockly-B/src/modules/settings/settings.validator.ts` *(nuevo)*, `settings.routes.ts:11`
   - **Qué hacer:** Es el único endpoint mutante sin `validate()`. Un cuerpo `null` provoca un `TypeError` (500) en `Object.entries`, y una forma incorrecta devuelve 200 sin efecto — que es exactamente cómo pasó desapercibido T1-05. Generar el esquema desde `SETTINGS_CATALOG` y aplicarlo con `.strict()`.
+    **Implementado.** El esquema se construye recorriendo `SETTINGS_CATALOG` y mapeando cada `type` a su validador, así que **añadir un ajuste nuevo al catálogo lo valida sin tocar el validador**. Todas las claves son opcionales (es un PATCH parcial) pero se exige **al menos una**: un cuerpo vacío también era un 200 sin efecto. Encaja con el frontend tras T1-08, que solo envía los ajustes modificados y deshabilita Guardar cuando no hay ninguno.
   - **Criterio de aceptación:** `PATCH /settings` con `{updates:{...}}` o con un cuerpo no-objeto devuelve 422; con la forma correcta devuelve 200 y persiste.
+  - **Verificado localmente (2026-08-07):** 5 tests de integración nuevos, todos en verde — clave fuera del catálogo → **422** (y cero filas escritas), payload antiguo `{updates:{…}}` → **422**, tipo equivocado (`"true"` en vez de `true`) → **422** con `field: "lowStockAlertEnabled"`, cuerpo no-objeto (`[1,2]`) → **422** en lugar de 500, y cuerpo vacío → **422**. `pnpm verify` completo del backend ✅ **209/209**.
+  - **Cambio de comportamiento:** el endpoint deja de ser tolerante. El test *«ignora claves desconocidas sin romper»* se sustituyó por su contrario, que es lo que pide esta tarea: un cliente que envíe una clave desconocida ahora recibe 422 en vez de un 200 engañoso.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T1-08] Eliminar el efecto de sincronización de `SettingsPage`**
+- [x] **[T1-08] Eliminar el efecto de sincronización de `SettingsPage`** ✅ *(2026-08-07)*
   - **Área:** UI/UX / Código
-  - **Ubicación:** `Stockly-F/src/modules/settings/components/SettingsPage.tsx:28-34`
+  - **Ubicación:** `Stockly-F/src/modules/settings/components/SettingsPage.tsx:30-55`
   - **Qué hacer:** ESLint marca `setState` síncrono dentro de un efecto. La dependencia `settings` proviene de `data ?? []`, que crea un array nuevo en cada render mientras la consulta carga, provocando renders en cascada. Derivar el estado en lugar de sincronizarlo: mantener solo un `overrides` de los valores modificados y calcular el valor mostrado y el `isDirty` en render.
+    **Implementado** tal cual: un estado `cambios` que solo guarda lo que el usuario ha tocado, y `valorDe()` / `isDirty` derivados en render. Dos mejoras que salen gratis con este diseño: el guardado envía **solo los ajustes modificados** en vez de todo el catálogo, y los cambios se limpian en `onSuccess` para que la respuesta nueva del servidor no siga pisada por el estado local.
   - **Criterio de aceptación:** `pnpm lint` no reporta el error en este archivo; la página no encadena renders durante la carga (verificar con React DevTools Profiler); los tests existentes de `SettingsPage` siguen pasando.
+  - **Verificado localmente (2026-08-07):** `eslint` ✅ sin errores en el archivo · los 4 tests existentes siguen pasando, más 3 nuevos (7/7). **No verificado:** el recuento de renders con el Profiler de React DevTools, que exige la app en marcha y medición manual; el efecto que los provocaba ya no existe.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-06
 
 ### Calidad estática
 
-- [ ] **[T1-09] Dejar `pnpm lint` en verde**
+- [x] **[T1-09] Dejar `pnpm lint` en verde** ✅ *(2026-08-07)*
   - **Área:** QA
-  - **Ubicación:** `Stockly-F/eslint.config.js`
-  - **Qué hacer:** 26 errores y 4 avisos. Desactivar `react-refresh/only-export-components` para `src/routes/**` (23 falsos positivos por los `lazy()`), eliminar las 3 directivas `eslint-disable` inútiles, y resolver los 3 errores reales de `react-hooks` (T1-08 y T1-10). Evaluar el aviso de React Compiler en `TagsPage.tsx:37` (`watch("color")` provoca el bailout del componente).
+  - **Ubicación:** `Stockly-F/eslint.config.js`, `Stockly-F/src/modules/tags/components/TagsPage.tsx:2,33-40`
+  - **Qué hacer:** Quedan **24 errores y 4 avisos** (eran 26 y 4; T1-10 resolvió dos). Desactivar `react-refresh/only-export-components` para `src/routes/**` (23 falsos positivos por los `lazy()`), añadir `coverage/` a los `ignores` —ESLint analiza los artefactos generados, de donde salen 3 de los 4 avisos de directivas `eslint-disable` inútiles—, y resolver el error de `react-hooks` que queda, el de `SettingsPage` (T1-08). Evaluar el aviso de React Compiler en `TagsPage.tsx:37` (`watch("color")` provoca el bailout del componente).
+    **Implementado.** `globalIgnores` incluye ahora `coverage`; `react-refresh/only-export-components` queda desactivada solo para `src/routes/**`; y el aviso de React Compiler se resolvió en origen sustituyendo `watch("color")` por `useWatch({ control, name: "color" })` en `TagsPage` — el mismo patrón que ya usaba `ProductForm`. Las 3 directivas `eslint-disable` inútiles no había que tocarlas: estaban en `coverage/`.
   - **Criterio de aceptación:** `pnpm lint` termina con código de salida 0.
+  - **Verificado localmente (2026-08-07):** `pnpm lint` → **0 errores, 0 avisos, exit code 0** ✅ (venía de 26 errores y 4 avisos en la auditoría). El componente `TagFormModal` deja además de ser descartado por el React Compiler.
   - **Esfuerzo:** bajo
-  - **Depende de:** T1-08, T1-10
+  - **Depende de:** T1-08 ✅, T1-10 ✅
 
-- [ ] **[T1-10] Corregir el `setState` en efecto de `App.tsx` y `ProductForm.tsx`**
+- [x] **[T1-10] Corregir el `setState` en efecto de `App.tsx` y `ProductForm.tsx`** ✅ *(2026-08-07)*
   - **Área:** Código
-  - **Ubicación:** `Stockly-F/src/App.tsx:180-182`, `Stockly-F/src/modules/products/components/ProductForm.tsx:91-109`
+  - **Ubicación:** `Stockly-F/src/App.tsx:170-190`, `Stockly-F/src/modules/products/components/ProductForm.tsx:26-53`
   - **Qué hacer:** En `App.tsx`, el cierre del menú móvil al cambiar de ruta puede resolverse con una `key` en el contenedor o comprobando el estado previo antes de actualizar. En `ProductForm.tsx`, el `setSelectedTagIds` dentro del efecto de `reset` puede derivarse de `product` (el componente ya se remonta por `key` desde `ProductsPage:255`).
+    **Implementado**, en ambos casos derivando en render y eliminando el efecto entero:
+    1. **`App.tsx`.** En lugar de un booleano `mobileOpen` sincronizado con un efecto, se guarda la ruta en la que se abrió el menú (`openedAt`) y el estado se calcula en render: `mobileOpen = openedAt === pathname`. Al navegar deja de coincidir y el menú se cierra solo, venga la navegación de un enlace del menú, del contenido o del historial del navegador.
+    2. **`ProductForm.tsx`.** Los valores del producto pasan a `defaultValues` de `useForm` y las etiquetas al inicializador perezoso de `useState`. El `useEffect` de `reset` desaparece por completo. Es correcto porque `ProductsPage:255` ya remonta el formulario con `key={editingProduct?.id ?? "new"}`.
   - **Criterio de aceptación:** ESLint no reporta `react-hooks` en ninguno de los dos archivos; el menú móvil sigue cerrándose al navegar y el formulario sigue precargando las etiquetas al editar.
+  - **Verificado localmente (2026-08-07):** `eslint` sobre ambos archivos ✅ **sin errores** · `pnpm check` ✅ · `pnpm test:coverage` ✅ **187/187**. El lint global baja de **26 a 24 errores**. Ninguno de los dos comportamientos estaba cubierto por tests, así que se añadieron **6**: `src/tests/App.test.tsx` (nuevo — abrir/cerrar con la hamburguesa, cierre al navegar desde **fuera** del menú, cierre al pulsar un enlace del menú) y tres en `ProductForm.test.tsx` (precarga de campos, precarga de etiquetas y su envío al actualizar, alta y baja de etiquetas sobre las precargadas). La cobertura de sentencias sube de 19.88 % a **23.83 %**.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
@@ -1047,6 +1066,13 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-05 | **T1-02** Cadena de verificación del frontend — *verificada, bloqueada* | `install --frozen-lockfile` ✅, `check` ✅, `test:coverage` ✅ 181/181, `build` ✅. **`lint` ❌ 26 errores** | Se añadieron a `package.json` el script `check` (`tsc -b`) y el campo `packageManager: pnpm@11.2.2`, que no existían. El rojo del lint **es T1-09**. **Pendiente:** empaquetarlo como script `verify`. |
 | 2026-08-06 | **Decisión: sin CI** | `Stockly-B/.github/` y `Stockly-F/.github/` eliminados | Se descarta GitHub Actions y cualquier pipeline. Toda la verificación (tipos, lint, tests, cobertura, build, E2E) se ejecuta en local. T1-01 y T1-02 se reformulan como guiones de verificación local. También se quitó la dependencia de `process.env.CI` en `playwright.config.ts:11-12`. |
 | 2026-08-07 | **T1-01** Script `verify` del backend — **completada** | `pnpm verify` entero en verde contra el PostgreSQL local (5433): `generate` ✅, `migrate deploy` ✅, `check` ✅, `test:coverage` ✅ 205/205, `build` ✅, smoke ✅ `/api/v1/health` → 200, salida **0**. Camino de fallo comprobado: con `dist/server.js` renombrado sale **1** | Nuevo `scripts/smoke.js`. Usa `SMOKE_PORT` (3100) para no chocar con el `dev`, y `process.exitCode` en vez de `process.exit()`: en Windows, salir con el hijo aún cerrándose aborta libuv (`UV_HANDLE_CLOSING`) y devuelve un código basura pese a haber pasado la comprobación. |
+| 2026-08-07 | **T1-05** Payload de `PATCH /settings` — **completada** | Contra el backend real: el payload antiguo `{updates:{…}}` responde **200 con `data` vacío y no persiste**; el objeto plano persiste `true`. Ajuste restaurado a `false` | El 200 mudo es lo que hizo invisible el fallo. Convertirlo en 422 es T1-07. |
+| 2026-08-07 | **T1-07** Validación Zod en `PATCH /settings` — **completada** | 5 tests de integración nuevos: clave desconocida, payload `{updates:{…}}`, tipo equivocado, cuerpo no-objeto y cuerpo vacío → **422** en los cinco. `verify` backend ✅ **209/209** | Esquema generado desde `SETTINGS_CATALOG`: un ajuste nuevo se valida solo. Cierra el 200 mudo que dejó vivir a T1-05. **Cambio de contrato:** el endpoint deja de tolerar claves desconocidas. |
+| 2026-08-07 | **T1-06** Tipo de `SettingEntry.value` — **completada** | `GET /settings` real devuelve `"value":false` (boolean) y **sin** `defaultValue`: los dos desajustes confirmados | Nuevo `SettingValue = boolean \| string \| number` y `esVerdadero()`. Se eliminó `defaultValue` del tipo, que el backend nunca envía. El mock del test se corrigió: era el ejemplo canónico del informe. |
+| 2026-08-07 | **T1-08** Efecto de sincronización de `SettingsPage` — **completada** | `eslint` limpio en el archivo ✅ · 7/7 tests (4 existentes + 3 nuevos) | Estado `cambios` solo con lo tocado y valores derivados en render. De paso, el guardado envía únicamente los ajustes modificados. Sin verificar: el recuento de renders con el Profiler. |
+| 2026-08-07 | **T1-09** `pnpm lint` en verde — **completada** | `pnpm lint` → **0 errores, 0 avisos, exit 0** ✅ (venía de 26 y 4) | `coverage` a `globalIgnores`, `react-refresh/only-export-components` desactivada solo en `src/routes/**`, y `watch()` → `useWatch()` en `TagsPage`, que además deja de ser descartado por el React Compiler. |
+| 2026-08-07 | **T1-02** Script `verify` del frontend — **desbloqueada y completada** | `pnpm verify` entero **exit 0**: `check` ✅, `lint` ✅, **190/190** ✅, `build` ✅ | Estuvo en rojo por el lint desde que se escribió, hasta cerrar T1-09. |
+| 2026-08-07 | **T1-10** `setState` en efecto de `App.tsx` y `ProductForm.tsx` — **completada** | `eslint` limpio en ambos archivos ✅ · `check` ✅ · **187/187** tests ✅. Lint global **26 → 24** errores; cobertura de sentencias **19.88 % → 23.83 %** | Ambos resueltos derivando en render, sin efecto: `App.tsx` guarda la ruta de apertura (`openedAt === pathname`) en vez de un booleano; `ProductForm.tsx` pasa los valores a `defaultValues` y las etiquetas al inicializador de `useState`, apoyándose en el remonte por `key` de `ProductsPage:255`. Se añadieron 6 tests, entre ellos el primer `App.test.tsx`, porque ninguno de los dos comportamientos estaba cubierto. |
 | 2026-08-07 | **T1-02** Script `verify` del frontend — *implementado, bloqueado por T1-09* | `check` ✅, `test:coverage` ✅ 181/181, `build` ✅. **`lint` ❌ 26 errores + 4 avisos**, así que `verify` se detiene ahí | El primer `verify` real destapó **un conflicto de merge sin resolver commiteado** en `e2e/smoke.spec.ts:3-12` (merge `4254582`, 2026-08-05) que reintroducía la credencial `Ad159753` purgada por T0-06 — resuelto a favor del lado del seed, con lo que el lint vuelve de 27 a 26 errores. También: ESLint analiza `coverage/`, de donde salen 3 de los 4 avisos. |
 
 ### Resumen por Tier
@@ -1054,23 +1080,23 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
-| Tier 1 | 1 | 26 | 4 % |
+| Tier 1 | 8 | 26 | 31 % |
 | Tier 2 | 0 | 41 | 0 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **10** | **100** | **10 %** |
+| **Total** | **17** | **100** | **17 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
 ### Métricas
 
-| Métrica | Inicial (auditoría) | Tras Tier 0 | Objetivo |
+| Métrica | Inicial (auditoría) | Actual (2026-08-07) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **205/205** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **87.10 %** | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | 181/181 ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | 19.88 % | ≥ 45 % |
-| `pnpm lint` (frontend) | ❌ 26 errores | ❌ 26 errores | ✅ 0 errores |
+| Tests backend | 198/198 ✅ | **209/209** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **87.12 %** | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **190/190** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **23.98 %** | ≥ 45 % |
+| `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |
 | Conflictos de merge sin resolver en el árbol | 1 *(no detectado en la auditoría)* | **0** ✅ | 0 |
 | `pnpm check` (ambos) | ✅ sin errores | ✅ sin errores | mantener |
 | `node dist/server.js` | ❌ MODULE_NOT_FOUND | ✅ **arranca** | ✅ arranca |
@@ -1078,7 +1104,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | `docker compose up --build` | ❌ no alcanzable | ✅ **health 200** | ✅ health 200 |
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
 | Índices no-únicos en BD | 0 | 0 | 14 |
-| Guiones `verify` locales | 0 | **2** *(backend en verde; el del frontend se detiene en el lint — T1-09)* | 2 en verde |
+| Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
 | Tokens semánticos en `@theme` | 1 (`--font-sans`) | 1 | capa completa (T2-35) |
 | Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | 561 | 0 fuera de excepciones |
 | Variantes de `Badge` sin significado | 4 de 7 | 4 de 7 | 0 |

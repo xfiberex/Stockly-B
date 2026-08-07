@@ -61,15 +61,55 @@ describe("Settings API (ADMIN)", () => {
             expect(stored?.value).toBe("true");
         });
 
-        it("ignora claves desconocidas sin romper", async () => {
+    });
+
+    // El endpoint aceptaba cualquier cuerpo y respondía 200 sin efecto, que es como
+    // T1-05 (el frontend enviaba `{ updates: {...} }`) sobrevivió sin ser detectado.
+    // Desde T1-07 el esquema es estricto y se genera desde SETTINGS_CATALOG.
+    describe("Validación del cuerpo (T1-07)", () => {
+        it("422: una clave fuera del catálogo se rechaza en lugar de ignorarse", async () => {
             const res = await request(app)
                 .patch(BASE)
                 .set("Cookie", adminCookie)
                 .send({ claveInventada: true, lowStockAlertEnabled: false });
-            expect(res.status).toBe(200);
-            // Solo la clave válida del catálogo se persiste
-            const stored = await prisma.appSetting.findMany();
-            expect(stored.every((s) => s.key === "lowStockAlertEnabled")).toBe(true);
+
+            expect(res.status).toBe(422);
+            expect(await prisma.appSetting.count()).toBe(0);
+        });
+
+        it("422: el payload antiguo `{ updates: {...} }` se rechaza", async () => {
+            const res = await request(app)
+                .patch(BASE)
+                .set("Cookie", adminCookie)
+                .send({ updates: { lowStockAlertEnabled: true } });
+
+            expect(res.status).toBe(422);
+            expect(await prisma.appSetting.count()).toBe(0);
+        });
+
+        it("422: un valor con el tipo equivocado se rechaza", async () => {
+            const res = await request(app)
+                .patch(BASE)
+                .set("Cookie", adminCookie)
+                .send({ lowStockAlertEnabled: "true" });
+
+            expect(res.status).toBe(422);
+            expect(res.body.errors[0].field).toBe("lowStockAlertEnabled");
+        });
+
+        it("422: un cuerpo que no es objeto no provoca un 500", async () => {
+            const res = await request(app)
+                .patch(BASE)
+                .set("Cookie", adminCookie)
+                .set("Content-Type", "application/json")
+                .send("[1,2]");
+
+            expect(res.status).toBe(422);
+        });
+
+        it("422: un cuerpo vacío se rechaza en lugar de responder 200 sin efecto", async () => {
+            const res = await request(app).patch(BASE).set("Cookie", adminCookie).send({});
+            expect(res.status).toBe(422);
         });
     });
 });
