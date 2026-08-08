@@ -54,14 +54,14 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **265/265** | **232/232** |
-| Cobertura (sentencias) | 88.48 % | 30.01 % |
+| Tests | **265/265** | **257/257** |
+| Cobertura (sentencias) | 88.48 % | 30.59 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
 nada a mano. Arranca solo la base de datos, el backend y el frontend.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 7/41** · Total **42/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 8/41** · Total **43/100**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -159,14 +159,21 @@ En marcha el **Tier 2**. Cerrado ya el bloque de arrastres del Tier 1: **T2-03 +
 existe, los primitivos la consumen y **no queda ninguna utilidad de color cruda** en la
 interfaz — eran 561. Cambiar la paleta es ahora editar `index.css`.
 
-Tres tests lo sostienen y conviene no desactivarlos: `theme.test.ts` recalcula los
+Cuatro tests lo sostienen y conviene no desactivarlos: `theme.test.ts` recalcula los
 contrastes desde el CSS, `tokens.test.ts` recorre todos los archivos buscando utilidades
-crudas, y los de `Button`/`Badge` comprueban que ninguna variante emita una.
+crudas, los de `Button`/`Badge` comprueban que ninguna variante emita una, y
+`estados.test.tsx` exige que dos estados del mismo conjunto no dibujen el mismo icono.
 La regla al escribir interfaz es nombrar el papel, no el valor: `bg-surface`, no `bg-white`.
 
-Lo que queda del bloque de diseño: **T2-38** (icono además de color en los estados;
-`textoLegibleSobre()` de `shared/lib/color.ts` ya está disponible), **T2-39**, **T2-40** y
-**T2-41**. Ninguna es grande.
+**Con T2-38, el estado ya no se comunica solo por color.** Etiqueta, color e icono de cada
+estado salen de un descriptor único en `Stockly-F/src/shared/lib/estados.ts`, y `EstadoBadge`
+lo pinta entero: no hay forma de poner uno sin los otros. Al añadir un estado nuevo hay que
+elegir icono ahí mismo, y el test lo comprueba comparando la **geometría del trazo** del SVG,
+no el nombre del componente importado. La tarea destapó que «bajo» y «agotado» eran el mismo
+triángulo ámbar, indistinguibles incluso con color.
+
+Lo que queda del bloque de diseño: **T2-39**, **T2-40** y **T2-41**. Ninguna es grande.
+`textoLegibleSobre()` de `shared/lib/color.ts` sigue disponible por si hace falta.
 
 **Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro
 de los componentes. No son utilidades —`fill`/`stroke` son props—, así que ningún test las
@@ -185,5 +192,10 @@ ROADMAP): la interfaz no permite cancelar una orden de venta ya enviada —la re
 stock de T0-03 existe en el backend pero no se puede alcanzar desde la aplicación—, y
 falta un índice por `createdAt` en `products` pese a que todos los listados ordenan por él.
 
-`shared/lib/color.ts` (de T2-17) ya calcula el color de texto legible sobre cualquier
-fondo: **T2-38** tiene el mismo problema en `Badge` y puede reutilizarlo.
+**Para verificar cambios de interfaz en el navegador**, el camino corto: `pnpm dev` en los
+dos repositorios, entrar con `admin@stockly.app` / `Admin1234!` y, si hace falta un estado
+que la base de desarrollo no tiene (un producto agotado, una venta pendiente o enviada),
+crearlo por la API con el token CSRF de la cookie **y borrarlo después**. Ojo: una venta ya
+enviada no se puede borrar por la API, así que la limpieza pide un script con el cliente de
+Prisma —`pnpm exec tsx`, importando `./src/shared/lib/prisma`, que es quien tiene el adaptador
+configurado; construir un `PrismaClient` a pelo falla.

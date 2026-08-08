@@ -785,13 +785,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Dos decisiones de criterio, no mecánicas:** los enlaces van a `text-info` —mantienen la afordancia azul y cumplen AA— en vez de a `text-primary`, que los dejaría en gris pizarra; y los indicadores de foco pasan a `ring-accent`, el verde de la marca, en lugar de un azul suelto.
   - **Fuera del alcance de la tarea:** las paletas de los gráficos de Recharts siguen como hex en el componente. No son utilidades —`fill`/`stroke` son props, no clases—, así que el criterio no las cubre; llevarlas a los tokens exigiría leer las variables CSS desde JS. Anotado como candidato.
 
-- [ ] **[T2-38] Comunicar el estado con icono además de color**
+- [x] **[T2-38] Comunicar el estado con icono además de color**
   - **Área:** Accesibilidad / UI/UX
   - **Ubicación:** `Stockly-F/src/modules/products/components/ProductTable.tsx`, `dashboard/components/DashboardPage.tsx`, `sale-orders/components/SaleOrdersPage.tsx`, `purchase-orders/components/PurchaseOrdersPage.tsx`
   - **Qué hacer:** Los tres conjuntos de estado del producto —nivel de stock (correcto / bajo / agotado), estado de orden (`PENDING`/`SHIPPED`/`RECEIVED`/`CANCELLED`) y tipo de movimiento (`IN`/`OUT`)— se distinguen hoy únicamente por color, lo que incumple WCAG 1.4.1 y deja fuera a los usuarios con deficiencia de visión cromática: precisamente la información crítica de una aplicación de inventario. Acompañar cada estado de un icono de Heroicons y de su texto. Es el mismo principio que T2-17 aplica a los colores de etiqueta elegidos por el usuario.
   - **Criterio de aceptación:** con el filtro de escala de grises del navegador activado, los tres conjuntos de estado siguen siendo distinguibles entre sí en tabla, dashboard y listados de órdenes.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-36
+  - **Verificado localmente (2026-08-08):** `verify` ✅ **257/257** (25 tests nuevos), E2E ✅ 9 pasados 1 omitido. Etiqueta, color e icono de cada estado salen ahora de un único descriptor en `Stockly-F/src/shared/lib/estados.ts`, así que en la interfaz **no hay forma de poner el color sin el icono**; `Badge` acepta el icono como prop y `EstadoBadge` pinta el descriptor entero.
+  - **Comprobado con el filtro de escala de grises del navegador** (capturas en gris de tabla de productos, órdenes de compra, órdenes de venta, historial de movimientos y dashboard), que es el criterio de aceptación: nivel de stock (triángulo / círculo con aspa), actividad (visto / prohibido), estado de orden (reloj, camión, visto, aspa) y tipo de movimiento (flecha hacia dentro / hacia fuera) se distinguen sin color. Para llegar a los estados que la base de desarrollo no tenía —agotado, pendiente y enviado— se creó un producto y dos ventas temporales; **se borraron después** y la base quedó como estaba.
+  - **Defecto que la tarea destapó:** «bajo» y «agotado» eran el mismo triángulo ámbar en la tabla de productos, indistinguibles incluso **con** color. Ahora `nivelDeStock()` los separa y agotado tiene prioridad sobre bajo — cero no es el extremo de «bajo», es otro estado.
+  - **El test comprueba la propiedad, no la escritura:** `src/tests/components/estados.test.tsx` renderiza cada estado, extrae del SVG los atributos `d` —la geometría del trazo, no el nombre del componente importado, que puede diferir dibujando lo mismo— y exige que dos estados del mismo conjunto no coincidan, con una comprobación aparte para los que comparten color. Falsificado a propósito: dando a «Cancelado» el reloj de «Pendiente», el test falla.
+  - **Más allá de la ubicación listada:** el mismo patrón estaba en `UsersPage` (activo/inactivo, rol, sin verificar) y en `ProductDetailModal`; se migraron para no dejar la mitad de la aplicación con el criterio viejo. Un estado que la API añada y la interfaz no conozca cae en la variante neutra con su código en crudo, en vez de heredar el color del último conocido.
 
 - [ ] **[T2-39] Cifras tabulares en las columnas numéricas**
   - **Área:** UI/UX
@@ -1115,7 +1120,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 |---|---|---|
 | DS-01 Sin capa de tokens semánticos (1 solo token en `@theme`) | Medio | T2-35, T2-37 |
 | DS-02 561 utilidades de color crudas en 41 de 57 archivos | Medio | T2-36, T2-37 |
-| DS-03 El estado se comunica solo por color (WCAG 1.4.1) | Medio | T2-38 |
+| DS-03 El estado se comunica solo por color (WCAG 1.4.1) | Medio | T2-38 ✅ |
 | DS-04 Cifras proporcionales en columnas numéricas | Bajo | T2-39 |
 | DS-05 Densidad sin sistema y `Button` de 36 px bajo el mínimo táctil | Medio | T2-40 |
 | DS-06 Escala tipográfica implícita; `font-black` sin peso importado | Bajo | T2-41 |
@@ -1172,6 +1177,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-07 | **T2-35** Capa de tokens semánticos — **completada** | Los tres puntos del criterio: capa completa (13 tests), propagación comprobada cambiando `--color-accent` a `#ff00ff` y reconstruyendo, y contrastes **recalculados desde `index.css`** con la fórmula WCAG | **Corrección sobre la ficha de la paleta:** `#dc2626` cumple contra blanco (4.83) pero **falla sobre su propia superficie de badge (4.41)** — los ratios estaban medidos solo contra blanco. Ahora `#b91c1c`. Lo encontró el test, no la revisión a ojo. **Comprobado contra Tailwind 4:** todos los tokens generan utilidad salvo las duraciones, que no tienen espacio de nombres; por eso viven en `:root`. Ningún `--radius-*` tocado, con test que lo vigila. Desbloquea T2-36/37/38/39/40/41. |
 | 2026-08-07 | **T2-36** `Button` y `Badge` semánticos — **completada** | Cero utilidades crudas en los dos primitivos y cero variantes decorativas en la app. `verify` ✅ **231/231**; E2E **3 pasadas seguidas** en verde | Las 7 variantes de `Badge` pasan a 5 con significado, y los 12 usos se reasignan por lo que comunican (categoría → `neutral`, no `info`: clasifica, no informa de estado). `BadgeVariant` exportado tipa los cuatro mapas del proyecto: el compilador cazó un `purple` superviviente. Los tests comprueban con expresión regular que **ninguna variante emite una utilidad cruda**. **Prueba intermitente corregida:** el E2E de configuración esperaba a que el botón se deshabilitara, pero eso también ocurre con la petición en vuelo; ahora espera la respuesta del PATCH. |
 | 2026-08-07 | **T2-37** Fuera las utilidades de color crudas — **completada** | **593 sustituciones en 39 archivos**; el grep del criterio devuelve **cero, sin excepciones**. `verify` ✅ **232/232**, E2E ✅. Comparación visual antes/después de dashboard, productos y reportes con Chrome DevTools | Codemod en Node (PowerShell habría roto el UTF-8). El criterio deja de depender de que alguien ejecute el grep: `tokens.test.ts` lo comprueba en cada `verify`. **Regresión que solo se vio en las capturas:** el fondo de página (`bg-gray-50`) acabó en `bg-surface-muted`, el mismo valor que el botón secundario, que se volvió invisible; los 9 contenedores de página pasan a `bg-background`. `gray-50` significaba dos cosas distintas según dónde estuviera, y eso una sustitución mecánica no lo distingue. **Fuera de alcance:** las paletas de Recharts siguen en hex — son props, no clases. |
+| 2026-08-08 | **T2-38** El estado se dice con icono, no solo con color — **completada** | Verificado **con el filtro de escala de grises del navegador**, que es el criterio: capturas en gris de tabla de productos, órdenes de compra y de venta, movimientos y dashboard. `verify` ✅ **257/257** (25 tests nuevos), E2E ✅ | Etiqueta, color e icono salen de un descriptor único (`shared/lib/estados.ts`): no hay forma de poner uno sin los otros. **Defecto destapado:** «bajo» y «agotado» eran el mismo triángulo ámbar, indistinguibles incluso **con** color; `nivelDeStock()` los separa y agotado gana a bajo. El test extrae del SVG los atributos `d` —la geometría, no el nombre del componente— y exige que dos estados del mismo conjunto no coincidan; falsificado dando a «Cancelado» el reloj de «Pendiente». Se migraron también `UsersPage` y `ProductDetailModal`, fuera de la ubicación listada. Los estados que faltaban en la base de desarrollo se crearon para verlos y **se borraron después**. |
 
 ### Resumen por Tier
 
@@ -1179,21 +1185,22 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 7 | 41 | 17 % |
+| Tier 2 | 8 | 41 | 20 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **42** | **100** | **42 %** |
+| **Total** | **43** | **100** | **43 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
 ### Métricas
 
-| Métrica | Inicial (auditoría) | Actual (2026-08-07) | Objetivo |
+| Métrica | Inicial (auditoría) | Actual (2026-08-08) | Objetivo |
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **265/265** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.48 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **232/232** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **30.01 %** | ≥ 45 % |
+| Tests frontend | 181/181 ✅ | **257/257** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **30.59 %** | ≥ 45 % |
+| Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** ✅ | escenarios que crucen la frontera |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
