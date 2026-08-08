@@ -1,7 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
-import { checkLowStockAlert } from "@/shared/lib/stockAlerts";
+import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
 import type {
     CreateProductDto,
@@ -178,7 +178,7 @@ export const productService = {
         });
 
         if (hasStockChange && stockDelta < 0) {
-            await checkLowStockAlert(updated.name, newStock!, updated.minStock);
+            dispararAlertaStock(updated.name, newStock!, updated.minStock);
         }
 
         return updated;
@@ -366,7 +366,7 @@ export const productService = {
 
         // Solo alerta si el stock disminuyó respecto al valor previo.
         if (newStock < product.stock) {
-            await checkLowStockAlert(product.name, newStock, product.minStock);
+            dispararAlertaStock(product.name, newStock, product.minStock);
         }
 
         return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
@@ -400,7 +400,7 @@ export const productService = {
                     }
 
                     if (outcome.delta < 0) {
-                        await checkLowStockAlert(outcome.name, stock, outcome.minStock);
+                        dispararAlertaStock(outcome.name, stock, outcome.minStock);
                     }
 
                     results.push({ productId, success: true });

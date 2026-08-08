@@ -1,7 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
 import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
-import { checkLowStockAlert } from "@/shared/lib/stockAlerts";
+import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
@@ -175,9 +175,11 @@ export const saleOrderService = {
             });
         });
 
-        // Alertas best-effort, ya fuera de la transacción para no retener locks durante el SMTP.
+        // Alertas best-effort, fuera de la transacción y **sin esperarlas** (T2-07):
+        // aquí eran una por producto y en serie, así que enviar la orden costaba
+        // tantas idas y vueltas al SMTP como productos bajaran de mínimo.
         for (const target of lowStockTargets) {
-            await checkLowStockAlert(target.name, target.newStock, target.minStock);
+            dispararAlertaStock(target.name, target.newStock, target.minStock);
         }
 
         return updated;

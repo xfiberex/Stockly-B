@@ -54,14 +54,14 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **265/265** | **279/279** |
-| Cobertura (sentencias) | 88.48 % | 31.94 % |
+| Tests | **275/275** | **282/282** |
+| Cobertura (sentencias) | 88.62 % | 32.03 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
 nada a mano. Arranca solo la base de datos, el backend y el frontend.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 11/41** · Total **46/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 14/41** · Total **49/100**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -119,6 +119,16 @@ omite. Desde **T1-19** solo quedan exentas siete rutas públicas de `/auth`: `lo
 una pasada de navegador: el 429 hace fallar pruebas que no van de eso, e incluso la
 comprobación de salud del `webServer`. `RATE_LIMIT_MAX` y `AUTH_RATE_LIMIT_MAX` suben el
 techo (ya vienen puestas en `playwright.config.ts`); el limitador y CSRF siguen activos.
+
+**Un *transport* de pino cuesta caro con el E2E delante.** `pino-pretty` no formatea en
+proceso: levanta un hilo de trabajo y le pasa cada línea por un canal. Con cuatro
+navegadores, Vite compilando y el servidor en `tsx`, eso subió la pasada de **36 s a 66 s**
+y puso a dos pruebas a agotar su tiempo, de forma reproducible. Por eso `logger.ts`
+condiciona el formato legible a `process.stdout.isTTY`: si nadie está mirando la terminal,
+JSON directo y sin hilo. Vale la regla general: **antes de acusar al código de una tarea,
+comparar contra el estado anterior con `git stash` en la misma máquina** — aquí evitó dos
+diagnósticos equivocados, y también demostró que un `pnpm dev` olvidado ocupando un puerto
+falsea toda la medición.
 
 **PowerShell 5.1 destroza el UTF-8.** `Get-Content -Raw | ... | Set-Content` lee con la
 página de códigos ANSI y reescribe en UTF-8, dejando doble codificación (`—` → `â€"`), y
@@ -203,9 +213,19 @@ tipografía. Los cinco tests que lo sostienen —`theme`, `tokens`, `estados`, `
 ya se había colado una vez. `textoLegibleSobre()` de `shared/lib/color.ts` sigue disponible
 por si hace falta.
 
-**El siguiente bloque ya no es de diseño.** Las dos raíces son **T2-10** (logging
-estructurado, que desbloquea T2-07 y hace diagnosticable todo lo demás) y **T2-11** (saltar
-al contenido, que desbloquea T2-18).
+**Ya hay observabilidad** (T2-10): `pino` + `pino-http` con `requestId` por petición,
+devuelto en `x-request-id` y presente en cada línea; en producción, JSON. Al depurar un
+fallo, pedir ese identificador es lo primero. Las cabeceras van redactadas (`cookie`,
+`authorization`): sin eso, pino-http registra la sesión completa en cada llamada.
+
+Con el log en su sitio, **las alertas de bajo stock ya no bloquean la respuesta** (T2-07).
+Se disparan sin esperar y sus fallos se registran; `esperarAlertasEnVuelo()` existe para que
+los tests puedan esperarlas de verdad. Si añades otro aviso por correo, sigue ese patrón.
+
+**El enlace de saltar al contenido** (T2-11) es ahora el primer elemento enfocable, y
+`<main id="contenido" tabIndex={-1}>` es su destino. Ese `tabIndex` no se puede quitar: sin
+él el foco no viaja y el enlace pasa a ser decoración. **T2-18** (gestión del foco al
+cambiar de ruta) ya tiene aquí su punto de anclaje.
 
 **Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro
 de los componentes. No son utilidades —`fill`/`stroke` son props—, así que ningún test las

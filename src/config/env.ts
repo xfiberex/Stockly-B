@@ -99,6 +99,9 @@ export const env = {
     nodeEnv: process.env.NODE_ENV ?? "development",
     // Techo global de peticiones por IP cada 15 min. Configurable para el E2E.
     rateLimitMax: Number.parseInt(process.env.RATE_LIMIT_MAX ?? "", 10) || 100,
+    // Nivel de log (T2-10). En los tests el valor por defecto es `silent` para no
+    // ensuciar la salida del suite; los que comprueban el log lo suben a mano.
+    logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "test" ? "silent" : "info"),
     databaseUrl: process.env.DATABASE_URL!,
     cloudinary: {
         // `configured` distingue «no hay credenciales» de «las credenciales fallan».

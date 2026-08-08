@@ -1,16 +1,20 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
-import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
+import { pinoHttp } from "pino-http";
 import { env } from "@/config/env";
+import { logger, generarRequestId } from "@/shared/lib/logger";
 import { router } from "@/routes";
 import { errorHandler } from "@/shared/middlewares/error.middleware";
 import { csrfProtection } from "@/shared/middlewares/csrf.middleware";
 import { registerSwagger } from "@/swagger";
 
 const app = express();
+
+/** Ruta tal y como la pidió el cliente, antes de que el router la reescriba. */
+const rutaPedida = (req: { url?: string; originalUrl?: string }) => req.originalUrl ?? req.url;
 
 app.use(helmet());
 
@@ -19,9 +23,24 @@ app.use(cors({
     credentials: true,
 }));
 
-if (env.nodeEnv === "development") {
-    app.use(morgan("dev"));
-}
+// Log de peticiones (T2-10). Va antes que todo lo demás para que también queden
+// registradas las que mueren en el rate limit o en la comprobación CSRF, que son
+// precisamente las que a uno le interesa buscar después.
+app.use(pinoHttp({
+    logger,
+    genReqId: generarRequestId,
+    // El 4xx es un cliente equivocado, no una avería: aviso, no error. El 5xx sí.
+    customLogLevel: (_req, res, err) => {
+        if (err || res.statusCode >= 500) return "error";
+        if (res.statusCode >= 400) return "warn";
+        return "info";
+    },
+    // `req.url` NO sirve aquí: Express lo reescribe al entrar en un router montado,
+    // así que todas las peticiones acababan con el mensaje «GET /». La ruta que
+    // pidió el cliente está en `originalUrl`.
+    customSuccessMessage: (req, res) => `${req.method} ${rutaPedida(req)} → ${res.statusCode}`,
+    customErrorMessage: (req, res, err) => `${req.method} ${rutaPedida(req)} → ${res.statusCode}: ${err.message}`,
+}));
 
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));

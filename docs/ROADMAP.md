@@ -469,13 +469,16 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T2-07] No bloquear la respuesta HTTP con el envío de alertas**
+- [x] **[T2-07] No bloquear la respuesta HTTP con el envío de alertas**
   - **Área:** Rendimiento
   - **Ubicación:** `Stockly-B/src/modules/products/product.service.ts:182,370,404`, `sale-orders/sale-orders.service.ts:143-145`
   - **Qué hacer:** `checkLowStockAlert` está correctamente fuera de la transacción, pero se `await`-ea dentro del ciclo de la petición; en órdenes de venta se hace además en serie, una alerta por producto. Disparar sin esperar, registrando los fallos: `void checkLowStockAlert(...).catch((e) => logger.warn(e))`.
   - **Criterio de aceptación:** el tiempo de respuesta de `POST /products/:id/movements` no depende de la latencia del servidor SMTP; los tests de `low-stock-alert.test.ts` siguen verificando el envío (añadiendo un `await` explícito o un flush si hiciera falta).
   - **Esfuerzo:** bajo
   - **Depende de:** T2-10
+  - **Verificado localmente (2026-08-08):** backend `verify` ✅ **275/275**, E2E ✅. El criterio se comprueba **haciendo lento el correo a propósito**: con un envío de 500 ms, la respuesta de `POST /products/:id/movements` tarda menos de 500 ms; con el `await` de antes tardaba **750 ms**. Falsificado devolviendo el `await`: el test falla con «Expected: < 500, Received: 750».
+  - **Un `void promesa` no bastaba:** dejaba el envío sin poder testear y los fallos sin registrar. `dispararAlertaStock()` guarda las promesas vivas en un registro y expone `esperarAlertasEnVuelo()`, así que los tests **esperan de verdad** en vez de dormir un rato y cruzar los dedos. Los fallos de correo van a `logger.warn` (de aquí la dependencia con T2-10): antes se habrían perdido en silencio.
+  - **Dos tests nuevos:** que la respuesta no espera al SMTP, y que un SMTP caído no impide que el movimiento de stock quede guardado.
 
 - [ ] **[T2-08] Ajustar el lote de importación masiva al tamaño del pool**
   - **Área:** Rendimiento
@@ -495,23 +498,31 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Observabilidad
 
-- [ ] **[T2-10] Logging estructurado con correlación de peticiones**
+- [x] **[T2-10] Logging estructurado con correlación de peticiones**
   - **Área:** Código / DevOps
   - **Ubicación:** `Stockly-B/src/app.ts:22-24`, `shared/middlewares/error.middleware.ts:15`
   - **Qué hacer:** `morgan("dev")` solo en desarrollo y un `console.error` de texto plano en producción, sin identificador de petición ni niveles. Adoptar `pino` + `pino-http`, generar un `requestId` por petición, propagarlo al `errorHandler` y devolverlo en la cabecera `x-request-id`.
   - **Criterio de aceptación:** los logs de producción salen en JSON con nivel y `requestId`; dado un `x-request-id` de una respuesta, se pueden recuperar todas sus líneas de log.
   - **Esfuerzo:** medio
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-08):** backend `verify` ✅ **275/275** (8 tests nuevos), E2E ✅ **9 pasados 1 omitido, tres pasadas seguidas**. `pino` + `pino-http` sustituyen a morgan y al `console.error`. Cada respuesta lleva `x-request-id`; si viene uno por cabecera se respeta, para no romper una traza que empezó en otro servicio.
+  - **El criterio, comprobado de verdad:** los tests **capturan la salida real** de pino interceptando `process.stdout.write`, cogen el `x-request-id` de la respuesta y buscan sus líneas en el log. Un 4xx se registra como `warn` y un 5xx como `error`: un cliente equivocado no es una avería.
+  - **La redacción no es decorativa:** `pino-http` registra **todas** las cabeceras de la petición, así que sin `redact` la cookie de sesión y el `Authorization` acababan en el log en cada llamada. Se comprobó mirando una línea real: salen como `[oculto]`.
+  - **Dos defectos encontrados al mirar la salida:** el mensaje decía `GET /` en todas las peticiones, porque Express reescribe `req.url` al entrar en un router montado (se usa `originalUrl`); y en desarrollo cada línea vomitaba los objetos `req` y `res` enteros, que como sustituto de morgan habría sido un cambio a peor (se ocultan y lo útil va en el mensaje: `GET /api/v1/health → 200  33ms  [id]`).
+  - **Regresión propia, medida y corregida:** `pino-pretty` es un *transport*, es decir un hilo de trabajo con un canal por línea. Con el E2E —cuatro navegadores, Vite compilando y `tsx`— la pasada **subió de 36 s a 66 s y dos pruebas empezaron a agotar su tiempo, de forma reproducible**. Se aisló comparando contra el estado anterior con `git stash` en la misma máquina. Arreglado condicionando el formato legible a que la salida sea una terminal (`process.stdout.isTTY`): cuando nadie mira —el `webServer` de Playwright, Docker, un recolector— se escribe JSON directo, sin hilo. Tras el cambio, **36 s y 9/9 en tres pasadas**, igual que antes de la tarea.
 
 ### Accesibilidad
 
-- [ ] **[T2-11] Enlace para saltar al contenido principal**
+- [x] **[T2-11] Enlace para saltar al contenido principal**
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/App.tsx:184-236`
   - **Qué hacer:** La barra de navegación tiene entre 3 y 12 controles y se repite en todas las páginas, sin mecanismo para saltarla (WCAG 2.4.1, nivel A). Añadir un enlace visible al recibir foco que apunte a `<main id="contenido" tabIndex={-1}>`.
   - **Criterio de aceptación:** la primera pulsación de Tab desde el inicio de la página revela el enlace; activarlo mueve el foco al contenido principal.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-08):** frontend `verify` ✅ **282/282** (3 tests nuevos), E2E ✅. Medido en el navegador: sin foco ocupa **1×1 px**; al recibirlo, **218×44**. Los tests comprueban las dos cosas que lo hacen útil —que es el primero en recibir el foco al tabular y que activarlo deja el foco **dentro** de `<main>`—, no solo que exista.
+  - **`tabIndex={-1}` en `<main>` no es un detalle:** sin él el navegador desplaza la página pero deja el foco donde estaba, y el siguiente Tab devuelve al usuario al principio de la navegación que quería saltarse. Es el fallo clásico que convierte el enlace en decoración.
+  - **El foco se mueve por código, no confiando en el navegador:** el salto por fragmento depende de cada navegador y jsdom no lo implementa, así que un `onClick` lo hace explícito —y comprobable—. Se quitó el `scrollIntoView()` que había puesto detrás: `focus()` ya desplaza, y encima lanzaba una excepción no capturada en jsdom que ensuciaba la suite.
 
 - [ ] **[T2-12] Respetar `prefers-reduced-motion`**
   - **Área:** Accesibilidad
@@ -1198,6 +1209,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-08 | **T2-39** Cifras tabulares en las columnas numéricas — **completada** | **Medido en el navegador** (jsdom no tiene métricas de fuente): el KPI de valor de inventario pasa de moverse **50.42 px** entre `$1,111,111.11` y `$8,888,888.88` a **0**; los bordes derechos de la columna de stock caen todos en la misma coordenada. `verify` ✅ **260/260**, E2E ✅ | La regla va en `index.css` sobre `table`, no celda a celda: la próxima tabla nace alineada. Las cifras tabulares **no bastaban** para el criterio de alineación vertical — hizo falta alinear a la derecha la columna de precio y meter el stock en una caja de ancho fijo, porque el icono y el mínimo que van detrás cambian de ancho por fila. **Trampa:** la contraprueba con la clase `proportional-nums` no medía nada, porque Tailwind solo genera las utilidades que aparecen escritas en el código; hay que usar `style.fontVariantNumeric`. |
 | 2026-08-08 | **T2-40** Densidad y mínimo táctil — **completada con una salvedad** | Mínimo táctil: de **71 dianas bajo 44×44 a 0** a 375 px, con emulación táctil, barriendo seis pantallas y el modal de nueva orden. Fila de escritorio: **80.8 → 48.8 px**. `verify` ✅ **269/269**, E2E ✅ | **Los 36 px de fila no se alcanzan**: 6+6 de relleno, 20 de nombre y 16 de SKU son ya 48, y la celda de imagen 44; llegar a 36 exigiría quitar el SKU y bajar la miniatura a 24 px, o sea empeorar la tabla para cuadrar la cifra. Se documenta en vez de forzarlo. Un solo componente en dos densidades (`min-h-11` / `md:min-h-9`); lo que no puede crecer —casilla de 16 px, interruptor de 24— recibe el toque en su envoltorio. La rejilla de 12 columnas de los ítems de orden dejaba «Cant.» en 38 px de ancho a 375 px: pasa a 2 columnas hasta `md`. **Regresión propia cazada por el E2E:** el `sr-only` con que nombré la casilla duplicaba el nombre del producto en el árbol de texto; se sustituye por `aria-label`. |
 | 2026-08-08 | **T2-41** Escala tipográfica explícita y recorte de Inter — **completada** | Dos compilaciones reales para medir el antes y el después: **56 → 8 archivos de fuente emitidos**, CSS **78.40 → 68.40 kB** (gzip **13.55 → 12.14**). `verify` ✅ **279/279** (10 tests nuevos), E2E ✅ | La escala se declara **borrando antes** `--text-*` y `--font-weight-*`: los tamaños no declarados dejan de existir, así que es una restricción, no un comentario. Cinco tamaños con un papel cada uno y cuatro pesos. El ahorro de fuentes viene de que `@fontsource/inter/400.css` trae **siete `@font-face` por peso** (cirílico, griego, vietnamita…) para una aplicación que solo se escribe en español; los `latin-*.css` traen uno. **La auditoría no había visto el `text-6xl`** del 404: apareció al borrar el espacio de nombres, junto al `font-black` que el navegador venía fingiendo. **El test se acusaba a sí mismo** —encontraba las clases prohibidas en los comentarios que explican por qué se fueron—, así que escanea el código sin comentarios. |
+| 2026-08-08 | **T2-10** Logging estructurado con correlación — **completada** | Los tests **capturan la salida real de pino** y recuperan las líneas de una petición por su `x-request-id`. `verify` ✅ **275/275** (8 nuevos), E2E ✅ 3 pasadas | `pino` + `pino-http` sustituyen a morgan y al `console.error`. **La redacción no era opcional:** pino-http registra todas las cabeceras, así que sin ella la cookie de sesión iba al log en cada llamada. Dos defectos vistos al mirar la salida: el mensaje decía `GET /` (Express reescribe `req.url` en un router montado) y en desarrollo se volcaban `req` y `res` enteros. **Regresión propia:** el hilo de `pino-pretty` subió el E2E de 36 s a 66 s con dos pruebas agotando su tiempo; aislada con `git stash` contra el estado anterior y resuelta condicionando el formato legible a `process.stdout.isTTY`. |
+| 2026-08-08 | **T2-07** Las alertas de stock dejan de bloquear la respuesta — **completada** | Con un SMTP de 500 ms la respuesta tarda menos de 500; con el `await` anterior, **750 ms**. `verify` ✅ **275/275** | Un `void promesa` habría dejado el envío sin testar y los fallos sin registrar: hay un registro de alertas en vuelo y `esperarAlertasEnVuelo()`, así que los tests esperan de verdad. En órdenes de venta era una alerta por producto **y en serie**. |
+| 2026-08-08 | **T2-11** Saltar al contenido principal — **completada** | 1×1 px sin foco, 218×44 al recibirlo. `verify` ✅ **282/282** (3 nuevos), E2E ✅ | Lo que se comprueba no es que el enlace exista: que sea el primero en el orden de tabulación y que activarlo deje el foco **dentro** de `<main>`. Sin `tabIndex={-1}` el navegador desplaza pero no mueve el foco, y el siguiente Tab devuelve al principio de la navegación — el fallo que convierte el enlace en decoración. |
 
 ### Resumen por Tier
 
@@ -1205,10 +1219,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 11 | 41 | 27 % |
+| Tier 2 | 14 | 41 | 34 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **46** | **100** | **46 %** |
+| **Total** | **49** | **100** | **49 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1216,9 +1230,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-08) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **265/265** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **88.48 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **279/279** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **275/275** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **282/282** ✅ | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **31.94 %** | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
