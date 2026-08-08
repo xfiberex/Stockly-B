@@ -54,14 +54,14 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **265/265** | **230/230** |
+| Tests | **265/265** | **232/232** |
 | Cobertura (sentencias) | 88.48 % | 30.01 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
 nada a mano. Arranca solo la base de datos, el backend y el frontend.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 5/41** · Total **40/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 7/41** · Total **42/100**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -155,14 +155,22 @@ En marcha el **Tier 2**. Cerrado ya el bloque de arrastres del Tier 1: **T2-03 +
 (esquema de Swagger, que ahora está atado al validador por un test) y **T2-17**
 (conmutadores de etiqueta accesibles).
 
-**T2-35 ya está**: la capa semántica está declarada en `index.css` y comprobada, pero
-**todavía no la consume ningún componente**. Lo natural ahora es **T2-36** (`Button` y
-`Badge` a variantes semánticas) y luego **T2-37** (el resto de la interfaz): son las que
-convierten los tokens en cambios visibles. Detrás quedan T2-38, T2-39, T2-40 y T2-41.
+**El sistema de diseño ya está en su sitio** (T2-35, T2-36 y T2-37): la capa semántica
+existe, los primitivos la consumen y **no queda ninguna utilidad de color cruda** en la
+interfaz — eran 561. Cambiar la paleta es ahora editar `index.css`.
 
-Al tocar colores, la regla es nombrar el papel y no el valor: `bg-surface`, no `bg-white`.
-`theme.test.ts` recalcula los contrastes desde el CSS, así que un token que baje del
-mínimo WCAG rompe la suite.
+Tres tests lo sostienen y conviene no desactivarlos: `theme.test.ts` recalcula los
+contrastes desde el CSS, `tokens.test.ts` recorre todos los archivos buscando utilidades
+crudas, y los de `Button`/`Badge` comprueban que ninguna variante emita una.
+La regla al escribir interfaz es nombrar el papel, no el valor: `bg-surface`, no `bg-white`.
+
+Lo que queda del bloque de diseño: **T2-38** (icono además de color en los estados;
+`textoLegibleSobre()` de `shared/lib/color.ts` ya está disponible), **T2-39**, **T2-40** y
+**T2-41**. Ninguna es grande.
+
+**Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro
+de los componentes. No son utilidades —`fill`/`stroke` son props—, así que ningún test las
+detecta; llevarlas a los tokens exige leer las variables CSS desde JS.
 
 Después, dos raíces más: **T2-10** (logging estructurado, que desbloquea T2-07 y hace
 diagnosticable todo lo demás) y **T2-11** (saltar al contenido, que desbloquea T2-18).

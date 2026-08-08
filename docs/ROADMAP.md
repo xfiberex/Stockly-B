@@ -759,21 +759,31 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T2-36] Migrar `Button` y `Badge` a variantes semánticas**
+- [x] **[T2-36] Migrar `Button` y `Badge` a variantes semánticas** ✅ *(2026-08-07)*
   - **Área:** UI/UX
   - **Ubicación:** `Stockly-F/src/shared/components/Button.tsx:9-14`, `Badge.tsx:10-18`
   - **Qué hacer:** Son los dos primitivos de los que cuelga el resto de la interfaz, así que la migración se propaga sola. En `Button`, sustituir los literales (`bg-blue-600`, `bg-gray-100`, `bg-red-600`) por los tokens, usando `--color-accent-strong` en los rellenos por lo dicho en T2-35. En `Badge`, las siete variantes actuales mezclan semántica (`success`, `danger`) con decoración (`blue`, `purple`, `orange`, `teal`): `purple` y `teal` se usan **una vez cada una** en toda la aplicación. Reducir a cinco variantes con significado — `neutral | success | warning | danger | info` — mapeadas a los pares `--color-<estado>-surface` / `--color-<estado>`, y reasignar los 12 usos existentes según lo que el badge realmente comunica.
   - **Criterio de aceptación:** ninguno de los dos archivos contiene utilidades `bg-<familia>-<n>`; `pnpm test:run` sigue en verde; los badges de estado de órdenes conservan su significado y ningún estado queda sin variante propia.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-35
+  - **Verificado localmente (2026-08-07):** cero coincidencias de `(bg|text|border)-<familia>-<n>` en `Button.tsx` y `Badge.tsx`, y cero usos de las variantes decorativas (`blue`, `purple`, `orange`, `teal`, `default`) en toda la aplicación. `pnpm verify` ✅ **231/231**. Los tests de ambos primitivos comprueban además, con una expresión regular sobre el `className` renderizado, que **ninguna variante emite una utilidad cruda** — no basta con que hoy no las haya. En el CSS construido se confirmó que las 11 utilidades nuevas (`bg-primary`, `bg-danger`, `bg-success-surface`, `text-warning`…) se generan de verdad.
 
-- [ ] **[T2-37] Erradicar las utilidades de color crudas del resto de la interfaz**
+    **Reasignación de los badges, por lo que comunican:** estados de orden `PENDING → warning` (hay algo por hacer), `RECEIVED`/`SHIPPED → success`, `CANCELLED → danger`. Categoría de producto `blue → neutral`: clasifica, no informa de un estado. Rol ADMIN `blue → info`. «Sin verificar» y avisos de stock `orange → warning`. Movimientos: `ADJUSTMENT → info` e `IMPORT → neutral`, que no mueven mercancía real y no compiten con `IN`/`OUT` por el color. Auditoría: `RESTORE` pasa a `success` porque deshace un borrado, y `purple`/`orange` a `info`. `BadgeVariant` se exporta, así que los cuatro mapas de variantes del proyecto quedan tipados contra las cinco válidas — el compilador cazó un `purple` superviviente en `USER_ROLE_CHANGE`.
+
+    **Prueba intermitente corregida por el camino:** el E2E de configuración (T1-23) esperaba a que «Guardar cambios» se deshabilitara, pero ese botón también se deshabilita **mientras la petición está en vuelo**, así que la recarga podía adelantarse al guardado. Ahora espera a la respuesta del PATCH. Falló 1 de 2 veces antes del arreglo; **3 pasadas seguidas en verde** después.
+
+- [x] **[T2-37] Erradicar las utilidades de color crudas del resto de la interfaz** ✅ *(2026-08-07)*
   - **Área:** UI/UX / Refactorización
   - **Ubicación:** transversal — **41 de los 57 archivos `.tsx`** de `Stockly-F/src/`
   - **Qué hacer:** Medido: **561 utilidades** de color literal (`bg|text|border|ring-<familia>-<n>`), repartidas en 386 `gray`, 66 `blue`, 35 `red`, 30 `orange`, 16 `green` y una cola de `purple`, `amber`, `emerald` y `teal` sueltas. Mientras existan, cualquier ajuste de paleta —y el modo oscuro de T4-03— es una edición de 561 puntos. La mayor parte es sustitución mecánica (`text-gray-900`→`text-foreground`, `text-gray-500`→`text-foreground-muted`, `border-gray-200`→`border-border`, `bg-white`→`bg-surface`). Reservar el juicio para los usos que ya codifican estado: `DashboardPage.tsx:36-40` define las tarjetas de KPI con pares `bg-*-50`/`text-*-600` que pasan a los pares de estado del token.
   - **Criterio de aceptación:** `grep -rE "\b(bg|text|border|ring)-(slate|gray|red|orange|amber|green|emerald|teal|blue|indigo|purple)-[0-9]{2,3}" --include="*.tsx" src/` devuelve cero resultados fuera de una lista de excepciones documentada; una comparación visual de las páginas principales no muestra regresiones.
   - **Esfuerzo:** medio
   - **Depende de:** T2-36
+  - **Verificado localmente (2026-08-07):** **593 sustituciones en 39 archivos**, hechas con un codemod en Node (no con PowerShell: `Set-Content` destroza el UTF-8). El grep del criterio devuelve **cero resultados, sin excepciones**, y ya no depende de que alguien se acuerde de ejecutarlo: `src/tests/tokens.test.ts` recorre todos los `.ts`/`.tsx` en cada `pnpm verify` y falla nombrando archivo y clase. `verify` ✅ **232/232**; E2E ✅ 9 pasados, 1 omitido.
+  - **Comparación visual (Chrome DevTools, capturas antes/después):** dashboard, productos y reportes. Maquetación idéntica; los únicos cambios son los buscados — la marca pasa al acento, «Categorías» deja de ser decorativa y los avisos de stock adoptan el ámbar del token `warning`.
+  - **Regresión encontrada y corregida en esa comparación:** el fondo de página era `bg-gray-50` y el codemod lo mandó a `bg-surface-muted`, **el mismo valor que el botón secundario**, que quedó invisible sobre él (se vio en la captura de reportes: «Descargar PDF» sin fondo). Los 9 contenedores de página pasan a `bg-background`. Es exactamente el fallo que una sustitución mecánica no puede evitar: `gray-50` significaba dos cosas distintas según dónde estuviera.
+  - **Dos decisiones de criterio, no mecánicas:** los enlaces van a `text-info` —mantienen la afordancia azul y cumplen AA— en vez de a `text-primary`, que los dejaría en gris pizarra; y los indicadores de foco pasan a `ring-accent`, el verde de la marca, en lugar de un azul suelto.
+  - **Fuera del alcance de la tarea:** las paletas de los gráficos de Recharts siguen como hex en el componente. No son utilidades —`fill`/`stroke` son props, no clases—, así que el criterio no las cubre; llevarlas a los tokens exigiría leer las variables CSS desde JS. Anotado como candidato.
 
 - [ ] **[T2-38] Comunicar el estado con icono además de color**
   - **Área:** Accesibilidad / UI/UX
@@ -1160,6 +1170,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-07 | **T2-29** Esquema `Product` de Swagger — **completada** | El cuerpo documentado enviado a `POST /products` devuelve **201** y `category` sale como objeto. 5 tests | El test **compara los campos escribibles del esquema con lo que acepta `createProductSchema`**: si documentación y validador vuelven a separarse, la suite lo dice. Esquemas nuevos `NamedRef`, `Tag`, `ProductWrite` y `ProductImport` (que va por nombre de categoría, no por id). Corregidos también los filtros de `GET /products`. |
 | 2026-08-07 | **T2-17** Conmutadores de etiqueta accesibles — **completada** | 4 tests de componente + 7 del helper `color.ts`. El contraste se comprueba **recorriendo los 256 grises**: peor caso **4.58 ≥ 4.5** | `aria-pressed`, `role="group"` rotulado y color de texto calculado por luminancia. **Obligó a usar negro puro:** con un gris oscuro, el peor fondo se queda en 4.23 y no llega al mínimo. Destapó además que `#ef4444` contrasta más con negro (5.7) que con blanco (3.7). `textoLegibleSobre()` queda listo para T2-38. |
 | 2026-08-07 | **T2-35** Capa de tokens semánticos — **completada** | Los tres puntos del criterio: capa completa (13 tests), propagación comprobada cambiando `--color-accent` a `#ff00ff` y reconstruyendo, y contrastes **recalculados desde `index.css`** con la fórmula WCAG | **Corrección sobre la ficha de la paleta:** `#dc2626` cumple contra blanco (4.83) pero **falla sobre su propia superficie de badge (4.41)** — los ratios estaban medidos solo contra blanco. Ahora `#b91c1c`. Lo encontró el test, no la revisión a ojo. **Comprobado contra Tailwind 4:** todos los tokens generan utilidad salvo las duraciones, que no tienen espacio de nombres; por eso viven en `:root`. Ningún `--radius-*` tocado, con test que lo vigila. Desbloquea T2-36/37/38/39/40/41. |
+| 2026-08-07 | **T2-36** `Button` y `Badge` semánticos — **completada** | Cero utilidades crudas en los dos primitivos y cero variantes decorativas en la app. `verify` ✅ **231/231**; E2E **3 pasadas seguidas** en verde | Las 7 variantes de `Badge` pasan a 5 con significado, y los 12 usos se reasignan por lo que comunican (categoría → `neutral`, no `info`: clasifica, no informa de estado). `BadgeVariant` exportado tipa los cuatro mapas del proyecto: el compilador cazó un `purple` superviviente. Los tests comprueban con expresión regular que **ninguna variante emite una utilidad cruda**. **Prueba intermitente corregida:** el E2E de configuración esperaba a que el botón se deshabilitara, pero eso también ocurre con la petición en vuelo; ahora espera la respuesta del PATCH. |
+| 2026-08-07 | **T2-37** Fuera las utilidades de color crudas — **completada** | **593 sustituciones en 39 archivos**; el grep del criterio devuelve **cero, sin excepciones**. `verify` ✅ **232/232**, E2E ✅. Comparación visual antes/después de dashboard, productos y reportes con Chrome DevTools | Codemod en Node (PowerShell habría roto el UTF-8). El criterio deja de depender de que alguien ejecute el grep: `tokens.test.ts` lo comprueba en cada `verify`. **Regresión que solo se vio en las capturas:** el fondo de página (`bg-gray-50`) acabó en `bg-surface-muted`, el mismo valor que el botón secundario, que se volvió invisible; los 9 contenedores de página pasan a `bg-background`. `gray-50` significaba dos cosas distintas según dónde estuviera, y eso una sustitución mecánica no lo distingue. **Fuera de alcance:** las paletas de Recharts siguen en hex — son props, no clases. |
 
 ### Resumen por Tier
 
@@ -1167,10 +1179,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 5 | 41 | 12 % |
+| Tier 2 | 7 | 41 | 17 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **40** | **100** | **40 %** |
+| **Total** | **42** | **100** | **42 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1180,7 +1192,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **265/265** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.48 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **230/230** ✅ | mantener en verde |
+| Tests frontend | 181/181 ✅ | **232/232** ✅ | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **30.01 %** | ≥ 45 % |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** ✅ | escenarios que crucen la frontera |
@@ -1197,8 +1209,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
 | Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
 | Tokens semánticos en `@theme` | 1 (`--font-sans`) | **21** ✅ *(17 colores, 2 sombras, easing y tipografía)* | capa completa (T2-35) |
-| Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | 561 | 0 fuera de excepciones |
-| Variantes de `Badge` sin significado | 4 de 7 | 4 de 7 | 0 |
+| Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | **0** ✅ *(con test que lo vigila)* | 0 fuera de excepciones |
+| Variantes de `Badge` sin significado | 4 de 7 | **0 de 5** ✅ | 0 |
 | Clases `dark:` | 0 | 0 | (T4-03) |
 
 ### Hallazgos nuevos del 2026-08-07 (no estaban en la auditoría)
