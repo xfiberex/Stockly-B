@@ -54,14 +54,14 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **265/265** | **257/257** |
-| Cobertura (sentencias) | 88.48 % | 30.59 % |
+| Tests | **265/265** | **269/269** |
+| Cobertura (sentencias) | 88.48 % | 31.94 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
 nada a mano. Arranca solo la base de datos, el backend y el frontend.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 8/41** · Total **43/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 10/41** · Total **45/100**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -172,7 +172,25 @@ elegir icono ahí mismo, y el test lo comprueba comparando la **geometría del t
 no el nombre del componente importado. La tarea destapó que «bajo» y «agotado» eran el mismo
 triángulo ámbar, indistinguibles incluso con color.
 
-Lo que queda del bloque de diseño: **T2-39**, **T2-40** y **T2-41**. Ninguna es grande.
+**Las tablas ya piden cifras tabulares desde `index.css`** (T2-39), no celda a celda: una
+tabla de inventario existe para comparar cifras en vertical, así que la próxima que se
+escriba nace alineada. Fuera de tablas la utilidad `tabular-nums` va explícita. Aviso para
+quien mida esto en el navegador: **Tailwind solo genera las utilidades que aparecen escritas
+en el código**, así que una contraprueba con `proportional-nums` no mide nada si esa clase no
+está en ningún archivo; hay que tocar `style.fontVariantNumeric`.
+
+**Dos densidades, un solo componente** (T2-40): `min-h-11` (44 px, mínimo táctil) hasta `md`
+y `md:min-h-9` (36 px) a partir de ahí. Al añadir un control nuevo hay que llevar el par
+entero; `densidad.test.tsx` falla si falta una de las dos clases. Lo que no puede crecer sin
+dejar de parecer lo que es —la casilla de 16 px, el interruptor de 24— recibe el toque en su
+envoltorio, no en el dibujo.
+
+**Salvedad de T2-40 que conviene no dar por hecha:** la fila de la tabla de productos se
+quedó en **48 px**, no en los 36 del perfil denso. No es un descuido: relleno 6+6, nombre 20
+y SKU 16 ya suman 48, y la celda de la miniatura, 44. Bajar a 36 exige quitar el SKU de la
+tabla o encoger la miniatura a 24 px, y eso es una decisión de producto.
+
+Lo que queda del bloque de diseño: **T2-41**, la última y pequeña.
 `textoLegibleSobre()` de `shared/lib/color.ts` sigue disponible por si hace falta.
 
 **Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro

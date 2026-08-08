@@ -798,21 +798,33 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **El test comprueba la propiedad, no la escritura:** `src/tests/components/estados.test.tsx` renderiza cada estado, extrae del SVG los atributos `d` —la geometría del trazo, no el nombre del componente importado, que puede diferir dibujando lo mismo— y exige que dos estados del mismo conjunto no coincidan, con una comprobación aparte para los que comparten color. Falsificado a propósito: dando a «Cancelado» el reloj de «Pendiente», el test falla.
   - **Más allá de la ubicación listada:** el mismo patrón estaba en `UsersPage` (activo/inactivo, rol, sin verificar) y en `ProductDetailModal`; se migraron para no dejar la mitad de la aplicación con el criterio viejo. Un estado que la API añada y la interfaz no conozca cae en la variante neutra con su código en crudo, en vez de heredar el color del último conocido.
 
-- [ ] **[T2-39] Cifras tabulares en las columnas numéricas**
+- [x] **[T2-39] Cifras tabulares en las columnas numéricas**
   - **Área:** UI/UX
   - **Ubicación:** `Stockly-F/src/modules/products/components/ProductTable.tsx`, `dashboard/components/DashboardPage.tsx:64-77`, `reports/components/ReportsPage.tsx`
   - **Qué hacer:** Stock, precios, totales e importes se renderizan con las cifras proporcionales de Inter: las columnas no alinean verticalmente entre filas y los KPI cambian de ancho al refrescarse. Inter incluye cifras tabulares; aplicar `tabular-nums` a las celdas numéricas de tabla y a los contadores del dashboard.
   - **Criterio de aceptación:** en una tabla con valores de uno a cinco dígitos las unidades quedan alineadas en vertical; el KPI de valor de inventario no cambia de ancho al actualizarse.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-35
+  - **Verificado localmente (2026-08-08):** `verify` ✅ **260/260**, E2E ✅ 9 pasados 1 omitido. **Medido en el navegador, que es donde se puede medir:** jsdom no tiene métricas de fuente, así que las cifras se midieron sobre la aplicación en marcha con `getBoundingClientRect`.
+  - **Las cifras del KPI de valor de inventario, mismo formato y distintos dígitos:** sin cifras tabulares `$1,111,111.11` mide **126.39 px** y `$8,888,888.88` mide **176.81 px** — el bloque se movía **50 px** en cada refresco. Con ellas, ambos miden **174.7 px**: diferencia **0**. A escala de dígito suelto, Inter da «1» = 6.51 px y «8» = 9.90 px.
+  - **Alineación vertical de las unidades:** los bordes derechos de la columna de stock de la tabla de productos, con valores de uno y dos dígitos, caen todos en la **misma coordenada** (966.28 px). Las cifras tabulares por sí solas no bastaban para eso: hizo falta además alinear a la derecha la columna de precio y meter el stock en una caja de ancho fijo (`min-w-10 text-right`), porque detrás vienen el icono de incidencia y el mínimo, cuyo ancho sí cambia de fila a fila.
+  - **La regla vive en `index.css` (`table { font-variant-numeric: tabular-nums }`), no celda a celda:** una tabla de inventario existe para comparar cifras en vertical, así que la próxima que alguien escriba nace alineada en lugar de depender de que se acuerde. Fuera de tablas —KPI del dashboard y de reportes, totales de órdenes, stock de la ficha de movimientos— sí va la utilidad explícita.
+  - **Trampa encontrada al montar la contraprueba:** medir con la clase `proportional-nums` daba el mismo ancho, porque Tailwind solo genera las utilidades que encuentra en el código fuente y esa no estaba escrita en ninguna parte. La contraprueba válida usa `style.fontVariantNumeric`.
 
-- [ ] **[T2-40] Densidad de tabla en escritorio y mínimo táctil en móvil**
+- [x] **[T2-40] Densidad de tabla en escritorio y mínimo táctil en móvil** *(mínimo táctil ✅ · fila de 36 px ❌, ver abajo)*
   - **Área:** UI/UX / Accesibilidad
   - **Ubicación:** `Stockly-F/src/shared/components/Button.tsx:26`, `Input.tsx`, `Select.tsx`, `modules/products/components/ProductTable.tsx`
   - **Qué hacer:** El perfil *Data-Dense* pide fila de 36 px, padding de tarjeta de 12 px y escala 4/8/16/24/32 en escritorio — pero esa densidad choca de frente con el mínimo táctil de 44 px en móvil, y la resolución de ese conflicto es lo que hay que decidir aquí. Medido: el `Button` base mide **36 px** de alto (`py-2` + `text-sm`), por debajo del mínimo, y es el componente de las acciones por fila y de los controles de paginación. Resolver con padding responsivo sobre el mismo componente (denso a partir de `md`, cómodo por debajo), **no** duplicando componentes.
   - **Criterio de aceptación:** a 375 px de ancho ninguna acción interactiva mide menos de 44×44 px CSS, verificable con el inspector; a ≥1024 px la altura de fila de la tabla de productos es de 36 px.
   - **Esfuerzo:** medio
   - **Depende de:** T2-35
+  - **Verificado localmente (2026-08-08):** `verify` ✅ **269/269** (9 tests nuevos), E2E ✅ 9 pasados 1 omitido. Medido en el navegador con emulación de dispositivo (375×812, táctil) y a 1280 px.
+  - **Mínimo táctil — criterio cumplido:** de **71 dianas por debajo de 44×44 a 0**, barriendo productos, órdenes de compra y de venta, usuarios, configuración y el modal de nueva orden, con el menú de navegación y el de usuario desplegados. La medición cuenta el envoltorio pulsable, no solo el control: una casilla de 16 px cumple si su etiqueta ocupa 44×44.
+  - **Fila de 36 px en escritorio — NO se cumple, y no por descuido.** La fila pasa de **64.8–80.8 px a 48.8–68.8** (−40 % en el caso común), pero 36 es inalcanzable con el contenido actual. La aritmética a ≥1024 px: relleno 6 + 6, nombre 20, SKU 16 → **48 px**; y la celda de imagen, 6 + 32 + 6 → **44 px**. Llegar a 36 exige **quitar la línea del SKU y bajar la miniatura a 24 px**, que es empeorar la tabla para cuadrar una cifra. Se deja en 48 y se documenta; la decisión de sacrificar el SKU o la miniatura es de producto, no de implementación.
+  - **Un mismo componente en dos densidades, no dos componentes:** `min-h-11` (44 px) hasta `md` y `md:min-h-9` (36 px) a partir de ahí, en `Button`, `Input`, `Select`, `DropdownButton`, las pestañas y el botón de cerrar del modal. A 1280 px el `Button` mide exactamente **36 px**.
+  - **Los controles que no pueden crecer reciben el toque en su envoltorio:** la casilla de selección (16 px) va dentro de una etiqueta de 44×44, y el interruptor de configuración (carril de 44×24) dentro de un botón de 44 px de alto. El dibujo no cambia; la diana, sí.
+  - **Cambio de maquetación que el criterio obligaba:** los ítems de las órdenes se montaban en una rejilla de 12 columnas también a 375 px, y el campo «Cant.» quedaba en **38 px de ancho**. Ninguna altura mínima arregla eso: la rejilla ahora es de 2 columnas hasta `md`.
+  - **Regresión propia, detectada por el E2E:** para nombrar la casilla usé un `<span class="sr-only">Seleccionar {nombre}</span>` dentro de la etiqueta, y ese texto se suma al árbol de texto de la fila: el nombre del producto pasó a aparecer **dos veces** y `getByText` falló por ambigüedad. Corregido con `aria-label` en el `input`, que da el mismo nombre accesible sin añadir texto.
 
 - [ ] **[T2-41] Escala tipográfica explícita y recorte de pesos de Inter**
   - **Área:** UI/UX / Rendimiento
@@ -1121,8 +1133,8 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | DS-01 Sin capa de tokens semánticos (1 solo token en `@theme`) | Medio | T2-35, T2-37 |
 | DS-02 561 utilidades de color crudas en 41 de 57 archivos | Medio | T2-36, T2-37 |
 | DS-03 El estado se comunica solo por color (WCAG 1.4.1) | Medio | T2-38 ✅ |
-| DS-04 Cifras proporcionales en columnas numéricas | Bajo | T2-39 |
-| DS-05 Densidad sin sistema y `Button` de 36 px bajo el mínimo táctil | Medio | T2-40 |
+| DS-04 Cifras proporcionales en columnas numéricas | Bajo | T2-39 ✅ |
+| DS-05 Densidad sin sistema y `Button` de 36 px bajo el mínimo táctil | Medio | T2-40 ✅ *(densidad de fila, parcial)* |
 | DS-06 Escala tipográfica implícita; `font-black` sin peso importado | Bajo | T2-41 |
 | DS-07 Radios y sombras sin convención | Bajo | T3-14 |
 | DS-08 Sistema de diseño sin documentar | Bajo | T3-15 |
@@ -1178,6 +1190,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-07 | **T2-36** `Button` y `Badge` semánticos — **completada** | Cero utilidades crudas en los dos primitivos y cero variantes decorativas en la app. `verify` ✅ **231/231**; E2E **3 pasadas seguidas** en verde | Las 7 variantes de `Badge` pasan a 5 con significado, y los 12 usos se reasignan por lo que comunican (categoría → `neutral`, no `info`: clasifica, no informa de estado). `BadgeVariant` exportado tipa los cuatro mapas del proyecto: el compilador cazó un `purple` superviviente. Los tests comprueban con expresión regular que **ninguna variante emite una utilidad cruda**. **Prueba intermitente corregida:** el E2E de configuración esperaba a que el botón se deshabilitara, pero eso también ocurre con la petición en vuelo; ahora espera la respuesta del PATCH. |
 | 2026-08-07 | **T2-37** Fuera las utilidades de color crudas — **completada** | **593 sustituciones en 39 archivos**; el grep del criterio devuelve **cero, sin excepciones**. `verify` ✅ **232/232**, E2E ✅. Comparación visual antes/después de dashboard, productos y reportes con Chrome DevTools | Codemod en Node (PowerShell habría roto el UTF-8). El criterio deja de depender de que alguien ejecute el grep: `tokens.test.ts` lo comprueba en cada `verify`. **Regresión que solo se vio en las capturas:** el fondo de página (`bg-gray-50`) acabó en `bg-surface-muted`, el mismo valor que el botón secundario, que se volvió invisible; los 9 contenedores de página pasan a `bg-background`. `gray-50` significaba dos cosas distintas según dónde estuviera, y eso una sustitución mecánica no lo distingue. **Fuera de alcance:** las paletas de Recharts siguen en hex — son props, no clases. |
 | 2026-08-08 | **T2-38** El estado se dice con icono, no solo con color — **completada** | Verificado **con el filtro de escala de grises del navegador**, que es el criterio: capturas en gris de tabla de productos, órdenes de compra y de venta, movimientos y dashboard. `verify` ✅ **257/257** (25 tests nuevos), E2E ✅ | Etiqueta, color e icono salen de un descriptor único (`shared/lib/estados.ts`): no hay forma de poner uno sin los otros. **Defecto destapado:** «bajo» y «agotado» eran el mismo triángulo ámbar, indistinguibles incluso **con** color; `nivelDeStock()` los separa y agotado gana a bajo. El test extrae del SVG los atributos `d` —la geometría, no el nombre del componente— y exige que dos estados del mismo conjunto no coincidan; falsificado dando a «Cancelado» el reloj de «Pendiente». Se migraron también `UsersPage` y `ProductDetailModal`, fuera de la ubicación listada. Los estados que faltaban en la base de desarrollo se crearon para verlos y **se borraron después**. |
+| 2026-08-08 | **T2-39** Cifras tabulares en las columnas numéricas — **completada** | **Medido en el navegador** (jsdom no tiene métricas de fuente): el KPI de valor de inventario pasa de moverse **50.42 px** entre `$1,111,111.11` y `$8,888,888.88` a **0**; los bordes derechos de la columna de stock caen todos en la misma coordenada. `verify` ✅ **260/260**, E2E ✅ | La regla va en `index.css` sobre `table`, no celda a celda: la próxima tabla nace alineada. Las cifras tabulares **no bastaban** para el criterio de alineación vertical — hizo falta alinear a la derecha la columna de precio y meter el stock en una caja de ancho fijo, porque el icono y el mínimo que van detrás cambian de ancho por fila. **Trampa:** la contraprueba con la clase `proportional-nums` no medía nada, porque Tailwind solo genera las utilidades que aparecen escritas en el código; hay que usar `style.fontVariantNumeric`. |
+| 2026-08-08 | **T2-40** Densidad y mínimo táctil — **completada con una salvedad** | Mínimo táctil: de **71 dianas bajo 44×44 a 0** a 375 px, con emulación táctil, barriendo seis pantallas y el modal de nueva orden. Fila de escritorio: **80.8 → 48.8 px**. `verify` ✅ **269/269**, E2E ✅ | **Los 36 px de fila no se alcanzan**: 6+6 de relleno, 20 de nombre y 16 de SKU son ya 48, y la celda de imagen 44; llegar a 36 exigiría quitar el SKU y bajar la miniatura a 24 px, o sea empeorar la tabla para cuadrar la cifra. Se documenta en vez de forzarlo. Un solo componente en dos densidades (`min-h-11` / `md:min-h-9`); lo que no puede crecer —casilla de 16 px, interruptor de 24— recibe el toque en su envoltorio. La rejilla de 12 columnas de los ítems de orden dejaba «Cant.» en 38 px de ancho a 375 px: pasa a 2 columnas hasta `md`. **Regresión propia cazada por el E2E:** el `sr-only` con que nombré la casilla duplicaba el nombre del producto en el árbol de texto; se sustituye por `aria-label`. |
 
 ### Resumen por Tier
 
@@ -1185,10 +1199,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 8 | 41 | 20 % |
+| Tier 2 | 10 | 41 | 24 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **43** | **100** | **43 %** |
+| **Total** | **45** | **100** | **45 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1198,8 +1212,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **265/265** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.48 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **257/257** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **30.59 %** | ≥ 45 % |
+| Tests frontend | 181/181 ✅ | **269/269** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **31.94 %** | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** ✅ | escenarios que crucen la frontera |
@@ -1232,6 +1246,7 @@ candidatos a tarea propia.
 | El rate limit global (100 peticiones / 15 min por IP) se agota en una sola pasada del navegador; devolvía 429 en pruebas ajenas al tema | ✅ configurable con `RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_MAX`, sin bajar el techo por defecto |
 | **La interfaz no permite cancelar una orden de venta ya enviada**: los botones solo aparecen en estado PENDIENTE. La reposición de stock de T0-03 existe en el backend pero es inalcanzable desde la aplicación | ⬜ candidato a tarea |
 | `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo; la lista de índices de la auditoría no lo contemplaba. `products_isActive_idx` sí se creó pero el planificador no lo usa (filtro poco selectivo) | ⬜ candidato a tarea |
+| En la tabla «Top por valor» de reportes conviven dos formatos de importe: «Precio unit.» sale de `toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString` y sí lo lleva. Visto al alinear las columnas en T2-39; es formato, no alineación, así que quedó fuera de esa tarea | ⬜ candidato a tarea |
 
 ### Línea base de navegador (2026-07-15)
 
