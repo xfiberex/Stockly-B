@@ -826,13 +826,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Cambio de maquetación que el criterio obligaba:** los ítems de las órdenes se montaban en una rejilla de 12 columnas también a 375 px, y el campo «Cant.» quedaba en **38 px de ancho**. Ninguna altura mínima arregla eso: la rejilla ahora es de 2 columnas hasta `md`.
   - **Regresión propia, detectada por el E2E:** para nombrar la casilla usé un `<span class="sr-only">Seleccionar {nombre}</span>` dentro de la etiqueta, y ese texto se suma al árbol de texto de la fila: el nombre del producto pasó a aparecer **dos veces** y `getByText` falló por ambigüedad. Corregido con `aria-label` en el `input`, que da el mismo nombre accesible sin añadir texto.
 
-- [ ] **[T2-41] Escala tipográfica explícita y recorte de pesos de Inter**
+- [x] **[T2-41] Escala tipográfica explícita y recorte de pesos de Inter**
   - **Área:** UI/UX / Rendimiento
   - **Ubicación:** `Stockly-F/src/index.css:2-5`, transversal
   - **Qué hacer:** Inter es la elección correcta y se mantiene —es el emparejamiento recomendado para paneles de administración—, pero su uso es hoy implícito. Medido: la escala real en uso es `text-sm` (104), `text-xs` (65), `text-2xl` (17), `text-base` (15), `text-xl` (8) y `text-lg` (**1 sola vez**, que es ruido); y los pesos son `font-medium` (57), `font-semibold` (33), `font-bold` (27) y `font-black` (1). **`font-black` (900) no está entre los pesos importados** (`index.css` carga 400/500/600/700), por lo que ese texto se renderiza con negrita sintética. Fijar la escala con roles declarados, eliminar el `text-lg` y el `font-black` huérfanos, y verificar que los cuatro pesos importados son los cuatro usados. Contribuye directamente a T2-06.
   - **Criterio de aceptación:** la escala está declarada en `@theme` con un rol por tamaño; no queda ningún peso usado sin importar ni importado sin usar; el CSS de fuentes baja de peso de forma medible.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-35
+  - **Verificado localmente (2026-08-08):** `verify` ✅ **279/279** (10 tests nuevos), E2E ✅ 9 pasados 1 omitido. La escala se declara en `@theme` **borrando antes los espacios de nombres** (`--text-*: initial`, `--font-weight-*: initial`): los tamaños y pesos no declarados dejan de existir, así que esto no es documentación sino una restricción real. Quedan cinco tamaños con un papel cada uno (xs metadatos, sm cuerpo, base título de tarjeta, xl título secundario, 2xl título de página y KPI) y cuatro pesos.
+  - **Los dos huérfanos, fuera:** `text-lg` (1 uso) pasa a `text-xl`, y el `404` deja `text-6xl font-black` —un tamaño y un peso que no usaba nadie más, y el 900 **ni siquiera estaba cargado**: el navegador lo fingía— por `text-2xl font-bold`. La auditoría no había contado el `text-6xl`; salió al borrar el espacio de nombres.
+  - **El CSS de fuentes baja de forma medible, y por una razón concreta:** `@fontsource/inter/400.css` declara **siete `@font-face` por peso** (cirílico, cirílico ext., griego, griego ext., latino, latino ext. y vietnamita); los `latin-*.css` declaran uno. Medido con dos compilaciones reales: **56 → 8 archivos de fuente emitidos** y el CSS de **78.40 kB → 68.40 kB** (gzip **13.55 → 12.14 kB**). De esos 10 kB, 8.1 son los subconjuntos y 1.9 los tamaños y pesos borrados.
+  - **Comprobado en el navegador:** `document.fonts` carga los cuatro pesos (400/500/600/700) como Inter, y los acentos y signos del español están todos en el subconjunto latino. Las flechas (`→`, U+2192) se pintan con la fuente de respaldo, **igual que antes**: no están en el rango latino de Google, así que no es una regresión de este cambio.
+  - **El test se acusaba a sí mismo:** el escaneo de clases prohibidas encontraba `text-6xl` y `font-black` en los comentarios que explican por qué se fueron. `tipografia.test.ts` mira el código sin comentarios. Falsificado a propósito: añadir `text-3xl font-black` a un componente hace fallar dos comprobaciones.
 
 ---
 
@@ -1135,7 +1140,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | DS-03 El estado se comunica solo por color (WCAG 1.4.1) | Medio | T2-38 ✅ |
 | DS-04 Cifras proporcionales en columnas numéricas | Bajo | T2-39 ✅ |
 | DS-05 Densidad sin sistema y `Button` de 36 px bajo el mínimo táctil | Medio | T2-40 ✅ *(densidad de fila, parcial)* |
-| DS-06 Escala tipográfica implícita; `font-black` sin peso importado | Bajo | T2-41 |
+| DS-06 Escala tipográfica implícita; `font-black` sin peso importado | Bajo | T2-41 ✅ |
 | DS-07 Radios y sombras sin convención | Bajo | T3-14 |
 | DS-08 Sistema de diseño sin documentar | Bajo | T3-15 |
 | DS-09 Navegación superior con doce módulos | Bajo | T4-10 |
@@ -1192,6 +1197,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-08 | **T2-38** El estado se dice con icono, no solo con color — **completada** | Verificado **con el filtro de escala de grises del navegador**, que es el criterio: capturas en gris de tabla de productos, órdenes de compra y de venta, movimientos y dashboard. `verify` ✅ **257/257** (25 tests nuevos), E2E ✅ | Etiqueta, color e icono salen de un descriptor único (`shared/lib/estados.ts`): no hay forma de poner uno sin los otros. **Defecto destapado:** «bajo» y «agotado» eran el mismo triángulo ámbar, indistinguibles incluso **con** color; `nivelDeStock()` los separa y agotado gana a bajo. El test extrae del SVG los atributos `d` —la geometría, no el nombre del componente— y exige que dos estados del mismo conjunto no coincidan; falsificado dando a «Cancelado» el reloj de «Pendiente». Se migraron también `UsersPage` y `ProductDetailModal`, fuera de la ubicación listada. Los estados que faltaban en la base de desarrollo se crearon para verlos y **se borraron después**. |
 | 2026-08-08 | **T2-39** Cifras tabulares en las columnas numéricas — **completada** | **Medido en el navegador** (jsdom no tiene métricas de fuente): el KPI de valor de inventario pasa de moverse **50.42 px** entre `$1,111,111.11` y `$8,888,888.88` a **0**; los bordes derechos de la columna de stock caen todos en la misma coordenada. `verify` ✅ **260/260**, E2E ✅ | La regla va en `index.css` sobre `table`, no celda a celda: la próxima tabla nace alineada. Las cifras tabulares **no bastaban** para el criterio de alineación vertical — hizo falta alinear a la derecha la columna de precio y meter el stock en una caja de ancho fijo, porque el icono y el mínimo que van detrás cambian de ancho por fila. **Trampa:** la contraprueba con la clase `proportional-nums` no medía nada, porque Tailwind solo genera las utilidades que aparecen escritas en el código; hay que usar `style.fontVariantNumeric`. |
 | 2026-08-08 | **T2-40** Densidad y mínimo táctil — **completada con una salvedad** | Mínimo táctil: de **71 dianas bajo 44×44 a 0** a 375 px, con emulación táctil, barriendo seis pantallas y el modal de nueva orden. Fila de escritorio: **80.8 → 48.8 px**. `verify` ✅ **269/269**, E2E ✅ | **Los 36 px de fila no se alcanzan**: 6+6 de relleno, 20 de nombre y 16 de SKU son ya 48, y la celda de imagen 44; llegar a 36 exigiría quitar el SKU y bajar la miniatura a 24 px, o sea empeorar la tabla para cuadrar la cifra. Se documenta en vez de forzarlo. Un solo componente en dos densidades (`min-h-11` / `md:min-h-9`); lo que no puede crecer —casilla de 16 px, interruptor de 24— recibe el toque en su envoltorio. La rejilla de 12 columnas de los ítems de orden dejaba «Cant.» en 38 px de ancho a 375 px: pasa a 2 columnas hasta `md`. **Regresión propia cazada por el E2E:** el `sr-only` con que nombré la casilla duplicaba el nombre del producto en el árbol de texto; se sustituye por `aria-label`. |
+| 2026-08-08 | **T2-41** Escala tipográfica explícita y recorte de Inter — **completada** | Dos compilaciones reales para medir el antes y el después: **56 → 8 archivos de fuente emitidos**, CSS **78.40 → 68.40 kB** (gzip **13.55 → 12.14**). `verify` ✅ **279/279** (10 tests nuevos), E2E ✅ | La escala se declara **borrando antes** `--text-*` y `--font-weight-*`: los tamaños no declarados dejan de existir, así que es una restricción, no un comentario. Cinco tamaños con un papel cada uno y cuatro pesos. El ahorro de fuentes viene de que `@fontsource/inter/400.css` trae **siete `@font-face` por peso** (cirílico, griego, vietnamita…) para una aplicación que solo se escribe en español; los `latin-*.css` traen uno. **La auditoría no había visto el `text-6xl`** del 404: apareció al borrar el espacio de nombres, junto al `font-black` que el navegador venía fingiendo. **El test se acusaba a sí mismo** —encontraba las clases prohibidas en los comentarios que explican por qué se fueron—, así que escanea el código sin comentarios. |
 
 ### Resumen por Tier
 
@@ -1199,10 +1205,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 10 | 41 | 24 % |
+| Tier 2 | 11 | 41 | 27 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **45** | **100** | **45 %** |
+| **Total** | **46** | **100** | **46 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1212,7 +1218,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **265/265** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.48 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **269/269** ✅ | mantener en verde |
+| Tests frontend | 181/181 ✅ | **279/279** ✅ | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **31.94 %** | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
@@ -1221,6 +1227,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | Índices no-únicos en el esquema | 0 | **15** ✅ | cubrir FK y ordenaciones |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
+| CSS de la aplicación (build) | 78.40 kB · gzip 13.55 | **68.40 kB · gzip 12.14** ✅ | bajar con la escala y los subconjuntos |
+| Archivos de fuente emitidos | 56 *(7 subconjuntos × 4 pesos × 2 formatos)* | **8** ✅ | solo el subconjunto latino |
 | `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |
 | Conflictos de merge sin resolver en el árbol | 1 *(no detectado en la auditoría)* | **0** ✅ | 0 |
 | `pnpm check` (ambos) | ✅ sin errores | ✅ sin errores | mantener |

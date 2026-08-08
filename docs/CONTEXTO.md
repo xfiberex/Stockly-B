@@ -54,14 +54,14 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **265/265** | **269/269** |
+| Tests | **265/265** | **279/279** |
 | Cobertura (sentencias) | 88.48 % | 31.94 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
 nada a mano. Arranca solo la base de datos, el backend y el frontend.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 10/41** · Total **45/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 11/41** · Total **46/100**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -159,7 +159,7 @@ En marcha el **Tier 2**. Cerrado ya el bloque de arrastres del Tier 1: **T2-03 +
 existe, los primitivos la consumen y **no queda ninguna utilidad de color cruda** en la
 interfaz — eran 561. Cambiar la paleta es ahora editar `index.css`.
 
-Cuatro tests lo sostienen y conviene no desactivarlos: `theme.test.ts` recalcula los
+Los tests que lo sostienen no conviene desactivarlos: `theme.test.ts` recalcula los
 contrastes desde el CSS, `tokens.test.ts` recorre todos los archivos buscando utilidades
 crudas, los de `Button`/`Badge` comprueban que ninguna variante emita una, y
 `estados.test.tsx` exige que dos estados del mismo conjunto no dibujen el mismo icono.
@@ -190,15 +190,27 @@ quedó en **48 px**, no en los 36 del perfil denso. No es un descuido: relleno 6
 y SKU 16 ya suman 48, y la celda de la miniatura, 44. Bajar a 36 exige quitar el SKU de la
 tabla o encoger la miniatura a 24 px, y eso es una decisión de producto.
 
-Lo que queda del bloque de diseño: **T2-41**, la última y pequeña.
-`textoLegibleSobre()` de `shared/lib/color.ts` sigue disponible por si hace falta.
+**La escala tipográfica está cerrada, no solo documentada** (T2-41). `index.css` borra los
+espacios de nombres de Tailwind (`--text-*: initial`, `--font-weight-*: initial`) y declara
+cinco tamaños y cuatro pesos: **un `text-3xl` escrito por inercia no pinta nada**. Si algo se
+ve con el tamaño equivocado, es la primera sospecha; `tipografia.test.ts` lo señala por
+archivo. De Inter se cargan solo los subconjuntos latinos: los `@fontsource/inter/400.css`
+traen siete `@font-face` por peso (cirílico, griego, vietnamita…) y los `latin-*.css`, uno.
+
+**El bloque de diseño está terminado** (T2-35 a T2-41): color, estados, cifras, densidad y
+tipografía. Los cinco tests que lo sostienen —`theme`, `tokens`, `estados`, `densidad`,
+`tipografia`, más los de `Button`/`Badge`— no son decorativos: cada uno cerró un agujero que
+ya se había colado una vez. `textoLegibleSobre()` de `shared/lib/color.ts` sigue disponible
+por si hace falta.
+
+**El siguiente bloque ya no es de diseño.** Las dos raíces son **T2-10** (logging
+estructurado, que desbloquea T2-07 y hace diagnosticable todo lo demás) y **T2-11** (saltar
+al contenido, que desbloquea T2-18).
 
 **Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro
 de los componentes. No son utilidades —`fill`/`stroke` son props—, así que ningún test las
 detecta; llevarlas a los tokens exige leer las variables CSS desde JS.
 
-Después, dos raíces más: **T2-10** (logging estructurado, que desbloquea T2-07 y hace
-diagnosticable todo lo demás) y **T2-11** (saltar al contenido, que desbloquea T2-18).
 Como relleno entre tareas grandes, las de esfuerzo bajo y sin dependencias: T2-01, T2-32,
 T2-33, T2-27, T2-06, T2-34, T2-08 y la tanda de accesibilidad T2-13/14/15/16.
 
