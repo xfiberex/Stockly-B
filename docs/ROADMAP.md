@@ -433,21 +433,25 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** medio
   - **Depende de:** T1-15
 
-- [ ] **[T2-03] Paginar el listado de órdenes de compra en el backend**
+- [x] **[T2-03] Paginar el listado de órdenes de compra en el backend** ✅ *(2026-08-07)*
   - **Área:** Rendimiento
   - **Ubicación:** `Stockly-B/src/modules/purchase-orders/purchase-orders.service.ts:13-18`
   - **Qué hacer:** `getAll()` no tiene `skip`/`take` y arrastra el detalle completo de cada ítem — es la única lista de la API sin techo. Replicar el patrón de `saleOrderService.getAll` (`sale-orders.service.ts:22-36`), incluyendo el objeto `meta`.
   - **Criterio de aceptación:** `GET /api/v1/purchase-orders?page=2&limit=5` devuelve 5 elementos y `meta` con `total`, `page`, `limit` y `totalPages`.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-16
+  - **Verificado localmente (2026-08-07):** 6 tests nuevos — el criterio literal (`?page=2&limit=5` → 5 elementos y `meta` completo con `total: 12` y `totalPages: 3`), que las páginas **no repiten órdenes**, el filtro por estado, que un estado inventado se ignora en vez de romper, y que `?page=abc` cae a la paginación por defecto en vez de dar 500. Ya no queda ninguna lista sin techo en la API. Se replicó también el `parseStatusFilter` de las órdenes de venta, así que ambos módulos son ahora simétricos.
 
-- [ ] **[T2-04] Adaptar el frontend a la respuesta paginada de órdenes de compra**
+- [x] **[T2-04] Adaptar el frontend a la respuesta paginada de órdenes de compra** ✅ *(2026-08-07)*
   - **Área:** UI/UX
   - **Ubicación:** `Stockly-F/src/modules/purchase-orders/hooks/usePurchaseOrders.ts`, `components/PurchaseOrdersPage.tsx`
   - **Qué hacer:** Consumir la nueva forma `{ data, meta }` y añadir los controles de paginación, igual que en `ProductsPage:240-252`.
   - **Criterio de aceptación:** la página muestra la paginación y navega entre páginas correctamente.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-03
+  - **Verificado localmente (2026-08-07):** `PurchaseOrdersPage.test.tsx` nuevo, 4 tests con 23 órdenes simuladas: la cabecera muestra el **total del servidor** y no el número de filas de la página, los controles indican «Página 1 de 3» con «Anterior» deshabilitado, pulsar «Siguiente» **pide `{ page: 2, limit: 10 }` al servidor** —no recorta en cliente, que es lo que el test vigila— y la última página deshabilita «Siguiente» y muestra solo las 3 restantes.
+    La clave de React Query incluye los parámetros, así que cada página se cachea por separado y las invalidaciones por prefijo siguen funcionando. Borrar la última orden de una página retrocede a la anterior, resuelto en el propio manejador del evento para no añadir un `setState` en efecto (ver T1-10).
+    **Encontrado por el camino:** el contador decía «ordenes», sin tilde, porque el plural se construía concatenando `"es"`. Corregido.
 
 - [ ] **[T2-05] Exportaciones por lotes y en streaming**
   - **Área:** Rendimiento
@@ -549,13 +553,17 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T2-17] Exponer el estado de los conmutadores de etiqueta del formulario de producto**
+- [x] **[T2-17] Exponer el estado de los conmutadores de etiqueta del formulario de producto** ✅ *(2026-08-07)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/modules/products/components/ProductForm.tsx:221-252`
   - **Qué hacer:** La selección se comunica solo por color de fondo. Añadir `aria-pressed={isSelected}`, envolver en `role="group"` con `aria-label`, y calcular la luminancia de `tag.color` para elegir texto blanco o negro y no fallar el contraste con colores claros.
   - **Criterio de aceptación:** el lector de pantalla anuncia qué etiquetas están seleccionadas; el texto sobre cualquier color de etiqueta cumple un ratio de contraste ≥ 4.5.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-03
+  - **Verificado localmente (2026-08-07):** 4 tests de componente (`aria-pressed` refleja la selección y cambia al pulsar, los conmutadores están en un `role="group"` rotulado «Etiquetas», y el texto usa el color que contrasta) más 7 del helper nuevo `shared/lib/color.ts`. El contraste no se comprueba con una muestra: **se recorren los 256 grises y se toma el peor caso**, que queda en **4.58 ≥ 4.5**.
+    **Detalle que cambió la implementación:** con un gris oscuro como color de texto en vez de negro puro, el peor fondo posible se queda en **4.23** y no llega al mínimo. Por eso el helper elige entre blanco y negro puros. De paso destapó una suposición equivocada: `#ef4444` parece oscuro pero contrasta más con negro (5.7) que con blanco (3.7).
+    `textoLegibleSobre()` queda disponible para T2-38, que tiene el mismo problema en `Badge`.
+    **No verificado:** la locución real en un lector de pantalla; se comprueba la semántica que la hace posible.
 
 - [ ] **[T2-18] Gestión de foco y anuncio al cambiar de ruta**
   - **Área:** Accesibilidad
@@ -651,13 +659,15 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Documentación de API
 
-- [ ] **[T2-29] Corregir el esquema `Product` de Swagger**
+- [x] **[T2-29] Corregir el esquema `Product` de Swagger** ✅ *(2026-08-07)*
   - **Área:** Documentación
   - **Ubicación:** `Stockly-B/src/swagger.ts:17-31,147-151,172-177`
   - **Qué hacer:** El esquema declara `category` como un enum de cadenas cuando en realidad es una relación (`{ id, name }`) y el campo de escritura es `categoryId` (UUID). El `requestBody` de `POST /products` exige un campo `category` que el validador no acepta, por lo que seguir la documentación produce un 422.
   - **Criterio de aceptación:** una petición construida siguiendo el «Try it out» de Swagger para crear un producto devuelve 201.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-03
+  - **Verificado localmente (2026-08-07):** `swagger-contract.test.ts` nuevo, 5 tests. El cuerpo documentado (`name`, `price`, `stock`, `minStock`, `categoryId`) enviado a `POST /products` devuelve **201** y la respuesta trae `category` como objeto `{ id, name }`. El test no se limita a mirar la documentación: **compara la lista de campos escribibles del esquema con lo que acepta `createProductSchema`**, así que documentar un campo nuevo sin añadirlo al validador —o al revés— hace fallar la suite.
+    Esquemas nuevos: `NamedRef` (categoría, marca y proveedor), `Tag`, `ProductWrite` (cuerpo real de creación y actualización) y `ProductImport`, que tiene otro contrato: categoría y marca por nombre. Corregidos de paso los filtros de `GET /products`, que documentaban un `category` por nombre inexistente en lugar de `categoryId`, `brandId`, `supplierId` y `tagId`.
 
 - [ ] **[T2-30] Documentar en Swagger los módulos ausentes**
   - **Área:** Documentación
@@ -707,7 +717,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 **Principio rector:** en una aplicación de inventario el color es **dato**, no decoración. Stock bajo, orden cancelada, movimiento `IN`/`OUT`. Si el cromo de la interfaz compite por el color, el usuario pierde la señal. De ahí la separación: **cromo neutro (slate), color reservado para el estado.**
 
-- [ ] **[T2-35] Definir la capa de tokens semánticos en `@theme`**
+- [x] **[T2-35] Definir la capa de tokens semánticos en `@theme`** ✅ *(2026-08-07)*
   - **Área:** UI/UX / Arquitectura
   - **Ubicación:** `Stockly-F/src/index.css`
   - **Qué hacer:** Hoy `index.css` declara **un solo token** (`--font-sans`); todo lo demás son utilidades crudas de Tailwind repartidas por los componentes. Declarar la capa semántica completa en el bloque `@theme` de Tailwind 4, que ya está en uso. Paleta *Industrial slate + stock green*, con los contrastes verificados contra blanco:
@@ -735,6 +745,17 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
     1. **No redefinir los `--radius-*` de Tailwind.** Cambiar `--radius-lg` alteraría de golpe las 68 utilidades `rounded-lg`/`rounded-xl` ya escritas. Se fija la *convención de uso* (`rounded-xl` superficies, `rounded-lg` controles, `rounded-full` badges) y la aplica T3-14.
     2. **El acento tiene dos valores a propósito.** Blanco sobre `#059669` (emerald-600) da **3.77:1** y **falla AA** para texto normal; los rellenos usan `#047857`. El valor de la ficha de la skill es el primero — la corrección es deliberada.
   - **Criterio de aceptación:** `index.css` declara la capa semántica completa; cambiar `--color-accent` por un valor de prueba altera el acento en toda la aplicación sin tocar ningún componente; cada par de la tabla se verifica con una herramienta WCAG.
+  - **Verificado localmente (2026-08-07):** los tres puntos del criterio, uno a uno.
+    1. **Capa completa** — 17 colores, 2 sombras, `--ease-standard` y las 2 duraciones, con `theme.test.ts` (13 tests) comprobando que están todos declarados.
+    2. **Propagación** — se cambió `--color-accent` a `#ff00ff`, se reconstruyó y el CSS de salida quedó con `--color-accent:#f0f`; las utilidades se emiten como `.text-accent{color:var(--color-accent)}`, así que todo consumidor sigue el token. Valor revertido después.
+    3. **Contrastes** — no se dan por buenos los de la ficha: el test **los recalcula desde `index.css`** con la fórmula WCAG 2.1 y falla si un token baja del mínimo. Incluye el límite superior del acento suave (≥ 3:1 para bordes pero < 4.5:1), que es lo que evita que alguien lo «arregle» y deshaga el par accent/accent-strong.
+
+    **Corrección sobre la paleta de la ficha:** `--color-danger: #dc2626` cumple contra blanco (4.83) pero sobre **su propia superficie de badge** (`#fef2f2`) se queda en **4.41 y falla AA** — los ratios estaban medidos solo contra blanco. Se cambió a **`#b91c1c`**: 6.47 sobre blanco y 5.91 sobre su superficie. Lo destapó el test, no la revisión a ojo.
+
+    **Comprobado empíricamente contra Tailwind 4:** `bg-background`, `text-foreground-muted`, `border-border`, `bg-accent-strong`, `bg-success-surface`, `shadow-raised`, `shadow-overlay` y `ease-standard` se generan como utilidades; **`duration-fast` no**, porque Tailwind 4 no tiene espacio de nombres `--duration-*`. Por eso las dos duraciones viven en `:root` y no en `@theme`, con el comentario que lo explica.
+
+    Sin tocar ningún `--radius-*`, como pedía la precisión 1 — hay un test que lo vigila.
+  - **Nota de alcance:** los componentes siguen usando utilidades crudas; la capa está lista pero aún no la consume nadie. Eso es **T2-36** (`Button` y `Badge`) y **T2-37** (el resto).
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
@@ -1135,6 +1156,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-07 | **T1-24** E2E reproducible — **completada** | `pnpm test:e2e:full` **sin levantar nada a mano**: 9 pasados, 1 omitido | `e2e/global-setup.ts` deja la base lista (y solo recurre a Docker si no hay PostgreSQL escuchando); el `webServer` arranca backend y frontend. Proyecto `Mobile Chrome` añadido. **Hallazgo:** el rate limit global (100/15 min) se agota en una sola pasada del navegador y devolvía 429 hasta en la comprobación de salud; se añadieron `RATE_LIMIT_MAX` y `AUTH_RATE_LIMIT_MAX` para subir el techo **sin desactivar limitador ni CSRF**. |
 | 2026-08-07 | **T1-23** E2E de los tres flujos rotos — **completada** | Los 3 escenarios pasan contra la aplicación completa en `chromium` y `Mobile Chrome` | **Dos defectos encontrados y corregidos por el camino:** el modal no tenía scroll propio, así que un formulario más alto que la ventana dejaba sus botones fuera de pantalla e inalcanzables; y `Input`/`Select` no ataban la etiqueta al campo sin un `id` explícito, dejando varios controles sin nombre accesible (`useId` como respaldo). **Limitación anotada:** la interfaz no permite cancelar una orden ya enviada, así que ese paso del tercer escenario va por API. |
 | 2026-08-07 | **T1-21** Contenedor sin privilegios — **implementada, SIN VERIFICAR** | — | `COPY --chown=node:node`, `chown -R` y `USER node` en el stage runner. **El daemon de Docker no arranca en esta máquina**, así que `docker exec … id` → `uid=1000(node)` sigue sin comprobarse. Pendiente de ejecutar en un equipo con Docker. |
+| 2026-08-07 | **T2-03 + T2-04** Órdenes de compra paginadas — **completadas** | Backend: 6 tests (criterio literal, sin repetición entre páginas, filtro por estado, estado inventado ignorado, `?page=abc` sin 500). Frontend: 4 tests con 23 órdenes — «Siguiente» **pide `{page: 2}` al servidor**, no recorta en cliente | Era la última lista de la API sin techo. Se replicó también `parseStatusFilter`, así que compras y ventas quedan simétricas. En el frontend, los parámetros entran en la clave de React Query (una caché por página) y borrar la última orden de una página retrocede desde el propio evento, sin `setState` en efecto (T1-10). **Hallazgo menor:** el contador decía «ordenes» sin tilde, por concatenar `"es"`. |
+| 2026-08-07 | **T2-29** Esquema `Product` de Swagger — **completada** | El cuerpo documentado enviado a `POST /products` devuelve **201** y `category` sale como objeto. 5 tests | El test **compara los campos escribibles del esquema con lo que acepta `createProductSchema`**: si documentación y validador vuelven a separarse, la suite lo dice. Esquemas nuevos `NamedRef`, `Tag`, `ProductWrite` y `ProductImport` (que va por nombre de categoría, no por id). Corregidos también los filtros de `GET /products`. |
+| 2026-08-07 | **T2-17** Conmutadores de etiqueta accesibles — **completada** | 4 tests de componente + 7 del helper `color.ts`. El contraste se comprueba **recorriendo los 256 grises**: peor caso **4.58 ≥ 4.5** | `aria-pressed`, `role="group"` rotulado y color de texto calculado por luminancia. **Obligó a usar negro puro:** con un gris oscuro, el peor fondo se queda en 4.23 y no llega al mínimo. Destapó además que `#ef4444` contrasta más con negro (5.7) que con blanco (3.7). `textoLegibleSobre()` queda listo para T2-38. |
+| 2026-08-07 | **T2-35** Capa de tokens semánticos — **completada** | Los tres puntos del criterio: capa completa (13 tests), propagación comprobada cambiando `--color-accent` a `#ff00ff` y reconstruyendo, y contrastes **recalculados desde `index.css`** con la fórmula WCAG | **Corrección sobre la ficha de la paleta:** `#dc2626` cumple contra blanco (4.83) pero **falla sobre su propia superficie de badge (4.41)** — los ratios estaban medidos solo contra blanco. Ahora `#b91c1c`. Lo encontró el test, no la revisión a ojo. **Comprobado contra Tailwind 4:** todos los tokens generan utilidad salvo las duraciones, que no tienen espacio de nombres; por eso viven en `:root`. Ningún `--radius-*` tocado, con test que lo vigila. Desbloquea T2-36/37/38/39/40/41. |
 
 ### Resumen por Tier
 
@@ -1142,10 +1167,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 0 | 41 | 0 % |
+| Tier 2 | 5 | 41 | 12 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **35** | **100** | **35 %** |
+| **Total** | **40** | **100** | **40 %** |
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1153,10 +1178,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-07) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **254/254** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **88.19 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **202/202** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **26.02 %** | ≥ 45 % |
+| Tests backend | 198/198 ✅ | **265/265** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **88.48 %** ✅ | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **230/230** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **30.01 %** | ≥ 45 % |
+| Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** ✅ | escenarios que crucen la frontera |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
@@ -1170,7 +1196,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | `docker compose up --build` | ❌ no alcanzable | ✅ **health 200** | ✅ health 200 |
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
 | Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
-| Tokens semánticos en `@theme` | 1 (`--font-sans`) | 1 | capa completa (T2-35) |
+| Tokens semánticos en `@theme` | 1 (`--font-sans`) | **21** ✅ *(17 colores, 2 sombras, easing y tipografía)* | capa completa (T2-35) |
 | Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | 561 | 0 fuera de excepciones |
 | Variantes de `Badge` sin significado | 4 de 7 | 4 de 7 | 0 |
 | Clases `dark:` | 0 | 0 | (T4-03) |

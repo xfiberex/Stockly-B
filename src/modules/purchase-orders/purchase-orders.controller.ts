@@ -4,9 +4,11 @@ import { auditService } from "@/modules/audit-logs";
 import { buildCsv } from "@/shared/lib/csv";
 import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
-export async function getAllOrders(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getAllOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const orders = await purchaseOrderService.getAll();
+        const orders = await purchaseOrderService.getAll(
+            req.query as { page?: string; limit?: string; status?: string },
+        );
         res.json({ success: true, message: "Órdenes obtenidas exitosamente", data: orders });
     } catch (error) {
         next(error);

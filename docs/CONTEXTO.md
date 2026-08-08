@@ -54,14 +54,14 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **254/254** | **202/202** |
-| Cobertura (sentencias) | 88.19 % | 26.02 % |
+| Tests | **265/265** | **230/230** |
+| Cobertura (sentencias) | 88.48 % | 30.01 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
 nada a mano. Arranca solo la base de datos, el backend y el frontend.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · Total **35/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 5/41** · Total **40/100**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -123,7 +123,9 @@ techo (ya vienen puestas en `playwright.config.ts`); el limitador y CSRF siguen 
 **PowerShell 5.1 destroza el UTF-8.** `Get-Content -Raw | ... | Set-Content` lee con la
 página de códigos ANSI y reescribe en UTF-8, dejando doble codificación (`—` → `â€"`), y
 la conversión inversa no siempre es reversible. Para editar archivos hay que usar las
-herramientas de edición, no reemplazos por consola. Costó restaurar el README desde git.
+herramientas de edición, no reemplazos por consola. Ha pasado dos veces: con el README
+(restaurado desde git) y con `index.css` (reescrito a mano, porque sus cambios aún no
+estaban commiteados y `git checkout` los habría perdido).
 
 ---
 
@@ -148,16 +150,32 @@ necesita al arrancar el contenedor.
 
 ## 6. Por dónde seguir
 
-Los tiers 0 y 1 están cerrados, así que empieza el **Tier 2** (41 tareas). Lo más rentable
-ahora mismo:
+En marcha el **Tier 2**. Cerrado ya el bloque de arrastres del Tier 1: **T2-03 + T2-04**
+(órdenes de compra paginadas; ya no queda ninguna lista de la API sin techo), **T2-29**
+(esquema de Swagger, que ahora está atado al validador por un test) y **T2-17**
+(conmutadores de etiqueta accesibles).
 
-**T2-03** — paginar el listado de órdenes de compra, la única lista de la API sin techo.
-Desbloqueada por T1-16: basta replicar `saleOrderService.getAll` con el helper
-`parsePagination` de `shared/lib/pagination.ts`. Arrastra **T2-04** en el frontend.
+**T2-35 ya está**: la capa semántica está declarada en `index.css` y comprobada, pero
+**todavía no la consume ningún componente**. Lo natural ahora es **T2-36** (`Button` y
+`Badge` a variantes semánticas) y luego **T2-37** (el resto de la interfaz): son las que
+convierten los tokens en cambios visibles. Detrás quedan T2-38, T2-39, T2-40 y T2-41.
 
-**T2-01** — el 404 responde HTML en una API que solo habla JSON.
+Al tocar colores, la regla es nombrar el papel y no el valor: `bg-surface`, no `bg-white`.
+`theme.test.ts` recalcula los contrastes desde el CSS, así que un token que baje del
+mínimo WCAG rompe la suite.
+
+Después, dos raíces más: **T2-10** (logging estructurado, que desbloquea T2-07 y hace
+diagnosticable todo lo demás) y **T2-11** (saltar al contenido, que desbloquea T2-18).
+Como relleno entre tareas grandes, las de esfuerzo bajo y sin dependencias: T2-01, T2-32,
+T2-33, T2-27, T2-06, T2-34, T2-08 y la tanda de accesibilidad T2-13/14/15/16.
+
+Las tareas de Docker (**T2-25, T2-26, T2-28**) conviene agruparlas con la verificación
+pendiente de **T1-21**, para una sesión en un equipo donde el daemon arranque.
 
 Además, el cierre del Tier 1 dejó **dos hallazgos sin tarea asignada** (tabla al final del
 ROADMAP): la interfaz no permite cancelar una orden de venta ya enviada —la reposición de
 stock de T0-03 existe en el backend pero no se puede alcanzar desde la aplicación—, y
 falta un índice por `createdAt` en `products` pese a que todos los listados ordenan por él.
+
+`shared/lib/color.ts` (de T2-17) ya calcula el color de texto legible sobre cualquier
+fondo: **T2-38** tiene el mismo problema en `Badge` y puede reutilizarlo.

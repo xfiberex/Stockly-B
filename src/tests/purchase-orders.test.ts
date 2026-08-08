@@ -205,6 +205,82 @@ describe("Purchase Orders API", () => {
         });
     });
 
+    // T2-03: era la única lista de la API sin techo — devolvía todas las órdenes con
+    // el detalle completo de cada ítem.
+    describe("Paginación", () => {
+        async function crearOrdenes(cuantas: number) {
+            for (let i = 0; i < cuantas; i++) {
+                await request(app)
+                    .post(BASE)
+                    .set("Cookie", adminCookie)
+                    .send({ items: [{ productName: `Ítem ${i}`, quantity: 1, unitPrice: 5 }] });
+            }
+        }
+
+        it("devuelve `data` y `meta` con el total, la página, el límite y las páginas", async () => {
+            await crearOrdenes(3);
+
+            const res = await request(app).get(BASE).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.data).toHaveLength(3);
+            expect(res.body.data.meta).toEqual({ total: 3, page: 1, limit: 10, totalPages: 1 });
+        });
+
+        it("respeta `page` y `limit`", async () => {
+            await crearOrdenes(12);
+
+            const res = await request(app).get(`${BASE}?page=2&limit=5`).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.data).toHaveLength(5);
+            expect(res.body.data.meta).toMatchObject({ total: 12, page: 2, limit: 5, totalPages: 3 });
+        });
+
+        it("no repite órdenes entre páginas", async () => {
+            await crearOrdenes(6);
+
+            const p1 = await request(app).get(`${BASE}?page=1&limit=3`).set("Cookie", adminCookie);
+            const p2 = await request(app).get(`${BASE}?page=2&limit=3`).set("Cookie", adminCookie);
+
+            const ids1 = p1.body.data.data.map((o: { id: string }) => o.id);
+            const ids2 = p2.body.data.data.map((o: { id: string }) => o.id);
+            expect(ids1.filter((id: string) => ids2.includes(id))).toHaveLength(0);
+        });
+
+        it("filtra por estado", async () => {
+            await crearOrdenes(2);
+            const listado = await request(app).get(BASE).set("Cookie", adminCookie);
+            await request(app)
+                .patch(`${BASE}/${listado.body.data.data[0].id}`)
+                .set("Cookie", adminCookie)
+                .send({ status: "CANCELLED" });
+
+            const res = await request(app).get(`${BASE}?status=CANCELLED`).set("Cookie", adminCookie);
+
+            expect(res.body.data.meta.total).toBe(1);
+            expect(res.body.data.data[0].status).toBe("CANCELLED");
+        });
+
+        it("ignora un estado que no existe en lugar de fallar", async () => {
+            await crearOrdenes(2);
+
+            const res = await request(app).get(`${BASE}?status=INVENTADO`).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.meta.total).toBe(2);
+        });
+
+        it("cae a la paginación por defecto con parámetros no numéricos (T1-16)", async () => {
+            await crearOrdenes(1);
+
+            const res = await request(app).get(`${BASE}?page=abc&limit=xyz`).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.meta).toMatchObject({ page: 1, limit: 10 });
+        });
+    });
+
     describe("Exportación", () => {
         it("exporta CSV (ADMIN)", async () => {
             await request(app)

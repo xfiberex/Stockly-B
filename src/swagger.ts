@@ -1,7 +1,9 @@
 import swaggerUi from "swagger-ui-express";
 import type { Express } from "express";
 
-const spec = {
+// Exportado para que los tests puedan comprobar que lo documentado y lo que acepta
+// el validador no se separen otra vez (T2-29).
+export const spec = {
     openapi: "3.0.3",
     info: {
         title: "Stockly API",
@@ -14,19 +16,78 @@ const spec = {
             cookieAuth: { type: "apiKey", in: "cookie", name: "token" },
         },
         schemas: {
+            // Categoría, marca y proveedor son relaciones: se leen como objeto y se
+            // escriben por su id. El esquema las declaraba como un enum de cadenas y
+            // el `requestBody` exigía un campo `category` que el validador rechaza,
+            // así que seguir el «Try it out» acababa en 422.
+            NamedRef: {
+                type: "object",
+                nullable: true,
+                properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Electrónica" },
+                },
+            },
+            Tag: {
+                type: "object",
+                properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Oferta" },
+                    color: { type: "string", nullable: true, example: "#ef4444" },
+                },
+            },
             Product: {
                 type: "object",
                 properties: {
                     id: { type: "string", format: "uuid" },
                     name: { type: "string", example: "Laptop Pro 15" },
                     description: { type: "string", nullable: true },
+                    sku: { type: "string", nullable: true, example: "ELE-LAP-LAPT15" },
                     price: { type: "number", example: 1299.99 },
                     stock: { type: "integer", example: 15 },
-                    category: { type: "string", enum: ["Electrónica", "Periféricos", "Audio", "Accesorios", "Muebles", "Otros"] },
+                    minStock: { type: "integer", example: 3 },
+                    category: { $ref: "#/components/schemas/NamedRef" },
+                    brand: { $ref: "#/components/schemas/NamedRef" },
+                    supplier: { $ref: "#/components/schemas/NamedRef" },
+                    tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
                     imageUrl: { type: "string", nullable: true },
                     isActive: { type: "boolean" },
                     createdAt: { type: "string", format: "date-time" },
                     updatedAt: { type: "string", format: "date-time" },
+                },
+            },
+            // Cuerpo real de creación y actualización: los mismos campos que acepta
+            // `createProductSchema`. `tagIds` se repite una vez por etiqueta porque
+            // multipart no tiene arrays; `""` significa «ninguna».
+            ProductWrite: {
+                type: "object",
+                properties: {
+                    name: { type: "string", example: "Laptop Pro 15" },
+                    description: { type: "string" },
+                    sku: { type: "string" },
+                    price: { type: "number", example: 1299.99 },
+                    stock: { type: "integer", example: 15 },
+                    minStock: { type: "integer", example: 3 },
+                    categoryId: { type: "string", format: "uuid" },
+                    brandId: { type: "string", format: "uuid" },
+                    supplierId: { type: "string", format: "uuid" },
+                    tagIds: { type: "array", items: { type: "string", format: "uuid" } },
+                    image: { type: "string", format: "binary" },
+                },
+            },
+            // La importación masiva tiene su propio contrato: categoría y marca van
+            // por nombre, no por id, y se crean si no existen.
+            ProductImport: {
+                type: "object",
+                required: ["name", "price"],
+                properties: {
+                    name: { type: "string", example: "Laptop Pro 15" },
+                    description: { type: "string" },
+                    price: { type: "number", example: 1299.99 },
+                    stock: { type: "integer", example: 15 },
+                    categoryName: { type: "string", example: "Electrónica" },
+                    brandName: { type: "string", example: "Genérica" },
+                    isActive: { type: "boolean" },
                 },
             },
             StockMovement: {
@@ -139,14 +200,18 @@ const spec = {
                     { name: "page", in: "query", schema: { type: "integer", default: 1 } },
                     { name: "limit", in: "query", schema: { type: "integer", default: 10 } },
                     { name: "search", in: "query", schema: { type: "string" } },
-                    { name: "category", in: "query", schema: { type: "string" } },
+                    // Los filtros van por id, no por nombre (ver `ProductQuery`).
+                    { name: "categoryId", in: "query", schema: { type: "string", format: "uuid" } },
+                    { name: "brandId", in: "query", schema: { type: "string", format: "uuid" } },
+                    { name: "supplierId", in: "query", schema: { type: "string", format: "uuid" } },
+                    { name: "tagId", in: "query", schema: { type: "string", format: "uuid" } },
                     { name: "isActive", in: "query", schema: { type: "boolean" } },
                 ],
                 responses: { "200": { description: "Lista paginada de productos" }, "401": { description: "No autenticado" } },
             },
             post: {
                 tags: ["Products"], summary: "Crear producto (ADMIN)",
-                requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", required: ["name", "price", "category"], properties: { name: { type: "string" }, description: { type: "string" }, price: { type: "number" }, stock: { type: "integer" }, category: { type: "string" }, image: { type: "string", format: "binary" } } } } } },
+                requestBody: { required: true, content: { "multipart/form-data": { schema: { allOf: [{ $ref: "#/components/schemas/ProductWrite" }, { required: ["name", "price"] }] } } } },
                 responses: { "201": { description: "Producto creado", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/Product" } } } } } }, "403": { description: "Solo ADMIN" }, "422": { description: "Datos inválidos" } },
             },
         },
@@ -159,7 +224,7 @@ const spec = {
         "/products/import": {
             post: {
                 tags: ["Products"], summary: "Importar productos en masa (ADMIN, máx 1000)",
-                requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["products"], properties: { products: { type: "array", items: { $ref: "#/components/schemas/Product" } } } } } } },
+                requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["products"], properties: { products: { type: "array", items: { $ref: "#/components/schemas/ProductImport" } } } } } } },
                 responses: { "201": { description: "Resultado de la importación con conteo de errores por fila" }, "403": { description: "Solo ADMIN" }, "422": { description: "Validación fallida" } },
             },
         },
@@ -172,7 +237,7 @@ const spec = {
             put: {
                 tags: ["Products"], summary: "Actualizar producto (ADMIN)",
                 parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-                requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", properties: { name: { type: "string" }, price: { type: "number" }, stock: { type: "integer" }, category: { type: "string" }, image: { type: "string", format: "binary" }, removeImage: { type: "boolean" } } } } } },
+                requestBody: { required: true, content: { "multipart/form-data": { schema: { allOf: [{ $ref: "#/components/schemas/ProductWrite" }, { type: "object", properties: { removeImage: { type: "string", description: "Cualquier valor no vacío elimina la imagen actual" } } }] } } } },
                 responses: { "200": { description: "Producto actualizado" }, "403": { description: "Solo ADMIN" }, "404": { description: "No encontrado" } },
             },
             delete: {

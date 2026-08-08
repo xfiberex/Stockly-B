@@ -1,5 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
+import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
+import { parsePagination } from "@/shared/lib/pagination";
 import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 const ORDER_INCLUDE = {
@@ -9,12 +11,35 @@ const ORDER_INCLUDE = {
     },
 } as const;
 
+// Solo acepta como filtro un status que sea miembro válido del enum.
+function parseStatusFilter(status?: string): $Enums.PurchaseOrderStatus | undefined {
+    if (status && status in $Enums.PurchaseOrderStatus) {
+        return status as $Enums.PurchaseOrderStatus;
+    }
+    return undefined;
+}
+
 export const purchaseOrderService = {
-    async getAll() {
-        return prisma.purchaseOrder.findMany({
-            include: ORDER_INCLUDE,
-            orderBy: { createdAt: "desc" },
-        });
+    // Era la única lista de la API sin techo: traía todas las órdenes con el detalle
+    // completo de cada ítem. Mismo contrato `{ data, meta }` que las de venta.
+    async getAll(query: { page?: string; limit?: string; status?: string } = {}) {
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
+
+        const statusFilter = parseStatusFilter(query.status);
+        const where = statusFilter ? { status: statusFilter } : {};
+
+        const [orders, total] = await prisma.$transaction([
+            prisma.purchaseOrder.findMany({
+                where,
+                skip,
+                take: limit,
+                include: ORDER_INCLUDE,
+                orderBy: { createdAt: "desc" },
+            }),
+            prisma.purchaseOrder.count({ where }),
+        ]);
+
+        return { data: orders, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     },
 
     async getById(id: string) {
