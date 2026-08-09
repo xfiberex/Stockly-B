@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **275/275** | **376/376** |
+| Tests | **275/275** | **382/382** |
 | Cobertura (sentencias) | 88.62 % *(suelo 85 %)* | 44.62 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -122,6 +122,10 @@ omite. Desde **T1-19** solo quedan exentas siete rutas públicas de `/auth`: `lo
 una pasada de navegador: el 429 hace fallar pruebas que no van de eso, e incluso la
 comprobación de salud del `webServer`. `RATE_LIMIT_MAX` y `AUTH_RATE_LIMIT_MAX` suben el
 techo (ya vienen puestas en `playwright.config.ts`); el limitador y CSRF siguen activos.
+**Y ojo con los servidores huérfanos:** `reuseExistingServer` reaprovecha lo que haya en el
+puerto, así que un backend que quedó vivo de una pasada anterior llega con su cupo gastado y
+responde **429 hasta en `/health`** — Playwright se queda esperando y muere con «Timed out
+waiting 120000ms from config.webServer». Se mata el proceso del 3000 y del 5173 y se repite.
 
 **Un *transport* de pino cuesta caro con el E2E delante.** `pino-pretty` no formatea en
 proceso: levanta un hilo de trabajo y le pasa cada línea por un canal. Con cuatro
@@ -266,7 +270,9 @@ que el texto no baile un píxel al señalar— que se pinta en `hover` y en `foc
 opción activa y la acción destructiva se delimitan en su propio color (azul de sección, rojo
 de peligro). Al añadir un desplegable nuevo, usar ese helper y `CLASES_PANEL_DE_MENU`, que da
 al panel relleno por los cuatro lados: con los ítems delimitados, un borde pegado al borde del
-panel se lee como un fallo de dibujo. **Los disparadores siguen la misma regla** y además
+panel se lee como un fallo de dibujo, y **los ítems se separan entre sí** (`gap-1`): pegados,
+dos recuadros contiguos comparten línea y parecen solaparse — no se notaba mientras no tenían
+borde. **Los disparadores siguen la misma regla** y además
 conservan el borde **mientras el menú está abierto**, para leerse como una pieza con el panel.
 El menú de usuario lleva cabecera con nombre y correo: en el disparador el nombre se recorta a
 144 px y en pantallas pequeñas ni aparece, así que es el único sitio donde la cuenta se lee
@@ -282,6 +288,15 @@ hipótesis falsas al ajustar los menús: llegué a creer que Tailwind no generab
 **Y al medir, hacerlo sobre el elemento que se tocó.** Un `document.querySelectorAll(...).find(...)`
 dentro de `page.evaluate` puede caer en otro nodo con el mismo texto —la interfaz duplica la
 navegación en escritorio y móvil—. `locator.evaluate()` mide justo el que Playwright pulsó.
+
+**Los dos proyectos del E2E corren en paralelo contra la misma base**, así que un test que
+pulse «el primero de la lista» puede operar sobre lo que acaba de crear el otro proyecto.
+Pasó con el escenario de la venta cancelada: `chromium` enviaba la orden de `Mobile Chrome` y
+el stock nunca bajaba. La cura no fue serializar, sino **nombrar**: las acciones de fila de las
+órdenes de venta llevan el número de la orden en su `aria-label`, y el test localiza la suya.
+Vale como regla: si un test necesita `.first()`, casi siempre falta un nombre accesible.
+Y si una pasada se interrumpe, deja órdenes y productos `E2E-*` a medias en la base de
+desarrollo, que ensucian la siguiente.
 
 **Un desplegable de navegación no es un `menu`.** La ficha de T2-16 pedía `role="menu"` y
 `role="menuitem"` en `NavDropdown`, y **no se aplicó a propósito**: ese rol es para comandos
