@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **275/275** | **382/382** |
+| Tests | **275/275** | **386/386** |
 | Cobertura (sentencias) | 88.62 % *(suelo 85 %)* | 44.62 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -154,6 +154,17 @@ módulo real exporta, y un `Proxy` no pasa esa comprobación. Hay que enumerar l
 85/72/87/87 y frontend 42/50/33/43, unos puntos por debajo de lo real. Sin CI, ese umbral es
 lo único que impide que la cobertura se erosione. **Al subirla, hay que subir el umbral**, o
 deja de significar nada.
+
+**React Router no restablece el desplazamiento al cambiar de ruta.** Se conserva el del
+documento anterior y se aterriza a media página, con el `<h1>` por encima del borde superior:
+había que subir a mano para ver en qué sección se estaba. Lo enmascaraba a medias el `focus()`
+de T2-18 —al enfocar un elemento más alto que la ventana, el navegador desplaza *lo mínimo*, y
+desde abajo eso alinea el **final** de `<main>` con el borde inferior, nunca su principio—, así
+que parecía un desplazamiento caprichoso en vez de uno ausente. Medido: desde 800 px en
+Reportes, ir a Dashboard dejaba la página en 202 px y el título en −113. Ahora `AnuncioDeRuta`
+manda `window.scrollTo(0, 0)` y enfoca con `preventScroll`, para que no haya dos mecanismos
+decidiendo dónde queda la página. **En `POP` no se toca**: atrás y adelante restauran la
+posición guardada, y forzar el principio borraría justo lo que se espera recuperar.
 
 **Los archivos del frontend tienen finales de línea CRLF.** Un reemplazo de varias líneas
 escrito con `\n` no encuentra nada y **falla en silencio**: el script dice que terminó, el
