@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **275/275** | **369/369** |
-| Cobertura (sentencias) | 88.62 % *(suelo 85 %)* | 44.55 % *(suelo 42 %)* |
+| Tests | **275/275** | **376/376** |
+| Cobertura (sentencias) | 88.62 % *(suelo 85 %)* | 44.62 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -258,6 +258,30 @@ cada cambio de ruta, `AnuncioDeRuta` mueve allí el foco y cambia el texto de un
 foco y anuncio al navegar, ARIA y Escape en los desplegables, nombres en los selectores de
 color y en las casillas de fila, fin del `<button>` dentro de `<a>` y respeto por
 `prefers-reduced-motion`.
+
+**Los ítems de menú son cajas delimitadas** (2026-08-09, a petición de diseño). Menú de
+usuario, Catálogo/Órdenes/Admin, Exportar y el menú móvil salen todos de
+`clasesDeItemDeMenu()` en `Stockly-F/src/shared/lib/`: borde **transparente en reposo** —para
+que el texto no baile un píxel al señalar— que se pinta en `hover` y en `focus-visible`. La
+opción activa y la acción destructiva se delimitan en su propio color (azul de sección, rojo
+de peligro). Al añadir un desplegable nuevo, usar ese helper y `CLASES_PANEL_DE_MENU`, que da
+al panel relleno por los cuatro lados: con los ítems delimitados, un borde pegado al borde del
+panel se lee como un fallo de dibujo. **Los disparadores siguen la misma regla** y además
+conservan el borde **mientras el menú está abierto**, para leerse como una pieza con el panel.
+El menú de usuario lleva cabecera con nombre y correo: en el disparador el nombre se recorta a
+144 px y en pantallas pequeñas ni aparece, así que es el único sitio donde la cuenta se lee
+entera.
+
+**Medir un color justo después de un clic o un `hover` da el color de antes.** Los controles
+llevan `transition-colors`, que dura 150–200 ms: `getComputedStyle` leído inmediatamente
+devuelve el fotograma inicial —`rgba(0,0,0,0)` en un fondo que va a ser azul— y parece que la
+clase no se aplica. Con `waitForTimeout(400)` sale el valor real. Costó media hora y dos
+hipótesis falsas al ajustar los menús: llegué a creer que Tailwind no generaba las utilidades.
+**Regla:** para un estado con transición, o se espera a que termine, o se mira una captura.
+
+**Y al medir, hacerlo sobre el elemento que se tocó.** Un `document.querySelectorAll(...).find(...)`
+dentro de `page.evaluate` puede caer en otro nodo con el mismo texto —la interfaz duplica la
+navegación en escritorio y móvil—. `locator.evaluate()` mide justo el que Playwright pulsó.
 
 **Un desplegable de navegación no es un `menu`.** La ficha de T2-16 pedía `role="menu"` y
 `role="menuitem"` en `NavDropdown`, y **no se aplicó a propósito**: ese rol es para comandos
