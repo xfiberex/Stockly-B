@@ -613,37 +613,47 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Cobertura de tests
 
-- [ ] **[T2-19] Tests de las páginas de órdenes de venta y compra**
+- [x] **[T2-19] Tests de las páginas de órdenes de venta y compra** ✅ *(2026-08-09)*
   - **Área:** QA
   - **Ubicación:** `Stockly-F/src/tests/` (nuevos), cubriendo `SaleOrdersPage.tsx` y `PurchaseOrdersPage.tsx`
   - **Qué hacer:** Son las páginas con más lógica de UI sin cobertura (formularios de array dinámico con `useFieldArray`, transiciones de estado con efectos sobre el inventario) y están al 0 %. Cubrir: alta con varios ítems, validación de cantidades y precios, cambio de estado y renderizado de la lista con sus badges.
   - **Criterio de aceptación:** ambas páginas superan el 60 % de cobertura de sentencias.
   - **Esfuerzo:** medio
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** las dos páginas superan el 60 % que pide el criterio — **`PurchaseOrdersPage` 49.25 % → 92.53 %** (12 tests nuevos) y `SaleOrdersPage` **65.67 %**, que ya lo cumplía con los 8 tests de T2-42. Cubre lo que más lógica tiene: el array dinámico de ítems (`useFieldArray`), la validación, y las transiciones de estado, que en compras **suman stock** al recibir y lo restan al cancelar una recibida (T0-04).
+  - **Los tests miran el payload, no solo la pantalla:** que elegir un producto rellene nombre y precio, que la cantidad viaje como **número** y no como el texto del input, y que un proveedor sin elegir se envíe como `undefined` en vez de cadena vacía — las tres cosas que el backend distingue.
 
-- [ ] **[T2-20] Tests de la página de gestión de usuarios**
+- [x] **[T2-20] Tests de la página de gestión de usuarios** ✅ *(2026-08-09)*
   - **Área:** QA
   - **Ubicación:** `Stockly-F/src/tests/` (nuevo), cubriendo `UsersPage.tsx`
   - **Qué hacer:** Página al 0 % con acciones destructivas (cambio de rol, activar/desactivar). Cubrir el renderizado de la lista, el cambio de rol, la desactivación y el caso de intentar actuar sobre uno mismo (que el backend rechaza con 400).
   - **Criterio de aceptación:** la página supera el 60 % de cobertura de sentencias.
   - **Esfuerzo:** medio
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** `UsersPage` **0 % → 86.66 %**, 9 tests nuevos. El criterio pedía 60 %.
+  - **Lo que más importaba cubrir es lo que no debe poder hacerse:** actuar sobre la propia cuenta. El backend lo rechaza con 400, y aquí el selector de rol y el botón de desactivar están **deshabilitados**, así que ni se llega a pedir. También la traducción del filtro de estado, donde `""` significa «todos» y tiene que convertirse en `undefined`, no en `false`.
 
-- [ ] **[T2-21] Tests del dashboard y la página de reportes**
+- [x] **[T2-21] Tests del dashboard y la página de reportes** ✅ *(2026-08-09)*
   - **Área:** QA
   - **Ubicación:** `Stockly-F/src/tests/` (nuevos), cubriendo `DashboardPage.tsx` y `ReportsPage.tsx`
   - **Qué hacer:** Ambas al 0 %. Cubrir estados de carga, renderizado de las tarjetas de KPI con datos mockeados, la sección de alertas de stock bajo y el formateo de moneda.
   - **Criterio de aceptación:** ambas páginas superan el 50 % de cobertura de sentencias.
   - **Esfuerzo:** medio
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** `DashboardPage` **0 % → 81.81 %** y `ReportsPage` **0 % → 84.37 %**, con 12 tests que comparten los mismos datos de prueba porque comparten endpoint: si el contrato de `/reports` cambia, fallan las dos a la vez.
+  - **Recharts va mockeado:** mide su contenedor con `ResizeObserver`, que en jsdom no existe y da siempre 0×0, así que los gráficos no llegan a pintarse. Lo que se prueba son las cifras, el formato y los enlaces.
+  - **Trampa que costó una suite colgada:** el primer mock era un `Proxy` que devolvía un componente para **cualquier** propiedad — también para `then`. Eso convierte al módulo en «thenable» y el `import()` que lo espera **no resuelve nunca**: vitest se queda parado sin dar un solo error. Y aun arreglado, un `Proxy` no pasa la comprobación de vitest de que el mock exporte lo que el módulo real exporta. La versión buena enumera los componentes uno a uno.
 
-- [ ] **[T2-22] Umbrales de cobertura en ambos repositorios**
+- [x] **[T2-22] Umbrales de cobertura en ambos repositorios** ✅ *(2026-08-09)*
   - **Área:** QA
   - **Ubicación:** `Stockly-B/jest.config.js`, `Stockly-F/vite.config.ts:40-53`
   - **Qué hacer:** Ninguna configuración define umbrales, así que nada impide que la cobertura baje. Fijar el suelo en el valor actual menos 2 puntos (backend 85 %, frontend al nivel que resulte tras T2-19/20/21) y subirlo con cada incorporación.
   - **Criterio de aceptación:** `pnpm test:coverage` falla en local si la cobertura baja del umbral.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-01, T1-02, T2-19, T2-20, T2-21
+  - **Verificado localmente (2026-08-09):** umbrales puestos y **falsificados en los dos repositorios**, que es lo único que demuestra que un umbral existe: subiendo el de sentencias a 99 %, el backend falla con «Coverage for statements (88.62%) does not meet "global" threshold (99%)» y el frontend con su equivalente; restaurados, ambos `verify` vuelven a exit 0.
+  - **Los valores, dos puntos por debajo de lo real** (2026-08-09) — backend **85 / 72 / 87 / 87** sobre 88.62 / 74.88 / 89.43 / 89.97; frontend **42 / 50 / 33 / 43** sobre 44.55 / 52.19 / 35.70 / 45.59. Es margen para un refactor honrado, no para el descuido.
+  - **Sin CI, el umbral es la única barrera** contra la erosión: nada impedía que la cobertura bajara commit a commit. Al subirla hay que subir también estos números, o el suelo deja de significar nada.
 
 - [ ] **[T2-23] Cubrir las zonas de baja cobertura del backend**
   - **Área:** QA
@@ -1308,6 +1318,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-08 | **T2-41** Escala tipográfica explícita y recorte de Inter — **completada** | Dos compilaciones reales para medir el antes y el después: **56 → 8 archivos de fuente emitidos**, CSS **78.40 → 68.40 kB** (gzip **13.55 → 12.14**). `verify` ✅ **279/279** (10 tests nuevos), E2E ✅ | La escala se declara **borrando antes** `--text-*` y `--font-weight-*`: los tamaños no declarados dejan de existir, así que es una restricción, no un comentario. Cinco tamaños con un papel cada uno y cuatro pesos. El ahorro de fuentes viene de que `@fontsource/inter/400.css` trae **siete `@font-face` por peso** (cirílico, griego, vietnamita…) para una aplicación que solo se escribe en español; los `latin-*.css` traen uno. **La auditoría no había visto el `text-6xl`** del 404: apareció al borrar el espacio de nombres, junto al `font-black` que el navegador venía fingiendo. **El test se acusaba a sí mismo** —encontraba las clases prohibidas en los comentarios que explican por qué se fueron—, así que escanea el código sin comentarios. |
 | 2026-08-08 | **T2-10** Logging estructurado con correlación — **completada** | Los tests **capturan la salida real de pino** y recuperan las líneas de una petición por su `x-request-id`. `verify` ✅ **275/275** (8 nuevos), E2E ✅ 3 pasadas | `pino` + `pino-http` sustituyen a morgan y al `console.error`. **La redacción no era opcional:** pino-http registra todas las cabeceras, así que sin ella la cookie de sesión iba al log en cada llamada. Dos defectos vistos al mirar la salida: el mensaje decía `GET /` (Express reescribe `req.url` en un router montado) y en desarrollo se volcaban `req` y `res` enteros. **Regresión propia:** el hilo de `pino-pretty` subió el E2E de 36 s a 66 s con dos pruebas agotando su tiempo; aislada con `git stash` contra el estado anterior y resuelta condicionando el formato legible a `process.stdout.isTTY`. |
 | 2026-08-08 | **T2-07** Las alertas de stock dejan de bloquear la respuesta — **completada** | Con un SMTP de 500 ms la respuesta tarda menos de 500; con el `await` anterior, **750 ms**. `verify` ✅ **275/275** | Un `void promesa` habría dejado el envío sin testar y los fallos sin registrar: hay un registro de alertas en vuelo y `esperarAlertasEnVuelo()`, así que los tests esperan de verdad. En órdenes de venta era una alerta por producto **y en serie**. |
+| 2026-08-09 | **T2-19 a T2-22** Cobertura del frontend y umbrales — **completadas** | `PurchaseOrdersPage` **49.25 → 92.53 %**, `UsersPage` **0 → 86.66 %**, `DashboardPage` **0 → 81.81 %**, `ReportsPage` **0 → 84.37 %**; global **38.52 → 44.55 %** con **369** tests. Umbrales falsificados en los dos repos subiéndolos a 99 % y comprobando que `verify` falla | Los tests miran el **payload**, no solo la pantalla: cantidades como número y no como texto, proveedor vacío como `undefined`. En usuarios lo importante es lo que **no** debe poder hacerse —actuar sobre la propia cuenta, que el backend rechaza con 400—. **Trampa cara:** el primer mock de Recharts era un `Proxy` que respondía a cualquier propiedad, incluida `then`; eso vuelve el módulo «thenable» y el `import()` no resuelve nunca — la suite se cuelga sin dar un error. |
 | 2026-08-09 | **T2-12 a T2-16** Bloque de accesibilidad cerrado — **completadas** | 21 tests nuevos y dos comprobaciones en navegador: con «reducir movimiento» la transición de un botón pasa de **0.15 s a 0.00001 s** y el spinner de 1 s a 3 s; la fila de la tabla expone **6 paradas de tabulación, una por acción**, y cero interactivos anidados. `verify` ✅ **336/336**, E2E ✅ | **Una desviación deliberada:** T2-16 pedía `role="menu"`/`menuitem` en `NavDropdown` y **no se aplica**, porque ese rol es para comandos y dentro hay enlaces de navegación: con él dejan de anunciarse como enlaces y salen de la lista de enlaces del lector. Lo destapó el E2E al no encontrar «Productos» por rol — un fallo de prueba ajena señalando un problema real. El resto: `prefers-reduced-motion` reduce sin eliminar (con `none`, los `transitionend` quedan colgados), los diez selectores de color pasan a tener nombre y `aria-pressed`, el `<button>` dentro de `<a>` se queda en enlace con las clases extraídas a `clasesDeBoton()`, y la casilla «seleccionar todos» completa la selección sin desmarcar lo ya marcado, con estado indeterminado —que solo existe como propiedad del DOM—. |
 | 2026-08-09 | **T2-18** Foco y anuncio al cambiar de ruta — **completada** | **Medido en el navegador:** al ir del panel a Reportes, `document.title` → «Reportes · Stockly», la región viva → «Reportes» y el foco → `#contenido`; **el Tab siguiente cae en «Descargar PDF», dentro de `<main>`**, no al principio del menú. `verify` ✅ **313/313** (12 tests nuevos), E2E ✅ | El texto se **deriva** del `pathname`: ni `setState` en efecto (T1-08, T1-10) ni anuncio en la primera carga, porque una región viva anuncia sus cambios y no su contenido inicial. Los títulos **no se leen del `<h1>`** —con las rutas en `lazy()` aún no está montado al cambiar de ruta—, viven en una lista que `titulos.test.ts` compara con el router en ambos sentidos. De paso, `document.title` deja de ser el mismo en las 21 rutas. **Trampa al medir:** la primera lectura decía que no pasaba nada; era la medición, no el código — React Router navega en `startTransition`, la URL cambia antes de que React confirme el render y el efecto corre al confirmar. |
 | 2026-08-09 | **T2-43** Índices del orden por `createdAt` en `products` — **completada** | `EXPLAIN (ANALYZE, BUFFERS)` sobre 40 000 productos: listado por defecto **10.309 ms → 0.016 ms** (773 → 7 buffers); filtrado por activos **10.170 → 0.015 ms**; por inactivos **0.701 → 0.022 ms**. `verify` ✅ **275/275** | Dos índices, no uno: el filtro `isActive` es **opcional**, así que el listado sin filtro es una consulta real y el compuesto no la sirve (su primera columna no es `createdAt`). `products_isActive_idx` **no se retira: se amplía** a `(isActive, createdAt)`, que gana por medición al índice parcial `WHERE isActive = false` —iguala en el caso inactivo pero no sirve para nada más y no es expresable en el esquema de Prisma, así que habría vivido en SQL suelto—. Los 40 000 productos de banco se borraron al terminar. |
@@ -1322,10 +1333,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 24 | 45 | 53 % |
+| Tier 2 | 28 | 45 | 62 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **59** | **104** | **57 %** |
+| **Total** | **63** | **104** | **61 %** |
 
 *El denominador creció el 2026-08-08 con cuatro tareas nuevas (T2-42 a T2-45) que no venían de la auditoría, así que el porcentaje se mueve poco pese a cerrarse dos de ellas.*
 
@@ -1336,9 +1347,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Métrica | Inicial (auditoría) | Actual (2026-08-08) | Objetivo |
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **275/275** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **336/336** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **38.52 %** | ≥ 45 % |
+| Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **369/369** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **44.55 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |

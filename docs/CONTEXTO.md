@@ -56,15 +56,15 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **275/275** | **336/336** |
-| Cobertura (sentencias) | 88.62 % | 38.52 % |
+| Tests | **275/275** | **369/369** |
+| Cobertura (sentencias) | 88.62 % *(suelo 85 %)* | 44.55 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
 de datos, el backend y el frontend—. En este equipo (2026-08-08): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 24/45** · Total **59/104**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 28/45** · Total **63/104**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -139,6 +139,17 @@ las rutas en `lazy()` esa confirmación espera al *chunk*. Medir el `document.ti
 una región viva justo después del clic —o justo después de un `waitForURL`— da el estado
 **anterior**, y parece un fallo del código. Hay que esperar a que la página esté pintada
 (`getByRole("heading", …)`). Pasó al verificar T2-18 y costó una medición en falso.
+
+**Un `Proxy` como mock de módulo cuelga la suite.** Al mockear Recharts con un `Proxy` que
+devuelve un componente para cualquier propiedad, también responde a `then`: el módulo pasa a
+ser «thenable», el `import()` que lo espera **no resuelve nunca** y vitest se queda parado sin
+dar un solo error. Y aunque se excluya `then`, vitest comprueba que el mock exporte lo que el
+módulo real exporta, y un `Proxy` no pasa esa comprobación. Hay que enumerar los componentes.
+
+**La cobertura tiene suelo desde T2-22** (`jest.config.js` y `vite.config.ts`): backend
+85/72/87/87 y frontend 42/50/33/43, unos puntos por debajo de lo real. Sin CI, ese umbral es
+lo único que impide que la cobertura se erosione. **Al subirla, hay que subir el umbral**, o
+deja de significar nada.
 
 **Los archivos del frontend tienen finales de línea CRLF.** Un reemplazo de varias líneas
 escrito con `\n` no encuentra nada y **falla en silencio**: el script dice que terminó, el
