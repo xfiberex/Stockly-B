@@ -526,45 +526,65 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **`tabIndex={-1}` en `<main>` no es un detalle:** sin él el navegador desplaza la página pero deja el foco donde estaba, y el siguiente Tab devuelve al usuario al principio de la navegación que quería saltarse. Es el fallo clásico que convierte el enlace en decoración.
   - **El foco se mueve por código, no confiando en el navegador:** el salto por fragmento depende de cada navegador y jsdom no lo implementa, así que un `onClick` lo hace explícito —y comprobable—. Se quitó el `scrollIntoView()` que había puesto detrás: `focus()` ya desplaza, y encima lanzaba una excepción no capturada en jsdom que ensuciaba la suite.
 
-- [ ] **[T2-12] Respetar `prefers-reduced-motion`**
+- [x] **[T2-12] Respetar `prefers-reduced-motion`** ✅ *(2026-08-09)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/index.css`
   - **Qué hacer:** Cero coincidencias de `prefers-reduced-motion` en todo `src/`, pese al uso generalizado de `transition-*`, `hover:scale-110` y `animate-spin`. Añadir el bloque `@media` estándar que reduce animaciones y transiciones a duración mínima.
   - **Criterio de aceptación:** con «Reducir movimiento» activado en el sistema operativo, la interfaz no anima transiciones ni escalados.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** **medido en el navegador con la preferencia emulada**, que es la única forma de comprobarlo —jsdom no evalúa consultas de medios—. Con «reducir movimiento» activo, la transición de un botón pasa de **0.15 s a 0.00001 s** y el giro del spinner de **1 s a 3 s**. 6 tests sobre la hoja de estilos (`movimiento.test.ts`), al modo de `theme.test.ts`.
+  - **Reducir, no eliminar.** `0.01ms` deja el estado final donde toca —el menú abierto sigue abierto, el foco donde debe— y los `transitionend` que alguien escuche siguen disparándose; con `animation: none` se quedarían colgados, y hay un test que lo prohíbe.
+  - **El spinner no se congela, se frena.** Girando comunica «esto sigue en marcha»; quieto no dice nada. Baja a una vuelta cada tres segundos en vez de desaparecer.
+  - **`!important` es obligatorio aquí:** el bloque compite con utilidades de Tailwind, que ganan por especificidad. Sin él no haría absolutamente nada, así que el test exige que todas las declaraciones lo lleven.
 
-- [ ] **[T2-13] Nombres accesibles en la página de etiquetas**
+- [x] **[T2-13] Nombres accesibles en la página de etiquetas** ✅ *(2026-08-09)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/modules/tags/components/TagsPage.tsx:63-73,135-144`
   - **Qué hacer:** Los diez selectores de color son botones sin texto ni etiqueta, y su estado seleccionado se comunica solo con un `outline` CSS; los botones de editar y eliminar tampoco tienen `title` ni `aria-label` (a diferencia de `ProductTable` y `SuppliersPage`). Añadir `aria-label` descriptivos con el nombre de la etiqueta, `aria-pressed` en los colores, y envolverlos en `role="group"` con etiqueta.
   - **Criterio de aceptación:** un lector de pantalla anuncia el propósito de cada botón y el color actualmente seleccionado.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** 3 tests nuevos en `TagsPage.test.tsx`. Los diez selectores tienen nombre («Azul», «Rojo», «Ámbar»…), van dentro de un `role="group"` rotulado «Color» y `aria-pressed` marca **uno y solo uno**, tanto al abrir el formulario como tras elegir otro o al editar una etiqueta existente.
+  - **El color deja de ser el único identificador.** Eran diez botones sin texto —diez «botón» idénticos para un lector de pantalla— y el elegido se distinguía solo por un contorno CSS. Los nombres viven junto al valor en `PRESET_COLORS`, así que añadir un color obliga a nombrarlo.
+  - **De paso, mínimo táctil:** el círculo de 28 px se queda como dibujo (`aria-hidden`) dentro de un botón de 44×44 hasta `md`, el mismo patrón de T2-40 para lo que no puede crecer sin desentonar.
+  - **Los botones de editar y eliminar ya se habían resuelto en T1-17**, al añadirles `aria-label` con el nombre de la etiqueta.
 
-- [ ] **[T2-14] Eliminar el anidamiento `<Link><Button>` de la tabla de productos**
+- [x] **[T2-14] Eliminar el anidamiento `<Link><Button>` de la tabla de productos** ✅ *(2026-08-09)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/modules/products/components/ProductTable.tsx:156-160`
   - **Qué hacer:** Un `<button>` dentro de un `<a>` es HTML inválido: produce dos paradas de tabulación por acción y confunde a las tecnologías de asistencia, multiplicado por cada fila de la tabla. Como es una navegación, dejar solo el `<Link>` con las clases del botón y un `aria-label` descriptivo.
   - **Criterio de aceptación:** el HTML validado no contiene contenido interactivo anidado; la acción tiene una única parada de tabulación y se activa con Enter.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** 2 tests nuevos y **comprobado en el navegador**: la primera fila de la tabla expone **6 paradas de tabulación, una por acción**, y el recuento de `a button, button a` en toda la página es **0**.
+  - **Se queda el enlace, no el botón:** la acción navega, así que lo correcto es un `<a>`. Toma las clases de `clasesDeBoton()`, extraído de `Button.tsx` para no copiar la cadena —que es como se separan dos cosas que deberían cambiar juntas— y lleva `aria-label` con el nombre del producto, porque «Historial de movimientos» repetido diez veces no dice sobre cuál.
+  - **`clasesDeBoton()` vive en `shared/lib/`, no en `Button.tsx`:** un archivo que exporta componentes no puede exportar además funciones sin romper el *fast refresh*, y `pnpm lint` lo señaló en cuanto se intentó.
 
-- [ ] **[T2-15] Nombre accesible en las casillas de selección de fila**
+- [x] **[T2-15] Nombre accesible en las casillas de selección de fila** ✅ *(2026-08-09)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/modules/products/components/ProductTable.tsx:71-76`
   - **Qué hacer:** Las casillas del flujo de ajuste masivo de stock —una operación destructiva— no tienen `<label>` ni `aria-label`. Añadir `aria-label={`Seleccionar ${product.name}`}` y una casilla de cabecera «Seleccionar todos» con estado indeterminado.
   - **Criterio de aceptación:** un lector de pantalla identifica a qué producto corresponde cada casilla; la casilla de cabecera selecciona y deselecciona toda la página.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** 6 tests nuevos en `ProductTable.test.tsx`. La casilla de cabecera **completa la selección sin desmarcar lo ya marcado** (con una fila de dos marcada, un clic llama al conmutador solo para la otra), desmarca la página entera cuando están todas, y una selección parcial queda **indeterminada**, no «sin marcar».
+  - **El estado indeterminado solo existe como propiedad del DOM**, no como atributo: se pone por `ref`. Sin él, «una de dos seleccionadas» se anuncia como «no marcado», que es justo lo contrario de lo que hay.
+  - **Sin cambiar la interfaz del componente:** `onToggleSelect` actualiza con función, así que llamarlo en bucle es seguro —cada llamada ve el conjunto que dejó la anterior— y no hizo falta añadir una prop nueva ni tocar `ProductsPage`.
+  - **El nombre por fila ya estaba** desde T2-40 (`aria-label` con el nombre del producto), puesto al resolver una duplicación de texto en el árbol de accesibilidad; aquí se cubre con un test propio.
 
-- [ ] **[T2-16] Atributos ARIA y cierre con Escape en los menús de navegación**
+- [x] **[T2-16] Atributos ARIA y cierre con Escape en los menús de navegación** ✅ *(2026-08-09)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/shared/components/NavDropdown.tsx:36-46`, `Stockly-F/src/App.tsx:67-104`
   - **Qué hacer:** `NavDropdown` (Catálogo, Órdenes, Admin) carece de `aria-haspopup`, `aria-expanded`, `role="menu"` y `role="menuitem"`, que `UserMenu` sí tiene bien resueltos. Ninguno de los dos cierra con Escape ni devuelve el foco al botón disparador. Replicar el patrón del `UserMenu` y añadir el manejador de Escape en ambos.
   - **Criterio de aceptación:** el estado abierto/cerrado se anuncia; pulsar Escape cierra el menú y devuelve el foco a su botón.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** 5 tests nuevos para `NavDropdown` y 1 para `UserMenu`. El botón declara `aria-haspopup`, `aria-expanded` y `aria-controls` —que **desaparece al cerrar**, para no apuntar a un id inexistente—, y **Escape cierra y devuelve el foco al botón**. `verify` ✅ **336/336**, E2E ✅ 9 pasados 1 omitido.
+  - **Desviación deliberada de la ficha, y el motivo:** pedía replicar el `role="menu"`/`role="menuitem"` de `UserMenu`. **No se aplica en `NavDropdown`, y es a propósito:** ese rol es para comandos de aplicación, y lo que hay dentro son enlaces de navegación. Con `menuitem` dejan de anunciarse como enlaces y **desaparecen de la lista de enlaces del lector de pantalla**, que es justo la herramienta con la que se recorre un sitio. Queda como desplegable (*disclosure*): botón que dice que abre algo, panel rotulado y salida con Escape.
+  - **Lo cazó el E2E, no la revisión:** llegué a poner `role="menuitem"` y el smoke falló al buscar «Productos» por rol de enlace. El fallo de una prueba ajena señaló un problema real de accesibilidad, no un selector viejo.
+  - **El comportamiento compartido vive en un hook** (`useMenuDesplegable`): el cierre al pulsar fuera estaba duplicado y el de Escape no estaba en ninguno. Ahora no pueden volver a separarse.
+  - **Devolver el foco no es un adorno:** al cerrar, el elemento enfocado desaparece del DOM, el navegador manda el foco al `<body>` y el siguiente Tab reempieza por el principio de la página.
 
 - [x] **[T2-17] Exponer el estado de los conmutadores de etiqueta del formulario de producto** ✅ *(2026-08-07)*
   - **Área:** Accesibilidad
@@ -578,13 +598,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
     `textoLegibleSobre()` queda disponible para T2-38, que tiene el mismo problema en `Badge`.
     **No verificado:** la locución real en un lector de pantalla; se comprueba la semántica que la hace posible.
 
-- [ ] **[T2-18] Gestión de foco y anuncio al cambiar de ruta**
+- [x] **[T2-18] Gestión de foco y anuncio al cambiar de ruta** ✅ *(2026-08-09)*
   - **Área:** Accesibilidad
   - **Ubicación:** `Stockly-F/src/App.tsx`, `Stockly-F/src/routes/index.tsx`
   - **Qué hacer:** En una SPA la navegación no recarga la página: el foco se queda donde estaba y el lector de pantalla no anuncia nada. Añadir un componente que, al cambiar `pathname`, mueva el foco a `<main tabIndex={-1}>` y actualice una región `aria-live="polite"` con el título de la página.
   - **Criterio de aceptación:** navegar entre secciones anuncia el nuevo título y coloca el foco al inicio del contenido.
   - **Esfuerzo:** medio
   - **Depende de:** T2-11
+  - **Verificado localmente (2026-08-09):** `AnuncioDeRuta` en `Stockly-F/src/shared/components/`, con `TITULOS_DE_RUTA` en `shared/lib/titulos.ts`. `verify` ✅ **313/313** (12 tests nuevos), E2E ✅ 9 pasados 1 omitido. **Medido en el navegador**, que es donde vive el criterio: al ir del panel a Reportes, `document.title` pasa a «Reportes · Stockly», la región viva pasa a decir «Reportes» y `document.activeElement` es `#contenido`. **La prueba de fuego es el Tab siguiente:** cae en «Descargar PDF», **dentro de `<main>**`, en vez de volver al principio de la barra de navegación.
+  - **El texto se deriva del `pathname`, no se guarda en un estado sincronizado por un efecto.** Además de evitar el `setState` en efecto que ya costó T1-08 y T1-10, encaja con cómo funciona una región viva: anuncia sus **cambios**, no su contenido inicial. Así, en la primera carga no dice nada —y tampoco roba el foco, que es lo que haría un `focus()` sin guardia— y en cada navegación posterior sí.
+  - **Los títulos no se leen del `<h1>` de cada página**, que sería la fuente única evidente: con las rutas en `lazy()`, en el instante del cambio de ruta el contenido nuevo aún no está montado y no habría nada que leer. Viven en una lista, y `titulos.test.ts` **la compara con el router de verdad** en las dos direcciones: una ruta nueva sin título hace fallar la suite —que es mejor que anunciar «Página no encontrada» al llegar a ella— y un título huérfano también. Es el mismo patrón con el que T2-29 ató el esquema de Swagger al validador. Falsificado quitando `/reports` de la lista.
+  - **De regalo, `document.title` deja de ser fijo.** Era «Stockly — Gestión de inventario» en las 21 rutas; ahora nombra la sección, que es lo que distingue una pestaña de otra y lo que lee el historial del navegador.
+  - **Trampa al medir, anotada para no repetirla:** la primera medición en el navegador daba que **no pasaba nada** —título y región sin cambiar, foco en el enlace— y parecía un fallo del código. No lo era: React Router navega dentro de un `startTransition`, así que la URL cambia antes de que React confirme el render nuevo, y el efecto corre al confirmar, después de que cargue el *chunk* de la ruta. Esperando a que la página esté pintada, las tres cosas son correctas. Anunciar antes habría sido peor: diría «Reportes» con la pantalla todavía en el panel.
 
 ### Cobertura de tests
 
@@ -875,7 +900,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Sin «Eliminar» en las órdenes enviadas:** el backend no permite borrarlas, así que ofrecer el botón sería preparar un 400.
   - **`Mobile Chrome`, verificado después:** al cerrarse, el escenario no llegaba a la cancelación en ese proyecto porque fallaba antes, al crear el producto —y fallaba igual con estos cambios revertidos (`git stash`)—. La causa resultó ser un defecto propio de móvil, ajeno a esta tarea: **T2-45**. Con él corregido, el escenario pasa entero también en `Mobile Chrome`.
 
-- [ ] **[T2-43] Índice por `createdAt` en `products` y revisión de `products_isActive_idx`**
+- [x] **[T2-43] Índice por `createdAt` en `products` y revisión de `products_isActive_idx`** ✅ *(2026-08-09)*
   - **Área:** Rendimiento
   - **Ubicación:** `Stockly-B/prisma/schema.prisma` (modelo `Product`), nueva migración
   - **Qué hacer:** Dos cabos sueltos que dejó T1-15, ninguno de los dos contemplado en la lista de la auditoría:
@@ -884,8 +909,19 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** `EXPLAIN (ANALYZE, BUFFERS)` sobre `SELECT * FROM products ORDER BY "createdAt" DESC LIMIT 10` pasa de `Seq Scan` + ordenación a `Index Scan Backward`, medido sobre el mismo volumen sintético de T1-15 (40 000 productos); la decisión sobre `products_isActive_idx` queda tomada y justificada con su plan; la migración aplica limpiamente y `pnpm verify` sigue en verde.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-15 ✅
+  - **Verificado localmente (2026-08-09):** migración `20260809024157_t2_43_indices_createdat_products`. 40 000 productos sintéticos (5 % inactivos), `ANALYZE` y dos pasadas por consulta —la primera calienta la caché—:
 
-- [ ] **[T2-44] Un único formato de importe en toda la interfaz**
+    | Consulta | Antes | Después | |
+    |---|---|---|---|
+    | `ORDER BY "createdAt" DESC LIMIT 10` | `Seq Scan` + `Sort`, **10.309 ms**, 773 buffers | `Index Scan Backward`, **0.016 ms**, 7 buffers | **644×** |
+    | `WHERE "isActive" = true` + mismo orden | `Seq Scan` + `Sort`, **10.170 ms**, 773 buffers | `Index Scan Backward`, **0.015 ms**, 3 buffers | **678×** |
+    | `WHERE "isActive" = false` + mismo orden | `Index Scan` + `Sort`, **0.701 ms**, 775 buffers | `Index Scan Backward`, **0.022 ms**, 12 buffers | **32×** |
+
+    `pnpm verify` completo ✅ **275/275**, cobertura 88.62 %, smoke ✅. Los productos de banco se borraron al terminar (quedan los 52 del seed).
+  - **`products_isActive_idx` no se retira: se amplía.** Se comparó por SQL, sobre los mismos datos, contra las dos alternativas que planteaba la ficha. El índice **compuesto `(isActive, createdAt)`** gana a las dos: cubre el listado filtrado en los dos sentidos con un solo índice (activos 3 buffers, inactivos 12) y, como `isActive` es su prefijo, el filtro por estado a secas sigue cubierto. El **índice parcial** `WHERE "isActive" = false` iguala en el caso inactivo (12 buffers) pero no sirve para nada más y no es expresable en el esquema de Prisma, así que habría vivido en SQL suelto y en riesgo de deriva.
+  - **Hacen falta los dos índices, no uno.** El filtro `isActive` es **opcional** en `getProducts` (`product.service.ts:39-42`): cuando el cliente no lo envía —el caso normal al abrir el catálogo— la consulta ordena por `createdAt` sin filtro, y el compuesto no la sirve porque su primera columna no es `createdAt`.
+
+- [x] **[T2-44] Un único formato de importe en toda la interfaz** ✅ *(2026-08-09)*
   - **Área:** UI/UX
   - **Ubicación:** `Stockly-F/src/shared/lib/` (helper nuevo), `Stockly-F/src/modules/reports/components/ReportsPage.tsx:182`, transversal
   - **Qué hacer:** En la tabla «Top por valor» conviven dos formatos en la misma fila: «Precio unit.» sale de `Number(p.price).toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString("es-MX", { minimumFractionDigits: 2 })` y sí lo lleva. Visto al alinear las columnas en T2-39, donde quedó fuera de alcance por ser formato y no alineación.
@@ -893,6 +929,10 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** no queda ningún importe formateado con `toFixed` en `src/**/*.tsx`; dos importes de la misma tabla con magnitudes distintas se pintan con el mismo formato; hay un test del helper con separador de miles, dos decimales siempre y el caso del cero.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** `formatearImporte()` en `shared/lib/moneda.ts` y **18 sustituciones en 7 archivos**. `verify` ✅ **301/301** (9 tests nuevos), E2E ✅ 9 pasados 1 omitido. **Comprobado en la página real**, que es donde estaba el defecto: la fila de «Top por valor» pinta ahora `$14,999.00` junto a `$179,988.00` —antes el primero salía `$14999.00`— y el KPI conserva sus cero decimales (`$2,211,974`).
+  - **`Intl.NumberFormat` con `style: "currency"`, no un `toLocaleString` con decimales:** el símbolo deja de escribirse a mano en cada llamada —eran 20 `$` sueltos— y los negativos salen bien colocados (`-$1,234.50`, no `$-1,234.50`). `signDisplay: "exceptZero"` da el `+` de la columna de variación de precio sin el `{diff >= 0 ? "+" : ""}` que había antes.
+  - **Un valor no numérico da `—`, no `$NaN`.** El precio llega como cadena desde la API (`Decimal` de Prisma) y el helper la acepta, así que ya no depende de que alguien recuerde envolverlo en `Number()`.
+  - **Dos exclusiones deliberadas, que el test respeta:** las etiquetas compactas de los ejes (`$${(v / 1000).toFixed(0)}k`) —un eje que dijera «$1,200,000.00» sería ilegible— y `dailyVelocity.toFixed(2)`, que es una velocidad y no lleva símbolo. El primer escáner que escribí, «un `toFixed` en la misma línea que un `$`», marcaba las tres cosas; el que queda busca los **dos patrones concretos** que había antes y se falsificó devolviendo un `toFixed(2)` a `ReportsPage`.
 
 - [x] **[T2-45] Contener los scrollers horizontales para que no ensanchen el viewport en móvil** ✅ *(2026-08-08)*
   - **Área:** UI/UX / Accesibilidad
@@ -1268,6 +1308,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-08 | **T2-41** Escala tipográfica explícita y recorte de Inter — **completada** | Dos compilaciones reales para medir el antes y el después: **56 → 8 archivos de fuente emitidos**, CSS **78.40 → 68.40 kB** (gzip **13.55 → 12.14**). `verify` ✅ **279/279** (10 tests nuevos), E2E ✅ | La escala se declara **borrando antes** `--text-*` y `--font-weight-*`: los tamaños no declarados dejan de existir, así que es una restricción, no un comentario. Cinco tamaños con un papel cada uno y cuatro pesos. El ahorro de fuentes viene de que `@fontsource/inter/400.css` trae **siete `@font-face` por peso** (cirílico, griego, vietnamita…) para una aplicación que solo se escribe en español; los `latin-*.css` traen uno. **La auditoría no había visto el `text-6xl`** del 404: apareció al borrar el espacio de nombres, junto al `font-black` que el navegador venía fingiendo. **El test se acusaba a sí mismo** —encontraba las clases prohibidas en los comentarios que explican por qué se fueron—, así que escanea el código sin comentarios. |
 | 2026-08-08 | **T2-10** Logging estructurado con correlación — **completada** | Los tests **capturan la salida real de pino** y recuperan las líneas de una petición por su `x-request-id`. `verify` ✅ **275/275** (8 nuevos), E2E ✅ 3 pasadas | `pino` + `pino-http` sustituyen a morgan y al `console.error`. **La redacción no era opcional:** pino-http registra todas las cabeceras, así que sin ella la cookie de sesión iba al log en cada llamada. Dos defectos vistos al mirar la salida: el mensaje decía `GET /` (Express reescribe `req.url` en un router montado) y en desarrollo se volcaban `req` y `res` enteros. **Regresión propia:** el hilo de `pino-pretty` subió el E2E de 36 s a 66 s con dos pruebas agotando su tiempo; aislada con `git stash` contra el estado anterior y resuelta condicionando el formato legible a `process.stdout.isTTY`. |
 | 2026-08-08 | **T2-07** Las alertas de stock dejan de bloquear la respuesta — **completada** | Con un SMTP de 500 ms la respuesta tarda menos de 500; con el `await` anterior, **750 ms**. `verify` ✅ **275/275** | Un `void promesa` habría dejado el envío sin testar y los fallos sin registrar: hay un registro de alertas en vuelo y `esperarAlertasEnVuelo()`, así que los tests esperan de verdad. En órdenes de venta era una alerta por producto **y en serie**. |
+| 2026-08-09 | **T2-12 a T2-16** Bloque de accesibilidad cerrado — **completadas** | 21 tests nuevos y dos comprobaciones en navegador: con «reducir movimiento» la transición de un botón pasa de **0.15 s a 0.00001 s** y el spinner de 1 s a 3 s; la fila de la tabla expone **6 paradas de tabulación, una por acción**, y cero interactivos anidados. `verify` ✅ **336/336**, E2E ✅ | **Una desviación deliberada:** T2-16 pedía `role="menu"`/`menuitem` en `NavDropdown` y **no se aplica**, porque ese rol es para comandos y dentro hay enlaces de navegación: con él dejan de anunciarse como enlaces y salen de la lista de enlaces del lector. Lo destapó el E2E al no encontrar «Productos» por rol — un fallo de prueba ajena señalando un problema real. El resto: `prefers-reduced-motion` reduce sin eliminar (con `none`, los `transitionend` quedan colgados), los diez selectores de color pasan a tener nombre y `aria-pressed`, el `<button>` dentro de `<a>` se queda en enlace con las clases extraídas a `clasesDeBoton()`, y la casilla «seleccionar todos» completa la selección sin desmarcar lo ya marcado, con estado indeterminado —que solo existe como propiedad del DOM—. |
+| 2026-08-09 | **T2-18** Foco y anuncio al cambiar de ruta — **completada** | **Medido en el navegador:** al ir del panel a Reportes, `document.title` → «Reportes · Stockly», la región viva → «Reportes» y el foco → `#contenido`; **el Tab siguiente cae en «Descargar PDF», dentro de `<main>`**, no al principio del menú. `verify` ✅ **313/313** (12 tests nuevos), E2E ✅ | El texto se **deriva** del `pathname`: ni `setState` en efecto (T1-08, T1-10) ni anuncio en la primera carga, porque una región viva anuncia sus cambios y no su contenido inicial. Los títulos **no se leen del `<h1>`** —con las rutas en `lazy()` aún no está montado al cambiar de ruta—, viven en una lista que `titulos.test.ts` compara con el router en ambos sentidos. De paso, `document.title` deja de ser el mismo en las 21 rutas. **Trampa al medir:** la primera lectura decía que no pasaba nada; era la medición, no el código — React Router navega en `startTransition`, la URL cambia antes de que React confirme el render y el efecto corre al confirmar. |
+| 2026-08-09 | **T2-43** Índices del orden por `createdAt` en `products` — **completada** | `EXPLAIN (ANALYZE, BUFFERS)` sobre 40 000 productos: listado por defecto **10.309 ms → 0.016 ms** (773 → 7 buffers); filtrado por activos **10.170 → 0.015 ms**; por inactivos **0.701 → 0.022 ms**. `verify` ✅ **275/275** | Dos índices, no uno: el filtro `isActive` es **opcional**, así que el listado sin filtro es una consulta real y el compuesto no la sirve (su primera columna no es `createdAt`). `products_isActive_idx` **no se retira: se amplía** a `(isActive, createdAt)`, que gana por medición al índice parcial `WHERE isActive = false` —iguala en el caso inactivo pero no sirve para nada más y no es expresable en el esquema de Prisma, así que habría vivido en SQL suelto—. Los 40 000 productos de banco se borraron al terminar. |
+| 2026-08-09 | **T2-44** Un solo formato de importe — **completada** | 18 sustituciones en 7 archivos y 9 tests nuevos. `verify` ✅ **301/301**, E2E ✅. **Comprobado en la página real:** «Top por valor» pinta `$14,999.00` junto a `$179,988.00`, donde antes el primero salía `$14999.00` | `Intl.NumberFormat` con `style: "currency"` en vez de `toLocaleString` con decimales: el símbolo deja de escribirse a mano (eran 20 `$` sueltos), los negativos se colocan bien y `signDisplay` da el `+` de la columna de variación. Un valor no numérico devuelve `—`, no `$NaN`. **Dos exclusiones deliberadas:** las etiquetas compactas de los ejes y `dailyVelocity`, que no es dinero — el primer escáner las marcaba, y por eso el definitivo busca los dos patrones concretos que existían. |
 | 2026-08-08 | **T2-45** Scrollers horizontales contenidos en móvil — **completada** | Sonda `position: fixed; inset: 0` en Pixel 5 (393 px): **663 → 393**. `pnpm test:e2e:full` **9 pasados, 1 omitido, 0 fallos** en `chromium` **y** `Mobile Chrome`, que venían de 2 fallos. `verify` ✅ **292/292** | Un `overflow-x-auto` ensancha el viewport de diseño de Chrome de Android con el ancho de su contenido **aunque lo recorte**, y todo lo `position: fixed` se dimensiona contra ese viewport: el modal medía 663 px en una pantalla de 393 y su botón primario caía fuera. **El síntoma señalaba a otro sitio** —«el `<label>` de *Stock mínimo* intercepta el clic»—, que era simplemente lo que había bajo las coordenadas. Tres candidatos descartados **midiendo**: `body{overflow:hidden}` no influye (el viewport ya estaba ensanchado sin modal), `html{overflow-x:hidden}` no cambia nada y quitar el `min-w-160` tampoco, porque el mínimo intrínseco de las celdas ya supera la pantalla. `desbordes.test.ts` falla si aparece un scroller sin `contain-paint`. |
 | 2026-08-08 | **T2-42** Cancelar por interfaz una venta ya enviada — **completada** | 8 tests nuevos (`verify` frontend ✅ **290/290**) y el escenario E2E de la venta cancelada **hecho entero por la interfaz en `chromium`**: stock 20 → envío 17 → cancelación confirmada → **20** | La reposición de T0-03 llevaba cuatro días en el backend **sin camino desde la aplicación**. Se confirma el movimiento de stock, no el cambio de estado: la orden pendiente se sigue cancelando de un clic y la enviada abre un diálogo que dice cuántas unidades vuelven. El recuento **excluye los ítems sin `productId`**, porque el backend no los repone. Falsificado desactivando la condición de estado: caen 5 de los 8 tests, y los 3 que quedan son justo los que describen lo que no debía cambiar. **Hallazgo ajeno:** en `Mobile Chrome` el escenario no llega a la cancelación porque falla al crear el producto — reproducido con los cambios revertidos. |
 | 2026-08-08 | **T2-11** Saltar al contenido principal — **completada** | 1×1 px sin foco, 218×44 al recibirlo. `verify` ✅ **282/282** (3 nuevos), E2E ✅ | Lo que se comprueba no es que el enlace exista: que sea el primero en el orden de tabulación y que activarlo deje el foco **dentro** de `<main>`. Sin `tabIndex={-1}` el navegador desplaza pero no mueve el foco, y el siguiente Tab devuelve al principio de la navegación — el fallo que convierte el enlace en decoración. |
@@ -1278,10 +1322,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 16 | 45 | 36 % |
+| Tier 2 | 24 | 45 | 53 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **51** | **104** | **49 %** |
+| **Total** | **59** | **104** | **57 %** |
 
 *El denominador creció el 2026-08-08 con cuatro tareas nuevas (T2-42 a T2-45) que no venían de la auditoría, así que el porcentaje se mueve poco pese a cerrarse dos de ellas.*
 
@@ -1293,15 +1337,15 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **275/275** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **292/292** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **34.93 %** | ≥ 45 % |
+| Tests frontend | 181/181 ✅ | **336/336** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **38.52 %** | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
-| Índices no-únicos en el esquema | 0 | **15** ✅ | cubrir FK y ordenaciones |
+| Índices no-únicos en el esquema | 0 | **16** ✅ *(T2-43 añade los del orden por `createdAt`)* | cubrir FK y ordenaciones |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
 | CSS de la aplicación (build) | 78.40 kB · gzip 13.55 | **68.40 kB · gzip 12.14** ✅ | bajar con la escala y los subconjuntos |
 | Archivos de fuente emitidos | 56 *(7 subconjuntos × 4 pesos × 2 formatos)* | **8** ✅ | solo el subconjunto latino |
@@ -1331,9 +1375,9 @@ de la tarea que los encontró. El último apareció al verificar T2-42 y sigue s
 | `Input` y `Select` solo ataban la etiqueta al campo si se les pasaba `id`. Sin él, `htmlFor` quedaba vacío: campos rotulados a la vista, **sin nombre accesible** (los ítems de las órdenes, entre otros) | ✅ corregido (`useId` como respaldo) |
 | El rate limit global (100 peticiones / 15 min por IP) se agota en una sola pasada del navegador; devolvía 429 en pruebas ajenas al tema | ✅ configurable con `RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_MAX`, sin bajar el techo por defecto |
 | **La interfaz no permite cancelar una orden de venta ya enviada**: los botones solo aparecen en estado PENDIENTE. La reposición de stock de T0-03 existe en el backend pero es inalcanzable desde la aplicación | ⬜ **[T2-42]** |
-| `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo; la lista de índices de la auditoría no lo contemplaba. `products_isActive_idx` sí se creó pero el planificador no lo usa (filtro poco selectivo) | ⬜ **[T2-43]** |
+| `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo; la lista de índices de la auditoría no lo contemplaba. `products_isActive_idx` sí se creó pero el planificador no lo usa (filtro poco selectivo) | ✅ **[T2-43]** |
 | **En `Mobile Chrome` no se puede crear un producto:** al pulsar «Crear producto» (y antes, un conmutador de etiqueta) el clic lo intercepta el `<label>` de «Stock mínimo (alerta)», con reintentos hasta agotar el tiempo. Tumba los dos escenarios de `flows.spec.ts` que pasan por el formulario. Visto al verificar T2-42 y **reproducido con esos cambios revertidos** (`git stash`, misma máquina, Chrome Headless Shell 149): no es una regresión de esa tarea. **Diagnosticado el mismo día:** no era del modal ni del formulario, sino de la tabla de productos, que ensancha el viewport de diseño de Chrome móvil y con él todo lo `position: fixed`. El `<label>` que aparecía en el mensaje era solo lo que había en las coordenadas donde Playwright pulsaba | ✅ **[T2-45]** |
-| En la tabla «Top por valor» de reportes conviven dos formatos de importe: «Precio unit.» sale de `toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString` y sí lo lleva. Visto al alinear las columnas en T2-39; es formato, no alineación, así que quedó fuera de esa tarea | ⬜ **[T2-44]** |
+| En la tabla «Top por valor» de reportes conviven dos formatos de importe: «Precio unit.» sale de `toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString` y sí lo lleva. Visto al alinear las columnas en T2-39; es formato, no alineación, así que quedó fuera de esa tarea | ✅ **[T2-44]** |
 
 ### Línea base de navegador (2026-07-15)
 

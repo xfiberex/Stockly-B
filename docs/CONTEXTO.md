@@ -19,8 +19,10 @@ SMTP) se pasan a mano. Desde **T1-26** solo son imprescindibles cuatro: `DATABAS
 arranca igual y solo esa función responde **503** con un mensaje que dice qué falta.
 
 **Base de datos.** Sirve cualquier PostgreSQL con la base creada; solo tiene que
-coincidir `DATABASE_URL`. El puerto cambia según el equipo —**5433** en el original,
-**5432** en el actual— y es lo primero que hay que ajustar si `verify` falla al conectar.
+coincidir `DATABASE_URL`. **El proyecto se trabaja desde dos equipos y el puerto no es el
+mismo en los dos** —anda entre **5432** y **5433**—; como el `.env` no viaja en git, cada
+máquina tiene el suyo. Si `verify` falla al conectar, eso es lo primero que hay que mirar,
+y el valor bueno es el que diga el `.env` local, no el que ponga aquí ningún documento.
 Con Docker: `docker compose up db -d` **desde `Stockly-B/`**, que es donde vive ahora el
 `docker-compose.yml`.
 
@@ -54,15 +56,15 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **275/275** | **292/292** |
-| Cobertura (sentencias) | 88.62 % | 34.93 % |
+| Tests | **275/275** | **336/336** |
+| Cobertura (sentencias) | 88.62 % | 38.52 % |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
 de datos, el backend y el frontend—. En este equipo (2026-08-08): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 16/45** · Total **51/104**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 24/45** · Total **59/104**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -130,6 +132,18 @@ JSON directo y sin hilo. Vale la regla general: **antes de acusar al código de 
 comparar contra el estado anterior con `git stash` en la misma máquina** — aquí evitó dos
 diagnósticos equivocados, y también demostró que un `pnpm dev` olvidado ocupando un puerto
 falsea toda la medición.
+
+**Tras un clic de navegación, la página no ha cambiado todavía.** React Router navega dentro
+de un `startTransition`: la URL se actualiza antes de que React confirme el render nuevo, y con
+las rutas en `lazy()` esa confirmación espera al *chunk*. Medir el `document.title`, el foco o
+una región viva justo después del clic —o justo después de un `waitForURL`— da el estado
+**anterior**, y parece un fallo del código. Hay que esperar a que la página esté pintada
+(`getByRole("heading", …)`). Pasó al verificar T2-18 y costó una medición en falso.
+
+**Los archivos del frontend tienen finales de línea CRLF.** Un reemplazo de varias líneas
+escrito con `\n` no encuentra nada y **falla en silencio**: el script dice que terminó, el
+archivo sigue igual. Para cambios multilínea hay que usar las herramientas de edición, no
+`String.replace` desde consola. Es hermana de la trampa de PowerShell, y se nota tarde.
 
 **PowerShell 5.1 destroza el UTF-8.** `Get-Content -Raw | ... | Set-Content` lee con la
 página de códigos ANSI y reescribe en UTF-8, dejando doble codificación (`—` → `â€"`), y
@@ -225,8 +239,29 @@ los tests puedan esperarlas de verdad. Si añades otro aviso por correo, sigue e
 
 **El enlace de saltar al contenido** (T2-11) es ahora el primer elemento enfocable, y
 `<main id="contenido" tabIndex={-1}>` es su destino. Ese `tabIndex` no se puede quitar: sin
-él el foco no viaja y el enlace pasa a ser decoración. **T2-18** (gestión del foco al
-cambiar de ruta) ya tiene aquí su punto de anclaje.
+él el foco no viaja y el enlace pasa a ser decoración. **T2-18 usa ese mismo destino**: en
+cada cambio de ruta, `AnuncioDeRuta` mueve allí el foco y cambia el texto de una región
+`aria-live`, así que el Tab siguiente ya cae dentro del contenido y no al principio del menú.
+
+**El bloque de accesibilidad del Tier 2 está cerrado** (T2-11 a T2-18): salto al contenido,
+foco y anuncio al navegar, ARIA y Escape en los desplegables, nombres en los selectores de
+color y en las casillas de fila, fin del `<button>` dentro de `<a>` y respeto por
+`prefers-reduced-motion`.
+
+**Un desplegable de navegación no es un `menu`.** La ficha de T2-16 pedía `role="menu"` y
+`role="menuitem"` en `NavDropdown`, y **no se aplicó a propósito**: ese rol es para comandos
+de aplicación; con él, los enlaces de Catálogo/Órdenes/Admin dejan de anunciarse como enlaces
+y desaparecen de la lista de enlaces del lector de pantalla. Se quedó en *disclosure*
+(`aria-haspopup` + `aria-expanded` + `aria-controls` + Escape). `UserMenu` sí conserva
+`role="menu"`, que ya tenía: ahí dentro hay un comando de verdad («Cerrar sesión»).
+**Lo destapó el E2E**, que dejó de encontrar «Productos» por rol de enlace: un fallo de una
+prueba ajena señalando un problema real, no un selector viejo.
+
+**Al añadir una ruta hay que darle título** en `Stockly-F/src/shared/lib/titulos.ts`, o
+`titulos.test.ts` falla — a propósito: sin entrada, al llegar a esa sección se anunciaría
+«Página no encontrada», que es peor que el silencio. No se leen del `<h1>` porque, con las
+rutas en `lazy()`, al cambiar de ruta todavía no hay `<h1>` que leer. Ese archivo es también
+el que pone el `document.title` de cada pestaña.
 
 **Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro
 de los componentes. No son utilidades —`fill`/`stroke` son props—, así que ningún test las
@@ -244,10 +279,15 @@ Tier 2 pasa por eso de 41 a 44 tareas — y a **45** con T2-45, que salió de ve
 - **T2-42 ✅ hecha** — la interfaz ya permite cancelar una orden de venta enviada, así que la
   reposición de stock de T0-03 **deja de ser inalcanzable desde la aplicación**. Es la única de
   las tres que le faltaba al usuario.
-- **T2-43** — falta el índice por `createdAt` en `products` pese a que todos los listados ordenan
-  por él, y `products_isActive_idx` se creó pero el planificador no lo usa.
-- **T2-44** — dos formatos de importe conviven en la misma fila de reportes; no hay helper de
-  moneda, sino 12 `toLocaleString` y 10 `toFixed(2)` sueltos.
+- **T2-43 ✅ hecha** — `products` ya tiene índice por `createdAt`, y el de `isActive` **no se
+  retiró: se amplió** a `(isActive, createdAt)`. Hacen falta los dos porque el filtro por estado
+  es opcional: el listado sin filtro no lo sirve el compuesto, cuya primera columna no es la
+  fecha. El listado del catálogo pasa de `Seq Scan` de 10.3 ms a `Index Scan Backward` de 0.016.
+- **T2-44 ✅ hecha** — `formatearImporte()` en `shared/lib/moneda.ts` es el único sitio donde se
+  da forma a un importe, y también el único que escribe el `$`. Dos exclusiones a propósito: las
+  etiquetas compactas de los ejes de las gráficas y `dailyVelocity`, que no es dinero.
+
+**Los cuatro hallazgos del 2026-08-08 están cerrados** (T2-42, T2-43, T2-44 y T2-45).
 
 **Con T2-42, la asimetría de confirmación es intencionada:** cancelar una orden *pendiente* sigue
 siendo un clic directo, porque no toca inventario; cancelar una *enviada* abre un diálogo que dice

@@ -97,7 +97,15 @@ model Product {
   @@index([categoryId])
   @@index([brandId])
   @@index([supplierId])
-  @@index([isActive])
+  // Todos los listados del catálogo ordenan por `createdAt` y el filtro por estado es
+  // opcional, así que hacen falta las dos formas (T2-43):
+  //   - sin filtro          → `products_createdAt_idx`
+  //   - con `?isActive=`    → el compuesto, que ordena dentro de cada estado.
+  // El compuesto sustituye al índice sobre `isActive` solo, que el planificador
+  // descartaba en la consulta dominante y solo servía al filtro inverso; como prefijo
+  // del compuesto, ese caso sigue cubierto sin un índice propio.
+  @@index([createdAt])
+  @@index([isActive, createdAt])
   @@map("products")
 }
 
