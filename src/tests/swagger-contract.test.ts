@@ -13,6 +13,9 @@ jest.mock("@/shared/lib/nodemailer", () => ({
 }));
 
 jest.mock("@/shared/middlewares/upload.middleware", () => ({
+    // T2-32: el mock debe exportar **todo** lo que las rutas importan de este módulo.
+    // Sin esta línea, Express recibe `undefined` como manejador y la suite no arranca.
+    verificarFirmaDeImagen: (_req: unknown, _res: unknown, next: () => void) => next(),
     uploadToCloudinary: jest.fn(),
     deleteFromCloudinary: jest.fn(),
     upload: { single: jest.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()) },

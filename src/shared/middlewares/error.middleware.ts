@@ -3,10 +3,38 @@ import { env } from "@/config/env";
 import { HttpError } from "@/shared/lib/httpError";
 import { logger } from "@/shared/lib/logger";
 
+/**
+ * Errores de terceros que ya traen su código y un mensaje pensado para el cliente.
+ *
+ * Es la convención de `http-errors`, que usan Express y `body-parser`: `expose: true`
+ * significa «este mensaje se puede enseñar». Sin esto, un cuerpo por encima del límite
+ * (T2-33) se trataba como avería y salía **500** — en desarrollo con el mensaje real y en
+ * producción con «Error interno del servidor», que es justo lo contrario de lo que pasa:
+ * la petición está mal, el servidor está bien.
+ *
+ * Se comprueba `expose` y no solo el código, para no reenviar al cliente el mensaje de un
+ * error de terceros que no estuviera pensado para él.
+ */
+function errorExpuestoDeTercero(err: Error): { statusCode: number; message: string } | null {
+    const e = err as Error & { status?: unknown; statusCode?: unknown; expose?: unknown };
+    const codigo = typeof e.status === "number" ? e.status : e.statusCode;
+
+    if (e.expose === true && typeof codigo === "number" && codigo >= 400 && codigo < 500) {
+        return { statusCode: codigo, message: err.message };
+    }
+    return null;
+}
+
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
     try {
         if (err instanceof HttpError) {
             res.status(err.statusCode).json({ success: false, message: err.message });
+            return;
+        }
+
+        const deTercero = errorExpuestoDeTercero(err);
+        if (deTercero) {
+            res.status(deTercero.statusCode).json({ success: false, message: deTercero.message });
             return;
         }
 

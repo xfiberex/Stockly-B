@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { upload } from "@/shared/middlewares/upload.middleware";
+import { upload, verificarFirmaDeImagen } from "@/shared/middlewares/upload.middleware";
 import { validate } from "@/shared/middlewares/validate.middleware";
 import { requireAuth, requireRole } from "@/shared/middlewares/auth.middleware";
 import {
@@ -39,8 +39,10 @@ productRouter.get("/:id/price-history", getPriceHistory);
 
 // Escritura — solo ADMIN
 productRouter.post("/import", requireRole("ADMIN"), validate(importProductsSchema), importProducts);
-productRouter.post("/", requireRole("ADMIN"), upload.single("image"), validate(createProductSchema), createProduct);
-productRouter.put("/:id", requireRole("ADMIN"), upload.single("image"), validate(updateProductSchema), updateProduct);
+// T2-32: la firma se comprueba **después** de multer, que es cuando existe el buffer, y
+// antes de validar el resto: si el archivo no es una imagen, no hay nada más que mirar.
+productRouter.post("/", requireRole("ADMIN"), upload.single("image"), verificarFirmaDeImagen, validate(createProductSchema), createProduct);
+productRouter.put("/:id", requireRole("ADMIN"), upload.single("image"), verificarFirmaDeImagen, validate(updateProductSchema), updateProduct);
 productRouter.delete("/:id", requireRole("ADMIN"), deleteProduct);
 productRouter.patch("/:id/restore", requireRole("ADMIN"), restoreProduct);
 productRouter.post("/:id/movements", requireRole("ADMIN"), validate(createManualMovementSchema), createManualMovement);

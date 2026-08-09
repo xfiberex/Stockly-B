@@ -238,7 +238,20 @@ export const productService = {
     },
 
     async importBulk(products: ImportProductDto[]) {
-        const BATCH_SIZE = 50;
+        // T2-08 — un lote es **dos sentencias**, no dos por producto.
+        //
+        // Antes, cada elemento hacía su `create` y su movimiento por separado y el lote
+        // los lanzaba a la vez: 50 elementos eran hasta 100 consultas simultáneas contra
+        // un pool de 10 conexiones, cada una esperando hasta `connectionTimeoutMillis`
+        // (5 s) a que se liberara una. Con la base al lado eso no se nota; con latencia o
+        // con la base ocupada, es una importación que falla a medias por tiempo de espera
+        // y no por los datos.
+        //
+        // El tamaño ya no gobierna la concurrencia —cada lote son dos sentencias—, así
+        // que sirve para acotar otra cosa: cuánto trabajo se repite si un lote falla y
+        // hay que reintentarlo fila a fila para saber **qué** fila fue. 200 filas × 7
+        // columnas son 1400 parámetros, lejos del tope de Postgres.
+        const TAM_LOTE = 200;
         const errors: Array<{ row: number; error: string }> = [];
         let created = 0;
 
@@ -249,38 +262,69 @@ export const productService = {
         const categoryMap = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
         const brandMap = new Map(brands.map((b) => [b.name.toLowerCase(), b.id]));
 
-        for (let i = 0; i < products.length; i += BATCH_SIZE) {
-            const batch = products.slice(i, i + BATCH_SIZE);
+        /** Los datos de una fila del archivo, ya resueltos contra el catálogo. */
+        const filaDeProducto = (dto: ImportProductDto) => ({
+            name: dto.name,
+            description: dto.description,
+            price: parseFloat(String(dto.price)),
+            stock: dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0,
+            categoryId: dto.categoryName ? (categoryMap.get(dto.categoryName.toLowerCase()) ?? null) : null,
+            brandId: dto.brandName ? (brandMap.get(dto.brandName.toLowerCase()) ?? null) : null,
+            isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : true,
+        });
 
-            const results = await Promise.allSettled(
-                batch.map(async (dto) => {
-                    const stock = dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0;
-                    const categoryId = dto.categoryName ? (categoryMap.get(dto.categoryName.toLowerCase()) ?? null) : null;
-                    const brandId = dto.brandName ? (brandMap.get(dto.brandName.toLowerCase()) ?? null) : null;
+        for (let i = 0; i < products.length; i += TAM_LOTE) {
+            const lote = products.slice(i, i + TAM_LOTE);
 
-                    const product = await prisma.product.create({
-                        data: {
-                            name: dto.name,
-                            description: dto.description,
-                            price: parseFloat(String(dto.price)),
-                            stock,
-                            categoryId,
-                            brandId,
-                            isActive: dto.isActive !== undefined ? Boolean(dto.isActive) : true,
-                        },
-                    });
-                    await recordMovement(product.id, "IMPORT", stock, stock, "Importación masiva");
-                    return product;
-                }),
-            );
+            try {
+                const creados = await prisma.product.createManyAndReturn({
+                    data: lote.map(filaDeProducto),
+                    select: { id: true, stock: true },
+                });
 
-            results.forEach((result, batchIndex) => {
-                if (result.status === "fulfilled") {
-                    created++;
-                } else {
-                    errors.push({ row: i + batchIndex + 1, error: result.reason?.message ?? "Error desconocido" });
+                // Los movimientos, también en una sola sentencia. El `stock` sale de la
+                // fila devuelta y no del índice, así que no depende del orden en que
+                // Postgres devuelva lo insertado.
+                const movimientos = creados
+                    .filter((p) => p.stock !== 0)
+                    .map((p) => ({
+                        productId: p.id,
+                        type: "IMPORT" as StockMovementType,
+                        delta: p.stock,
+                        stockAfter: p.stock,
+                        note: "Importación masiva",
+                    }));
+                if (movimientos.length > 0) {
+                    await prisma.stockMovement.createMany({ data: movimientos });
                 }
-            });
+
+                created += creados.length;
+            } catch {
+                // `createMany` es **una** sentencia: o entra el lote entero o no entra
+                // nada, así que reintentar fila a fila no puede duplicar lo ya insertado.
+                // Se hace solo para poder decir *qué* fila falló, que es lo que el
+                // usuario necesita para corregir su archivo; el camino rápido se queda
+                // para el caso normal, que es que el archivo esté bien.
+                const resultados = await Promise.allSettled(
+                    lote.map(async (dto) => {
+                        const fila = filaDeProducto(dto);
+                        const product = await prisma.product.create({ data: fila });
+                        await recordMovement(product.id, "IMPORT", fila.stock, fila.stock, "Importación masiva");
+                        return product;
+                    }),
+                );
+
+                resultados.forEach((resultado, indiceEnLote) => {
+                    if (resultado.status === "fulfilled") {
+                        created++;
+                    } else {
+                        errors.push({
+                            row: i + indiceEnLote + 1,
+                            error: resultado.reason?.message ?? "Error desconocido",
+                        });
+                    }
+                });
+            }
         }
 
         return { created, errors };

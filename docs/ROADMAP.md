@@ -488,13 +488,20 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Un `void promesa` no bastaba:** dejaba el envío sin poder testear y los fallos sin registrar. `dispararAlertaStock()` guarda las promesas vivas en un registro y expone `esperarAlertasEnVuelo()`, así que los tests **esperan de verdad** en vez de dormir un rato y cruzar los dedos. Los fallos de correo van a `logger.warn` (de aquí la dependencia con T2-10): antes se habrían perdido en silencio.
   - **Dos tests nuevos:** que la respuesta no espera al SMTP, y que un SMTP caído no impide que el movimiento de stock quede guardado.
 
-- [ ] **[T2-08] Ajustar el lote de importación masiva al tamaño del pool**
+- [x] **[T2-08] Ajustar el lote de importación masiva al tamaño del pool** ✅ *(2026-08-09)*
   - **Área:** Rendimiento
-  - **Ubicación:** `Stockly-B/src/modules/products/product.service.ts:242,253-285`, `shared/lib/prisma.ts:9-14`
+  - **Ubicación:** `Stockly-B/src/modules/products/product.service.ts:240-325`
   - **Qué hacer:** `BATCH_SIZE = 50` con dos operaciones por elemento contra un pool de 10 conexiones y `connectionTimeoutMillis: 5000` puede producir errores por timeout en importaciones grandes. Reducir el lote a ~10 o usar `createMany` seguido de una inserción agrupada de movimientos.
   - **Criterio de aceptación:** importar 1000 productos (el máximo que permite el validador) termina sin errores de timeout en el resultado.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** contra el servidor real, con 1000 productos (185.1 kB): **806 ms → 271-414 ms** en tres pasadas, siempre `created: 1000, errors: []`. Y lo que de verdad importa, **consultas de inserción**: con 200 productos, **396 → 2**; con 1000, **10 en total**. `verify` ✅ **298/298** (2 tests nuevos).
+  - **Se eligió `createMany`, no bajar el lote a 10.** Reducir el tamaño mantiene las 2000 consultas y solo las hace menos simultáneas: alivia el síntoma y empeora el tiempo. Agrupar quita el problema de raíz — el pool deja de ser un cuello de botella porque ya no hay 100 consultas peleándose por 10 conexiones.
+  - **El tamaño de lote sigue existiendo, pero ya no gobierna la concurrencia:** ahora acota cuánto trabajo se repite si un lote falla. 200 filas × 7 columnas son 1400 parámetros, lejos del tope de Postgres.
+  - **La atribución de errores por fila se conserva**, que era lo que más fácilmente se perdía al agrupar: si la inserción del lote falla, se reintenta fila a fila. Como `createMany` es **una sola sentencia atómica**, ese reintento no puede duplicar lo ya insertado, y hay un test que lo comprueba.
+  - **El movimiento de stock se lee de la fila devuelta, no del índice**, así que no depende del orden en que Postgres devuelva lo insertado. Los productos con stock 0 siguen sin generar movimiento.
+  - **Medido forzando la vía antigua** con una variable de entorno: la rama de reserva es literalmente el algoritmo anterior, así que el «antes» no es una estimación. Los **4400 productos** de banco se borraron al terminar (52, como antes).
+  - **El caso de la fila mala costó un intento:** el primero usaba un nombre de 300 caracteres, que el validador rechaza antes de llegar a la base (422). Se cambió por un precio de 100 000 000, que pasa Zod —solo exige que sea positivo— y revienta contra `Decimal(10, 2)`, que es el fallo que solo aparece al insertar.
 
 - [ ] **[T2-09] Índice trigram para la búsqueda por nombre**
   - **Área:** Rendimiento
@@ -741,21 +748,35 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** medio
   - **Depende de:** T0-07
 
-- [ ] **[T2-32] Validar las imágenes por sus magic bytes**
+- [x] **[T2-32] Validar las imágenes por sus magic bytes** ✅ *(2026-08-09)*
   - **Área:** Seguridad
-  - **Ubicación:** `Stockly-B/src/shared/middlewares/upload.middleware.ts:12-18`
+  - **Ubicación:** `Stockly-B/src/shared/middlewares/upload.middleware.ts`, `Stockly-B/src/modules/products/product.routes.ts:44-45`
   - **Qué hacer:** `fileFilter` confía en `file.mimetype`, que lo fija el cliente. Verificar la firma real del buffer (p. ej. con `file-type`) antes de subir a Cloudinary.
   - **Criterio de aceptación:** un archivo no-imagen enviado con `Content-Type: image/jpeg` se rechaza con 422 antes de llegar a Cloudinary; hay un test que lo verifica.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** `verify` ✅ **296/296** (9 tests nuevos). Un ejecutable de Windows (`MZ…`) enviado como `image/jpeg` se rechaza con **422**; JPEG, PNG y WebP reales pasan.
+  - **No va en `fileFilter`, y no puede ir:** multer lo llama con los metadatos del archivo **antes** de leer su contenido, así que ahí solo existe la cabecera que puso el cliente. La comprobación es un middleware aparte, después de `upload.single(...)`, que es cuando `req.file.buffer` existe. El `fileFilter` se conserva porque descarta lo evidente sin leer nada, pero deja de ser la defensa.
+  - **Sin `file-type`, y a propósito:** son **tres formatos**, doce bytes de comparación, y la librería es ESM puro desde la v19 mientras este proyecto compila a CommonJS — habría entrado por un `import()` dinámico, asíncrono dentro de un middleware síncrono, a cambio de nada.
+  - **WebP no tiene un prefijo continuo:** es un contenedor RIFF y la marca está partida, `RIFF` al principio y `WEBP` en el byte 8. Un WAV empieza igual, así que hay un test con uno para que comprobar solo `RIFF` no baste.
+  - **Cabecera que miente sobre una imagen que sí lo es: manda el contenido.** Se corrige `mimetype` en vez de rechazar; un navegador que etiqueta mal un PNG no es un ataque, y lo que importaba ya está comprobado.
+  - **Un test comprueba que está enchufada:** recorre `product.routes.ts` y exige que toda línea con `upload.single(` lleve también el middleware. El middleware más correcto no sirve de nada si una ruta nueva se olvida de él, y eso no lo caza ningún test de comportamiento.
+  - **Falsificado** haciendo que el middleware confíe en la cabecera: caen 4 de los 9 tests.
+  - **Volvió a morder la trampa del mock de `upload.middleware`:** cuatro suites dejaron de arrancar con «argument handler must be a function», porque el mock no exportaba el middleware nuevo y Express recibía `undefined`. Es el mismo motivo por el que estos tests son directos y no por HTTP, y ya estaba documentado en CONTEXTO.md.
 
-- [ ] **[T2-33] Limitar el tamaño del cuerpo por ruta**
+- [x] **[T2-33] Limitar el tamaño del cuerpo por ruta** ✅ *(2026-08-09)*
   - **Área:** Seguridad
-  - **Ubicación:** `Stockly-B/src/app.ts:26-27`, `Stockly-B/src/modules/products/product.routes.ts:41`
+  - **Ubicación:** `Stockly-B/src/app.ts:45-59`, `Stockly-B/src/shared/middlewares/error.middleware.ts`
   - **Qué hacer:** `express.json({ limit: "5mb" })` se aplica globalmente cuando solo la importación masiva lo justifica. Bajar el límite global a `100kb` y aplicar el de 5 MB específicamente en `POST /products/import`.
   - **Criterio de aceptación:** un cuerpo de 1 MB en cualquier endpoint que no sea el de importación devuelve 413; la importación de 1000 productos sigue funcionando.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** `verify` ✅ **287/287** (7 tests nuevos). **Los dos lados del criterio, medidos contra el servidor real:** 1000 productos son **185.1 kB** y se importan en **806 ms** con `created: 1000, errors: []`; un cuerpo de 1 MB en `/auth/login` responde **413**.
+  - **El orden de los parsers es lo que decide cuál se aplica:** `body-parser` marca la petición al parsearla y el siguiente se abstiene, así que el específico de la importación va **antes** que el general. Al revés no tendría ningún efecto, porque el global ya habría rechazado el cuerpo.
+  - **Falsificado comentando la excepción de ruta:** la misma importación pasa de 201 a **413 en 8 ms**. No era una precaución teórica: 185 kB están muy por encima de los 100 kB del límite general.
+  - **Descubierto al comprobarlo: el 413 salía como 500.** `body-parser` lanza un error que no es `HttpError`, así que `errorHandler` lo tomaba por avería — en desarrollo con el mensaje real y en producción con «Error interno del servidor», que dice lo contrario de lo que pasa: la petición está mal, el servidor está bien. Se ensancha el manejador para respetar los errores de terceros marcados con `expose: true` (la convención de `http-errors`, que usan Express y `body-parser`).
+  - **Ese ensanchamiento es deliberadamente estrecho**, con tres tests que lo fijan: se reenvía un 4xx **solo** si lleva `expose: true`; sin la marca vuelve a ser 500, y un 5xx ajeno tampoco se reenvía aunque venga expuesto. La regla cubre «el cliente se equivocó», no «algo se rompió».
+  - **Los 1000 productos de banco se borraron** al terminar (52 productos, como antes).
 
 - [ ] **[T2-34] Descargar el CSV de movimientos vía axios y con codificación correcta**
   - **Área:** UI/UX
@@ -1380,16 +1401,20 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | 2026-08-09 | **T2-01** 404 en JSON — **completada** | `verify` ✅ **280/280** (5 nuevos) y comprobado contra el servidor en marcha: `application/json` y `{"success":false,"message":"Ruta no encontrada: …"}`. Falsificado comentando el `app.use`: caen 4 de 5, y sobrevive el que describe lo que no debía cambiar | El estado ya era 404: lo roto era el formato, y por eso `health.test.ts` daba el caso por cubierto comprobando solo el estado. El middleware **lanza** en vez de formatear, para que el sobre se escriba en un único sitio y el 404 se registre con su `requestId`. **Un caso del test se cayó al probarlo de verdad:** `DELETE /api/v1/health` da 404 en jest pero 403 en el servidor real, porque el CSRF va antes del router y en tests se omite. |
 
+| 2026-08-09 | **T2-33** Límite de cuerpo por ruta — **completada** | 1000 productos son **185.1 kB** y entran en **806 ms**; 1 MB en `/auth/login` da **413**. Falsificado quitando la excepción de ruta: la importación pasa de 201 a **413 en 8 ms**. `verify` ✅ **287/287** (7 nuevos) | El orden de los parsers decide cuál se aplica: `body-parser` marca la petición y el siguiente se abstiene, así que el específico va **antes** que el general. **Descubierto al comprobarlo: el 413 salía como 500**, porque el error de `body-parser` no es `HttpError` y el manejador lo tomaba por avería. Se ensancha para respetar `expose: true` (convención de `http-errors`), y estrecho a propósito: sin la marca vuelve a ser 500, y un 5xx ajeno tampoco se reenvía. |
+| 2026-08-09 | **T2-32** Imágenes validadas por su firma — **completada** | Un ejecutable (`MZ…`) enviado como `image/jpeg` se rechaza con **422**; JPEG, PNG y WebP reales pasan. Falsificado confiando en la cabecera: caen 4 de 9. `verify` ✅ **296/296** (9 nuevos) | **No puede ir en `fileFilter`:** multer lo llama antes de leer el contenido, así que ahí solo existe la cabecera del cliente. Va después de `upload.single(...)`. Sin `file-type` a propósito: tres formatos, doce bytes, y la librería es ESM puro contra un proyecto CommonJS. WebP obliga a mirar dos trozos —`RIFF` y `WEBP` en el byte 8—, y hay un test con un WAV para que `RIFF` no baste. Un test recorre las rutas y exige la comprobación en toda línea con `upload.single(`. **Volvió a morder la trampa del mock:** cuatro suites dejaron de arrancar con «argument handler must be a function». |
+| 2026-08-09 | **T2-08** Importación masiva agrupada — **completada** | 1000 productos: **806 → 271-414 ms**. Consultas de inserción: con 200 productos **396 → 2**; con 1000, **10**. `verify` ✅ **298/298** (2 nuevos) | Se agrupa con `createMany` en vez de bajar el lote a 10, que mantendría las 2000 consultas y solo las haría menos simultáneas. **La atribución de errores por fila se conserva** —lo que más fácil era perder— reintentando fila a fila si el lote falla; como `createMany` es una sentencia atómica, ese reintento no puede duplicar nada. El «antes» se midió **forzando la vía de reserva**, que es literalmente el algoritmo anterior. El caso de la fila mala costó un intento: un nombre de 300 caracteres lo rechaza Zod antes de llegar a la base; un precio de 100 000 000 pasa Zod y revienta contra `Decimal(10, 2)`. |
+
 ### Resumen por Tier
 
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 32 | 48 | 67 % |
+| Tier 2 | 35 | 48 | 73 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **67** | **107** | **63 %** |
+| **Total** | **70** | **107** | **65 %** |
 
 *El denominador ha crecido dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el porcentaje se mueve poco pese a cerrarse las siete. **Siguen siendo 17 las pendientes del Tier 2**, las mismas de antes: ninguna de las siete estaba en la lista de trabajo.*
 
@@ -1399,8 +1424,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-09) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **280/280** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests backend | 198/198 ✅ | **298/298** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **89.04 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
 | Tests frontend | 181/181 ✅ | **386/386** ✅ | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **44.76 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |

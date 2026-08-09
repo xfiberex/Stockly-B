@@ -11,6 +11,9 @@ jest.mock("@/shared/lib/nodemailer", () => ({
 }));
 
 jest.mock("@/shared/middlewares/upload.middleware", () => ({
+    // T2-32: el mock debe exportar **todo** lo que las rutas importan de este módulo.
+    // Sin esta línea, Express recibe `undefined` como manejador y la suite no arranca.
+    verificarFirmaDeImagen: (_req: unknown, _res: unknown, next: () => void) => next(),
     uploadToCloudinary: jest.fn().mockResolvedValue({
         url: "https://res.cloudinary.com/test/image/upload/v1/test.jpg",
         publicId: "test/test",
@@ -364,6 +367,70 @@ describe("Products API", () => {
                 .send({ products: [{ name: "X", price: 10 }] });
 
             expect(res.status).toBe(401);
+        });
+
+        // T2-08: la importación pasó de dos consultas por producto a dos por lote. Lo
+        // que se comprueba aquí es que el resultado observable no cambió — el efecto de
+        // agrupar es de rendimiento, y sería fácil que se llevara por delante los
+        // movimientos de stock o la atribución de errores por fila.
+        it("201: un lote grande crea todos los productos y sus movimientos", async () => {
+            const N = 250; // más de un lote (200), para que se ejerciten dos
+            const products = Array.from({ length: N }, (_, i) => ({
+                name: `T208-producto-${i}`,
+                price: 10 + i,
+                // Uno de cada cincuenta entra con stock 0: no debe generar movimiento.
+                stock: i % 50 === 0 ? 0 : 5,
+            }));
+
+            const res = await request(app).post(`${BASE}/import`).set("Cookie", authCookie).send({ products });
+
+            expect(res.status).toBe(201);
+            expect(res.body.data).toMatchObject({ created: N, errors: [] });
+
+            const creados = await prisma.product.findMany({ where: { name: { startsWith: "T208-producto-" } } });
+            expect(creados).toHaveLength(N);
+
+            const movimientos = await prisma.stockMovement.findMany({
+                where: { productId: { in: creados.map((p) => p.id) } },
+            });
+            // Un movimiento por producto **con stock**: los de stock 0 no mueven nada,
+            // igual que antes de agrupar.
+            expect(movimientos).toHaveLength(N - Math.ceil(N / 50));
+            expect(movimientos.every((m) => m.type === "IMPORT")).toBe(true);
+            const conStock = creados.find((p) => p.stock === 5)!;
+            expect(movimientos.find((m) => m.productId === conStock.id)).toMatchObject({ delta: 5, stockAfter: 5 });
+
+            await prisma.stockMovement.deleteMany({ where: { productId: { in: creados.map((p) => p.id) } } });
+            await prisma.product.deleteMany({ where: { name: { startsWith: "T208-producto-" } } });
+        });
+
+        it("201: una fila mala no tumba el lote y se informa de cuál es", async () => {
+            // `price` es `Decimal(10, 2)`: el tope es 99 999 999.99. El validador solo
+            // exige que sea positivo, así que esta fila **pasa Zod y revienta en la
+            // base** — que es justo el caso que interesa, un fallo que solo aparece al
+            // insertar. Al fallar la inserción agrupada se reintenta el lote fila a
+            // fila, única forma de decir *qué* fila fue.
+            const products = [
+                { name: "T208-buena-1", price: 10, stock: 3 },
+                { name: "T208-mala", price: 100_000_000, stock: 3 },
+                { name: "T208-buena-2", price: 20, stock: 4 },
+            ];
+
+            const res = await request(app).post(`${BASE}/import`).set("Cookie", authCookie).send({ products });
+
+            expect(res.status).toBe(201);
+            expect(res.body.data.created).toBe(2);
+            expect(res.body.data.errors).toHaveLength(1);
+            // La fila se numera desde 1, como la ve el usuario en su archivo.
+            expect(res.body.data.errors[0].row).toBe(2);
+
+            const buenos = await prisma.product.findMany({ where: { name: { startsWith: "T208-buena-" } } });
+            // Y las buenas entraron una sola vez: `createMany` es una sentencia atómica,
+            // así que el reintento fila a fila no puede duplicar lo ya insertado.
+            expect(buenos).toHaveLength(2);
+
+            await prisma.stockMovement.deleteMany({ where: { productId: { in: buenos.map((p) => p.id) } } });
+            await prisma.product.deleteMany({ where: { name: { startsWith: "T208-buena-" } } });
         });
     });
 

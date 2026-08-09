@@ -43,8 +43,21 @@ app.use(pinoHttp({
     customErrorMessage: (req, res, err) => `${req.method} ${rutaPedida(req)} → ${res.statusCode}: ${err.message}`,
 }));
 
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+// T2-33 — el cuerpo grande solo donde se justifica.
+//
+// Los 5 MB estaban puestos globalmente por una única ruta, la importación masiva: en
+// todas las demás, aceptar 5 MB es regalar memoria y CPU de parseo a cualquiera que
+// mande basura, y ninguna de ellas recibe más de un formulario.
+//
+// El orden es lo que decide cuál se aplica: `body-parser` marca la petición al
+// parsearla y el siguiente parser se abstiene, así que **el específico va antes** que
+// el general. Al revés no tendría efecto — el global ya habría rechazado el cuerpo.
+const LIMITE_GENERAL = "100kb";
+const LIMITE_IMPORTACION = "5mb";
+
+app.use("/api/v1/products/import", express.json({ limit: LIMITE_IMPORTACION }));
+app.use(express.json({ limit: LIMITE_GENERAL }));
+app.use(express.urlencoded({ extended: true, limit: LIMITE_GENERAL }));
 app.use(cookieParser());
 
 // Rate limit global — los limitadores específicos de auth se aplican adicionalmente.
