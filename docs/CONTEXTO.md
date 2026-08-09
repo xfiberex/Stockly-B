@@ -54,14 +54,15 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **275/275** | **282/282** |
-| Cobertura (sentencias) | 88.62 % | 32.03 % |
+| Tests | **275/275** | **292/292** |
+| Cobertura (sentencias) | 88.62 % | 34.93 % |
 | Lint | — | **0 errores, 0 avisos** |
 
-**E2E:** `pnpm test:e2e:full` desde `Stockly-F` → **9 pasados, 1 omitido**, sin levantar
-nada a mano. Arranca solo la base de datos, el backend y el frontend.
+**E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
+de datos, el backend y el frontend—. En este equipo (2026-08-08): **9 pasados,
+1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 14/41** · Total **49/100**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 16/45** · Total **51/104**.
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -237,10 +238,46 @@ T2-33, T2-27, T2-06, T2-34, T2-08 y la tanda de accesibilidad T2-13/14/15/16.
 Las tareas de Docker (**T2-25, T2-26, T2-28**) conviene agruparlas con la verificación
 pendiente de **T1-21**, para una sesión en un equipo donde el daemon arranque.
 
-Además, el cierre del Tier 1 dejó **dos hallazgos sin tarea asignada** (tabla al final del
-ROADMAP): la interfaz no permite cancelar una orden de venta ya enviada —la reposición de
-stock de T0-03 existe en el backend pero no se puede alcanzar desde la aplicación—, y
-falta un índice por `createdAt` en `products` pese a que todos los listados ordenan por él.
+Los **tres hallazgos que el cierre del Tier 1 dejó sin tarea ya la tienen** (2026-08-08), y el
+Tier 2 pasa por eso de 41 a 44 tareas — y a **45** con T2-45, que salió de verificar la primera:
+
+- **T2-42 ✅ hecha** — la interfaz ya permite cancelar una orden de venta enviada, así que la
+  reposición de stock de T0-03 **deja de ser inalcanzable desde la aplicación**. Es la única de
+  las tres que le faltaba al usuario.
+- **T2-43** — falta el índice por `createdAt` en `products` pese a que todos los listados ordenan
+  por él, y `products_isActive_idx` se creó pero el planificador no lo usa.
+- **T2-44** — dos formatos de importe conviven en la misma fila de reportes; no hay helper de
+  moneda, sino 12 `toLocaleString` y 10 `toFixed(2)` sueltos.
+
+**Con T2-42, la asimetría de confirmación es intencionada:** cancelar una orden *pendiente* sigue
+siendo un clic directo, porque no toca inventario; cancelar una *enviada* abre un diálogo que dice
+cuántas unidades vuelven y de qué productos. Lo que se confirma es el movimiento de stock, no el
+cambio de estado. El recuento del diálogo **excluye los ítems sin `productId`**, porque el backend
+repone con `where: { productId: { not: null } }` y prometer esas unidades sería mentir. Si algún
+día se añade otra transición que mueva inventario, ese es el patrón a repetir.
+
+**Para ejecutar el E2E en este equipo** faltaban los navegadores de Playwright:
+`pnpm exec playwright install chromium` (113 MB, una sola vez).
+
+**T2-45 salió de verificar T2-42, y es la trampa de móvil que conviene no volver a pagar.** Los
+dos escenarios que pasan por el formulario de producto fallaban en `Mobile Chrome` con un mensaje
+que señalaba a otro sitio: «el `<label>` de *Stock mínimo* intercepta el clic». No era el modal ni
+el formulario. **Un contenedor `overflow-x-auto` ensancha el viewport de diseño de Chrome de
+Android con el ancho de su contenido aunque lo recorte visualmente**, y todo lo `position: fixed`
+se dimensiona contra ese viewport: con la tabla de productos en pantalla, un `fixed inset-0` medía
+**663 px sobre una pantalla de 393**, así que el modal se centraba en 663 y su mitad derecha —el
+botón primario— quedaba fuera del borde. El `<label>` era solo lo que había bajo las coordenadas.
+
+La cura es `contain: paint` en el scroller, y los tres candidatos evidentes **no funcionan**,
+comprobado uno a uno: `body { overflow: hidden }` (lo que pone el modal) no influye, porque el
+viewport ya estaba ensanchado sin ningún modal abierto; `html { overflow-x: hidden }` no cambia
+nada; y quitar el `min-w-160` de la tabla tampoco, porque el ancho mínimo intrínseco de las celdas
+ya supera la pantalla. Al añadir una tabla nueva hay que llevar `contain-paint` en su scroller:
+`desbordes.test.ts` falla si falta.
+
+**Moraleja repetida:** el fallo de Playwright nombraba un elemento que no tenía nada que ver.
+Medir la geometría —una sonda `position: fixed` y los rectángulos reales— costó cuatro pasadas y
+descartó tres hipótesis; leer el mensaje de error habría llevado a arreglar el formulario.
 
 **Para verificar cambios de interfaz en el navegador**, el camino corto: `pnpm dev` en los
 dos repositorios, entrar con `admin@stockly.app` / `Admin1234!` y, si hace falta un estado

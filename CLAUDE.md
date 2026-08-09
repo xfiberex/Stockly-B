@@ -15,7 +15,7 @@ Está en [`docs/`](docs/), y cubre **los dos repositorios**:
 | Archivo | Qué es |
 |---|---|
 | [docs/CONTEXTO.md](docs/CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado actual, decisiones vivas, trampas del entorno ya pagadas y por dónde seguir |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 100 tareas con dependencias, progreso y métricas. La fuente de verdad del trabajo pendiente |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 104 tareas con dependencias, progreso y métricas. La fuente de verdad del trabajo pendiente |
 | [docs/INFORME-AUDITORIA.md](docs/INFORME-AUDITORIA.md) | Los hallazgos que justifican cada tarea del roadmap |
 | [docs/README-proyecto.md](docs/README-proyecto.md) | Visión de conjunto y arranque de los dos repositorios |
 

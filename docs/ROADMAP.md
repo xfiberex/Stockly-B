@@ -13,10 +13,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 |---|---|---:|---|
 | **Tier 0** | Crítico / bloqueante — despliegue roto, corrupción de inventario, credencial expuesta | 8 | 5 / 3 / 0 |
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
-| **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 41 | 28 / 13 / 0 |
+| **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 45 | 32 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
 | **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 10 | 0 / 5 / 5 |
-| | **Total** | **100** | **71 / 24 / 5** |
+| | **Total** | **104** | **75 / 24 / 5** |
+
+*Las cuatro últimas tareas del Tier 2 (`T2-42`–`T2-45`) se añadieron el 2026-08-08 a partir de hallazgos que no vienen de la auditoría: tres del cierre del Tier 1 y una encontrada al verificar T2-42. Por eso el total pasa de 100 a 104.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -850,6 +852,61 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Comprobado en el navegador:** `document.fonts` carga los cuatro pesos (400/500/600/700) como Inter, y los acentos y signos del español están todos en el subconjunto latino. Las flechas (`→`, U+2192) se pintan con la fuente de respaldo, **igual que antes**: no están en el rango latino de Google, así que no es una regresión de este cambio.
   - **El test se acusaba a sí mismo:** el escaneo de clases prohibidas encontraba `text-6xl` y `font-black` en los comentarios que explican por qué se fueron. `tipografia.test.ts` mira el código sin comentarios. Falsificado a propósito: añadir `text-3xl font-black` a un componente hace fallar dos comprobaciones.
 
+### Hallazgos del cierre del Tier 1 (2026-08-07/08)
+
+> No proceden de la auditoría del 2026-08-04 ni de la consultoría de diseño: salieron al cerrar
+> el Tier 1 y las primeras tareas del Tier 2, y estuvieron anotados como «candidato a tarea» en
+> la tabla del final hasta el 2026-08-08. La tabla de [Hallazgos nuevos](#hallazgos-nuevos-del-2026-08-07-no-estaban-en-la-auditoría) enlaza ahora a estas tres fichas.
+
+- [x] **[T2-42] Permitir cancelar desde la interfaz una orden de venta ya enviada** ✅ *(2026-08-08)*
+  - **Área:** UI/UX / integridad de datos
+  - **Ubicación:** `Stockly-F/src/modules/sale-orders/components/SaleOrdersPage.tsx:168,222`, `Stockly-F/e2e/flows.spec.ts`
+  - **Qué hacer:** Las acciones de fila se pintan bajo `isAdmin && order.status === "PENDING"`, así que **la reposición de stock que implementó T0-03 —el defecto más grave de toda la auditoría— es inalcanzable desde la aplicación**: solo se puede provocar por API. El backend acepta `SHIPPED → CANCELLED` y devuelve el stock con su `StockMovement`; lo que falta es el botón. Mostrar «Cancelar» también en `SHIPPED` (no «Eliminar», que sigue siendo solo para `PENDING`) y dejar `PENDING` como está.
+    Dos detalles que el código de hoy obliga a decidir:
+    1. **No hay confirmación de ningún tipo en esta página.** `handleCancel` y `deleteMutation.mutate` disparan al primer clic, sin `window.confirm` ni componente de diálogo —no existe uno en `shared/components/`—. Cancelar una orden enviada **mueve inventario**, así que aquí sí hace falta: un `Modal` de confirmación que diga cuántas unidades se van a reponer. Es la diferencia entre esta acción y las otras dos.
+    2. **El E2E ya cubre el flujo, pero por API.** El tercer escenario de `flows.spec.ts` (T1-23) cancela con `request` usando la sesión del navegador precisamente porque la interfaz no ofrecía el camino. Con esta tarea ese paso debe pasar por la UI, que es lo que convierte el escenario en una prueba de extremo a extremo de verdad.
+  - **Criterio de aceptación:** con una orden en `SHIPPED`, un ADMIN ve la acción de cancelar, la confirma y el stock del producto vuelve a su valor previo al envío; un usuario `USER` no ve la acción; el escenario de `flows.spec.ts` hace la cancelación por la interfaz y sigue en verde.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T0-03 ✅, T1-23 ✅
+  - **Verificado localmente (2026-08-08):** `pnpm verify` del frontend ✅ **290/290** (8 tests nuevos en `src/tests/sale-orders/SaleOrdersPage.test.tsx`, el primer archivo de pruebas de este módulo), `check` y `lint` en 0. E2E: el escenario de la venta cancelada **pasa por la interfaz de principio a fin en `chromium`**, incluida la confirmación, y el stock vuelve a 20.
+  - **Falsificado:** desactivando la condición `order.status === "SHIPPED"` de la fila —el estado exacto anterior a esta tarea— caen **5 de los 8 tests**. Los tres que sobreviven son los que describen lo que no debía cambiar: la orden pendiente, el usuario `USER` y la orden cancelada.
+  - **Lo que se confirma no es el cambio de estado, es el movimiento de stock.** Cancelar una orden pendiente no toca inventario y sigue siendo un clic directo, como antes; cancelar una enviada abre un diálogo que dice cuántas unidades vuelven y de qué productos. Esa asimetría es deliberada y hay un test por cada lado.
+  - **El recuento del diálogo solo incluye los ítems con `productId`,** porque el backend repone con `where: { productId: { not: null } }`: un ítem escrito a mano no mueve inventario, y prometer sus unidades sería mentirle al usuario en el momento en que más caso le va a hacer. Con solo ítems manuales, el diálogo lo dice en vez de mostrar un total falso.
+  - **Sin «Eliminar» en las órdenes enviadas:** el backend no permite borrarlas, así que ofrecer el botón sería preparar un 400.
+  - **`Mobile Chrome`, verificado después:** al cerrarse, el escenario no llegaba a la cancelación en ese proyecto porque fallaba antes, al crear el producto —y fallaba igual con estos cambios revertidos (`git stash`)—. La causa resultó ser un defecto propio de móvil, ajeno a esta tarea: **T2-45**. Con él corregido, el escenario pasa entero también en `Mobile Chrome`.
+
+- [ ] **[T2-43] Índice por `createdAt` en `products` y revisión de `products_isActive_idx`**
+  - **Área:** Rendimiento
+  - **Ubicación:** `Stockly-B/prisma/schema.prisma` (modelo `Product`), nueva migración
+  - **Qué hacer:** Dos cabos sueltos que dejó T1-15, ninguno de los dos contemplado en la lista de la auditoría:
+    1. **Falta `Product([createdAt])`.** **Todos** los listados del catálogo ordenan por ese campo y ninguno tiene índice que lo respalde; con filtro por categoría el planificador ya usa `products_categoryId_idx`, pero el listado sin filtro —que es el caso común— sigue ordenando con un `Seq Scan` más `top-N heapsort`. Es el mismo patrón que en `audit_logs` dio **71×** al indexarse.
+    2. **`products_isActive_idx` no se usa.** La consulta dominante filtra `isActive = true`, que es la mayoría de las filas, así que el planificador lo descarta —correctamente— y solo queda su coste de escritura. Convertirlo en índice parcial `WHERE "isActive" = false`, que es el filtro selectivo de verdad, o retirarlo.
+  - **Criterio de aceptación:** `EXPLAIN (ANALYZE, BUFFERS)` sobre `SELECT * FROM products ORDER BY "createdAt" DESC LIMIT 10` pasa de `Seq Scan` + ordenación a `Index Scan Backward`, medido sobre el mismo volumen sintético de T1-15 (40 000 productos); la decisión sobre `products_isActive_idx` queda tomada y justificada con su plan; la migración aplica limpiamente y `pnpm verify` sigue en verde.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T1-15 ✅
+
+- [ ] **[T2-44] Un único formato de importe en toda la interfaz**
+  - **Área:** UI/UX
+  - **Ubicación:** `Stockly-F/src/shared/lib/` (helper nuevo), `Stockly-F/src/modules/reports/components/ReportsPage.tsx:182`, transversal
+  - **Qué hacer:** En la tabla «Top por valor» conviven dos formatos en la misma fila: «Precio unit.» sale de `Number(p.price).toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString("es-MX", { minimumFractionDigits: 2 })` y sí lo lleva. Visto al alinear las columnas en T2-39, donde quedó fuera de alcance por ser formato y no alineación.
+    No es un caso aislado: hay **12 usos de `toLocaleString("es-MX", …)` y 10 de `toFixed(2)`** repartidos por los `.tsx`, sin ningún helper que los unifique — la misma clase de repetición que T1-13 resolvió en el backend con `getActorEmail`. Extraer `formatearImporte()` a `shared/lib/` y sustituir los usos; distinguir los importes de las cifras que no son dinero (`dailyVelocity.toFixed(2)`, en `ReportsPage.tsx:270`, es una velocidad y no lleva `$`).
+  - **Criterio de aceptación:** no queda ningún importe formateado con `toFixed` en `src/**/*.tsx`; dos importes de la misma tabla con magnitudes distintas se pintan con el mismo formato; hay un test del helper con separador de miles, dos decimales siempre y el caso del cero.
+  - **Esfuerzo:** bajo
+  - **Depende de:** ninguna
+
+- [x] **[T2-45] Contener los scrollers horizontales para que no ensanchen el viewport en móvil** ✅ *(2026-08-08)*
+  - **Área:** UI/UX / Accesibilidad
+  - **Ubicación:** `Stockly-F/src/modules/products/components/ProductTable.tsx:63`, `catalog/components/CatalogItemSection.tsx:139`, `suppliers/components/SuppliersPage.tsx:140`, `products/components/StockMovementsPage.tsx:243`
+  - **Qué hacer:** En Chrome de Android, un contenedor con `overflow-x-auto` **ensancha el viewport de diseño con el ancho de su contenido aunque lo recorte visualmente**. Todo lo que sea `position: fixed` se dimensiona contra ese viewport ensanchado: en la página de productos, un `fixed inset-0` medía **663 px sobre una pantalla de 393**, así que el modal se centraba en 663 y su mitad derecha —donde está el botón primario— quedaba fuera del borde. Añadir `contain: paint` a los cuatro scrollers.
+  - **Criterio de aceptación:** con la tabla de productos en pantalla a 393 px, un elemento `position: fixed; inset: 0` mide lo mismo que la pantalla; `pnpm test:e2e:full` pasa en `Mobile Chrome`.
+  - **Esfuerzo:** bajo
+  - **Depende de:** ninguna
+  - **Cómo se encontró:** verificando T2-42. Los dos escenarios de `flows.spec.ts` que pasan por el formulario de producto fallaban en `Mobile Chrome` con un mensaje que apuntaba a otra parte —«el `<label>` de *Stock mínimo* intercepta el clic»—, porque Playwright pulsa en coordenadas de un botón que ya no está donde el navegador dice.
+  - **Verificado localmente (2026-08-08):** medido con una sonda `position: fixed; inset: 0` en Pixel 5 (393 px): **663 px → 393 px**. `pnpm test:e2e:full` → **9 pasados, 1 omitido, 0 fallos** en `chromium` **y** `Mobile Chrome`, que venían de 2 fallos. `verify` ✅ **292/292**.
+  - **Tres candidatos descartados por medición, no por intuición:** `body { overflow: hidden }` —que es lo que pone el modal— **no influye**: el viewport ya estaba ensanchado sin ningún modal abierto. `html { overflow-x: hidden }` **no cambia nada**. Quitar el `min-w-160` de la tabla **tampoco**: el ancho mínimo intrínseco de las celdas ya supera la pantalla. El único que funciona es `contain: paint`.
+  - **`desbordes.test.ts` lo vigila:** recorre los `.tsx` y falla si aparece un `overflow-x-auto` sin `contain-paint`. Sin él, el próximo scroller reabre el agujero y el síntoma vuelve a aparecer a tres pantallas de distancia de la causa.
+  - **Comprobado que no recorta nada:** ninguno de los cuatro contenedores tiene descendientes `absolute`, `fixed` ni `sticky`, así que la contención de pintura no puede ocultar un menú desplegable.
+
 ---
 
 ## Tier 3 — Pulido y mantenimiento
@@ -1211,6 +1268,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-08 | **T2-41** Escala tipográfica explícita y recorte de Inter — **completada** | Dos compilaciones reales para medir el antes y el después: **56 → 8 archivos de fuente emitidos**, CSS **78.40 → 68.40 kB** (gzip **13.55 → 12.14**). `verify` ✅ **279/279** (10 tests nuevos), E2E ✅ | La escala se declara **borrando antes** `--text-*` y `--font-weight-*`: los tamaños no declarados dejan de existir, así que es una restricción, no un comentario. Cinco tamaños con un papel cada uno y cuatro pesos. El ahorro de fuentes viene de que `@fontsource/inter/400.css` trae **siete `@font-face` por peso** (cirílico, griego, vietnamita…) para una aplicación que solo se escribe en español; los `latin-*.css` traen uno. **La auditoría no había visto el `text-6xl`** del 404: apareció al borrar el espacio de nombres, junto al `font-black` que el navegador venía fingiendo. **El test se acusaba a sí mismo** —encontraba las clases prohibidas en los comentarios que explican por qué se fueron—, así que escanea el código sin comentarios. |
 | 2026-08-08 | **T2-10** Logging estructurado con correlación — **completada** | Los tests **capturan la salida real de pino** y recuperan las líneas de una petición por su `x-request-id`. `verify` ✅ **275/275** (8 nuevos), E2E ✅ 3 pasadas | `pino` + `pino-http` sustituyen a morgan y al `console.error`. **La redacción no era opcional:** pino-http registra todas las cabeceras, así que sin ella la cookie de sesión iba al log en cada llamada. Dos defectos vistos al mirar la salida: el mensaje decía `GET /` (Express reescribe `req.url` en un router montado) y en desarrollo se volcaban `req` y `res` enteros. **Regresión propia:** el hilo de `pino-pretty` subió el E2E de 36 s a 66 s con dos pruebas agotando su tiempo; aislada con `git stash` contra el estado anterior y resuelta condicionando el formato legible a `process.stdout.isTTY`. |
 | 2026-08-08 | **T2-07** Las alertas de stock dejan de bloquear la respuesta — **completada** | Con un SMTP de 500 ms la respuesta tarda menos de 500; con el `await` anterior, **750 ms**. `verify` ✅ **275/275** | Un `void promesa` habría dejado el envío sin testar y los fallos sin registrar: hay un registro de alertas en vuelo y `esperarAlertasEnVuelo()`, así que los tests esperan de verdad. En órdenes de venta era una alerta por producto **y en serie**. |
+| 2026-08-08 | **T2-45** Scrollers horizontales contenidos en móvil — **completada** | Sonda `position: fixed; inset: 0` en Pixel 5 (393 px): **663 → 393**. `pnpm test:e2e:full` **9 pasados, 1 omitido, 0 fallos** en `chromium` **y** `Mobile Chrome`, que venían de 2 fallos. `verify` ✅ **292/292** | Un `overflow-x-auto` ensancha el viewport de diseño de Chrome de Android con el ancho de su contenido **aunque lo recorte**, y todo lo `position: fixed` se dimensiona contra ese viewport: el modal medía 663 px en una pantalla de 393 y su botón primario caía fuera. **El síntoma señalaba a otro sitio** —«el `<label>` de *Stock mínimo* intercepta el clic»—, que era simplemente lo que había bajo las coordenadas. Tres candidatos descartados **midiendo**: `body{overflow:hidden}` no influye (el viewport ya estaba ensanchado sin modal), `html{overflow-x:hidden}` no cambia nada y quitar el `min-w-160` tampoco, porque el mínimo intrínseco de las celdas ya supera la pantalla. `desbordes.test.ts` falla si aparece un scroller sin `contain-paint`. |
+| 2026-08-08 | **T2-42** Cancelar por interfaz una venta ya enviada — **completada** | 8 tests nuevos (`verify` frontend ✅ **290/290**) y el escenario E2E de la venta cancelada **hecho entero por la interfaz en `chromium`**: stock 20 → envío 17 → cancelación confirmada → **20** | La reposición de T0-03 llevaba cuatro días en el backend **sin camino desde la aplicación**. Se confirma el movimiento de stock, no el cambio de estado: la orden pendiente se sigue cancelando de un clic y la enviada abre un diálogo que dice cuántas unidades vuelven. El recuento **excluye los ítems sin `productId`**, porque el backend no los repone. Falsificado desactivando la condición de estado: caen 5 de los 8 tests, y los 3 que quedan son justo los que describen lo que no debía cambiar. **Hallazgo ajeno:** en `Mobile Chrome` el escenario no llega a la cancelación porque falla al crear el producto — reproducido con los cambios revertidos. |
 | 2026-08-08 | **T2-11** Saltar al contenido principal — **completada** | 1×1 px sin foco, 218×44 al recibirlo. `verify` ✅ **282/282** (3 nuevos), E2E ✅ | Lo que se comprueba no es que el enlace exista: que sea el primero en el orden de tabulación y que activarlo deje el foco **dentro** de `<main>`. Sin `tabIndex={-1}` el navegador desplaza pero no mueve el foco, y el siguiente Tab devuelve al principio de la navegación — el fallo que convierte el enlace en decoración. |
 
 ### Resumen por Tier
@@ -1219,10 +1278,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 14 | 41 | 34 % |
+| Tier 2 | 16 | 45 | 36 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **49** | **100** | **49 %** |
+| **Total** | **51** | **104** | **49 %** |
+
+*El denominador creció el 2026-08-08 con cuatro tareas nuevas (T2-42 a T2-45) que no venían de la auditoría, así que el porcentaje se mueve poco pese a cerrarse dos de ellas.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1232,11 +1293,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **275/275** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **282/282** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **31.94 %** | ≥ 45 % |
+| Tests frontend | 181/181 ✅ | **292/292** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **34.93 %** | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
-| E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** ✅ | escenarios que crucen la frontera |
+| E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |
+| Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | Índices no-únicos en el esquema | 0 | **15** ✅ | cubrir FK y ordenaciones |
@@ -1256,19 +1318,22 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Variantes de `Badge` sin significado | 4 de 7 | **0 de 5** ✅ | 0 |
 | Clases `dark:` | 0 | 0 | (T4-03) |
 
-### Hallazgos nuevos del 2026-08-07 (no estaban en la auditoría)
+### Hallazgos nuevos del 2026-08-07/08 (no estaban en la auditoría)
 
-Salieron al cerrar el Tier 1. Los tres primeros ya están corregidos; los dos últimos son
-candidatos a tarea propia.
+Salieron al cerrar el Tier 1 y las primeras tareas del Tier 2. Los tres primeros se corrigieron
+sobre la marcha, dentro de la tarea que los destapó; los tres siguientes **tienen desde el
+2026-08-08 ficha propia** en el Tier 2 (T2-42, T2-43 y T2-44), porque ninguno cabía en el alcance
+de la tarea que los encontró. El último apareció al verificar T2-42 y sigue sin diagnosticar.
 
 | Hallazgo | Estado |
 |---|---|
 | El modal no tenía scroll propio: un formulario más alto que la ventana dejaba sus botones fuera de pantalla e **inalcanzables** (el body está bloqueado mientras está abierto). Lo destapó el E2E al no poder pulsar «Crear producto» | ✅ corregido (`Modal.tsx`, `max-h` + `overflow-y-auto`) |
 | `Input` y `Select` solo ataban la etiqueta al campo si se les pasaba `id`. Sin él, `htmlFor` quedaba vacío: campos rotulados a la vista, **sin nombre accesible** (los ítems de las órdenes, entre otros) | ✅ corregido (`useId` como respaldo) |
 | El rate limit global (100 peticiones / 15 min por IP) se agota en una sola pasada del navegador; devolvía 429 en pruebas ajenas al tema | ✅ configurable con `RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_MAX`, sin bajar el techo por defecto |
-| **La interfaz no permite cancelar una orden de venta ya enviada**: los botones solo aparecen en estado PENDIENTE. La reposición de stock de T0-03 existe en el backend pero es inalcanzable desde la aplicación | ⬜ candidato a tarea |
-| `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo; la lista de índices de la auditoría no lo contemplaba. `products_isActive_idx` sí se creó pero el planificador no lo usa (filtro poco selectivo) | ⬜ candidato a tarea |
-| En la tabla «Top por valor» de reportes conviven dos formatos de importe: «Precio unit.» sale de `toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString` y sí lo lleva. Visto al alinear las columnas en T2-39; es formato, no alineación, así que quedó fuera de esa tarea | ⬜ candidato a tarea |
+| **La interfaz no permite cancelar una orden de venta ya enviada**: los botones solo aparecen en estado PENDIENTE. La reposición de stock de T0-03 existe en el backend pero es inalcanzable desde la aplicación | ⬜ **[T2-42]** |
+| `products` no tiene índice por `createdAt` pese a que **todos** los listados ordenan por ese campo; la lista de índices de la auditoría no lo contemplaba. `products_isActive_idx` sí se creó pero el planificador no lo usa (filtro poco selectivo) | ⬜ **[T2-43]** |
+| **En `Mobile Chrome` no se puede crear un producto:** al pulsar «Crear producto» (y antes, un conmutador de etiqueta) el clic lo intercepta el `<label>` de «Stock mínimo (alerta)», con reintentos hasta agotar el tiempo. Tumba los dos escenarios de `flows.spec.ts` que pasan por el formulario. Visto al verificar T2-42 y **reproducido con esos cambios revertidos** (`git stash`, misma máquina, Chrome Headless Shell 149): no es una regresión de esa tarea. **Diagnosticado el mismo día:** no era del modal ni del formulario, sino de la tabla de productos, que ensancha el viewport de diseño de Chrome móvil y con él todo lo `position: fixed`. El `<label>` que aparecía en el mensaje era solo lo que había en las coordenadas donde Playwright pulsaba | ✅ **[T2-45]** |
+| En la tabla «Top por valor» de reportes conviven dos formatos de importe: «Precio unit.» sale de `toFixed(2)` y se ve como `$14999.00`, sin separador de miles, mientras «Valor total» usa `toLocaleString` y sí lo lleva. Visto al alinear las columnas en T2-39; es formato, no alineación, así que quedó fuera de esa tarea | ⬜ **[T2-44]** |
 
 ### Línea base de navegador (2026-07-15)
 
