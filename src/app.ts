@@ -9,6 +9,7 @@ import { logger, generarRequestId } from "@/shared/lib/logger";
 import { router } from "@/routes";
 import { errorHandler } from "@/shared/middlewares/error.middleware";
 import { csrfProtection } from "@/shared/middlewares/csrf.middleware";
+import { notFoundHandler } from "@/shared/middlewares/notFound.middleware";
 import { registerSwagger } from "@/swagger";
 
 const app = express();
@@ -68,6 +69,10 @@ app.use("/api/v1", router);
 if (env.nodeEnv !== "production") {
     registerSwagger(app);
 }
+
+// Va después de Swagger, no solo del router: lo que se monta más tarde nunca llegaría
+// a verse. Y antes del manejador de errores, que es quien escribe el sobre.
+app.use(notFoundHandler);
 
 app.use(errorHandler);
 

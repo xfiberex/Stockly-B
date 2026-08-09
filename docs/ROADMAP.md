@@ -13,12 +13,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 |---|---|---:|---|
 | **Tier 0** | Crítico / bloqueante — despliegue roto, corrupción de inventario, credencial expuesta | 8 | 5 / 3 / 0 |
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
-| **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 45 | 32 / 13 / 0 |
+| **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
 | **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 10 | 0 / 5 / 5 |
-| | **Total** | **104** | **75 / 24 / 5** |
+| | **Total** | **107** | **78 / 24 / 5** |
 
-*Las cuatro últimas tareas del Tier 2 (`T2-42`–`T2-45`) se añadieron el 2026-08-08 a partir de hallazgos que no vienen de la auditoría: tres del cierre del Tier 1 y una encontrada al verificar T2-42. Por eso el total pasa de 100 a 104.*
+*Las siete últimas tareas del Tier 2 no vienen de la auditoría, y por eso el total pasa de 100 a 107: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42) y `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -419,13 +419,19 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Rendimiento
 
-- [ ] **[T2-01] Middleware 404 con respuesta JSON**
+- [x] **[T2-01] Middleware 404 con respuesta JSON** ✅ *(2026-08-09)*
   - **Área:** Código
-  - **Ubicación:** `Stockly-B/src/app.ts:45-51`
+  - **Ubicación:** `Stockly-B/src/shared/middlewares/notFound.middleware.ts` (nuevo), `Stockly-B/src/app.ts:74`
   - **Qué hacer:** Las rutas desconocidas devuelven la página HTML de error de Express (`<!DOCTYPE html>...Cannot GET`), rompiendo el sobre `{success, message}` que usa el resto de la API. Insertar un middleware 404 entre el router y el `errorHandler`.
   - **Criterio de aceptación:** `GET /api/v1/ruta-inexistente` devuelve 404 con `{ "success": false, "message": "..." }` y cabecera `application/json`.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** `verify` ✅ **280/280** (5 tests nuevos) y comprobado **contra el servidor en marcha**, no solo con supertest: `GET /api/v1/ruta-que-no-existe` → `content-type: application/json` y `{"success":false,"message":"Ruta no encontrada: GET /api/v1/ruta-que-no-existe"}`. Fuera de `/api/v1` igual.
+  - **El código de estado ya era 404 antes:** lo roto era el **formato**, y por eso `health.test.ts` daba el caso por cubierto —solo comprobaba el estado— mientras la respuesta seguía siendo una página HTML. Un cliente que hace `res.json()` con ella falla con «Unexpected token <», un error que no menciona en ningún momento que la ruta no exista: el fallo de integración más común disfrazado del menos informativo.
+  - **No formatea, lanza.** Un `HttpError(404)` que recoge `errorHandler`, para que el sobre siga escribiéndose en un único sitio y el 404 quede registrado por el mismo camino que los demás errores, con su `requestId`.
+  - **Va después de Swagger, no solo del router:** lo que se monte más tarde nunca llegaría a verse.
+  - **Falsificado** comentando el `app.use`: caen 4 de los 5 tests, y el que sobrevive es justamente «las rutas que sí existen siguen respondiendo».
+  - **Un caso del test se corrigió al comprobarlo contra el servidor real:** empezó siendo `DELETE /api/v1/health`, que en jest da 404 pero en producción **no llega hasta aquí** —la protección CSRF va antes del router y lo corta con un 403; en tests el CSRF se omite—. Se sustituyó por `GET /api/v1/auth/login`, verbo no mutante sobre una ruta que solo existe para POST, que se comporta igual en los dos sitios.
 
 - [ ] **[T2-02] Bajar a SQL los agregados del resumen de reportes**
   - **Área:** Rendimiento
@@ -957,6 +963,48 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **`desbordes.test.ts` lo vigila:** recorre los `.tsx` y falla si aparece un `overflow-x-auto` sin `contain-paint`. Sin él, el próximo scroller reabre el agujero y el síntoma vuelve a aparecer a tres pantallas de distancia de la causa.
   - **Comprobado que no recorta nada:** ninguno de los cuatro contenedores tiene descendientes `absolute`, `fixed` ni `sticky`, así que la contención de pintura no puede ocultar un menú desplegable.
 
+### Hallazgos del repaso de interfaz (2026-08-09)
+
+> Los tres salieron de mirar la aplicación en marcha, no de la auditoría ni de un test. Se anotan
+> aquí ya cerrados, porque la convención del proyecto es que ninguna tarea se dé por hecha sin
+> ficha: lo que no queda escrito no sobrevive a la siguiente sesión.
+
+- [x] **[T2-46] Delimitar los ítems de los menús desplegables y separarlos entre sí** ✅ *(2026-08-09)*
+  - **Área:** UI/UX
+  - **Ubicación:** `Stockly-F/src/shared/lib/clasesDeItemDeMenu.ts` (nuevo), `Stockly-F/src/App.tsx`, `shared/components/NavDropdown.tsx`, `shared/components/DropdownButton.tsx`
+  - **Qué hacer:** Los ítems de los tres desplegables (menú de usuario, Catálogo/Órdenes/Admin y Exportar) no mostraban dónde empieza y dónde acaba cada opción: solo cambiaban de fondo al señalarlos. Darles un borde que nazca transparente y aparezca en `hover` y `focus-visible`, unificado en un helper compartido. Lo mismo para el estado activo de Dashboard y Reportes, que debía distinguirse tanto al señalar como al estar en esa ruta.
+  - **Criterio de aceptación:** los tres desplegables comparten las mismas clases de ítem y de panel; el borde ocupa sitio en reposo, así que el texto no se desplaza al señalar; hay tests que fijan el patrón.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T2-16
+  - **Verificado localmente (2026-08-09):** medido en el navegador — altura de ítem **42 px** y hueco entre ítems **4 px**, donde antes era **0**. `verify` ✅ **380/380**, E2E ✅ 9 pasados 1 omitido.
+  - **El borde nace transparente, no se añade en `hover`:** si apareciera solo al señalar, el texto bailaría un píxel al pasar por encima. Y es `focus-visible` y no `focus`, para que quien navega con teclado vea el recuadro y quien pulsa con el ratón no se lo encuentre pegado tras el clic.
+  - **Separación entre ítems, descubierta al delimitarlos:** apilados sin holgura, dos recuadros contiguos comparten línea y se leen como uno solapado con el siguiente. El defecto no existía antes porque sin borde no había nada que solapar. Se probó con 2 px, se midió, y se subió a **4**; los separadores del menú de usuario perdieron sus márgenes propios, que sumaban de más.
+  - **El panel también cambia:** relleno por los cuatro lados en vez de solo arriba y abajo, porque con los ítems delimitados un borde pegado al del panel se lee como un fallo de dibujo.
+
+- [x] **[T2-47] La cabecera de la tabla de productos no debe partirse** ✅ *(2026-08-09)*
+  - **Área:** UI/UX
+  - **Ubicación:** `Stockly-F/src/modules/products/components/ProductTable.tsx:82`
+  - **Qué hacer:** Con `table-layout: auto`, un nombre de producto largo se lleva ancho de las demás columnas y la primera en romperse es «Stock / Mín», la única etiqueta de la cabecera con un espacio dentro. Prohibir el salto en la cabecera entera.
+  - **Criterio de aceptación:** la cabecera se pinta en una línea con nombres de producto largos en pantalla; el nombre del producto se sigue mostrando completo.
+  - **Esfuerzo:** bajo
+  - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** a 1308 px, cabecera en **una línea** (40 px = 16 de texto + 24 de relleno) y «Nombre / SKU» pasa a **335 px**. De diez filas, solo envuelve la del nombre más largo, y lo hace a dos líneas con el nombre íntegro. `verify` ✅ **382/382** (2 tests nuevos).
+  - **`whitespace-nowrap` en el `<thead>`, no columna a columna:** `white-space` se hereda, así que alcanza a las nueve columnas de una vez y ninguna futura nace pudiendo partirse.
+  - **Descartado truncar el nombre**, que era la otra salida evidente: es el identificador con el que se escanea la tabla, y dos productos que compartan prefijo se volverían indistinguibles sin abrir el detalle. **Descartado también ensanchar en general:** con reparto automático no arregla la causa, porque un nombre más largo vuelve a quitarle sitio a otra columna.
+
+- [x] **[T2-48] Volver al principio de la página al cambiar de ruta** ✅ *(2026-08-09)*
+  - **Área:** UI/UX / Accesibilidad
+  - **Ubicación:** `Stockly-F/src/shared/components/AnuncioDeRuta.tsx`, `Stockly-F/src/App.tsx:238` (enlace de salto)
+  - **Qué hacer:** React Router no restablece el desplazamiento al cambiar de ruta: se conserva el del documento anterior y se aterriza a media página, con el `<h1>` por encima del borde superior. Había que subir a mano para ver en qué sección se estaba. Desplazar al principio en cada navegación nueva y enfocar `<main>` con `preventScroll`.
+  - **Criterio de aceptación:** llegando desde una página desplazada, el `<h1>` de la nueva ruta queda visible por debajo de la barra fija; al retroceder se conserva la posición guardada; hay tests de las cuatro condiciones.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T2-18
+  - **Verificado localmente (2026-08-09):** antes, desde 800 px en Reportes, ir a Dashboard dejaba la página en **202 px** con el `<h1>` en **−113 px**. Después, `scrollY: 0` y título visible, comprobado sobre **15 rutas** (las cinco de Catálogo, las dos de Órdenes, Movimientos, Reportes, Dashboard, Usuarios, Auditoría, Configuración). Retroceso: Reportes a 600 px → Dashboard → atrás → **vuelve a 600**. `verify` ✅ **386/386** (4 tests nuevos).
+  - **Lo enmascaraba el `focus()` de T2-18, y por eso no parecía un desplazamiento ausente sino uno caprichoso:** al enfocar un elemento más alto que la ventana, el navegador desplaza *lo mínimo*, y desde abajo eso alinea el **final** de `<main>` con el borde inferior, nunca su principio. Los 202 px no eran arbitrarios: `scrollHeight 1091 − ventana 889`. De ahí que el foco pase a pedirse con `preventScroll`: quien decide dónde queda la página es el `scrollTo`, y no dos mecanismos peleándose.
+  - **En `POP` no se toca nada.** Atrás y adelante restauran la posición de esa entrada del historial, y forzar el principio borraría justo lo que se espera recuperar al volver.
+  - **El enlace «Saltar al contenido» tenía el mismo defecto** —dependía de que `focus()` desplazara, con la misma alineación por el final— y se corrige igual.
+  - **`window.scrollTo` de relevo en `src/tests/setup.ts`:** jsdom no lo implementa y cada llamada real escupía «Not implemented» por la salida de los tests, tapando los avisos que sí importan.
+
 ---
 
 ## Tier 3 — Pulido y mantenimiento
@@ -1326,6 +1374,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-08 | **T2-45** Scrollers horizontales contenidos en móvil — **completada** | Sonda `position: fixed; inset: 0` en Pixel 5 (393 px): **663 → 393**. `pnpm test:e2e:full` **9 pasados, 1 omitido, 0 fallos** en `chromium` **y** `Mobile Chrome`, que venían de 2 fallos. `verify` ✅ **292/292** | Un `overflow-x-auto` ensancha el viewport de diseño de Chrome de Android con el ancho de su contenido **aunque lo recorte**, y todo lo `position: fixed` se dimensiona contra ese viewport: el modal medía 663 px en una pantalla de 393 y su botón primario caía fuera. **El síntoma señalaba a otro sitio** —«el `<label>` de *Stock mínimo* intercepta el clic»—, que era simplemente lo que había bajo las coordenadas. Tres candidatos descartados **midiendo**: `body{overflow:hidden}` no influye (el viewport ya estaba ensanchado sin modal), `html{overflow-x:hidden}` no cambia nada y quitar el `min-w-160` tampoco, porque el mínimo intrínseco de las celdas ya supera la pantalla. `desbordes.test.ts` falla si aparece un scroller sin `contain-paint`. |
 | 2026-08-08 | **T2-42** Cancelar por interfaz una venta ya enviada — **completada** | 8 tests nuevos (`verify` frontend ✅ **290/290**) y el escenario E2E de la venta cancelada **hecho entero por la interfaz en `chromium`**: stock 20 → envío 17 → cancelación confirmada → **20** | La reposición de T0-03 llevaba cuatro días en el backend **sin camino desde la aplicación**. Se confirma el movimiento de stock, no el cambio de estado: la orden pendiente se sigue cancelando de un clic y la enviada abre un diálogo que dice cuántas unidades vuelven. El recuento **excluye los ítems sin `productId`**, porque el backend no los repone. Falsificado desactivando la condición de estado: caen 5 de los 8 tests, y los 3 que quedan son justo los que describen lo que no debía cambiar. **Hallazgo ajeno:** en `Mobile Chrome` el escenario no llega a la cancelación porque falla al crear el producto — reproducido con los cambios revertidos. |
 | 2026-08-08 | **T2-11** Saltar al contenido principal — **completada** | 1×1 px sin foco, 218×44 al recibirlo. `verify` ✅ **282/282** (3 nuevos), E2E ✅ | Lo que se comprueba no es que el enlace exista: que sea el primero en el orden de tabulación y que activarlo deje el foco **dentro** de `<main>`. Sin `tabIndex={-1}` el navegador desplaza pero no mueve el foco, y el siguiente Tab devuelve al principio de la navegación — el fallo que convierte el enlace en decoración. |
+| 2026-08-09 | **T2-46** Ítems de menú delimitados y separados — **completada** | Medido en el navegador: altura de ítem **42 px**, hueco entre ítems **4 px** (antes **0**). `verify` ✅ **380/380**, E2E ✅ | El borde nace transparente para que el texto no baile un píxel al señalar, y es `focus-visible` y no `focus` para que no se quede pegado tras un clic de ratón. La falta de separación **no existía antes de delimitarlos**: sin borde no hay nada que se solape. Se probó con 2 px, se midió y se subió a 4. Un solo helper para los tres desplegables, con tests que lo fijan: sin ellos el próximo panel nace pegado otra vez. |
+| 2026-08-09 | **T2-47** La cabecera de productos no se parte — **completada** | A 1308 px: cabecera en **una línea** y «Nombre / SKU» de 125 → **335 px**. De diez filas solo envuelve la del nombre más largo, y con el nombre íntegro. `verify` ✅ **382/382** (2 nuevos) | `whitespace-nowrap` en el `<thead>`: `white-space` se hereda, así que cubre las nueve columnas y las futuras. **Las dos salidas evidentes se descartaron con motivo:** truncar el nombre lo inutiliza como identificador —dos productos con prefijo común quedan indistinguibles—, y ensanchar en general no toca la causa, porque con reparto automático un nombre más largo vuelve a quitarle sitio a otra columna. |
+| 2026-08-09 | **T2-48** Volver arriba al cambiar de ruta — **completada** | Antes: desde 800 px en Reportes, Dashboard quedaba en **202 px** con el `<h1>` en **−113**. Después: **0** y título visible, sobre **15 rutas**. Retroceso comprobado: 600 → Dashboard → atrás → **600**. `verify` ✅ **386/386** (4 nuevos) | React Router no restablece el desplazamiento, y el `focus()` de T2-18 lo enmascaraba de la peor manera: al enfocar algo más alto que la ventana el navegador desplaza *lo mínimo*, alineando el **final** de `<main>` con el borde inferior. Los 202 px eran `scrollHeight 1091 − ventana 889`, no un capricho. De ahí `preventScroll`: un solo mecanismo decidiendo. **En `POP` no se toca**, o se borraría la posición que el usuario espera recuperar. El enlace de salto tenía el mismo defecto. |
+
+| 2026-08-09 | **T2-01** 404 en JSON — **completada** | `verify` ✅ **280/280** (5 nuevos) y comprobado contra el servidor en marcha: `application/json` y `{"success":false,"message":"Ruta no encontrada: …"}`. Falsificado comentando el `app.use`: caen 4 de 5, y sobrevive el que describe lo que no debía cambiar | El estado ya era 404: lo roto era el formato, y por eso `health.test.ts` daba el caso por cubierto comprobando solo el estado. El middleware **lanza** en vez de formatear, para que el sobre se escriba en un único sitio y el 404 se registre con su `requestId`. **Un caso del test se cayó al probarlo de verdad:** `DELETE /api/v1/health` da 404 en jest pero 403 en el servidor real, porque el CSRF va antes del router y en tests se omite. |
 
 ### Resumen por Tier
 
@@ -1333,23 +1386,23 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 28 | 45 | 62 % |
+| Tier 2 | 32 | 48 | 67 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **63** | **104** | **61 %** |
+| **Total** | **67** | **107** | **63 %** |
 
-*El denominador creció el 2026-08-08 con cuatro tareas nuevas (T2-42 a T2-45) que no venían de la auditoría, así que el porcentaje se mueve poco pese a cerrarse dos de ellas.*
+*El denominador ha crecido dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el porcentaje se mueve poco pese a cerrarse las siete. **Siguen siendo 17 las pendientes del Tier 2**, las mismas de antes: ninguna de las siete estaba en la lista de trabajo.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
 ### Métricas
 
-| Métrica | Inicial (auditoría) | Actual (2026-08-08) | Objetivo |
+| Métrica | Inicial (auditoría) | Actual (2026-08-09) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **275/275** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **280/280** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **88.62 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **369/369** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **44.55 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
+| Tests frontend | 181/181 ✅ | **386/386** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **44.76 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |
