@@ -186,6 +186,10 @@ model User {
   resetExpires   DateTime?
   refreshToken   String?   @unique
   refreshExpires DateTime?
+  // T2-31 — el hash del refresh token **anterior**, el que acaba de rotarse. Si llega uno
+  // que ya no está en `refreshToken` pero sí aquí, alguien está reutilizando un token ya
+  // gastado: la sesión se cierra entera y queda constancia en la auditoría.
+  previousRefreshToken String? @unique
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

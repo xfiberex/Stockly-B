@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
 import { auditService } from "@/modules/audit-logs";
 import { buildCsv } from "@/shared/lib/csv";
-import { enviarExportacion } from "@/shared/lib/exportacion";
+import { enviarExportacion, BOM } from "@/shared/lib/exportacion";
 import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
 export async function getProducts(
@@ -122,10 +122,13 @@ export async function exportProductMovements(
         const format = (req.query.format as string | undefined) ?? "json";
 
         if (format === "csv") {
+            // T2-34: mismo trato que la exportación grande — `charset` explícito y la
+            // marca de orden de bytes, sin la cual Excel rompe los acentos. Este listado
+            // va acotado a un producto, así que no necesita streaming.
             const csv = buildCsv(rows);
-            res.setHeader("Content-Type", "text/csv");
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
             res.setHeader("Content-Disposition", `attachment; filename=movements-${req.params.id}.csv`);
-            res.send(csv);
+            res.send(csv === "" ? "" : BOM + csv);
             return;
         }
 

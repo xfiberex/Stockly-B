@@ -1,3 +1,16 @@
+# Stockly — pila de desarrollo.
+#
+# T2-27: este archivo es **el de desarrollo**. Trae valores por defecto para que
+# `docker compose up` funcione recién clonado, y publica el puerto de la base para poder
+# conectarse con un cliente desde el host. Para producción se superpone
+# `docker-compose.prod.yml`, que exige la contraseña y **cierra ese puerto**:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Las credenciales salen de variables y no van escritas aquí: el README raíz presenta
+# este archivo como la ruta de despliegue, y `postgres`/`postgres` incrustados en un
+# archivo versionado es una credencial por defecto que nadie recuerda cambiar.
+
 services:
 
   # ── Base de datos PostgreSQL ─────────────────────────────────────────────────
@@ -6,15 +19,17 @@ services:
     container_name: stockly_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: Stockly
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-Stockly}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      # El puerto del host es configurable: en este proyecto varía entre equipos, y con
+      # un PostgreSQL local escuchando en 5432 el contenedor no llega a arrancar.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,14 +42,57 @@ services:
     container_name: stockly_backend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${BACKEND_HOST_PORT:-3000}:3000"
     env_file:
       - ./.env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/Stockly
+      # Se compone de las mismas variables que la base, para que no haya dos sitios
+      # donde cambiar la contraseña y uno se quede atrás.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-Stockly}
       NODE_ENV: production
+      # T2-28: nginx sirve frontend y API desde el mismo origen, así que las cookies no
+      # necesitan `SameSite=None` —que además obligaría a `Secure` y por tanto a TLS,
+      # que esta pila local no tiene—. En un despliegue real detrás de HTTPS se quitan
+      # las dos líneas y vuelven los valores por defecto.
+      COOKIE_SAMESITE: lax
+      COOKIE_SECURE: "false"
+      FRONTEND_URL: http://localhost:${FRONTEND_HOST_PORT:-8080}
     depends_on:
       db:
+        condition: service_healthy
+    # T2-25: se sondea `/ready`, no `/health`. El segundo responde 200 mientras el
+    # proceso viva, así que como healthcheck diría «sano» con la base caída.
+    # Se usa `node` y no `curl` ni `wget` porque la imagen es `node:alpine` y no
+    # trae curl; añadirlo solo para esto engorda la imagen y amplía su superficie.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/v1/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      # Margen para `prisma migrate deploy`, que corre antes de que el servidor escuche.
+      start_period: 40s
+
+  # ── Frontend (SPA servida por nginx) ─────────────────────────────────────────
+  # T2-28. El contexto apunta al repositorio hermano: los dos se clonan uno al lado del
+  # otro, y este compose no funciona sin `Stockly-F` en su sitio.
+  frontend:
+    build:
+      context: ../Stockly-F
+      dockerfile: Dockerfile
+      args:
+        # Ruta **relativa** a propósito: nginx hace de proxy de `/api`, así que el
+        # navegador habla siempre con su mismo origen y no hay petición entre dominios.
+        VITE_API_URL: /api/v1
+    container_name: stockly_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_HOST_PORT:-8080}:80"
+    depends_on:
+      backend:
         condition: service_healthy
 
 volumes:

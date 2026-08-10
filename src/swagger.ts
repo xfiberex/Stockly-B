@@ -1,5 +1,6 @@
 import swaggerUi from "swagger-ui-express";
 import type { Express } from "express";
+import { rutasAdicionales, esquemasAdicionales, etiquetasAdicionales, postDeMovimientoManual } from "@/swagger.paths";
 
 // Exportado para que los tests puedan comprobar que lo documentado y lo que acepta
 // el validador no se separen otra vez (T2-29).
@@ -120,6 +121,8 @@ export const spec = {
                     message: { type: "string" },
                 },
             },
+            // T2-30: los de los nueve módulos que faltaban, definidos en `swagger.paths.ts`.
+            ...esquemasAdicionales,
         },
     },
     security: [{ cookieAuth: [] }],
@@ -127,6 +130,7 @@ export const spec = {
         { name: "Auth", description: "Registro, login y gestión de cuenta" },
         { name: "Products", description: "CRUD de productos (escritura solo ADMIN)" },
         { name: "Stock Movements", description: "Historial de movimientos de stock" },
+        ...etiquetasAdicionales,
     ],
     paths: {
         "/auth/register": {
@@ -254,6 +258,7 @@ export const spec = {
             },
         },
         "/products/{id}/movements": {
+            ...postDeMovimientoManual,
             get: {
                 tags: ["Stock Movements"], summary: "Historial de movimientos de stock de un producto",
                 parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
@@ -266,6 +271,10 @@ export const spec = {
                 },
             },
         },
+        // T2-30 — el resto de módulos. Viven aparte porque son nueve y este archivo ya
+        // tenía 280 líneas; `swagger-cobertura.test.ts` comprueba contra el router real
+        // que no falte ninguna operación ni sobre ninguna inventada.
+        ...rutasAdicionales,
     },
 };
 

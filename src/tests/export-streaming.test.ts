@@ -3,7 +3,7 @@ import type { Response } from "express";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { buildCsv } from "@/shared/lib/csv";
-import { enviarExportacion, MAX_FILAS_EXPORTACION, TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
+import { enviarExportacion, MAX_FILAS_EXPORTACION, TAM_LOTE_EXPORTACION, BOM } from "@/shared/lib/exportacion";
 import { HttpError } from "@/shared/lib/httpError";
 import { cleanDb, createUser, getAuthCookie } from "./helpers";
 
@@ -58,8 +58,11 @@ describe("Exportación en streaming (T2-05)", () => {
         for await (const lote of (await import("@/modules/products/product.service")).productService.exportarPorLotes()) {
             filas.push(...lote);
         }
-        expect(res.text).toBe(buildCsv(filas));
-        expect(res.text.split("\n")[0]).toBe(
+        // El `BOM` de T2-34 va delante; quitado, el resto tiene que ser byte a byte lo
+        // que generaba `buildCsv`.
+        expect(res.text.startsWith(BOM)).toBe(true);
+        expect(res.text.slice(BOM.length)).toBe(buildCsv(filas));
+        expect(res.text.slice(BOM.length).split("\n")[0]).toBe(
             "name,description,sku,price,stock,minStock,isActive,categoryName,brandName,supplierName,tags",
         );
 
@@ -136,6 +139,66 @@ describe("Exportación en streaming (T2-05)", () => {
     });
 });
 
+// T2-34: el CSV salía como `text/csv` a secas y sin marca de orden de bytes, así que
+// Excel en Windows lo abría con la página de códigos del sistema y los acentos se
+// rompían — «Electrónica» se veía «ElectrÃ³nica».
+describe("Codificación del CSV exportado (T2-34)", () => {
+    let cookie: string;
+
+    beforeAll(async () => {
+        await cleanDb();
+        const admin = await createUser({ email: "csv_admin@example.com", role: "ADMIN" });
+        cookie = getAuthCookie(admin.id);
+    });
+
+    afterAll(async () => {
+        await cleanDb();
+    });
+
+    it("declara `charset=utf-8` y empieza por la marca de orden de bytes", async () => {
+        const producto = await prisma.product.create({
+            data: { name: "T234-Cámara réflex", description: "Ñandú, acentuación", price: 10, stock: 1, minStock: 0 },
+        });
+
+        const res = await request(app).get(`${BASE}/export?format=csv`).set("Cookie", cookie);
+
+        expect(res.headers["content-type"]).toMatch(/text\/csv; ?charset=utf-8/);
+        expect(res.text.startsWith(BOM)).toBe(true);
+        // Y el contenido acentuado llega intacto, que es de lo que iba todo esto.
+        expect(res.text).toContain("T234-Cámara réflex");
+
+        await prisma.product.delete({ where: { id: producto.id } });
+    });
+
+    it("el CSV de movimientos de un producto recibe el mismo trato", async () => {
+        const producto = await prisma.product.create({
+            data: { name: "T234-con-movimientos", price: 10, stock: 5, minStock: 0 },
+        });
+        await prisma.stockMovement.create({
+            data: { productId: producto.id, type: "IN", delta: 5, stockAfter: 5, note: "Importación" },
+        });
+
+        const res = await request(app)
+            .get(`${BASE}/${producto.id}/movements/export?format=csv`)
+            .set("Cookie", cookie);
+
+        expect(res.headers["content-type"]).toMatch(/text\/csv; ?charset=utf-8/);
+        expect(res.text.startsWith(BOM)).toBe(true);
+        expect(res.text).toContain("Importación");
+
+        await prisma.stockMovement.deleteMany({ where: { productId: producto.id } });
+        await prisma.product.delete({ where: { id: producto.id } });
+    });
+
+    it("el JSON no lleva la marca: sería un error de sintaxis", async () => {
+        const res = await request(app).get(`${BASE}/export`).set("Cookie", cookie);
+
+        // Un analizador estricto rechaza un documento JSON que empiece por `U+FEFF`.
+        expect(res.text.startsWith(BOM)).toBe(false);
+        expect(res.body.success).toBe(true);
+    });
+});
+
 describe("Tope de la exportación (T2-05)", () => {
     /** Un doble de `Response` que registra si se llegó a escribir algo. */
     function respuestaFalsa() {
@@ -182,6 +245,7 @@ describe("Tope de la exportación (T2-05)", () => {
             lotes: (async function* () { yield [{ a: 1 }]; })(),
         });
 
-        expect(escrito.join("")).toBe("a\n1");
+        // Con el `BOM` de T2-34 al frente: es lo primero que se escribe del archivo.
+        expect(escrito.join("")).toBe(BOM + "a\n1");
     });
 });

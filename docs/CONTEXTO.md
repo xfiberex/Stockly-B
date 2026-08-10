@@ -56,28 +56,29 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **308/308** | **386/386** |
-| Cobertura (sentencias) | 89.50 % *(suelo 85 %)* | 44.76 % *(suelo 42 %)* |
+| Tests | **339/339** | **395/395** |
+| Cobertura (sentencias) | 91.00 % *(suelo 85 %)* | 44.89 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
 de datos, el backend y el frontend—. En este equipo (2026-08-08): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 38/48** · Total **73/107**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · Total **83/107**.
 
-*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. Las pendientes del Tier 2 son **10**, y las 10 tienen ya todas sus dependencias satisfechas.*
+*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. **El Tier 2 queda cerrado el 2026-08-09.** Lo que sigue es Tier 3 (14 pendientes) y Tier 4, que la auditoría dejó fuera del alcance inmediato.*
 
-**Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
+**Los tres primeros tiers de trabajo están cerrados** (Tier 0, 1 y 2). La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
 para cuentas desactivadas, cinco listados que reventaban con un `page` no numérico, ningún
 índice en la base, `logout` expuesto a CSRF y el correo saliendo en claro, a tener todo eso
 corregido, medido y con tests.
 
-**La única salvedad es T1-21** (contenedor sin privilegios): el `Dockerfile` ya lleva
-`USER node`, pero **el daemon de Docker no arranca en este equipo**, así que
-`docker exec … id` → `uid=1000(node)` sigue sin comprobarse. Es lo primero que hay que
-ejecutar en una máquina con Docker.
+**La salvedad de T1-21 está resuelta desde el 2026-08-09**, con Docker en marcha:
+`docker exec stockly_backend id` → `uid=1000(node)`, y `prisma migrate deploy` aplica las
+10 migraciones sin privilegios, incluida la de la extensión `pg_trgm`. La pila completa
+—base, backend y frontend tras nginx— se levanta con `docker compose up -d --build` y el
+login funciona en el navegador contra `http://localhost:8080`.
 
 ---
 
@@ -124,6 +125,22 @@ crea `pg_trgm` a mano en esa base, una sola vez:
 ```bash
 node -e "const {Client}=require('pg');(async()=>{const c=new Client({connectionString:'…/Stockly_test'});await c.connect();await c.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');await c.end();})()"
 ```
+
+**Dos procesos pueden atarse al mismo puerto en Windows, y las conexiones van al que no
+es.** Con un PostgreSQL local escuchando en 5432, `docker compose up` publica el suyo
+**también en 5432 sin dar ningún error** —`docker compose ps` lo muestra tan feliz—, pero
+`localhost:5432` sigue llegando al local. El síntoma es desconcertante: `AuthenticationFailed`
+contra una base que, según Docker, está sana. Por eso el compose acepta
+`POSTGRES_HOST_PORT`; para trabajar contra el contenedor:
+
+```bash
+POSTGRES_HOST_PORT=5442 docker compose up -d
+DATABASE_URL="postgresql://postgres:postgres@localhost:5442/Stockly" pnpm exec prisma db seed
+```
+
+**La pila del compose no se siembra sola.** El contenedor aplica migraciones al arrancar
+(`prisma migrate deploy` en el `CMD`) pero no ejecuta el seed, así que la base queda con el
+esquema y sin usuarios: el login responde **401** y parece un fallo de credenciales.
 
 **CSRF** (double-submit): para un PATCH/POST manual contra el servidor hay que leer la
 cookie `csrfToken` y reenviarla en la cabecera `x-csrf-token`. En `NODE_ENV=test` se

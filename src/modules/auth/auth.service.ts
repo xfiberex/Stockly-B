@@ -3,6 +3,7 @@ import { HttpError } from "@/shared/lib/httpError";
 import { hashPassword, comparePassword } from "@/shared/lib/hash";
 import { generateToken, hashToken } from "@/shared/lib/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/shared/lib/nodemailer";
+import { auditService } from "@/modules/audit-logs";
 
 export const authService = {
     async register(email: string, password: string, name: string) {
@@ -78,7 +79,10 @@ export const authService = {
 
         await prisma.user.update({
             where: { id: user.id },
-            data: { refreshToken: hash, refreshExpires: expires },
+            // Un inicio de sesión empieza una familia nueva, así que el «anterior» se
+            // limpia: arrastrarlo dejaría un hash de la sesión pasada capaz de disparar
+            // la alarma de reuso de T2-31 sin que nadie haya robado nada.
+            data: { refreshToken: hash, previousRefreshToken: null, refreshExpires: expires },
         });
 
         return { user, rawRefreshToken: raw };
@@ -88,7 +92,43 @@ export const authService = {
         const hash = hashToken(rawToken);
         const user = await prisma.user.findFirst({ where: { refreshToken: hash } });
 
-        if (!user || !user.refreshExpires || user.refreshExpires < new Date()) {
+        if (!user) {
+            // T2-31 — reuso de un token ya rotado.
+            //
+            // Antes esto era indistinguible de una sesión caducada: un 401 y a otra cosa.
+            // Pero un token que **ya se gastó** y vuelve a aparecer solo tiene una
+            // explicación razonable: alguien se hizo con él. Y como la rotación ya le
+            // entregó uno nuevo al ladrón o a la víctima, seguir adelante deja al atacante
+            // con una sesión válida indefinidamente.
+            //
+            // La respuesta es cerrar la familia entera: se anulan los dos hashes, así que
+            // el token que esté en circulación —el legítimo incluido— deja de servir y
+            // ambos tienen que volver a autenticarse. Es agresivo a propósito; el usuario
+            // legítimo pierde la sesión, que es mucho menos que perder la cuenta.
+            const reutilizado = await prisma.user.findFirst({ where: { previousRefreshToken: hash } });
+
+            if (reutilizado) {
+                await prisma.user.update({
+                    where: { id: reutilizado.id },
+                    data: { refreshToken: null, previousRefreshToken: null, refreshExpires: null },
+                });
+
+                // Sin actor: quien llega aquí no está autenticado, y el usuario cuya
+                // sesión se cierra no es quien hizo la petición. El registro guarda a
+                // quién le pasó, que es lo que hace falta para investigarlo después.
+                await auditService.log(
+                    { userId: reutilizado.id, userEmail: reutilizado.email },
+                    "REFRESH_REUSE",
+                    "User",
+                    reutilizado.id,
+                    { motivo: "Se presentó un refresh token ya rotado; se cerraron todas las sesiones" },
+                );
+            }
+
+            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
+        }
+
+        if (!user.refreshExpires || user.refreshExpires < new Date()) {
             throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
         }
 
@@ -106,7 +146,9 @@ export const authService = {
 
         await prisma.user.update({
             where: { id: user.id },
-            data: { refreshToken: newHash, refreshExpires: expires },
+            // El hash que se acaba de gastar se guarda como «anterior»: es lo que permite
+            // reconocerlo si vuelve a presentarse (T2-31).
+            data: { refreshToken: newHash, previousRefreshToken: hash, refreshExpires: expires },
         });
 
         return { user, rawRefreshToken: raw };
@@ -116,7 +158,11 @@ export const authService = {
         const hash = hashToken(rawToken);
         await prisma.user.updateMany({
             where: { refreshToken: hash },
-            data: { refreshToken: null, refreshExpires: null },
+            // También el anterior: si al cerrar sesión se dejara vivo, un token ya rotado
+            // seguiría disparando la alarma de reuso de T2-31 mucho después, sobre una
+            // sesión que el propio usuario cerró — una falsa alarma, y de las que
+            // desactivan sesiones ajenas.
+            data: { refreshToken: null, previousRefreshToken: null, refreshExpires: null },
         });
     },
 

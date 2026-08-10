@@ -33,6 +33,12 @@ export const TAM_LOTE_EXPORTACION = 500;
 export const MAX_FILAS_EXPORTACION =
     Number.parseInt(process.env.EXPORT_MAX_ROWS ?? "", 10) || 100_000;
 
+/**
+ * Marca de orden de bytes (T2-34). Va solo en el CSV: en JSON sería un error de sintaxis
+ * para cualquier analizador estricto, y ahí nadie la necesita.
+ */
+export const BOM = "\uFEFF";
+
 interface OpcionesDeExportacion {
     /** `csv` o cualquier otra cosa, que se interpreta como JSON. */
     formato: string | undefined;
@@ -75,7 +81,12 @@ export async function enviarExportacion(
     }
 
     if (formato === "csv") {
-        res.setHeader("Content-Type", "text/csv");
+        // T2-34 — `charset=utf-8` explícito y marca de orden de bytes.
+        //
+        // Sin el `charset`, un cliente que no lo asuma decodifica con su página de
+        // códigos; y Excel en Windows ni siquiera mira la cabecera: si el archivo no
+        // empieza por `U+FEFF` lo abre en ANSI y «Electrónica» se ve «ElectrÃ³nica».
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename=${nombreArchivo}.csv`);
 
         let cabeceras: string[] | null = null;
@@ -85,7 +96,7 @@ export async function enviarExportacion(
                 // filas no se escribe nada, que es lo que devolvía antes para vacío.
                 if (!cabeceras) {
                     cabeceras = Object.keys(fila);
-                    await escribir(res, cabeceras.join(","));
+                    await escribir(res, BOM + cabeceras.join(","));
                 }
                 await escribir(res, "\n" + cabeceras.map((h) => escapeCsvCell(fila[h])).join(","));
             }

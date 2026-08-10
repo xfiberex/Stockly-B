@@ -1,0 +1,29 @@
+# Stockly — superposición de producción (T2-27).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Hace dos cosas que el archivo de desarrollo no puede hacer, porque en desarrollo
+# estorbarían:
+#
+#   1. **Exige** las credenciales en vez de darles un valor por defecto. La sintaxis
+#      `${VAR:?mensaje}` aborta el comando si la variable falta o está vacía, así que no
+#      hay forma de desplegar con `postgres`/`postgres` por descuido.
+#   2. **Cierra el puerto de la base**. En desarrollo se publica para poder conectarse con
+#      un cliente; en producción, exponer PostgreSQL al host es superficie regalada — el
+#      backend le habla por la red interna del compose, que no sale de la máquina.
+
+services:
+
+  db:
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?define POSTGRES_DB para desplegar}
+      POSTGRES_USER: ${POSTGRES_USER:?define POSTGRES_USER para desplegar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD para desplegar}
+    # `!reset` borra la lista del archivo base en lugar de añadirse a ella: sin esto,
+    # Compose **concatena** los `ports` de los dos archivos y el 5432 seguiría publicado.
+    ports: !reset []
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      NODE_ENV: production

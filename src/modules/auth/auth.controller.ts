@@ -6,12 +6,27 @@ import { env } from "@/config/env";
 import { HttpError } from "@/shared/lib/httpError";
 import { CSRF_COOKIE_NAME } from "@/shared/middlewares/csrf.middleware";
 
+/**
+ * T2-28 — los atributos de las cookies dependen de **cómo se sirve**, no solo del
+ * `NODE_ENV`.
+ *
+ * Con `NODE_ENV=production` esto ponía siempre `secure: true` y `sameSite: "none"`, que
+ * es lo correcto cuando frontend y backend viven en dominios distintos y detrás de TLS.
+ * Pero la pila del compose sirve los dos **desde el mismo origen** (nginx delante) y por
+ * HTTP: ahí `secure: true` hace que el navegador descarte la cookie de sesión sin decir
+ * nada, y el login parece fallar por credenciales. Se descubrió montando esa pila.
+ *
+ * Los valores por defecto no cambian, así que un despliegue existente se comporta igual.
+ * `COOKIE_SECURE` y `COOKIE_SAMESITE` permiten declarar la topología real cuando no es la
+ * supuesta — que es justo lo que hace `docker-compose.yml`.
+ */
 const isProd = env.nodeEnv === "production";
-const sameSite = (isProd ? "none" : "lax") as "none" | "lax";
+const sameSite = (process.env.COOKIE_SAMESITE ?? (isProd ? "none" : "lax")) as "none" | "lax";
+const secure = process.env.COOKIE_SECURE !== undefined ? process.env.COOKIE_SECURE === "true" : isProd;
 
 const COOKIE_OPTS = {
     httpOnly: true,
-    secure: isProd,
+    secure,
     sameSite,
     maxAge: env.jwt.expiresInMs, // derivado de JWT_EXPIRES_IN — una sola fuente de verdad
 };
@@ -19,7 +34,7 @@ const COOKIE_OPTS = {
 // Path restringido: el navegador solo envía esta cookie al endpoint /refresh
 const REFRESH_COOKIE_OPTS = {
     httpOnly: true,
-    secure: isProd,
+    secure,
     sameSite,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/api/v1/auth/refresh",
@@ -29,7 +44,7 @@ const REFRESH_COOKIE_OPTS = {
 // como cabecera. Protección double-submit contra peticiones cross-site.
 const CSRF_COOKIE_OPTS = {
     httpOnly: false,
-    secure: isProd,
+    secure,
     sameSite,
     maxAge: 7 * 24 * 60 * 60 * 1000,
 };

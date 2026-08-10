@@ -345,7 +345,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Verificado localmente (2026-08-07):** `smtp-tls.test.ts` levanta un servidor SMTP de mentira que no anuncia STARTTLS y lo rechaza con `502`. Con `requireTLS`, el envío **aborta con `ETLS`**; sin él, contra ese mismo servidor, **el correo sale en claro y es aceptado** — el contraste está escrito como tercer test, que es lo que demuestra que la corrección hace algo. Tercer caso: la configuración real del transporte declara `requireTLS: true` y `secure` solo en el puerto 465.
     **No verificado:** el envío contra el SMTP real de producción; requiere credenciales que no están en esta máquina.
 
-- [x] **[T1-21] Ejecutar el contenedor con un usuario sin privilegios** ⚠️ *(2026-08-07 — implementada, sin verificar por ejecución)*
+- [x] **[T1-21] Ejecutar el contenedor con un usuario sin privilegios** ✅ *(implementada 2026-08-07 · **verificada por ejecución 2026-08-09**)*
   - **Área:** Seguridad / DevOps
   - **Ubicación:** `Stockly-B/Dockerfile:19-37`
   - **Qué hacer:** El stage runner nunca cambia de usuario, por lo que Node corre como root. Añadir `USER node` antes del `CMD` y ajustar la propiedad de `/app` con `COPY --chown=node:node`.
@@ -353,7 +353,11 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** T0-02
   - **Implementado (2026-08-07):** en el stage runner, `COPY --chown=node:node` en las cuatro copias, `RUN chown -R node:node /app` —`pnpm install` corre como root y deja `node_modules` y su caché a su nombre— y `USER node` antes del `CMD`.
-  - **NO VERIFICADO:** el criterio de aceptación exige ejecutar el contenedor y **el daemon de Docker no está disponible en esta máquina** (el CLI está, el motor no arranca). Quedan sin comprobar tanto `id` → `uid=1000(node)` como que `prisma migrate deploy` conserve permiso de escritura donde lo necesite. **Es lo primero que hay que ejecutar en una máquina con Docker.**
+  - ~~**NO VERIFICADO:** el criterio de aceptación exige ejecutar el contenedor y **el daemon de Docker no está disponible en esta máquina**.~~ **Verificado el 2026-08-09**, con Docker ya en marcha (motor 29.6.2):
+    - `docker exec stockly_backend id` → **`uid=1000(node) gid=1000(node) groups=1000(node)`**, el criterio literal.
+    - Los procesos del contenedor corren como `node`, incluido el PID 1.
+    - `/api/v1/health` responde 200: el contenedor sirve peticiones con normalidad.
+    - **`prisma migrate deploy` funciona sin privilegios**, que era la duda de fondo: las **10** migraciones se aplican al arrancar, incluida la de T2-09 con su `CREATE EXTENSION pg_trgm`. Comprobado en la base del contenedor: la extensión existe y `products_name_idx` está creado como `gin (name gin_trgm_ops)`.
 
 - [x] **[T1-22] Retirar la promoción automática a ADMIN del primer usuario** ✅ *(2026-08-07)*
   - **Área:** Seguridad
@@ -485,13 +489,29 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Un fallo propio de la limpieza del test**, que conviene no repetir: `deleteMany({ name: { startsWith: "T205-" } })` no borraba el producto llamado `=T205-dos`, y contaminaba los tres tests siguientes. Se arregla con `contains`.
   - **Los 50 000 productos de banco se borraron** al terminar (52, como antes).
 
-- [ ] **[T2-06] Reducir el chunk `vendor` del frontend**
+- [x] **[T2-06] Reducir el chunk `vendor` del frontend** ✅ *(2026-08-09)* — *criterio cumplido a medias, ver abajo*
   - **Área:** Rendimiento
-  - **Ubicación:** `Stockly-F/vite.config.ts:19-30`
+  - **Ubicación:** `Stockly-F/vite.config.ts:19-50`
   - **Qué hacer:** Medido: `vendor` pesa 549.93 kB (170.86 kB gzip) y se carga en todas las rutas, incluida la de login — ~680 kB sin comprimir de JavaScript para pintar un formulario. Separar `vendor-react` y `vendor-forms` (react-hook-form + @hookform + zod) del resto, y reducir `@fontsource/inter` a los pesos realmente usados.
   - **Criterio de aceptación:** ningún chunk supera los 250 kB sin comprimir y `vite build` no emite el aviso de tamaño.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** el JavaScript del arranque —lo que hay que descargar para pintar el login— pasa de **697.3 kB a 474.9 kB (−32 %)**, y `vite build` **ya no emite el aviso de tamaño** (el trozo mayor es 391 kB, por debajo del umbral de 500). `verify` ✅ **389/389**.
+  - **El criterio de los 250 kB NO se cumple** y no se disimula: quedan `vendor` en 331 kB y `vendor-charts` en 391 kB. Lo que sigue explica por qué perseguirlo empeoraba la aplicación.
+  - **Separar `vendor-react`, que es lo que pedía la ficha, es contraproducente aquí.** Medido con cuatro variantes construidas y comparadas por el JavaScript del arranque:
+
+    | Variante | Arranque | ¿recharts diferido? |
+    |---|---:|---|
+    | Como estaba | 697.3 kB | sí |
+    | **+ `vendor-forms`** | **599.2 kB** | sí |
+    | + `vendor-react` | 956.0 kB | **no** |
+    | + ambos | 857.9 kB | **no** |
+
+    En cuanto React sale a su propio trozo, `vendor-charts` **entra en el arranque**: el grafo de trozos gana un ciclo entre React y quien lo importa, y rolldown resuelve metiendo las gráficas en la carga inicial. Lo mismo separando solo `react-dom` (856.9 kB). Se descartó con la medición delante, no por intuición.
+  - **Lo que sí funciona es separar recharts *y todo lo que existe solo por él*:** `@reduxjs/toolkit`, `react-redux`, `immer`, `reselect`, `es-toolkit`, `decimal.js-light`, `victory-vendor` y los `d3-*` no los usa esta aplicación — son dependencias de recharts, y estaban en `vendor`, que se descarga siempre. Sacarlas baja el arranque de 599.2 a **474.9 kB** manteniendo las gráficas diferidas, porque las rutas que las pintan son `lazy`.
+  - **`victory-vendor` no se alcanza buscando `d3-`:** recharts no depende de esos paquetes directamente, sino de `victory-vendor`, que los reempaqueta dentro de sí mismo. La primera regla que escribí no casaba con nada y el build salía idéntico.
+  - **Bajar `vendor-charts` de 250 kB exigiría partir recharts por rutas internas**, trozos arbitrarios que siempre se cargan juntos: no ahorraría ni un byte a nadie y dejaría una regla que se rompe en la siguiente actualización de la librería. **Y no hace falta:** ese trozo no se descarga hasta entrar en Dashboard o Reportes.
+  - **La parte de `@fontsource/inter` ya estaba hecha** en T2-41, que dejó los archivos de fuente emitidos en **8** (de 56) recortando a los subconjuntos latinos.
 
 - [x] **[T2-07] No bloquear la respuesta HTTP con el envío de alertas**
   - **Área:** Rendimiento
@@ -699,55 +719,88 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Los valores, dos puntos por debajo de lo real** (2026-08-09) — backend **85 / 72 / 87 / 87** sobre 88.62 / 74.88 / 89.43 / 89.97; frontend **42 / 50 / 33 / 43** sobre 44.55 / 52.19 / 35.70 / 45.59. Es margen para un refactor honrado, no para el descuido.
   - **Sin CI, el umbral es la única barrera** contra la erosión: nada impedía que la cobertura bajara commit a commit. Al subirla hay que subir también estos números, o el suelo deja de significar nada.
 
-- [ ] **[T2-23] Cubrir las zonas de baja cobertura del backend**
+- [x] **[T2-23] Cubrir las zonas de baja cobertura del backend** ✅ *(2026-08-09)*
   - **Área:** QA
   - **Ubicación:** `Stockly-B/src/tests/sale-orders.test.ts`, nuevos tests para `upload.middleware.ts`
   - **Qué hacer:** `nodemailer` (31.8 %) y `upload.middleware` (47 %) están siempre mockeados y sus rutas de error nunca se ejercitan; la exportación de órdenes de venta (`sale-orders.controller.ts:74-87`) no tiene tests. Añadir: exportación en CSV y JSON, y el `fileFilter` de multer rechazando un mimetype no permitido.
   - **Criterio de aceptación:** `sale-orders.controller.ts` supera el 75 % y `upload.middleware.ts` el 70 %.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** los dos umbrales, con margen. **`sale-orders.controller.ts` 69.44 % → 86.11 %** (pide > 75) y **`upload.middleware.ts` 75.67 %** (pide > 70). Cobertura global del backend **91.00 %**. `verify` ✅ **339/339** (6 tests nuevos).
+  - **Lo que faltaba eran las tres rutas de solo lectura** —listado, lectura por id y exportación—, justo las que nadie mira hasta que dejan de funcionar. Se cubren el sobre paginado (`data.data` + `meta`), el filtro por estado, el 404 y las dos exportaciones.
+  - **El test del CSV comprueba algo con consecuencias, no solo que responda 200:** una orden con dos líneas produce **dos filas**, no una. Es la diferencia entre contar órdenes y contar filas, que es exactamente lo que decide si el tope de la exportación (T2-05) se queda corto.
+  - **`upload.middleware` llegó al umbral por otro camino, y se dice:** la ficha proponía un test del `fileFilter` de multer, pero **T2-32 ya lo dejó en 75.67 %** al añadir la comprobación de firma. Escribir además ese test no habría medido nada nuevo, así que no se hizo.
+  - **`nodemailer` (39 %) se queda como está**, y no por descuido: está mockeado en toda la suite, y cubrir sus rutas de error exige un servidor SMTP falso. El criterio de aceptación no lo pedía y montarlo por un número no es una mejora.
 
-- [ ] **[T2-24] Tests de contrato entre frontend y backend**
+- [x] **[T2-24] Tests de contrato entre frontend y backend** ✅ *(2026-08-09)*
   - **Área:** QA / Arquitectura
   - **Ubicación:** `Stockly-F/src/tests/` (nuevos)
   - **Qué hacer:** Segundo nivel de defensa contra la clase de fallo que produjo T0-03, T1-03 y T1-05: validar los datos mockeados de los tests del frontend contra esquemas Zod que reproduzcan las respuestas reales del backend, de modo que un mock desalineado con la API haga fallar los tests. Empezar por settings, products y orders. `SettingsPage.test.tsx:20-23` es el ejemplo canónico: mockea `value` como cadena cuando la API devuelve un boolean.
   - **Criterio de aceptación:** existe al menos un test que falla si el mock diverge de la forma real de la respuesta, verificado alterando deliberadamente un mock.
   - **Esfuerzo:** medio
   - **Depende de:** T1-05, T1-06
+  - **Verificado localmente (2026-08-09):** `verify` frontend ✅ **395/395** (6 tests nuevos). **Falsificado como pedía el criterio:** cambiando `value: false` por `value: "false"` en el mock compartido, **dos archivos de test fallan al cargarse** con «El mock «ajusteBooleano» no coincide con la respuesta real del backend».
+  - **La validación corre al importar el módulo, no dentro de un `it`.** Es la decisión que hace que esto sirva: cualquier test que use un mock desalineado falla, sin depender de que alguien se acuerde de invocar el test de contrato. Un guardián que hay que llamar a mano es un guardián que se olvida.
+  - **El esquema de ajustes es una unión discriminada por `type`, y esto costó un intento.** La primera versión declaraba `value: boolean | number | string`, y con ella `{ type: "boolean", value: "false" }` **pasaba la validación** — que es justo el mock que ocultó T1-06. Un contrato que acepta el defecto que debe cazar no vale nada; los tests de falsificación lo detectaron antes de darlo por bueno.
+  - **Se cubren las tres divergencias que ya costaron una tarea**, cada una con su test: el booleano como cadena (T1-05/T1-06), las etiquetas como cadenas en vez de objetos (T1-03) y el listado sin el sobre `{ data, meta }`. Más el `productId: null` explícito de los ítems de orden, del que depende el recuento de reposición de T2-42.
+  - **`SettingsPage.test.tsx` ya consume el mock validado**, que era el ejemplo canónico de la ficha. Los demás módulos tienen su fixture listo en `tests/contratos/fixtures.ts`; engancharlos es sustituir la constante local por el import.
 
 ### Infraestructura
 
-- [ ] **[T2-25] Healthcheck de aplicación y sonda de readiness**
+- [x] **[T2-25] Healthcheck de aplicación y sonda de readiness** ✅ *(2026-08-09)*
   - **Área:** DevOps
-  - **Ubicación:** `Stockly-B/src/routes/index.ts:17-19`, `docker-compose.yml:22-38`
+  - **Ubicación:** `Stockly-B/src/routes/index.ts:17-52`, `docker-compose.yml`
   - **Qué hacer:** `/health` devuelve 200 aunque la base de datos esté caída, y el servicio `backend` no tiene `healthcheck` en el compose (el de `db` sí lo tiene). Añadir un endpoint `/ready` que ejecute `SELECT 1` y devuelva 503 si falla, y registrar el healthcheck en el compose.
   - **Criterio de aceptación:** con la base de datos detenida, `/ready` devuelve 503 y `docker compose ps` marca el contenedor backend como `unhealthy`.
   - **Esfuerzo:** bajo
   - **Depende de:** T0-02
+  - **Verificado localmente (2026-08-09):** el criterio, literal. Con la pila en marcha, `backend: Up (healthy)` y `/ready` → 200. Tras `docker compose stop db`: **`/ready` → 503** y, pasados los reintentos, **`backend: Up (unhealthy)`**. `verify` ✅ **314/314** (3 tests nuevos).
+  - **Son dos sondas porque responden a preguntas distintas, y confundirlas hace daño.** `/health` es vivacidad —¿responde el proceso?— y **sigue devolviendo 200 con la base caída a propósito**: reiniciar el contenedor no arregla una base que no está. `/ready` es disponibilidad, y es la que decide si mandarle tráfico. Hay un test de cada cosa, incluido el de que `/health` no cambia.
+  - **503 y no 500:** «aún no disponible» frente a «avería». Es la distinción que usa un orquestador para elegir entre retirar del balanceo y reiniciar.
+  - **`SELECT 1` y no una consulta a una tabla:** no depende del esquema, así que sigue significando lo mismo cuando cambien los modelos.
+  - **El healthcheck del compose usa `node`, no `curl`:** la imagen es `node:alpine` y no lo trae; añadirlo solo para esto engorda la imagen y amplía su superficie. Lleva `start_period: 40s` porque `prisma migrate deploy` corre antes de que el servidor escuche.
 
-- [ ] **[T2-26] Verificar la reproducibilidad del build de la imagen**
+- [x] **[T2-26] Verificar la reproducibilidad del build de la imagen** ✅ *(2026-08-09)*
   - **Área:** DevOps
   - **Ubicación:** `Stockly-B/Dockerfile:7,23`, `Stockly-B/package.json:22-28`
   - **Qué hacer:** El anclaje de la versión de pnpm lo resuelve **T0-02 (punto 1)**, porque `corepack prepare pnpm@latest --activate` no solo era irreproducible sino que además rompía el build. Lo que queda aquí es la verificación: comprobar que dos builds del mismo commit producen el mismo árbol de dependencias, y añadir el campo `"packageManager": "pnpm@11.2.2"` a `package.json` si T0-02 no lo hizo ya.
   - **Criterio de aceptación:** dos `docker build --no-cache` del mismo commit instalan idénticas versiones (comparar `pnpm list --depth=0` dentro de ambas imágenes).
   - **Esfuerzo:** bajo
   - **Depende de:** T0-02
+  - **Verificado localmente (2026-08-09):** dos `docker build --no-cache` del mismo árbol, comparados por tres huellas: **310 paquetes instalados, lista idéntica**; **`node v22.23.2` y `pnpm 11.21.0`** en las dos; y el compilado —`dist`, `src/generated` y `prisma`, **108 archivos**— con el **mismo md5 agregado**: `dc10fd0099f0f6be403ff966624ee0a5`.
+  - **El comando que pedía la ficha no sirve dentro de esta imagen, y por poco lo doy por bueno.** `pnpm list --depth=0` falla con `EACCES: permission denied, mkdir '/root/.local/share/pnpm/store/v11'`: insiste en el directorio de root aunque se le cambie `HOME`, porque desde T1-21 el contenedor corre como `node`. **Las dos imágenes devolvían exactamente lo mismo… que era el mismo error**, y un `diff` limpio parecía demostrar reproducibilidad sin demostrar nada.
+  - **Se sustituye por huellas que sí significan algo:** el listado de `node_modules/.pnpm` —un directorio por `paquete@versión`, que es el árbol resuelto de verdad— y el md5 del compilado, que además comprueba algo que la ficha no pedía: que dos builds producen el **mismo artefacto**, no solo las mismas dependencias.
+  - **El anclaje ya estaba:** `"packageManager": "pnpm@11.21.0"` en los dos repositorios y `corepack prepare pnpm@11.21.0` en los dos Dockerfile.
 
-- [ ] **[T2-27] Externalizar las credenciales de PostgreSQL del compose**
+- [x] **[T2-27] Externalizar las credenciales de PostgreSQL del compose** ✅ *(2026-08-09)*
   - **Área:** DevOps / Seguridad
   - **Ubicación:** `docker-compose.yml:9-13`
   - **Qué hacer:** `postgres`/`postgres` incrustados y el puerto 5432 publicado en el host, en un archivo que el README raíz presenta como «Docker (producción)». Externalizar a variables con valor requerido (`${POSTGRES_PASSWORD:?requerida}`), no publicar el puerto en producción, y separar `docker-compose.yml` de `docker-compose.prod.yml`.
   - **Criterio de aceptación:** el compose de producción falla si no se define la contraseña; el de desarrollo sigue funcionando con valores por defecto documentados.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** las tres situaciones, con `docker compose config`:
+    1. desarrollo sin variables → funciona, con `postgres`/`postgres` por defecto;
+    2. producción sin credenciales → **aborta**: «required variable POSTGRES_DB is missing a value: define POSTGRES_DB para desplegar»;
+    3. producción con credenciales → resuelve, y el servicio `db` **queda sin `ports`**.
+  - **`ports: !reset []` en la superposición, no una lista vacía:** Compose **concatena** los `ports` de los archivos superpuestos, así que sin `!reset` el 5432 seguiría publicado en producción por venir del archivo base. Comprobado en el `config` resuelto.
+  - **La `DATABASE_URL` del backend se compone de las mismas variables que la base**, para que no haya dos sitios donde cambiar la contraseña y uno se quede atrás.
+  - **El puerto del host es configurable (`POSTGRES_HOST_PORT`)**, y no es un adorno: ver la trampa del PostgreSQL local en CONTEXTO.md.
 
-- [ ] **[T2-28] Contenedorizar el frontend y añadirlo al compose**
+- [x] **[T2-28] Contenedorizar el frontend y añadirlo al compose** ✅ *(2026-08-09)*
   - **Área:** DevOps
   - **Ubicación:** `Stockly-F/Dockerfile` (nuevo), `docker-compose.yml`
   - **Qué hacer:** No existe ruta de despliegue reproducible para la mitad del producto. Dockerfile multi-stage (build con Node, servido con `nginx:alpine`) con `try_files $uri /index.html` para el enrutado SPA, y su servicio en el compose. Documentar si frontend y backend comparten dominio, porque de ello depende si el `sameSite: "none"` de las cookies puede endurecerse a `lax`.
   - **Criterio de aceptación:** `docker compose up --build` levanta base de datos, backend y frontend, y el login funciona de extremo a extremo desde el navegador.
   - **Esfuerzo:** medio
   - **Depende de:** T0-02
+  - **Verificado localmente (2026-08-09):** `docker compose up -d --build` deja `db (healthy)`, `backend (healthy)` y `frontend`, y **el login funciona en el navegador contra `http://localhost:8080`**: entra al Dashboard con sus KPIs. Recargando directamente en `/catalog/products`, la SPA responde 200 y pinta las 10 filas y «48 productos en total», así que `try_files` hace su trabajo.
+  - **Respuesta a lo que la ficha mandaba documentar —si comparten dominio—: sí, y por decisión.** nginx sirve la SPA **y hace de proxy de `/api`**, así que el navegador habla siempre con su mismo origen. El frontend se compila con `VITE_API_URL=/api/v1`, una ruta relativa.
+  - **De ahí sale la consecuencia sobre las cookies:** con dos orígenes hay que emitirlas `SameSite=None`, lo que **obliga a `Secure`** y por tanto a TLS, y las expone a viajar en peticiones de terceros. Detrás de este proxy basta `SameSite=Lax`.
+  - **Y ahí apareció un defecto real, que solo se ve montando la pila:** `NODE_ENV=production` forzaba `secure: true`, y sobre HTTP el navegador **descarta la cookie de sesión sin decir nada** — el login parece fallar por credenciales. Se añaden `COOKIE_SECURE` y `COOKIE_SAMESITE`, **con los valores actuales por defecto**, para poder declarar la topología real; el compose las pone en `lax`/`false`. Un despliegue tras TLS no toca nada.
+  - **`proxy_buffering off` en nginx:** con el búfer activado acumularía el archivo entero antes de mandarlo y desharía el streaming de las exportaciones de T2-05.
+  - **El contexto de build apunta al repositorio hermano** (`../Stockly-F`), así que este compose no funciona sin él clonado al lado. Se añade un `.dockerignore` que excluye `node_modules`, `dist` y **el `.env`**: Vite incrusta las `VITE_*` al compilar, y un `.env` colado en el contexto acabaría dentro del JavaScript publicado.
+  - **No se fuerza `USER nginx`** como en el backend: ahí no se ejecuta código de la aplicación, solo se sirven archivos estáticos, y `nginx:alpine` ya baja sus procesos de trabajo a `nginx`. Cambiarlo exige reasignar directorios de caché y el puerto, a cambio de poco.
 
 ### Documentación de API
 
@@ -761,23 +814,35 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Verificado localmente (2026-08-07):** `swagger-contract.test.ts` nuevo, 5 tests. El cuerpo documentado (`name`, `price`, `stock`, `minStock`, `categoryId`) enviado a `POST /products` devuelve **201** y la respuesta trae `category` como objeto `{ id, name }`. El test no se limita a mirar la documentación: **compara la lista de campos escribibles del esquema con lo que acepta `createProductSchema`**, así que documentar un campo nuevo sin añadirlo al validador —o al revés— hace fallar la suite.
     Esquemas nuevos: `NamedRef` (categoría, marca y proveedor), `Tag`, `ProductWrite` (cuerpo real de creación y actualización) y `ProductImport`, que tiene otro contrato: categoría y marca por nombre. Corregidos de paso los filtros de `GET /products`, que documentaban un `category` por nombre inexistente en lugar de `categoryId`, `brandId`, `supplierId` y `tagId`.
 
-- [ ] **[T2-30] Documentar en Swagger los módulos ausentes**
+- [x] **[T2-30] Documentar en Swagger los módulos ausentes** ✅ *(2026-08-09)*
   - **Área:** Documentación
   - **Ubicación:** `Stockly-B/src/swagger.ts:70-204`
   - **Qué hacer:** El spec cubre `auth` (parcial), `products` (parcial) y movimientos de stock. Faltan `categories`, `brands`, `suppliers`, `purchase-orders`, `sale-orders`, `reports`, `tags`, `users`, `settings`, `audit-logs`, y de products faltan `bulk-stock`, `price-history` y las exportaciones.
   - **Criterio de aceptación:** los doce módulos aparecen en `/api/v1/docs` con sus operaciones, parámetros y códigos de respuesta.
   - **Esfuerzo:** medio
   - **Depende de:** T2-29
+  - **Verificado localmente (2026-08-09):** el spec pasa de 3 módulos a **14 etiquetas, 43 rutas y 67 operaciones** —las 67 que expone el router— y `/api/v1/docs` responde 200. `verify` ✅ **333/333** (14 tests nuevos).
+  - **La garantía no es una lista escrita a mano, es el router.** `swagger-cobertura.test.ts` recorre el árbol de Express de los doce módulos, traduce `:id` a `{id}` y exige que **cada operación exista en el spec**. Una lista manual se queda vieja en cuanto alguien añade un endpoint; esto falla en el momento.
+  - **Y en el sentido contrario:** también comprueba que el spec **no documente rutas que no existen**. Documentación que promete un endpoint inexistente es peor que no tenerla, porque el «Try it out» acaba en 404 sin explicación.
+  - **Los cuatro catálogos se generan, no se copian.** Categorías, marcas, etiquetas y proveedores son el mismo CRUD con otro nombre: una función los produce. Copiados a mano, el cuarto se olvida de un código de respuesta y nadie lo nota.
+  - **El test nuevo cazó un fallo que yo mismo acababa de introducir:** al mezclar las rutas nuevas con `...rutasAdicionales`, la clave `/products/{id}/movements` **sobrescribió** la que ya existía y borró su `GET` —el spread sustituye la clave, no fusiona—. Se documentaba menos que antes, y en silencio. El `POST` se extrae aparte y se inserta dentro del objeto existente, con la nota puesta donde tocaría repetirlo.
+  - **Se documentan también `/health` y `/ready`** (T2-25), que no pertenecen a ningún módulo, y las tres exportaciones con su `?format=csv` y su 413.
 
 ### Endurecimiento adicional
 
-- [ ] **[T2-31] Detección de reuso de refresh tokens**
+- [x] **[T2-31] Detección de reuso de refresh tokens** ✅ *(2026-08-09)*
   - **Área:** Seguridad
   - **Ubicación:** `Stockly-B/src/modules/auth/auth.service.ts:84-102`
   - **Qué hacer:** La rotación es correcta, pero el reuso de un token ya rotado se trata como una expiración normal, sin invalidar la familia ni registrar la anomalía. Persistir el hash del token anterior; si llega un refresh con un hash ya rotado, invalidar todas las sesiones del usuario y registrar el evento en `AuditLog`.
   - **Criterio de aceptación:** reutilizar un refresh token ya rotado invalida la sesión activa y genera una entrada de auditoría; hay un test que lo verifica.
   - **Esfuerzo:** medio
   - **Depende de:** T0-07
+  - **Verificado localmente (2026-08-09):** `verify` ✅ **319/319** (5 tests nuevos). El escenario completo: se rota un token, se presenta el viejo → 401, **y el token legítimo recién emitido también deja de servir**; en la base quedan `refreshToken` y `previousRefreshToken` a `null`, y hay una entrada `REFRESH_REUSE` con el correo del usuario afectado.
+  - **Lo que cambia no es el 401 —ya lo daba— sino lo que pasa después.** Un token gastado que reaparece no tiene explicación inocente: alguien se hizo con él. Y como la rotación ya entregó uno nuevo, callarse deja al atacante con sesión indefinida. Se cierra la familia entera porque **no hay forma de saber cuál de los dos está en manos del atacante**; el usuario legítimo pierde la sesión, que es mucho menos que perder la cuenta.
+  - **Tres tests cubren los falsos positivos, que es donde esto se rompe de verdad:** tres rotaciones encadenadas siguen funcionando; un token inventado no dispara nada ni toca la sesión buena; y **tras un `logout` ordenado, presentar el token viejo no registra un reuso** — para eso hubo que limpiar también `previousRefreshToken` al cerrar sesión y al iniciar una nueva. Sin eso, la alarma saltaría sobre sesiones que el propio usuario cerró.
+  - **Falsificado** quitando el guardado del hash gastado: cae el test del escenario y sobreviven los cuatro que describen lo que no debía cambiar.
+  - **Alcance honesto:** se guarda **un solo** token anterior, no la familia completa. Detecta el caso real —un token robado que se reutiliza tras la rotación— pero no una cadena larga de tokens antiguos. Ampliarlo pide una tabla de sesiones, que es otra tarea.
+  - **La migración se escribió a mano:** `prisma migrate dev --create-only` no puede ejecutarse aquí porque exige TTY. Solo añade la columna y su índice único.
 
 - [x] **[T2-32] Validar las imágenes por sus magic bytes** ✅ *(2026-08-09)*
   - **Área:** Seguridad
@@ -809,13 +874,19 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Ese ensanchamiento es deliberadamente estrecho**, con tres tests que lo fijan: se reenvía un 4xx **solo** si lleva `expose: true`; sin la marca vuelve a ser 500, y un 5xx ajeno tampoco se reenvía aunque venga expuesto. La regla cubre «el cliente se equivocó», no «algo se rompió».
   - **Los 1000 productos de banco se borraron** al terminar (52 productos, como antes).
 
-- [ ] **[T2-34] Descargar el CSV de movimientos vía axios y con codificación correcta**
+- [x] **[T2-34] Descargar el CSV de movimientos vía axios y con codificación correcta** ✅ *(2026-08-09)*
   - **Área:** UI/UX
-  - **Ubicación:** `Stockly-F/src/modules/products/api/product.api.ts:95-100`, `Stockly-B/src/modules/products/product.controller.ts:133`
+  - **Ubicación:** `Stockly-F/src/modules/products/api/product.api.ts`, `utils/importExport.ts`, `components/ProductsPage.tsx`, `components/StockMovementsPage.tsx`; `Stockly-B/src/shared/lib/exportacion.ts`, `modules/products/product.controller.ts:124-133`
   - **Qué hacer:** La descarga usa un `<a href>` a otro origen, por lo que el atributo `download` se ignora y la petición esquiva el interceptor de axios: con la sesión caducada el usuario descarga el JSON del error 401 en lugar de ser redirigido al login. Además el backend envía `text/csv` sin `charset=utf-8` ni BOM, por lo que los acentos se ven mal en Excel. Descargar como `blob` vía axios reutilizando `downloadBlob`, y corregir la cabecera y el BOM en el backend.
   - **Criterio de aceptación:** con la sesión caducada la acción redirige al login; el CSV descargado muestra correctamente los acentos al abrirlo en Excel en Windows.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** contra el servidor real, el CSV llega con `content-type: text/csv; charset=utf-8` y sus tres primeros bytes son **`EF BB BF`**. Con la marca, la línea acentuada se lee «corrección»; decodificada en ANSI —lo que hacía Excel antes— se lee «correcciÃ³n». `verify` backend ✅ **311/311** y frontend ✅ **389/389** (6 tests nuevos).
+  - **El alcance real era mayor que el de la ficha:** `exportProductMovementsCsv` —el `<a href>` que describe— **no lo llamaba nadie**. Las dos descargas que sí usa la interfaz (catálogo y movimientos) construyen el CSV en el navegador y ya iban por axios, así que **el problema del 401 no era alcanzable**, pero **el de los acentos sí**, y en las dos. Se arregla el helper igualmente en vez de borrarlo, porque el día que se enchufe volvería a traer los tres defectos de golpe.
+  - **La marca va en el CSV y no en el JSON**, donde un analizador estricto la trataría como error de sintaxis. Hay un test de cada cosa.
+  - **No estorba al reimportar, y eso es una casualidad que conviene fijar:** `parseCsv` empieza con `text.trim()`, y `trim()` elimina `U+FEFF` porque el estándar lo cuenta como espacio en blanco. Si alguien cambia ese `trim()`, la primera columna pasa a llamarse ``U+FEFF`name` y todos los productos se importan sin nombre. Hay un test de ida y vuelta que lo comprueba.
+  - **El primer test de la marca fallaba estando el código bien:** comprobaba `blob.text()`, que decodifica con `TextDecoder`, y **`TextDecoder` se come la marca** salvo que se le pida `ignoreBOM`. Se cambió a mirar los bytes de `arrayBuffer()`, que además es lo que de verdad importa: lo que Excel encuentra en el archivo.
+  - **El lint cazó el carácter crudo** (`no-irregular-whitespace`) en los literales. Se usa el escape `"`U+FEFF`"`, que encima se lee: un `U+FEFF` incrustado en el código es invisible.
 
 ### Sistema de diseño
 
@@ -1440,16 +1511,31 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-09 | **T2-02** Agregados del dashboard en SQL — **completada** | Con 40 000 productos activos: **200.4 → 27.3 ms** de mediana y heap **178.9 → 32.8 MB**. `verify` ✅ **301/301** (3 nuevos), `reports.service.ts` sigue al **100 %** | La equivalencia se comprobó **comparando las dos respuestas completas** (capturada con `git stash`), no confiando en los tests: `totals` idéntico y el resto del informe byte a byte. Lo único que cambia es el orden de `stockByCategory`, y a mejor: antes lo daba el recorrido del `findMany` y dos cargas podían pintar el gráfico distinto. Los tres tests nuevos cubren los bordes fáciles de perder al traducir —«Sin categoría», orden, inactivos— y **dos de los tres fallan** contra la implementación anterior. |
 | 2026-08-09 | **T2-05** Exportaciones en streaming — **completada** | 50 000 productos: **3.58 MB en 4.0 s**. Con el heap limitado a **48 MB**, la forma anterior muere con `Reached heap limit` y la nueva termina con **pico de 42.5 MB**. `verify` ✅ **308/308** (7 nuevos) | **El primer intento de medición se quedó corto:** sin restricción, el pico apenas bajaba (105.2 → 92.5 MB), porque `heapUsed` cuenta la basura no recogida. El tamaño de lote **es** el techo de memoria: con 48 MB, 500 y 1000 caben y 2000 y 5000 no. Se elige 500 sobre 1000 pese a ser un 25 % más lento, porque 1000 deja el pico a 2 MB del límite. **Cuesta más tiempo y se dice:** 832 ms → 4.0 s, el precio de no tener el archivo en memoria. El JSON también se transmite por partes, que la ficha no pedía y tenía el mismo problema. **El desempate del cursor no se pudo falsificar** y se documenta como garantía, no como fallo corregido. |
 
+| 2026-08-09 | **T2-34** CSV con codificación correcta — **completada** | Contra el servidor real: `text/csv; charset=utf-8` y primeros bytes **`EF BB BF`**. La línea acentuada se lee «corrección»; en ANSI —lo que hacía Excel— «correcciÃ³n». `verify` backend ✅ **311/311**, frontend ✅ **389/389** (6 nuevos) | **El alcance real no era el de la ficha:** el `<a href>` que describe **no lo llamaba nadie**, así que el problema del 401 no era alcanzable; el de los acentos sí, y en las dos descargas que la interfaz sí usa. Se arregla el helper igualmente para que enchufarlo no reabra los tres defectos. La marca va en el CSV y no en el JSON, donde sería un error de sintaxis. **El primer test fallaba estando el código bien:** comprobaba `blob.text()`, y `TextDecoder` se come la marca; se cambió a mirar los bytes. El lint cazó el carácter crudo en los literales. |
+| 2026-08-09 | **T2-06** Reducir el `vendor` del frontend — **completada con salvedad** | JavaScript del arranque **697.3 → 474.9 kB (−32 %)** y `vite build` ya no emite el aviso de tamaño. **Los 250 kB por trozo no se cumplen**: quedan `vendor` 331 kB y `vendor-charts` 391 kB. `verify` ✅ **389/389** | **Lo que pedía la ficha era contraproducente:** separar `vendor-react` sube el arranque a **956 kB** porque mete `vendor-charts` en la carga inicial —el grafo de trozos gana un ciclo entre React y quien lo importa—. Cuatro variantes construidas y comparadas para decidirlo. Lo que sí funciona es sacar recharts **y todo lo que existe solo por él** (redux-toolkit, immer, es-toolkit, victory-vendor, d3), que estaba en `vendor` y se descargaba siempre. Bajar `vendor-charts` de 250 kB exigiría partir recharts en trozos arbitrarios que siempre se cargan juntos, y no hace falta: no se descarga hasta entrar en Dashboard o Reportes. |
+
+| 2026-08-09 | **T1-21** Contenedor sin privilegios — **verificada por ejecución** | `docker exec stockly_backend id` → **`uid=1000(node)`**. Las **10** migraciones se aplican al arrancar sin privilegios, incluida el `CREATE EXTENSION pg_trgm` de T2-09; comprobado en la base del contenedor que `products_name_idx` existe como `gin (name gin_trgm_ops)` | Quedaba pendiente desde el 2026-08-07 porque el motor de Docker no arrancaba en este equipo. La duda de fondo no era el `id` sino si `prisma migrate deploy` conservaría permiso de escritura como `node`: lo conserva. |
+| 2026-08-09 | **T2-25** Sonda de disponibilidad — **completada** | Con la pila arriba, `/ready` → 200 y `backend (healthy)`. Tras `docker compose stop db`: **`/ready` → 503** y **`backend (unhealthy)`**. `verify` ✅ **314/314** (3 nuevos) | Dos sondas para dos preguntas: `/health` es vivacidad y **sigue devolviendo 200 con la base caída a propósito** —reiniciar el contenedor no arregla una base que no está—; `/ready` es la que decide si mandar tráfico. 503 y no 500, que es la distinción que usa un orquestador. El healthcheck usa `node` porque `node:alpine` no trae `curl`. |
+| 2026-08-09 | **T2-27** Credenciales del compose fuera del archivo — **completada** | Las tres situaciones con `docker compose config`: desarrollo sin variables funciona; producción sin credenciales **aborta**; producción con credenciales resuelve y `db` **queda sin `ports`** | `ports: !reset []` y no una lista vacía: Compose **concatena** los `ports` de los archivos superpuestos, así que sin `!reset` el 5432 seguiría publicado en producción. La `DATABASE_URL` se compone de las mismas variables que la base, para no tener dos sitios donde cambiar la contraseña. |
+| 2026-08-09 | **T2-28** Frontend contenedorizado — **completada** | `docker compose up -d --build` deja `db`, `backend` y `frontend` en pie, y **el login funciona en el navegador** contra `http://localhost:8080`; recargar en `/catalog/products` pinta las 10 filas y «48 productos en total» | nginx sirve la SPA **y hace de proxy de `/api`**, así que hay un solo origen: eso responde lo que la ficha mandaba documentar y permite `SameSite=Lax` en vez de `None`+`Secure`. **Defecto real encontrado al montarlo:** `NODE_ENV=production` forzaba `secure: true` y sobre HTTP el navegador descarta la cookie sin decir nada — el login parecía fallar por credenciales. Se añaden `COOKIE_SECURE`/`COOKIE_SAMESITE` con los valores actuales por defecto. `proxy_buffering off`, o el búfer de nginx desharía el streaming de T2-05. |
+| 2026-08-09 | **T2-26** Reproducibilidad del build — **completada** | Dos `docker build --no-cache`: **310 paquetes, lista idéntica**; `node v22.23.2` y `pnpm 11.21.0` en las dos; y el compilado (108 archivos) con el **mismo md5**: `dc10fd00…` | **El comando de la ficha no sirve en esta imagen y por poco lo doy por bueno:** `pnpm list --depth=0` falla con `EACCES` sobre `/root/.local/share/pnpm` porque desde T1-21 el contenedor corre como `node`. Las dos imágenes devolvían lo mismo… **que era el mismo error**, y el `diff` limpio no demostraba nada. Se sustituye por el listado de `node_modules/.pnpm` y el md5 del compilado, que además comprueba que dos builds dan el mismo artefacto. |
+
+| 2026-08-09 | **T2-31** Reuso de refresh tokens — **completada** | Se rota un token, se presenta el viejo → 401 **y el legítimo recién emitido también deja de servir**; en la base los dos hashes a `null` y una entrada `REFRESH_REUSE`. Falsificado quitando el guardado del hash gastado: cae el test del escenario y sobreviven los cuatro que describen lo que no debía cambiar. `verify` ✅ **319/319** (5 nuevos) | Lo que cambia no es el 401 —ya lo daba— sino lo de después. Se cierra la familia entera porque no hay forma de saber cuál de los dos tokens tiene el atacante. **Tres de los cinco tests son de falsos positivos**, que es donde esto se rompe: rotaciones encadenadas, token inventado y —el que obligó a tocar más código— presentar el viejo **tras un logout ordenado**, que no debe registrar anomalía. Se guarda un solo token anterior, no la familia: se dice. |
+| 2026-08-09 | **T2-30** Swagger completo — **completada** | De 3 módulos a **14 etiquetas, 43 rutas y 67 operaciones**, las 67 del router real; `/api/v1/docs` responde 200. `verify` ✅ **333/333** (14 nuevos) | La garantía no es una lista a mano: el test **recorre el árbol de Express** y exige que cada operación esté documentada, y también que el spec no prometa rutas inexistentes. Los cuatro catálogos se generan con una función en vez de copiarse. **El test cazó un fallo recién introducido por mí:** el spread de las rutas nuevas sobrescribió `/products/{id}/movements` y borró su `GET` —sustituye la clave, no fusiona—, documentando menos que antes y en silencio. |
+
+| 2026-08-09 | **T2-23** Cobertura de las zonas flojas — **completada** | `sale-orders.controller.ts` **69.44 → 86.11 %** (pide >75) y `upload.middleware.ts` **75.67 %** (pide >70). Global del backend **91.00 %**. `verify` ✅ **339/339** (6 nuevos) | Faltaban las tres rutas de solo lectura, las que nadie mira hasta que dejan de funcionar. El test del CSV comprueba que una orden de dos líneas produce **dos filas**: la diferencia entre contar órdenes y contar filas, que es lo que decide si el tope de T2-05 se queda corto. **`upload.middleware` llegó al umbral por otro camino** —T2-32— así que el test que proponía la ficha no habría medido nada nuevo. `nodemailer` se queda al 39 %: cubrirlo exige un SMTP falso y el criterio no lo pedía. |
+| 2026-08-09 | **T2-24** Contrato frontend ↔ backend — **completada** | Falsificado como pedía el criterio: cambiar `value: false` por `"false"` en el mock compartido hace fallar **dos archivos al cargarse**. `verify` ✅ **395/395** (6 nuevos) | La validación corre **al importar**, no dentro de un `it`: así falla cualquier test que use un mock desalineado, sin depender de que alguien invoque el de contrato. **Costó un intento:** el primer esquema declaraba `value: boolean \| number \| string` y aceptaba `{ type: "boolean", value: "false" }`, o sea el mock exacto que ocultó T1-06. Un contrato que acepta el defecto que debe cazar no vale nada. |
+
 ### Resumen por Tier
 
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 38 | 48 | 79 % |
+| **Tier 2** | **48** | **48** | **100 %** ✅ |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **73** | **107** | **68 %** |
+| **Total** | **83** | **107** | **78 %** |
 
 *El denominador ha crecido dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el porcentaje se mueve poco pese a cerrarse las siete. **Siguen siendo 17 las pendientes del Tier 2**, las mismas de antes: ninguna de las siete estaba en la lista de trabajo.*
 
@@ -1459,10 +1545,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-09) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **308/308** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **89.50 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **386/386** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **44.76 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
+| Tests backend | 198/198 ✅ | **339/339** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **91.00 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **395/395** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **44.89 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |

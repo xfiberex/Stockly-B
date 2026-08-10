@@ -262,4 +262,95 @@ describe("Sale Orders API", () => {
             expect(movements).toHaveLength(1); // solo el movimiento que tuvo éxito
         });
     });
+
+    // -----------------------------------------------------------------------
+    // T2-23: el controlador de órdenes de venta se quedaba en el 69 % porque el listado,
+    // la lectura por id y la exportación no tenían ningún test. Son las tres rutas de
+    // solo lectura, justo las que nadie mira hasta que dejan de funcionar.
+    describe("Listado, lectura y exportación (T2-23)", () => {
+        async function ordenDePrueba() {
+            const product = await prisma.product.create({
+                data: { name: "T223-Teclado", price: 25, stock: 10, minStock: 0 },
+            });
+            const res = await request(app).post(BASE).set("Cookie", adminCookie).send({
+                customerName: "Cliente T223",
+                items: [{ productId: product.id, productName: product.name, quantity: 2, unitPrice: 25 }],
+            });
+            expect(res.status).toBe(201);
+            return { product, orderId: res.body.data.id as string };
+        }
+
+        it("200: el listado viene paginado, con la lista dentro de data.data", async () => {
+            await ordenDePrueba();
+
+            const res = await request(app).get(BASE).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.data).toHaveLength(1);
+            expect(res.body.data.meta).toMatchObject({ total: 1, page: 1 });
+        });
+
+        it("200: el filtro por estado descarta las que no coinciden", async () => {
+            await ordenDePrueba();
+
+            const enviadas = await request(app).get(`${BASE}?status=SHIPPED`).set("Cookie", adminCookie);
+            const pendientes = await request(app).get(`${BASE}?status=PENDING`).set("Cookie", adminCookie);
+
+            expect(enviadas.body.data.data).toHaveLength(0);
+            expect(pendientes.body.data.data).toHaveLength(1);
+        });
+
+        it("200 y 404: lectura por id", async () => {
+            const { orderId } = await ordenDePrueba();
+
+            const encontrada = await request(app).get(`${BASE}/${orderId}`).set("Cookie", adminCookie);
+            expect(encontrada.status).toBe(200);
+            expect(encontrada.body.data.items).toHaveLength(1);
+
+            const inexistente = await request(app)
+                .get(`${BASE}/aaaaaaaa-1111-2222-3333-444444444444`)
+                .set("Cookie", adminCookie);
+            expect(inexistente.status).toBe(404);
+        });
+
+        it("exporta en CSV una fila por línea de orden, no una por orden", async () => {
+            const product = await prisma.product.create({
+                data: { name: "T223-Ratón", price: 15, stock: 10, minStock: 0 },
+            });
+            await request(app).post(BASE).set("Cookie", adminCookie).send({
+                customerName: "Cliente dos líneas",
+                items: [
+                    { productId: product.id, productName: product.name, quantity: 1, unitPrice: 15 },
+                    { productName: "Servicio de instalación", quantity: 1, unitPrice: 40 },
+                ],
+            });
+
+            const res = await request(app).get(`${BASE}/export?format=csv`).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.headers["content-type"]).toMatch(/text\/csv/);
+            // Cabecera + dos líneas: es la diferencia entre contar órdenes y contar filas,
+            // que es justo lo que decide si el tope de la exportación se queda corto.
+            const lineas = res.text.replace(/^﻿/, "").trim().split("\n");
+            expect(lineas).toHaveLength(3);
+            expect(lineas[0]).toBe("orderId,status,customerName,customerEmail,createdAt,productName,quantity,unitPrice,totalLine");
+            expect(res.text).toContain("Servicio de instalación");
+        });
+
+        it("exporta en JSON con el sobre de la API", async () => {
+            await ordenDePrueba();
+
+            const res = await request(app).get(`${BASE}/export`).set("Cookie", adminCookie);
+
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ success: true, message: "Órdenes de venta exportadas" });
+            expect(res.body.data[0]).toMatchObject({ productName: "T223-Teclado", quantity: 2, totalLine: 50 });
+        });
+
+        it("401: exportar sin cookie", async () => {
+            const res = await request(app).get(`${BASE}/export`);
+            expect(res.status).toBe(401);
+        });
+    });
+
 });

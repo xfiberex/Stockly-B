@@ -7,7 +7,10 @@ export type AuditAction =
     | "STOCK_MOVEMENT" | "BULK_STOCK"
     | "ORDER_RECEIVE" | "ORDER_CANCEL"
     | "USER_ROLE_CHANGE" | "USER_ACTIVATE" | "USER_DEACTIVATE"
-    | "SALE_SHIP" | "SALE_CANCEL";
+    | "SALE_SHIP" | "SALE_CANCEL"
+    // T2-31: reuso de un refresh token ya rotado. Es el único que no lo provoca una
+    // acción del usuario sino una anomalía, y por eso se registra sin actor conocido.
+    | "REFRESH_REUSE";
 
 export type AuditEntity = "Product" | "PurchaseOrder" | "SaleOrder" | "User" | "Tag" | "Category" | "Brand" | "Supplier";
 
