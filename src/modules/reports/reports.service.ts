@@ -8,7 +8,8 @@ export const reportsService = {
         const [
             totalProducts,
             activeProducts,
-            products,
+            totalesDeInventario,
+            porCategoria,
             topByValue,
             movementsByMonth,
             lowStockProducts,
@@ -16,10 +17,37 @@ export const reportsService = {
         ] = await Promise.all([
             prisma.product.count(),
             prisma.product.count({ where: { isActive: true } }),
-            prisma.product.findMany({
-                where: { isActive: true },
-                select: { id: true, name: true, sku: true, price: true, stock: true, minStock: true, category: { select: { name: true } } },
-            }),
+            // T2-02 — el valor de inventario y el recuento de stock bajo, en la base.
+            //
+            // Antes esto era un `findMany` sin `take` que traía **el catálogo activo
+            // entero** al proceso Node —todas las filas, con su categoría— para sumar en
+            // JavaScript dos números y contar cuántas cumplen una condición. Es la
+            // consulta que alimenta el dashboard, la primera pantalla tras el login: el
+            // coste crece con el catálogo aunque el resultado sean cinco cifras.
+            //
+            // `COUNT(*) FILTER (WHERE …)` recorre la tabla una sola vez para las dos
+            // cosas, y `SUM` sobre `numeric` suma en decimal exacto en vez de acumular
+            // errores de coma flotante producto a producto.
+            prisma.$queryRaw<Array<{ inventoryValue: number; lowStockCount: bigint }>>`
+                SELECT
+                    COALESCE(SUM(price * stock), 0)::float8 AS "inventoryValue",
+                    COUNT(*) FILTER (WHERE stock <= "minStock") AS "lowStockCount"
+                FROM products
+                WHERE "isActive" = true
+            `,
+            // Stock y valor por categoría, agrupados también en la base. El `COALESCE`
+            // del nombre reproduce el «Sin categoría» que ponía el bucle de JavaScript.
+            prisma.$queryRaw<Array<{ name: string; stock: number; value: number }>>`
+                SELECT
+                    COALESCE(c.name, 'Sin categoría') AS name,
+                    COALESCE(SUM(p.stock), 0)::int AS stock,
+                    COALESCE(SUM(p.price * p.stock), 0)::float8 AS value
+                FROM products p
+                LEFT JOIN categories c ON c.id = p."categoryId"
+                WHERE p."isActive" = true
+                GROUP BY 1
+                ORDER BY value DESC
+            `,
             // Top 10 por valor de inventario (precio × stock), no por cantidad.
             prisma.$queryRaw<Array<{ id: string; name: string; sku: string | null; price: string; stock: number }>>`
                 SELECT id, name, sku, price, stock
@@ -70,17 +98,10 @@ export const reportsService = {
             `,
         ]);
 
-        const inventoryValue = products.reduce((sum, p) => sum + Number(p.price) * p.stock, 0);
-        const lowStockCount = products.filter((p) => p.stock <= p.minStock).length;
-
-        // Agrupar stock por categoría
-        const stockByCategory: Record<string, number> = {};
-        const valueByCategory: Record<string, number> = {};
-        for (const p of products) {
-            const cat = p.category?.name ?? "Sin categoría";
-            stockByCategory[cat] = (stockByCategory[cat] ?? 0) + p.stock;
-            valueByCategory[cat] = (valueByCategory[cat] ?? 0) + Number(p.price) * p.stock;
-        }
+        // Un `GROUP BY` sin filas no devuelve ninguna, así que la fila de totales sí
+        // existe siempre (es un agregado sin agrupación) pero conviene no darla por hecha.
+        const inventoryValue = Number(totalesDeInventario[0]?.inventoryValue ?? 0);
+        const lowStockCount = Number(totalesDeInventario[0]?.lowStockCount ?? 0);
 
         // Calcular métricas de rotación y proyección
         const rotationMetrics = stockMetrics.map((m) => {
@@ -110,7 +131,11 @@ export const reportsService = {
                 inventoryValue,
                 lowStockCount,
             },
-            stockByCategory: Object.entries(stockByCategory).map(([name, stock]) => ({ name, stock, value: valueByCategory[name] ?? 0 })),
+            stockByCategory: porCategoria.map((c) => ({
+                name: c.name,
+                stock: Number(c.stock),
+                value: Number(c.value),
+            })),
             topByValue: topByValue.map((p) => ({
                 id: p.id,
                 name: p.name,

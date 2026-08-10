@@ -106,6 +106,10 @@ model Product {
   // del compuesto, ese caso sigue cubierto sin un índice propio.
   @@index([createdAt])
   @@index([isActive, createdAt])
+  // La búsqueda del catálogo es `ILIKE '%término%'`, y un B-tree no sirve para un patrón
+  // que no empieza por prefijo: hay que recorrer la tabla. Un índice GIN de trigramas sí
+  // (T2-09). Requiere la extensión `pg_trgm`, que crea la propia migración.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("products")
 }
 
@@ -185,6 +189,11 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  // El buscador de usuarios mira **nombre y correo** con el mismo `ILIKE '%…%'`, así que
+  // se indexan los dos: con uno solo, la mitad del `OR` seguiría recorriendo la tabla y
+  // el planificador descartaría el índice entero (T2-09).
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("users")
 }
 

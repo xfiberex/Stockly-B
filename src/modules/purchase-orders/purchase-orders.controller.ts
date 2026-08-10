@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { purchaseOrderService } from "./purchase-orders.service";
 import { auditService } from "@/modules/audit-logs";
-import { buildCsv } from "@/shared/lib/csv";
+import { enviarExportacion } from "@/shared/lib/exportacion";
 import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 export async function getAllOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -80,18 +80,14 @@ export async function deleteOrder(
 
 export async function exportOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const rows = await purchaseOrderService.exportAll();
-        const format = (req.query.format as string | undefined) ?? "json";
-
-        if (format === "csv") {
-            const csv = buildCsv(rows);
-            res.setHeader("Content-Type", "text/csv");
-            res.setHeader("Content-Disposition", "attachment; filename=purchase-orders.csv");
-            res.send(csv);
-            return;
-        }
-
-        res.json({ success: true, message: "Órdenes exportadas exitosamente", data: rows });
+        // T2-05: el servicio entrega lotes y la respuesta se escribe según llegan.
+        await enviarExportacion(res, {
+            formato: req.query.format as string | undefined,
+            nombreArchivo: "purchase-orders",
+            mensaje: "Órdenes exportadas exitosamente",
+            total: await purchaseOrderService.contarParaExportar(),
+            lotes: purchaseOrderService.exportarPorLotes(),
+        });
     } catch (error) {
         next(error);
     }

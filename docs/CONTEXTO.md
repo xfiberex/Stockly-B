@@ -56,17 +56,17 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **298/298** | **386/386** |
-| Cobertura (sentencias) | 89.04 % *(suelo 85 %)* | 44.76 % *(suelo 42 %)* |
+| Tests | **308/308** | **386/386** |
+| Cobertura (sentencias) | 89.50 % *(suelo 85 %)* | 44.76 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
 de datos, el backend y el frontend—. En este equipo (2026-08-08): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 35/48** · Total **70/107**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 38/48** · Total **73/107**.
 
-*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. Las pendientes del Tier 2 son **13**, y las 13 tienen ya todas sus dependencias satisfechas.*
+*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. Las pendientes del Tier 2 son **10**, y las 10 tienen ya todas sus dependencias satisfechas.*
 
 **Los dos primeros tiers están cerrados.** La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -114,6 +114,16 @@ de stock asociados y la FK lo impide. Basta con limpiar lo propio.
 contra ella falla con **P3005** («the database schema is not empty»). Se sincroniza con
 `prisma db push` apuntando `DATABASE_URL` a `Stockly_test` — y hay que hacerlo cada vez que
 se añade una migración, porque `pnpm verify` solo migra la base de desarrollo.
+
+**`prisma db push` no ejecuta el SQL de las migraciones.** Solo lleva el *esquema* a la
+base, así que todo lo que viva únicamente en un archivo de migración —un `CREATE
+EXTENSION`, un índice parcial, un trigger— no llega a `Stockly_test`. Desde T2-09 esto
+importa: el push falla con «no existe la clase de operadores gin_trgm_ops» hasta que se
+crea `pg_trgm` a mano en esa base, una sola vez:
+
+```bash
+node -e "const {Client}=require('pg');(async()=>{const c=new Client({connectionString:'…/Stockly_test'});await c.connect();await c.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');await c.end();})()"
+```
 
 **CSRF** (double-submit): para un PATCH/POST manual contra el servidor hay que leer la
 cookie `csrfToken` y reenviarla en la cabecera `x-csrf-token`. En `NODE_ENV=test` se

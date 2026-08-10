@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
 import { auditService } from "@/modules/audit-logs";
 import { buildCsv } from "@/shared/lib/csv";
+import { enviarExportacion } from "@/shared/lib/exportacion";
 import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
 export async function getProducts(
@@ -140,18 +141,14 @@ export async function exportProducts(
     next: NextFunction,
 ): Promise<void> {
     try {
-        const products = await productService.exportAll();
-        const format = (req.query.format as string | undefined) ?? "json";
-
-        if (format === "csv") {
-            const csv = buildCsv(products as unknown as Record<string, unknown>[]);
-            res.setHeader("Content-Type", "text/csv");
-            res.setHeader("Content-Disposition", "attachment; filename=products.csv");
-            res.send(csv);
-            return;
-        }
-
-        res.json({ success: true, message: "Productos exportados exitosamente", data: products });
+        // T2-05: el servicio entrega lotes y la respuesta se escribe según llegan.
+        await enviarExportacion(res, {
+            formato: req.query.format as string | undefined,
+            nombreArchivo: "products",
+            mensaje: "Productos exportados exitosamente",
+            total: await productService.contarParaExportar(),
+            lotes: productService.exportarPorLotes(),
+        });
     } catch (error) {
         next(error);
     }

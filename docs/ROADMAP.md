@@ -433,13 +433,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Falsificado** comentando el `app.use`: caen 4 de los 5 tests, y el que sobrevive es justamente «las rutas que sí existen siguen respondiendo».
   - **Un caso del test se corrigió al comprobarlo contra el servidor real:** empezó siendo `DELETE /api/v1/health`, que en jest da 404 pero en producción **no llega hasta aquí** —la protección CSRF va antes del router y lo corta con un 403; en tests el CSRF se omite—. Se sustituyó por `GET /api/v1/auth/login`, verbo no mutante sobre una ruta que solo existe para POST, que se comporta igual en los dos sitios.
 
-- [ ] **[T2-02] Bajar a SQL los agregados del resumen de reportes**
+- [x] **[T2-02] Bajar a SQL los agregados del resumen de reportes** ✅ *(2026-08-09)*
   - **Área:** Rendimiento
-  - **Ubicación:** `Stockly-B/src/modules/reports/reports.service.ts:19-22,73-83`
+  - **Ubicación:** `Stockly-B/src/modules/reports/reports.service.ts:19-49,73-77,105-118`
   - **Qué hacer:** Un `findMany` sin `take` carga todos los productos activos en memoria para calcular el valor de inventario y los totales por categoría en JavaScript, junto a cinco consultas SQL crudas que sí están optimizadas. Es la consulta que alimenta el dashboard, la primera pantalla tras el login. Sustituir por `GROUP BY` con `SUM(price*stock)` y `COUNT(*) FILTER (WHERE stock <= "minStock")`.
   - **Criterio de aceptación:** `GET /api/v1/reports` devuelve exactamente los mismos valores que hoy (la cobertura de `reports.service.ts` es del 100 %, sirve de red) y ya no materializa el catálogo en el proceso Node.
   - **Esfuerzo:** medio
   - **Depende de:** T1-15
+  - **Verificado localmente (2026-08-09):** con **40 000 productos activos**, `getSummary()` pasa de **200.4 ms a 27.3 ms** de mediana (5 pasadas tras calentamiento) y el heap de **178.9 MB a 32.8 MB**. `verify` ✅ **301/301** (3 tests nuevos); `reports.service.ts` mantiene el **100 %** de sentencias.
+  - **La equivalencia se comprobó comparando las dos respuestas completas**, no confiando en los tests: se capturó el JSON con la versión anterior (`git stash`), se restauró la nueva y se compararon. `totals` idéntico, `stockByCategory` con **el mismo contenido**, y `topByValue`, `movementsByMonth`, `lowStockProducts` y `stockMetrics` byte a byte iguales.
+  - **Lo único que cambia es el orden de `stockByCategory`,** y es a mejor: antes lo daba el recorrido del `findMany`, o sea el que quisiera la base, así que dos cargas seguidas podían pintar el gráfico distinto. Ahora es `ORDER BY value DESC`, determinista. Comprobado en el dashboard real: mismos KPIs (`$2,211,974.00`, 52/48/4/8) y las barras descendiendo por valor.
+  - **`COUNT(*) FILTER (WHERE …)`** deja el recuento de stock bajo en la misma pasada que la suma del valor, en vez de recorrer el catálogo dos veces en JavaScript. Y `SUM` sobre `numeric` suma en **decimal exacto**, en lugar de acumular error de coma flotante producto a producto.
+  - **Tres tests para los bordes que el bucle resolvía sin querer** y que son fáciles de perder al traducir: los productos sin categoría se agrupan bajo «Sin categoría» (el `COALESCE` sobre el `LEFT JOIN`), el orden por valor es descendente, y los inactivos no cuentan ni para el valor ni para el desglose — el `WHERE "isActive" = true` va ahora repetido en cada agregado, y olvidarlo en uno solo lo desviaría todo. **Falsificados** contra la implementación anterior: dos de los tres fallan con ella.
 
 - [x] **[T2-03] Paginar el listado de órdenes de compra en el backend** ✅ *(2026-08-07)*
   - **Área:** Rendimiento
@@ -461,13 +466,24 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
     La clave de React Query incluye los parámetros, así que cada página se cachea por separado y las invalidaciones por prefijo siguen funcionando. Borrar la última orden de una página retrocede a la anterior, resuelto en el propio manejador del evento para no añadir un `setState` en efecto (ver T1-10).
     **Encontrado por el camino:** el contador decía «ordenes», sin tilde, porque el plural se construía concatenando `"es"`. Corregido.
 
-- [ ] **[T2-05] Exportaciones por lotes y en streaming**
+- [x] **[T2-05] Exportaciones por lotes y en streaming** ✅ *(2026-08-09)*
   - **Área:** Rendimiento
-  - **Ubicación:** `Stockly-B/src/modules/products/product.service.ts:208-239`, `sale-orders/sale-orders.service.ts:158-181`, `purchase-orders/purchase-orders.service.ts:107-133`
+  - **Ubicación:** `Stockly-B/src/shared/lib/exportacion.ts` (nuevo), `products/product.service.ts`, `sale-orders/sale-orders.service.ts`, `purchase-orders/purchase-orders.service.ts` y sus tres controladores
   - **Qué hacer:** Los tres `exportAll()` cargan la tabla completa y `buildCsv` concatena todo en una sola cadena antes de enviarla. Paginar con cursor y escribir el CSV en streaming sobre `res`, enviando primero la cabecera. Añadir un tope duro configurable como red de seguridad.
   - **Criterio de aceptación:** exportar 50 000 productos no dispara el uso de memoria del proceso por encima de un umbral razonable y el archivo resultante es idéntico al actual para conjuntos pequeños.
   - **Esfuerzo:** medio
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-09):** con **50 000 productos**, el servidor real entrega **3.58 MB y 50 053 líneas en 4.0 s**. `verify` ✅ **308/308** (7 tests nuevos).
+  - **La prueba de memoria buena no es el pico de heap, y el primer intento se quedó corto.** Medido sin restricción, el pico apenas bajaba (105.2 → 92.5 MB), porque `heapUsed` cuenta también la basura que V8 aún no ha recogido y no distingue lo vivo de lo suelto. **Con el heap limitado a 48 MB la diferencia es categórica:** la forma anterior muere con `FATAL ERROR: Reached heap limit`; la nueva **termina en 4.2 s con un pico de 42.5 MB**.
+  - **El tamaño de lote es el parámetro que fija ese techo,** no un ajuste fino. Con el mismo límite de 48 MB: 500 → 4272 ms y 42.6 MB; 1000 → 3151 ms y 46.4 MB; **2000 y 5000 se quedan sin memoria**. Se elige **500** aunque 1000 sea un 25 % más rápido: la tarea va de acotar la memoria y 1000 deja el pico a 2 MB del límite. Una exportación es una descarga en segundo plano, y el segundo que se gana no compensa medio margen.
+  - **Cuesta más tiempo, y eso se dice:** 832 ms → 4.0 s para 50 000 filas, porque son 100 consultas con sus *joins* en vez de una. Es el precio de no tener el archivo entero en memoria, y con el catálogo real (52 productos) la exportación tarda **63 ms**.
+  - **El JSON también se transmite por partes.** La ficha hablaba del CSV, pero `res.json({ data: rows })` tenía exactamente el mismo problema, así que se construye el sobre a mano alrededor del array.
+  - **Contrapresión, o el streaming no sirve de nada:** escribir en bucle sobre una respuesta más lenta que la base acumula en el búfer del socket justo lo que se quería evitar. Se espera a `drain` cuando `res.write` devuelve `false`.
+  - **El tope se comprueba antes del primer byte** y responde 413. Después de enviar la cabecera ya no se puede responder un error: solo quedaría cortar el archivo por la mitad y que el usuario se llevara una exportación incompleta creyéndola buena. Hay un test que comprueba que **no se escribió nada** al rechazar. El tope es de **filas del archivo**, no de registros: una orden con veinte líneas son veinte filas, así que las dos exportaciones de órdenes cuentan ítems.
+  - **La igualdad del archivo se comprueba contra `buildCsv`**, que es la función que lo generaba antes: si el escapado fila a fila cambiara una coma, una comilla o el orden de las columnas, el test lo caza. Incluye un producto cuyo nombre empieza por `=` para que la protección contra inyección de fórmulas siga aplicándose.
+  - **Salvedad honesta sobre el desempate por `id` del cursor:** se añade para que el orden sea total y la paginación no dependa de que Postgres devuelva el mismo orden arbitrario en cada página. **No he conseguido falsificarlo**: quitándolo, los tests siguen pasando, incluido el de 600 filas con el mismo `createdAt`. Se queda como garantía por construcción, no como corrección de un fallo reproducido, y así está anotado en el código.
+  - **Un fallo propio de la limpieza del test**, que conviene no repetir: `deleteMany({ name: { startsWith: "T205-" } })` no borraba el producto llamado `=T205-dos`, y contaminaba los tres tests siguientes. Se arregla con `contains`.
+  - **Los 50 000 productos de banco se borraron** al terminar (52, como antes).
 
 - [ ] **[T2-06] Reducir el chunk `vendor` del frontend**
   - **Área:** Rendimiento
@@ -503,13 +519,28 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Medido forzando la vía antigua** con una variable de entorno: la rama de reserva es literalmente el algoritmo anterior, así que el «antes» no es una estimación. Los **4400 productos** de banco se borraron al terminar (52, como antes).
   - **El caso de la fila mala costó un intento:** el primero usaba un nombre de 300 caracteres, que el validador rechaza antes de llegar a la base (422). Se cambió por un precio de 100 000 000, que pasa Zod —solo exige que sea positivo— y revienta contra `Decimal(10, 2)`, que es el fallo que solo aparece al insertar.
 
-- [ ] **[T2-09] Índice trigram para la búsqueda por nombre**
+- [x] **[T2-09] Índice trigram para la búsqueda por nombre** ✅ *(2026-08-09)*
   - **Área:** Rendimiento
-  - **Ubicación:** `Stockly-B/src/modules/products/product.service.ts:48`, `users/users.service.ts:30-33`, nueva migración
+  - **Ubicación:** `Stockly-B/prisma/schema.prisma`, migración `20260810011125_t2_09_indices_trigram`
   - **Qué hacer:** `{ contains, mode: "insensitive" }` genera `ILIKE '%término%'`, que ningún índice B-tree aprovecha. Migración manual con `CREATE EXTENSION pg_trgm` e índices GIN sobre `products.name` y `users.email`.
   - **Criterio de aceptación:** `EXPLAIN ANALYZE` de la búsqueda del catálogo usa el índice GIN en lugar de un recorrido secuencial.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-15
+  - **Verificado localmente (2026-08-09):** `EXPLAIN (ANALYZE, BUFFERS)` sobre **40 000 productos**, el mismo banco que T2-43. El criterio se cumple de forma literal: el plan pasa de recorrido secuencial a **`Bitmap Index Scan on products_name_idx`**. `verify` ✅ **298/298**.
+
+    | Consulta | Antes | Después |
+    |---|---:|---:|
+    | Término con pocas coincidencias (página 1) | 24.914 ms · 663 buffers | **0.346 ms · 33** |
+    | Término inexistente (página 1) | 24.851 ms · 660 | **0.030 ms · 19** |
+    | Recuento de un término común | 23.899 ms · 660 | **5.738 ms** |
+    | Término común (página 1) | 0.130 ms | 0.133 ms *(sin cambio)* |
+
+  - **El caso que parecía el principal ya era rápido, y no ha mejorado.** Buscar un término con muchas coincidencias resuelve la primera página recorriendo el índice de `createdAt` hasta juntar diez filas, así que nunca fue el problema. **Lo que dolía era lo contrario**: un término raro o inexistente obliga a mirar la tabla entera antes de poder decir «no hay nada» — y eso es justo lo que hace el usuario que no encuentra un producto y prueba otra palabra. De ahí la mejora de **72×** y **828×**.
+  - **También el recuento**, que se paga en *cada* búsqueda porque la respuesta lleva `meta.total`: 4× más rápido. Ahí la ganancia es menor porque sigue habiendo que tocar 5000 filas.
+  - **En usuarios se indexan nombre y correo, no solo el correo** como decía la ficha: el buscador mira los dos con el mismo `OR`, y con un solo índice la otra mitad seguiría recorriendo la tabla, con lo que el planificador descartaría el índice entero. **Medición honesta: ahí no se nota nada** (0.038 → 0.029 ms), porque la tabla tiene un puñado de filas; el índice está puesto para cuando deje de tenerlas.
+  - **La extensión la crea la migración**, editada a mano sobre la que generó Prisma: `gin_trgm_ops` no existe sin `pg_trgm` y las tres creaciones de índice fallan. En el esquema sí se declaran los índices, con `@@index([name(ops: raw("gin_trgm_ops"))], type: Gin)`, así que no quedan como SQL suelto fuera del modelo.
+  - **Trampa nueva, ya anotada en CONTEXTO.md:** `prisma db push` —que es como se sincroniza `Stockly_test`— **no ejecuta el SQL de las migraciones**, así que la extensión no llega ahí y el push muere con «no existe la clase de operadores gin_trgm_ops». Hay que crear `pg_trgm` a mano en esa base una vez.
+  - **Los 40 000 productos de banco se borraron** al terminar (52, como antes).
 
 ### Observabilidad
 
@@ -1405,16 +1436,20 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-09 | **T2-32** Imágenes validadas por su firma — **completada** | Un ejecutable (`MZ…`) enviado como `image/jpeg` se rechaza con **422**; JPEG, PNG y WebP reales pasan. Falsificado confiando en la cabecera: caen 4 de 9. `verify` ✅ **296/296** (9 nuevos) | **No puede ir en `fileFilter`:** multer lo llama antes de leer el contenido, así que ahí solo existe la cabecera del cliente. Va después de `upload.single(...)`. Sin `file-type` a propósito: tres formatos, doce bytes, y la librería es ESM puro contra un proyecto CommonJS. WebP obliga a mirar dos trozos —`RIFF` y `WEBP` en el byte 8—, y hay un test con un WAV para que `RIFF` no baste. Un test recorre las rutas y exige la comprobación en toda línea con `upload.single(`. **Volvió a morder la trampa del mock:** cuatro suites dejaron de arrancar con «argument handler must be a function». |
 | 2026-08-09 | **T2-08** Importación masiva agrupada — **completada** | 1000 productos: **806 → 271-414 ms**. Consultas de inserción: con 200 productos **396 → 2**; con 1000, **10**. `verify` ✅ **298/298** (2 nuevos) | Se agrupa con `createMany` en vez de bajar el lote a 10, que mantendría las 2000 consultas y solo las haría menos simultáneas. **La atribución de errores por fila se conserva** —lo que más fácil era perder— reintentando fila a fila si el lote falla; como `createMany` es una sentencia atómica, ese reintento no puede duplicar nada. El «antes» se midió **forzando la vía de reserva**, que es literalmente el algoritmo anterior. El caso de la fila mala costó un intento: un nombre de 300 caracteres lo rechaza Zod antes de llegar a la base; un precio de 100 000 000 pasa Zod y revienta contra `Decimal(10, 2)`. |
 
+| 2026-08-09 | **T2-09** Índice de trigramas en la búsqueda — **completada** | Sobre 40 000 productos: término raro **24.914 → 0.346 ms** (663 → 33 buffers), inexistente **24.851 → 0.030 ms**, recuento **23.899 → 5.738 ms**. El plan pasa a `Bitmap Index Scan on products_name_idx`. `verify` ✅ **298/298** | **El caso que parecía el principal ya era rápido y no mejora**: con muchas coincidencias, la primera página se resuelve por el índice de `createdAt`. Lo que dolía era lo contrario — un término raro obliga a mirar la tabla entera para poder decir «no hay nada», que es lo que hace quien no encuentra un producto y prueba otra palabra. En usuarios se indexan nombre **y** correo, no solo el correo: con uno la otra mitad del `OR` seguiría recorriendo la tabla. Ahí no se nota nada y se dice: son cuatro filas. **Trampa nueva:** `db push` no ejecuta el SQL de las migraciones, así que `pg_trgm` hay que crearla a mano en `Stockly_test`. |
+| 2026-08-09 | **T2-02** Agregados del dashboard en SQL — **completada** | Con 40 000 productos activos: **200.4 → 27.3 ms** de mediana y heap **178.9 → 32.8 MB**. `verify` ✅ **301/301** (3 nuevos), `reports.service.ts` sigue al **100 %** | La equivalencia se comprobó **comparando las dos respuestas completas** (capturada con `git stash`), no confiando en los tests: `totals` idéntico y el resto del informe byte a byte. Lo único que cambia es el orden de `stockByCategory`, y a mejor: antes lo daba el recorrido del `findMany` y dos cargas podían pintar el gráfico distinto. Los tres tests nuevos cubren los bordes fáciles de perder al traducir —«Sin categoría», orden, inactivos— y **dos de los tres fallan** contra la implementación anterior. |
+| 2026-08-09 | **T2-05** Exportaciones en streaming — **completada** | 50 000 productos: **3.58 MB en 4.0 s**. Con el heap limitado a **48 MB**, la forma anterior muere con `Reached heap limit` y la nueva termina con **pico de 42.5 MB**. `verify` ✅ **308/308** (7 nuevos) | **El primer intento de medición se quedó corto:** sin restricción, el pico apenas bajaba (105.2 → 92.5 MB), porque `heapUsed` cuenta la basura no recogida. El tamaño de lote **es** el techo de memoria: con 48 MB, 500 y 1000 caben y 2000 y 5000 no. Se elige 500 sobre 1000 pese a ser un 25 % más lento, porque 1000 deja el pico a 2 MB del límite. **Cuesta más tiempo y se dice:** 832 ms → 4.0 s, el precio de no tener el archivo en memoria. El JSON también se transmite por partes, que la ficha no pedía y tenía el mismo problema. **El desempate del cursor no se pudo falsificar** y se documenta como garantía, no como fallo corregido. |
+
 ### Resumen por Tier
 
 | Tier | Completadas | Total | % |
 |---|---:|---:|---:|
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
-| Tier 2 | 35 | 48 | 73 % |
+| Tier 2 | 38 | 48 | 79 % |
 | Tier 3 | 1 | 15 | 7 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **70** | **107** | **65 %** |
+| **Total** | **73** | **107** | **68 %** |
 
 *El denominador ha crecido dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el porcentaje se mueve poco pese a cerrarse las siete. **Siguen siendo 17 las pendientes del Tier 2**, las mismas de antes: ninguna de las siete estaba en la lista de trabajo.*
 
@@ -1424,8 +1459,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-09) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **298/298** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **89.04 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests backend | 198/198 ✅ | **308/308** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **89.50 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
 | Tests frontend | 181/181 ✅ | **386/386** ✅ | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **44.76 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
@@ -1434,7 +1469,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
-| Índices no-únicos en el esquema | 0 | **16** ✅ *(T2-43 añade los del orden por `createdAt`)* | cubrir FK y ordenaciones |
+| Índices no-únicos en el esquema | 0 | **19** ✅ *(T2-43 los del orden por `createdAt`; T2-09 los GIN de trigramas)* | cubrir FK, ordenaciones y búsqueda |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
 | CSS de la aplicación (build) | 78.40 kB · gzip 13.55 | **68.40 kB · gzip 12.14** ✅ | bajar con la escala y los subconjuntos |
 | Archivos de fuente emitidos | 56 *(7 subconjuntos × 4 pesos × 2 formatos)* | **8** ✅ | solo el subconjunto latino |

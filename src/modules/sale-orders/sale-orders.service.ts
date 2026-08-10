@@ -3,6 +3,7 @@ import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
+import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 const ORDER_INCLUDE = {
@@ -193,16 +194,34 @@ export const saleOrderService = {
         await prisma.saleOrder.delete({ where: { id } });
     },
 
-    async exportAll() {
-        const orders = await prisma.saleOrder.findMany({
-            orderBy: { createdAt: "desc" },
-            include: ORDER_INCLUDE,
-        });
+    /**
+     * T2-05 — filas del archivo, que **no** son órdenes: cada línea de una orden es una
+     * fila. Contar órdenes dejaría el tope de la exportación corto por un factor que
+     * depende de cuántos productos lleve cada una.
+     */
+    async contarParaExportar() {
+        return prisma.saleOrderItem.count();
+    },
 
-        const rows: Record<string, unknown>[] = [];
-        for (const o of orders) {
-            for (const item of o.items) {
-                rows.push({
+    /** Las órdenes en lotes, por cursor, aplanadas a una fila por línea (T2-05). */
+    async *exportarPorLotes() {
+        let cursor: string | undefined;
+
+        for (;;) {
+            const pagina = await prisma.saleOrder.findMany({
+                take: TAM_LOTE_EXPORTACION,
+                ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+                // El desempate por `id` da un orden total, que es lo que hace correcta
+                // la paginación sin depender de que Postgres devuelva el mismo orden
+                // arbitrario en cada página (ver el detalle en `product.service.ts`).
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                include: ORDER_INCLUDE,
+            });
+
+            if (pagina.length === 0) return;
+
+            yield pagina.flatMap((o) =>
+                o.items.map((item) => ({
                     orderId: o.id,
                     status: o.status,
                     customerName: o.customerName ?? "",
@@ -212,9 +231,11 @@ export const saleOrderService = {
                     quantity: item.quantity,
                     unitPrice: Number(item.unitPrice),
                     totalLine: item.quantity * Number(item.unitPrice),
-                });
-            }
+                })),
+            );
+
+            if (pagina.length < TAM_LOTE_EXPORTACION) return;
+            cursor = pagina[pagina.length - 1]!.id;
         }
-        return rows;
     },
 };

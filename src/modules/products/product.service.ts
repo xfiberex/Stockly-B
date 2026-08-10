@@ -3,6 +3,7 @@ import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
+import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import type {
     CreateProductDto,
     UpdateProductDto,
@@ -19,6 +20,54 @@ const PRODUCT_INCLUDE = {
     supplier: { select: { id: true, name: true } },
     tags: { select: { id: true, name: true, color: true } },
 } as const;
+
+// T2-05 — columnas y forma de fila de la exportación del catálogo. Salen del servicio
+// para que el generador por lotes y su mapeo no se dupliquen.
+const PRODUCT_EXPORT_SELECT = {
+    id: true,
+    name: true,
+    description: true,
+    sku: true,
+    price: true,
+    stock: true,
+    minStock: true,
+    isActive: true,
+    category: { select: { name: true } },
+    brand: { select: { name: true } },
+    supplier: { select: { name: true } },
+    tags: { select: { name: true } },
+} as const;
+
+type ProductoExportado = {
+    name: string;
+    description: string | null;
+    sku: string | null;
+    price: unknown;
+    stock: number;
+    minStock: number;
+    isActive: boolean;
+    category: { name: string } | null;
+    brand: { name: string } | null;
+    supplier: { name: string } | null;
+    tags: Array<{ name: string }>;
+};
+
+/** `id` se pide para el cursor, pero no sale en el archivo: las columnas no cambian. */
+function filaDeExportacion(p: ProductoExportado) {
+    return {
+        name: p.name,
+        description: p.description,
+        sku: p.sku,
+        price: p.price,
+        stock: p.stock,
+        minStock: p.minStock,
+        isActive: p.isActive,
+        categoryName: p.category?.name ?? null,
+        brandName: p.brand?.name ?? null,
+        supplierName: p.supplier?.name ?? null,
+        tags: p.tags.map((t) => t.name).join(";"),
+    };
+}
 
 async function recordMovement(
     productId: string,
@@ -204,37 +253,42 @@ export const productService = {
         return prisma.product.update({ where: { id }, data: { isActive: true }, include: PRODUCT_INCLUDE });
     },
 
-    async exportAll() {
-        const products = await prisma.product.findMany({
-            orderBy: { createdAt: "desc" },
-            select: {
-                name: true,
-                description: true,
-                sku: true,
-                price: true,
-                stock: true,
-                minStock: true,
-                isActive: true,
-                category: { select: { name: true } },
-                brand: { select: { name: true } },
-                supplier: { select: { name: true } },
-                tags: { select: { name: true } },
-            },
-        });
+    /** Filas que tendrá la exportación, para decidir el tope antes de escribir nada (T2-05). */
+    async contarParaExportar() {
+        return prisma.product.count();
+    },
 
-        return products.map((p) => ({
-            name: p.name,
-            description: p.description,
-            sku: p.sku,
-            price: p.price,
-            stock: p.stock,
-            minStock: p.minStock,
-            isActive: p.isActive,
-            categoryName: p.category?.name ?? null,
-            brandName: p.brand?.name ?? null,
-            supplierName: p.supplier?.name ?? null,
-            tags: p.tags.map((t) => t.name).join(";"),
-        }));
+    /**
+     * T2-05 — el catálogo en lotes, por cursor.
+     *
+     * Se pagina con cursor y no con `skip`: `OFFSET` obliga a Postgres a leer y
+     * descartar todas las filas anteriores en cada página, así que la última página de
+     * una exportación grande cuesta lo que la tabla entera.
+     *
+     * El desempate por `id` no estaba antes, y es lo que hace **correcta por
+     * construcción** la paginación: `createdAt` no es único —una importación masiva crea
+     * cientos de filas en el mismo instante—, y sin un orden total el resultado depende
+     * de que Postgres devuelva el mismo orden arbitrario en cada página. En la práctica
+     * lo hace mientras nadie escriba entre medias, y de hecho **los tests pasan también
+     * sin el desempate**: no es un fallo reproducido, es dejar de depender de una
+     * casualidad. Antes daba igual porque no había páginas.
+     */
+    async *exportarPorLotes() {
+        let cursor: string | undefined;
+
+        for (;;) {
+            const pagina = await prisma.product.findMany({
+                take: TAM_LOTE_EXPORTACION,
+                ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: PRODUCT_EXPORT_SELECT,
+            });
+
+            if (pagina.length === 0) return;
+            yield pagina.map(filaDeExportacion);
+            if (pagina.length < TAM_LOTE_EXPORTACION) return;
+            cursor = pagina[pagina.length - 1]!.id;
+        }
     },
 
     async importBulk(products: ImportProductDto[]) {

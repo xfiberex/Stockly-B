@@ -2,6 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
+import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 const ORDER_INCLUDE = {
@@ -175,19 +176,33 @@ export const purchaseOrderService = {
         await prisma.purchaseOrder.delete({ where: { id } });
     },
 
-    async exportAll() {
-        const orders = await prisma.purchaseOrder.findMany({
-            orderBy: { createdAt: "desc" },
-            include: {
-                supplier: { select: { name: true } },
-                items: { include: { product: { select: { sku: true } } } },
-            },
-        });
+    /** Filas del archivo: una por línea de orden, no una por orden (T2-05). */
+    async contarParaExportar() {
+        return prisma.purchaseOrderItem.count();
+    },
 
-        const rows: Record<string, unknown>[] = [];
-        for (const o of orders) {
-            for (const item of o.items) {
-                rows.push({
+    /** Las órdenes en lotes, por cursor, aplanadas a una fila por línea (T2-05). */
+    async *exportarPorLotes() {
+        let cursor: string | undefined;
+
+        for (;;) {
+            const pagina = await prisma.purchaseOrder.findMany({
+                take: TAM_LOTE_EXPORTACION,
+                ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+                // Desempate por `id`: `createdAt` no es único y el cursor necesita un
+                // orden total para no depender del que devuelva Postgres por su cuenta
+                // (ver el detalle en `product.service.ts`).
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                include: {
+                    supplier: { select: { name: true } },
+                    items: { include: { product: { select: { sku: true } } } },
+                },
+            });
+
+            if (pagina.length === 0) return;
+
+            yield pagina.flatMap((o) =>
+                o.items.map((item) => ({
                     orderId: o.id,
                     status: o.status,
                     supplierName: o.supplier?.name ?? "",
@@ -197,9 +212,11 @@ export const purchaseOrderService = {
                     quantity: item.quantity,
                     unitPrice: Number(item.unitPrice),
                     totalLine: item.quantity * Number(item.unitPrice),
-                });
-            }
+                })),
+            );
+
+            if (pagina.length < TAM_LOTE_EXPORTACION) return;
+            cursor = pagina[pagina.length - 1]!.id;
         }
-        return rows;
     },
 };

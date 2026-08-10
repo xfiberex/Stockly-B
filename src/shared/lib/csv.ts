@@ -1,4 +1,4 @@
-function escapeCsvCell(value: unknown): string {
+export function escapeCsvCell(value: unknown): string {
     const str = value === null || value === undefined ? "" : String(value);
     // Previene inyección de fórmulas (CSV injection): una celda que empieza con
     // = + - @ tab o retorno de carro puede ejecutarse como fórmula en Excel/Sheets.

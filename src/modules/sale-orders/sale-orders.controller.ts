@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { saleOrderService } from "./sale-orders.service";
 import { auditService } from "@/modules/audit-logs";
-import { buildCsv } from "@/shared/lib/csv";
+import { enviarExportacion } from "@/shared/lib/exportacion";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 export async function getAllSaleOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -64,17 +64,13 @@ export async function deleteSaleOrder(req: Request<{ id: string }>, res: Respons
 
 export async function exportSaleOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-        const rows = await saleOrderService.exportAll();
-        const format = (req.query.format as string | undefined) ?? "json";
-
-        if (format === "csv") {
-            const csv = buildCsv(rows);
-            res.setHeader("Content-Type", "text/csv");
-            res.setHeader("Content-Disposition", "attachment; filename=sale-orders.csv");
-            res.send(csv);
-            return;
-        }
-
-        res.json({ success: true, message: "Órdenes de venta exportadas", data: rows });
+        // T2-05: el servicio entrega lotes y la respuesta se escribe según llegan.
+        await enviarExportacion(res, {
+            formato: req.query.format as string | undefined,
+            nombreArchivo: "sale-orders",
+            mensaje: "Órdenes de venta exportadas",
+            total: await saleOrderService.contarParaExportar(),
+            lotes: saleOrderService.exportarPorLotes(),
+        });
     } catch (error) { next(error); }
 }
