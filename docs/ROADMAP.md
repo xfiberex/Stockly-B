@@ -5,15 +5,16 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-10 — **100 / 107**
+> ## Estado al 2026-08-10 — **101 / 108**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
-> Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordó
-> **T4-01**, **T4-02** y **T4-03**: las dos primeras por ser la causa raíz común de T0-03,
-> T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37 ya habían hecho el
-> trabajo caro. Las 7 restantes siguen fuera de alcance.
+> Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordaron
+> **T4-01**, **T4-02**, **T4-03** y **T4-11**: las dos primeras por ser la causa raíz común de
+> T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37 ya habían hecho
+> el trabajo caro, y la cuarta —que no viene de la auditoría— porque el cierre de T4-03 dejó
+> anotado que faltaba el conmutador manual. Las 7 restantes siguen fuera de alcance.
 >
-> Backend **402/402** tests y 91.95 % de sentencias; frontend **448/448** y 50.96 %; E2E 9 pasados
+> Backend **402/402** tests y 91.95 % de sentencias; frontend **471/471** y 52.17 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -30,10 +31,10 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
 | **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
-| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 10 | 0 / 5 / 5 |
-| | **Total** | **107** | **78 / 24 / 5** |
+| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 11 | 1 / 5 / 5 |
+| | **Total** | **108** | **79 / 24 / 5** |
 
-*Las siete últimas tareas del Tier 2 no vienen de la auditoría, y por eso el total pasa de 100 a 107: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42) y `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha.*
+*Ocho tareas no vienen de la auditoría, y por eso el total pasa de 100 a 108: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, y `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1389,12 +1390,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Los gráficos eran el bloqueo real, y ningún test los veía.** Recharts recibe los colores por props (`fill`, `stroke`), no por clases, así que `tokens.test.ts` nunca detectó los ~40 hexadecimales de tres componentes; con el modo oscuro dejaban de ser deuda estética y se quedaban en tonos claros sobre fondo oscuro. Se comprobó en el navegador que **`var()` funciona en un atributo de presentación de SVG y reacciona al cambio de tema sin volver a renderizar** —`rgb(59, 130, 246)` en claro, `rgb(96, 165, 250)` en oscuro—, lo que evitó tener que montar un hook con `matchMedia`. De paso, lo que era estado pasó a token de estado: entradas en `success`, salidas en `danger`, ajustes en `info`, stock mínimo en `warning`.
   - **Dos defectos propios, encontrados midiendo y no leyendo.** (1) **Las sombras no se podían redefinir por token**: Tailwind incrusta el color literal en la utilidad (`--tw-shadow: … var(--tw-shadow-color, #0f172a1f)`) en vez de referenciar `var(--shadow-overlay)`, al revés que los colores. El token quedaba escrito, mi test lo daba por bueno y el modal seguía con sombra azul translúcida —medido: `rgba(15, 23, 42, 0.12)`—. Se arregla sobrescribiendo `--tw-shadow-color`, que además conserva la composición con `ring-*`, y el test pasó a afirmar el mecanismo que sí funciona. (2) **El `body` no pintaba fondo**: solo lo hacía un envoltorio repetido en nueve pantallas, así que al rebotar el desplazamiento asomaba el lienzo blanco del navegador.
   - **Salvedad:** los colores de etiqueta **no cambian con el tema**, y es correcto: los elige el usuario y se guardan en la base, así que son datos. Su legibilidad la sigue resolviendo `textoLegibleSobre()` contra el color real.
-  - **No hay conmutador manual.** El criterio pide seguir la preferencia del sistema y eso es lo que hace; un selector en la interfaz exigiría persistencia y un tercer estado («auto»), que es otra tarea.
+  - **No hay conmutador manual.** El criterio pide seguir la preferencia del sistema y eso es lo que hace; un selector en la interfaz exigiría persistencia y un tercer estado («auto»), que es otra tarea. → Esa tarea es **T4-11**, cerrada el mismo día: al añadir el selector, la media query de esta ficha desaparece y el apaño de `--tw-shadow-color` deja de hacer falta, porque cada token pasa a declarar sus dos valores con `light-dark()`.
 
 - [ ] **[T4-04] Internacionalización**
   - **Área:** UI/UX
   - **Ubicación:** transversal, ambos repos
-  - **Qué hacer:** Todos los textos están incrustados en los componentes y el backend devuelve mensajes de error en español. Requeriría extraer cadenas en ambos repos y que la API devuelva códigos de error en lugar de mensajes.
+  - **Qué hacer:** Todos los textos están incrustados en los componentes y el backend devuelve mensajes de error en español. Requeriría extraer cadenas en ambos repos y que la API devuelva códigos de error en lugar de mensajes. Configurable desde la sección configuración del proyecto. El usuario podra elegir idioma o dejarlo en automático.
   - **Criterio de aceptación:** cambiar el idioma traduce toda la interfaz, incluidos los mensajes de error procedentes de la API.
   - **Esfuerzo:** alto
   - **Depende de:** T4-01
@@ -1446,6 +1447,24 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** si se aborda, todas las secciones son alcanzables en un clic a ≥1024 px, la sección actual queda destacada y la navegación por teclado y lector de pantalla sigue cumpliendo lo verificado en T2-16 y T2-18.
   - **Esfuerzo:** medio
   - **Depende de:** T2-16, T2-18, T3-04
+
+- [x] **[T4-11] Selector de tema en Configuración: claro, oscuro o automático** ✅ *(2026-08-10)*
+  - **Área:** UI/UX
+  - **Ubicación:** `Stockly-F/src/index.css`, `Stockly-F/index.html`, `Stockly-F/src/shared/lib/tema.ts`, `Stockly-F/src/modules/settings/`
+  - **Origen:** no viene de la auditoría. Sale del cierre de T4-03, que dejó por escrito que no había conmutador manual porque «exigiría persistencia y un tercer estado (auto), que es otra tarea». Esta es esa tarea.
+  - **Qué hacer:** T4-03 seguía `prefers-color-scheme` y no ofrecía forma de contradecirlo. Añadir una sección en Configuración con los tres estados —el importante es **auto**, que es lo que ve quien nunca entra ahí— y persistir la elección.
+  - **Criterio de aceptación:** la elección sobrevive a una recarga, se aplica **antes del primer pintado** —sin fogonazo del otro tema— y los dos temas siguen cumpliendo AA.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T4-03
+  - **Verificado localmente (2026-08-10):** `verify` frontend ✅ **471/471 + 1 omitido** (23 nuevos), cobertura **52.17 %** *(desde 50.96)*; E2E **9 pasados, 1 omitido** en `chromium` y `Mobile Chrome`. En el navegador, con la preferencia del sistema emulada en oscuro: elegir «Claro» deja `color-scheme: light` y el fondo en `rgb(248, 250, 252)`, sobrevive a la recarga y el radio vuelve marcado.
+  - **Todo el conmutador es `color-scheme`, y eso obligó a rehacer la capa de tokens — a mejor.** Una media query no se puede anular desde la aplicación, así que hacía falta un camino por selector. La salida obvia —duplicar la paleta oscura bajo `:root[data-tema="oscuro"]`— dejaba **cada color escrito en tres sitios**, y olvidarse en uno no rompe nada visible. En vez de eso, cada token pasa a declararse una sola vez con `light-dark(claro, oscuro)` y el navegador resuelve el par según el `color-scheme` efectivo. El bloque `@media (prefers-color-scheme: dark)` de 40 líneas **desaparece** y el conmutador entero son tres reglas de una línea. Comprobado antes de escribirlo: `light-dark()` sobrevive a la compilación de Tailwind 4, incluidos los modificadores de opacidad (`bg-accent/10` → `color-mix`).
+  - **De paso arregla el apaño de las sombras de T4-03.** Aquel hallazgo —que Tailwind incrusta el color literal en la utilidad en vez de referenciar `var(--shadow-overlay)`, así que redefinir el token no hace nada— sigue siendo cierto, y por eso T4-03 tuvo que sobrescribir `--tw-shadow-color` bajo la media query. Con el par **dentro** del token, el literal incrustado ya lleva los dos valores: medido, `rgba(15, 23, 42, 0.06)` en claro y `rgba(0, 0, 0, 0.5)` en oscuro. Las dos reglas del apaño se borran.
+  - **El parpadeo se mide, no se supone.** `main.tsx` es un módulo y por tanto diferido: para cuando corre, el navegador ya pintó. Quien elija un tema distinto al de su sistema vería el otro en cada carga — justo lo que el selector existe para evitar. Lo resuelve un script en línea y bloqueante en `<head>`. **Verificado sobre el build de producción**, con CPU a 1/20 y red «Slow 3G», leyendo el fondo en el primer `requestAnimationFrame`: con preferencia guardada «claro» y sistema en oscuro, el primer frame ya es `rgb(248, 250, 252)` **con React sin montar**. Falsificado quitando el script del `dist/index.html`: el mismo primer frame pasa a `rgb(11, 18, 32)`.
+  - **La preferencia va en `localStorage`, no en la API.** Los ajustes de `/settings` son globales —los comparten todos los usuarios—, así que el tema de uno cambiaría la pantalla de los demás. Y aunque fueran por usuario, el tema es una preferencia de **dispositivo**. Por eso también cambia la página: «Apariencia» va en su propia tarjeta y el botón «Guardar cambios» **baja** del encabezado a la sección de ajustes, donde ahora se ve a qué gobierna; el tema se aplica al instante y no pasa por él.
+  - **Defecto encontrado midiendo: el anillo de foco se pintaba blanco en oscuro.** `ring-offset-2` no deja un hueco transparente — lo rellena con `--tw-ring-offset-color`, que Tailwind fija en `#fff` de fábrica. Medido sobre el interruptor de Configuración: `rgb(255, 255, 255)` sin el token, `rgb(21, 29, 44)` con él. Dos usos en `src/`, los dos corregidos con `ring-offset-surface` / `ring-offset-background`. No lo veía ninguna guardia: no es una utilidad cruda de la paleta ni un hexadecimal en el código.
+  - **Radios nativos y no botones con `aria-pressed`:** un grupo de radio se recorre con las flechas, entra con un solo tabulador y se anuncia como «2 de 3». Van `sr-only` y pinta la etiqueta que los envuelve, con `has-[:checked]`.
+  - **Nueve mutaciones, nueve guardias caídas:** un color sin `light-dark()`, un bloque de tema por media query, la regla de «oscuro» borrada, una sombra con un solo color, un `ring-offset` sin token, la clave del script en línea cambiada, ese script convertido en módulo, y las dos mitades de `elegirTema` —aplicar y avisar— por separado.
+  - **Salvedad:** el E2E no cubre el selector. Sus radios son `sr-only`, así que habría que pulsar la etiqueta, y lo que aporta sobre los tests de unidad —que el atributo sobreviva a una recarga real— ya se comprobó a mano en el navegador.
 
 ---
 
@@ -1551,6 +1570,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-10 | **T4-11** Selector de tema en Configuración — **completada** | Sobre el build de producción, con CPU a 1/20 y red «Slow 3G»: con preferencia «claro» y sistema en oscuro, el **primer `requestAnimationFrame`** ya pinta `rgb(248, 250, 252)` **con React sin montar**. Falsificado quitando el script del `dist/index.html`: el mismo frame pasa a `rgb(11, 18, 32)`. `verify` ✅ **471/471**, E2E ✅ | **El conmutador obligó a rehacer la capa de tokens, a mejor:** una media query no se anula desde la aplicación, y duplicar la paleta bajo `[data-tema]` dejaba cada color en tres sitios. Cada token pasa a `light-dark(claro, oscuro)`, el bloque de 40 líneas de T4-03 **desaparece** y el conmutador entero son tres reglas de `color-scheme`. **Deja obsoleto el apaño de las sombras** de T4-03: con el par dentro del token, el literal que Tailwind incrusta ya lleva los dos valores. **Defecto encontrado midiendo:** `ring-offset-2` rellena el hueco con `#fff` de fábrica, así que el anillo de foco dibujaba un halo blanco en oscuro —`rgb(255,255,255)` medido, `rgb(21,29,44)` tras el arreglo—. La preferencia va en `localStorage` y no en `/settings`, que es global a todos los usuarios. Nueve mutaciones, nueve guardias caídas. |
 | 2026-08-04 | **T0-01** Alias `@/` en el build | `pnpm build && node dist/server.js` arranca y conecta con la BD | `tsc-alias@1.9.1` como devDependency; `build` pasa a `tsc && tsc-alias`. Se añadió también un `prebuild` que limpia `dist/` sin dependencias nuevas — **absorbe T3-07**. |
 | 2026-08-04 | **T0-02** Imagen Docker (5 fallos) | `docker compose up --build` → migraciones aplicadas + `GET /api/v1/health` **200** | Dentro de la imagen: `pnpm 11.2.2`, `prisma.config.ts` presente, CLI de Prisma disponible. `prisma` movida a `dependencies`; `packageManager` fijado; `pnpm-workspace.yaml` copiado; `ARG DATABASE_URL` para `prisma generate`. **Absorbe el anclaje de versión de T2-26.** |
 | 2026-08-04 | **T0-03** Reposición de stock al cancelar venta enviada | Test: stock 100 → `SHIPPED` 70 → `CANCELLED` **100** + movimiento `IN` de `+30` | Rama `beingCancelled` transaccional, simétrica al envío. |
@@ -1653,12 +1673,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **3** | 10 | 30 % |
-| **Total** | **100** | **107** | **93 %** |
+| Tier 4 | **4** | 11 | 36 % |
+| **Total** | **101** | **108** | **94 %** |
 
-*El denominador creció dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el 91 % de arriba es sobre 107, no sobre las 100 originales.*
+*El denominador creció tres veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48) y una el 2026-08-10 (T4-11)—, así que el 94 % de arriba es sobre 108, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** De las 10 del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10. Las 7 restantes siguen fuera de alcance.*
+***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, y ese mismo día se añadió y cerró **T4-11**, que no venía de la auditoría sino de una limitación anotada al cerrar T4-03. Las 7 restantes siguen fuera de alcance.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1668,8 +1688,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **402/402** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.95 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **448/448** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **50.96 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests frontend | 181/181 ✅ | **471/471** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **52.17 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
 | Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
 | Esquemas del spec escritos a mano | 14 *(~180 líneas de objeto literal)* | **0** ✅ *(23 derivados; solo `ProductWrite.image` es manual, T4-02)* | que la documentación se derive de la validación |
@@ -1691,10 +1711,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | `docker compose up --build` | ❌ no alcanzable | ✅ **health 200** | ✅ health 200 |
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
 | Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
-| Tokens semánticos en `@theme` | 1 (`--font-sans`) | **21** ✅ *(17 colores, 2 sombras, easing y tipografía)* | capa completa (T2-35) |
+| Tokens semánticos en `@theme` | 1 (`--font-sans`) | **30** ✅ *(17 colores de interfaz, 9 de gráfico, 2 sombras, easing y tipografía)* | capa completa (T2-35) |
 | Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | **0** ✅ *(con test que lo vigila)* | 0 fuera de excepciones |
 | Variantes de `Badge` sin significado | 4 de 7 | **0 de 5** ✅ | 0 |
 | Temas con contraste AA verificado | 1 *(solo claro)* | **2** ✅ *(claro y oscuro, recalculados por test, T4-03)* | 2 |
+| Paletas que hay que mantener a la vez | 2 *(un bloque claro y otro bajo media query, T4-03)* | **1** ✅ *(un `light-dark()` por token, T4-11)* | 1 |
+| Temas que el usuario puede elegir | 0 *(solo la preferencia del sistema)* | **3** ✅ *(auto, claro y oscuro, T4-11)* | 3 |
 | Clases `dark:` | 0 | **0** ✅ *(el modo oscuro es capa semántica, no clases)* | 0 |
 | Hexadecimales en los gráficos | 40 *(que ningún test veía)* | **0** ✅ *(tokens + guardia propia, T4-03)* | 0 |
 

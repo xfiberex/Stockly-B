@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **402/402** | **448/448** *(+1 omitido)* |
-| Cobertura (sentencias) | 91.95 % *(suelo 85 %)* | 50.96 % *(suelo 45 %)* |
+| Tests | **402/402** | **471/471** *(+1 omitido)* |
+| Cobertura (sentencias) | 91.95 % *(suelo 85 %)* | 52.17 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -65,11 +65,13 @@ de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 3/10** · Total **100/107**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 4/11** · Total **101/108**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
-consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. Las siete
-restantes siguen fuera de alcance, listadas para que no hacerlas sea una decisión consciente.
+consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
+selector de tema— se añadió ese mismo día y no viene de la auditoría, sino de una limitación que el
+propio cierre de T4-03 dejó anotada. Las siete restantes siguen fuera de alcance, listadas para que
+no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -81,8 +83,8 @@ tras nginx— se levanta con `docker compose up -d --build` y el login funciona 
 *Dos apuntes sobre las cifras. La cobertura del frontend cruzó por fin el objetivo del roadmap
 (**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño. Y el
 denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la
-aplicación en marcha anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**,
-porque ninguno estaba en ella.*
+aplicación en marcha anotados ya cerrados, y a 108 el 2026-08-10 con `T4-11`: **no descontaron ni
+una tarea de la lista de trabajo**, porque ninguno estaba en ella.*
 
 **Las fichas de la auditoría son pistas, no descripciones verificadas.** Cuatro se comprobaron
 equivocadas al abordarlas: la premisa de `T3-08` era **falsa** (Heroicons ya emitía `aria-hidden`,
@@ -96,9 +98,9 @@ de arreglar, y medir otra vez después.
 
 | Documento | Para qué |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 107 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [ROADMAP.md](ROADMAP.md) | Las 108 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
-| [adr/](adr/) | **Cinco decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
+| [adr/](adr/) | **Seis decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
 | [CHANGELOG.md](../CHANGELOG.md) | Registro de cambios de los dos repositorios |
@@ -286,14 +288,28 @@ regla general: **antes de acusar al código de una tarea, comparar contra el est
 `git stash` en la misma máquina.** Ahí evitó dos diagnósticos equivocados, y también demostró que un
 `pnpm dev` olvidado ocupando un puerto falsea toda la medición.
 
-**Tailwind incrusta el color de las sombras, así que sus tokens no se pueden redefinir por
-media query.** Las utilidades de color compilan a `var(--color-…)` y flipean solas con el
-tema; las de sombra no: `.shadow-overlay` sale como `--tw-shadow: 0 8px 24px
-var(--tw-shadow-color, #0f172a1f)`, con el literal dentro. Redefinir `--shadow-overlay` bajo
-`prefers-color-scheme` **no hace nada y no se nota** — el token queda escrito y un test que
-lea el CSS lo da por bueno. Se descubrió midiendo el modal en el navegador, que devolvía
-`rgba(15, 23, 42, 0.12)` en tema oscuro. Lo que sí funciona es sobrescribir
-`--tw-shadow-color` en la clase, que además conserva la composición con `ring-*`.
+**Tailwind incrusta el color de las sombras, así que sus tokens no se pueden redefinir desde
+fuera.** Las utilidades de color compilan a `var(--color-…)` y cambian solas con el tema; las
+de sombra no: `.shadow-overlay` sale como `--tw-shadow: 0 8px 24px
+var(--tw-shadow-color, #0f172a1f)`, con el literal dentro. Redefinir `--shadow-overlay` en
+otro bloque **no hace nada y no se nota** — el token queda escrito y un test que lea el CSS lo
+da por bueno. Se descubrió midiendo el modal en el navegador, que devolvía
+`rgba(15, 23, 42, 0.12)` en tema oscuro. La salida es meter los dos valores **dentro** del
+token con `light-dark()`, porque el literal que Tailwind incrusta es justamente ese.
+
+**`ring-offset-2` no deja un hueco transparente: lo rellena de blanco.** Tailwind registra
+`--tw-ring-offset-color` con `initial-value: #fff`, así que el anillo de foco dibuja 2 px
+blancos entre el control y el borde — invisible en tema claro, un halo en oscuro. Medido sobre
+el interruptor de Configuración: `rgb(255, 255, 255)` sin token y `rgb(21, 29, 44)` con
+`ring-offset-surface`. No lo veía ninguna guardia de color, porque no es una utilidad cruda de
+la paleta ni un hexadecimal escrito en el código; ahora lo vigila `tokens.test.ts`.
+
+**El tema no se puede aplicar desde `main.tsx`.** Un `<script type="module">` es diferido por
+definición, así que cuando corre el navegador ya pintó: quien elija un tema distinto al de su
+sistema ve un fogonazo del otro en cada carga. Va en un script en línea y bloqueante dentro de
+`<head>`. Se comprueba midiendo el fondo en el **primer `requestAnimationFrame`** sobre el
+build de producción, con la CPU a 1/20 y la red a «Slow 3G» para que React no haya montado —y
+falsificándolo: sin el script, ese mismo frame sale del color contrario.
 
 **Un test que repara lo que vigila se queda mudo para siempre, y parece un fallo intermitente.**
 El primer guardián de frescura del contrato tenía debajo otro caso que llamaba a `generar()` para

@@ -21,7 +21,7 @@ que se clonan uno al lado del otro:**
 | Documento | Para qué |
 |---|---|
 | [CONTEXTO.md](CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado, decisiones vivas y trampas del entorno ya pagadas |
-| [ROADMAP.md](ROADMAP.md) | Las 107 tareas con progreso y métricas |
+| [ROADMAP.md](ROADMAP.md) | Las 108 tareas con progreso y métricas |
 | [adr/](adr/) | Decisiones de arquitectura no obvias: por qué algo está así antes de simplificarlo |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | La auditoría del 2026-08-04. **Congelada**: describe un estado que ya no existe |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, flujo de ramas y convención de commits |

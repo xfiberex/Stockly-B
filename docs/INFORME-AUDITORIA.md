@@ -8,8 +8,8 @@
 
 > # ⚠ Documento congelado — describe el 2026-08-04, no el estado actual
 >
-> **Todo lo que sigue está escrito en presente y ya no lo es.** De los 70 hallazgos, **97 de las
-> 107 tareas que generaron están cerradas** al 2026-08-10: los cuatro tiers de trabajo (0, 1, 2 y
+> **Todo lo que sigue está escrito en presente y ya no lo es.** De los 70 hallazgos, **101 de las
+> 108 tareas que generaron están cerradas** al 2026-08-10: los cuatro tiers de trabajo (0, 1, 2 y
 > 3) están completos y solo queda el Tier 4, fuera del alcance inmediato. En particular, **los
 > cinco problemas del resumen ejecutivo están todos corregidos y verificados** — el build arranca,
 > la imagen Docker construye y sirve, las cancelaciones revierten stock, Configuración guarda y las

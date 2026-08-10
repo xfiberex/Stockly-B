@@ -19,9 +19,11 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
-- **Modo oscuro**, siguiendo la preferencia del sistema. Sin clases `dark:` ni conmutador:
-  se redefine la capa semántica de tokens, y el contraste AA se recalcula por test en los
-  dos temas. Las paletas de los gráficos pasan también a tokens (`T4-03`).
+- **Modo oscuro** (`T4-03`) y **selector de tema en Configuración** —claro, oscuro o
+  automático— (`T4-11`). Sin clases `dark:` ni segunda paleta: cada color declara sus dos
+  valores con `light-dark()` y todo el conmutador es `color-scheme`. La elección se guarda
+  por dispositivo y se aplica **antes del primer pintado**. El contraste AA se recalcula por
+  test en los dos temas, y las paletas de los gráficos pasan también a tokens.
 
 - Detección de reuso de refresh tokens: presentar uno ya rotado cierra la familia entera y
   queda registrado en auditoría (`T2-31`).
@@ -86,6 +88,8 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   evento rutinario siendo una anomalía de seguridad; tampoco estaba en el filtro (`T4-01`).
 - El fondo de página lo pintaba solo un envoltorio repetido en nueve pantallas y no el
   `body`, así que al rebotar el desplazamiento asomaba el lienzo del navegador (`T4-03`).
+- El anillo de foco dibujaba un halo blanco en tema oscuro: `ring-offset-2` no deja un hueco
+  transparente, lo rellena con un `#fff` de fábrica (`T4-11`).
 - La documentación de `/settings` describía un mapa de cadenas en las dos direcciones
   cuando la API devuelve un array de ajustes ya tipados; `/reports` daba cuatro de sus seis
   listas como «un array de algo» y `/products/export` no declaraba esquema (`T4-02`).
@@ -119,8 +123,10 @@ se cerraron bloques de tareas.
 | 2026-08-09 | **Tier 1 cerrado** (26/26, al verificar `T1-21` con Docker) y **Tier 2 cerrado** (48/48) |
 | 2026-08-10 | Tier 3: pulido, documentación y decisiones de arquitectura |
 
-Al 2026-08-10: **100 de 107 tareas**. Los cuatro tiers de trabajo están cerrados; del Tier 4,
+Al 2026-08-10: **101 de 108 tareas**. Los cuatro tiers de trabajo están cerrados; del Tier 4,
 fuera del alcance inmediato, se abordaron `T4-01` —causa raíz común de tres defectos
 anteriores—, `T4-02`, que dependía de ella, y `T4-03`, barata porque `T2-35`–`T2-37` ya
-habían hecho el trabajo caro. Backend **402 tests** y 92.0 % de cobertura de sentencias;
-frontend **448 tests** y 51.0 %; E2E 9 pasados y 1 omitido en `chromium` y en `Mobile Chrome`.
+habían hecho el trabajo caro. `T4-11` no viene de la auditoría: sale de una limitación que
+el propio cierre de `T4-03` dejó anotada. Backend **402 tests** y 92.0 % de cobertura de
+sentencias; frontend **471 tests** y 52.2 %; E2E 9 pasados y 1 omitido en `chromium` y en
+`Mobile Chrome`.
