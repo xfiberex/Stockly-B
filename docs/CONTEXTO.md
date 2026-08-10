@@ -248,31 +248,63 @@ estaban commiteados y `git checkout` los habría perdido).
 
 ---
 
-## 5. Tres cosas que dependen de ti, no del código
+## 5. Cosas que dependen de ti, no del código
 
-**Rotar la contraseña `Ad159753`.** Apareció en un conflicto de merge sin resolver que
-estaba commiteado y pusheado en `Stockly-F/main` desde el 2026-08-05 (merge `4254582`),
-dentro de `e2e/smoke.spec.ts`. El conflicto ya está resuelto a favor de la credencial del
-seed, pero **la contraseña estuvo en el repositorio y sigue en el historial de ese merge**.
-T0-06 había purgado esa misma credencial reescribiendo el historial; el merge la devolvió.
+**Activar el alias de búsqueda en cada máquina nueva.** Vive en `.git/config`, que no se
+versiona, así que un clon recién hecho no lo tiene. Una vez por repositorio:
+
+```bash
+git config --local include.path ../.gitconfig-stockly
+```
+
+Sin él, buscar en el código devuelve sobre todo documentación de tooling: `.agents/` y
+`.claude/` se versionan a propósito (T3-06) y son la mayoría de los archivos rastreados.
+Con él, `git buscar` y `git buscar-archivos` filtran a código de aplicación. Comprobado en
+esta máquina: en `Stockly-F`, `z.object` pasa de **61 archivos a 8**; en `Stockly-B`, de
+**57 a 14**. Está activado aquí; falta en el otro equipo.
 
 **En un despliegue nuevo nadie es administrador hasta ejecutar `pnpm db:seed`.** Desde
 T1-22 el registro público crea siempre usuarios `USER`. Para promover a alguien:
 `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN.
 
-**Comprobar T1-21 en una máquina con Docker.** El `Dockerfile` ya corre como `node`, pero
-falta ejecutar `docker compose up --build` y `docker exec stockly_backend id` para
-confirmar `uid=1000(node)` y que `prisma migrate deploy` siga teniendo los permisos que
-necesita al arrancar el contenedor.
+### Resueltas
+
+**La credencial filtrada está rotada (2026-08-10).** Apareció en un conflicto de merge sin
+resolver commiteado y pusheado en `Stockly-F/main` desde el 2026-08-05 (merge `4254582`),
+dentro de `e2e/smoke.spec.ts`, y devolvió al repositorio la misma contraseña que T0-06
+había purgado reescribiendo el historial. El conflicto se resolvió a favor de la credencial
+del seed y **la contraseña ya se cambió**, así que el valor que quedó en el historial de ese
+merge está muerto.
+
+De paso se **retiró del árbol actual**: estaba escrita en claro en `docs/CONTEXTO.md` y dos
+veces en `docs/ROADMAP.md`, que son archivos versionados. Ahora esos textos dicen «la
+credencial filtrada» y el registro conserva el sentido sin llevar el valor. `git grep` sobre
+los dos repositorios devuelve **cero** coincidencias. En el historial sigue estando, y con el
+valor ya rotado eso no es un riesgo, pero conviene saberlo si algún día se pasa un escáner
+de secretos: **avisará, y será un falso positivo**.
+
+Queda de la ficha T0-06 una gestión externa: abrir ticket a GitHub Support para recolectar el
+commit huérfano `55efe3b`. No es urgente con la contraseña ya cambiada.
+
+**T1-21 verificado (2026-08-09).** `docker exec stockly_backend id` devuelve
+`uid=1000(node)`, y las migraciones se aplican al arrancar sin privilegios de root,
+incluida la extensión `pg_trgm` de T2-09.
 
 ---
 
 ## 6. Por dónde seguir
 
-En marcha el **Tier 2**. Cerrado ya el bloque de arrastres del Tier 1: **T2-03 + T2-04**
-(órdenes de compra paginadas; ya no queda ninguna lista de la API sin techo), **T2-29**
-(esquema de Swagger, que ahora está atado al validador por un test) y **T2-17**
-(conmutadores de etiqueta accesibles).
+**Los cuatro tiers están cerrados** (97/107). Lo único pendiente es el **Tier 4**, diez
+tareas que la auditoría dejó fuera del alcance inmediato a propósito: se listan para que no
+hacerlas sea una decisión consciente, no un olvido.
+
+*Lo que sigue en esta sección es el poso de los Tiers 2 y 3 —qué quedó montado y qué no
+conviene deshacer— y se escribió sobre la marcha, así que el orden es cronológico y no
+temático.*
+
+De los arrastres del Tier 1 quedaron cerrados **T2-03 + T2-04** (órdenes de compra
+paginadas; ya no queda ninguna lista de la API sin techo), **T2-29** (esquema de Swagger,
+atado al validador por un test) y **T2-17** (conmutadores de etiqueta accesibles).
 
 **El sistema de diseño ya está en su sitio** (T2-35, T2-36 y T2-37): la capa semántica
 existe, los primitivos la consumen y **no queda ninguna utilidad de color cruda** en la
