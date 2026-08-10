@@ -45,7 +45,7 @@ export const purchaseOrderService = {
 
     async getById(id: string) {
         const order = await prisma.purchaseOrder.findUnique({ where: { id }, include: ORDER_INCLUDE });
-        if (!order) throw new HttpError(404, "Orden de compra no encontrada");
+        if (!order) throw new HttpError(404, "Orden de compra no encontrada", "PURCHASE_ORDER_NOT_FOUND");
         return order;
     },
 
@@ -69,8 +69,8 @@ export const purchaseOrderService = {
 
     async update(id: string, dto: UpdatePurchaseOrderDto) {
         const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Orden de compra no encontrada");
-        if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada");
+        if (!existing) throw new HttpError(404, "Orden de compra no encontrada", "PURCHASE_ORDER_NOT_FOUND");
+        if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada", "CANNOT_MODIFY_CANCELLED_ORDER");
 
         const wasReceived = existing.status !== "RECEIVED" && dto.status === "RECEIVED";
         // Cancelar una orden ya recibida debe retirar del inventario lo que entró con ella.
@@ -111,6 +111,8 @@ export const purchaseOrderService = {
                         throw new HttpError(
                             400,
                             `No se puede cancelar: las unidades recibidas de "${item.product.name}" ya se consumieron. Disponible: ${item.product.stock}, requerido: ${item.quantity}`,
+                            "CANNOT_CANCEL_UNITS_CONSUMED",
+                            { producto: item.product.name, disponible: item.product.stock, requerido: item.quantity },
                         );
                     }
 
@@ -170,8 +172,8 @@ export const purchaseOrderService = {
 
     async delete(id: string) {
         const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Orden de compra no encontrada");
-        if (existing.status === "RECEIVED") throw new HttpError(400, "No se puede eliminar una orden ya recibida");
+        if (!existing) throw new HttpError(404, "Orden de compra no encontrada", "PURCHASE_ORDER_NOT_FOUND");
+        if (existing.status === "RECEIVED") throw new HttpError(400, "No se puede eliminar una orden ya recibida", "CANNOT_DELETE_RECEIVED_ORDER");
 
         await prisma.purchaseOrder.delete({ where: { id } });
     },

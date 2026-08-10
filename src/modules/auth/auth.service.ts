@@ -8,7 +8,7 @@ import { auditService } from "@/modules/audit-logs";
 export const authService = {
     async register(email: string, password: string, name: string) {
         const existing = await prisma.user.findUnique({ where: { email } });
-        if (existing) throw new HttpError(409, "El correo ya está registrado");
+        if (existing) throw new HttpError(409, "El correo ya está registrado", "EMAIL_ALREADY_REGISTERED");
 
         const hashed = await hashPassword(password);
         const { raw, hash } = generateToken();
@@ -40,7 +40,7 @@ export const authService = {
         const user = await prisma.user.findFirst({ where: { verifyToken: hash } });
 
         if (!user || !user.verifyExpires || user.verifyExpires < new Date()) {
-            throw new HttpError(400, "Token inválido o expirado");
+            throw new HttpError(400, "Token inválido o expirado", "INVALID_OR_EXPIRED_TOKEN");
         }
 
         await prisma.user.update({
@@ -51,7 +51,7 @@ export const authService = {
 
     async resendVerification(email: string) {
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || user.isVerified) throw new HttpError(400, "Cuenta no encontrada o ya verificada");
+        if (!user || user.isVerified) throw new HttpError(400, "Cuenta no encontrada o ya verificada", "ACCOUNT_NOT_FOUND_OR_VERIFIED");
 
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -66,13 +66,13 @@ export const authService = {
 
     async login(email: string, password: string) {
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || !user.password) throw new HttpError(401, "Credenciales inválidas");
+        if (!user || !user.password) throw new HttpError(401, "Credenciales inválidas", "INVALID_CREDENTIALS");
 
         const valid = await comparePassword(password, user.password);
-        if (!valid) throw new HttpError(401, "Credenciales inválidas");
+        if (!valid) throw new HttpError(401, "Credenciales inválidas", "INVALID_CREDENTIALS");
 
-        if (!user.isActive) throw new HttpError(403, "Tu cuenta ha sido desactivada. Contacta al administrador");
-        if (!user.isVerified) throw new HttpError(403, "Confirma tu correo antes de iniciar sesión");
+        if (!user.isActive) throw new HttpError(403, "Tu cuenta ha sido desactivada. Contacta al administrador", "ACCOUNT_DISABLED");
+        if (!user.isVerified) throw new HttpError(403, "Confirma tu correo antes de iniciar sesión", "EMAIL_NOT_CONFIRMED");
 
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -125,11 +125,11 @@ export const authService = {
                 );
             }
 
-            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
+            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente", "SESSION_EXPIRED");
         }
 
         if (!user.refreshExpires || user.refreshExpires < new Date()) {
-            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
+            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente", "SESSION_EXPIRED");
         }
 
         // Defensa en profundidad: `setActive(false)` ya anula el refresh token
@@ -137,7 +137,7 @@ export const authService = {
         // desactivación —una edición directa en base de datos, un flujo futuro— sin
         // depender de que esa otra vía se acuerde de limpiar el token.
         if (!user.isActive) {
-            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente");
+            throw new HttpError(401, "Sesión expirada, inicia sesión nuevamente", "SESSION_EXPIRED");
         }
 
         // Rotación: el token anterior queda inválido, se emite uno nuevo
@@ -186,7 +186,7 @@ export const authService = {
         const user = await prisma.user.findFirst({ where: { resetToken: hash } });
 
         if (!user || !user.resetExpires || user.resetExpires < new Date()) {
-            throw new HttpError(400, "Token inválido o expirado");
+            throw new HttpError(400, "Token inválido o expirado", "INVALID_OR_EXPIRED_TOKEN");
         }
 
         const hashed = await hashPassword(newPassword);
@@ -222,12 +222,12 @@ export const authService = {
 
     async updateProfile(userId: string, name: string, email: string) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) throw new HttpError(404, "Usuario no encontrado");
+        if (!user) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
 
         const emailChanged = email !== user.email;
         if (emailChanged) {
             const taken = await prisma.user.findFirst({ where: { email, NOT: { id: userId } } });
-            if (taken) throw new HttpError(409, "El correo ya está en uso por otra cuenta");
+            if (taken) throw new HttpError(409, "El correo ya está en uso por otra cuenta", "EMAIL_IN_USE");
 
             const { raw, hash } = generateToken();
             const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -259,10 +259,10 @@ export const authService = {
 
     async updatePassword(userId: string, currentPassword: string, password: string) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user || !user.password) throw new HttpError(404, "Usuario no encontrado");
+        if (!user || !user.password) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
 
         const valid = await comparePassword(currentPassword, user.password);
-        if (!valid) throw new HttpError(403, "La contraseña actual es incorrecta");
+        if (!valid) throw new HttpError(403, "La contraseña actual es incorrecta", "WRONG_CURRENT_PASSWORD");
 
         const hashed = await hashPassword(password);
         await prisma.user.update({

@@ -52,7 +52,14 @@ export function sinRutasDeArchivo(mensaje: string): string {
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
     try {
         if (err instanceof HttpError) {
-            res.status(err.statusCode).json({ success: false, message: err.message });
+            // `code` y `params` solo salen si los hay (T4-04): un error sin código deja el
+            // sobre exactamente como estaba antes, y el cliente enseña el `message`.
+            res.status(err.statusCode).json({
+                success: false,
+                message: err.message,
+                ...(err.code ? { code: err.code } : {}),
+                ...(err.params ? { params: err.params } : {}),
+            });
             return;
         }
 
@@ -71,6 +78,10 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
         res.status(500).json({
             success: false,
             message: env.nodeEnv === "production" ? "Error interno del servidor" : sinRutasDeArchivo(err.message),
+            // Lo que el cliente puede enseñar traducido. El `message` de arriba sigue siendo
+            // el que se registra y el que ve quien llama a la API sin interfaz: fuera de
+            // producción trae el error real, que es justo lo que no conviene traducir.
+            code: "INTERNAL_ERROR",
             // El cliente no ve el error real en producción, así que se le da el hilo
             // del que tirar: este identificador es el que hay que citar al reportarlo.
             requestId: res.getHeader("x-request-id"),

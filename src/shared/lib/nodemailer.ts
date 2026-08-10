@@ -38,6 +38,7 @@ function requireSmtp(): void {
         throw new HttpError(
             503,
             "El envío de correo no está configurado. Define SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS y SMTP_FROM en el .env.",
+            "EMAIL_NOT_CONFIGURED",
         );
     }
 }

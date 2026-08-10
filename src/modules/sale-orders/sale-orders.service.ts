@@ -39,7 +39,7 @@ export const saleOrderService = {
 
     async getById(id: string) {
         const order = await prisma.saleOrder.findUnique({ where: { id }, include: ORDER_INCLUDE });
-        if (!order) throw new HttpError(404, "Orden de venta no encontrada");
+        if (!order) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
         return order;
     },
 
@@ -65,10 +65,10 @@ export const saleOrderService = {
 
     async update(id: string, dto: UpdateSaleOrderDto) {
         const existing = await prisma.saleOrder.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Orden de venta no encontrada");
-        if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada");
+        if (!existing) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
+        if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada", "CANNOT_MODIFY_CANCELLED_ORDER");
         if (existing.status === "SHIPPED" && dto.status === "SHIPPED") {
-            throw new HttpError(400, "La orden ya fue enviada");
+            throw new HttpError(400, "La orden ya fue enviada", "ORDER_ALREADY_SHIPPED");
         }
 
         const customerData = {
@@ -148,6 +148,8 @@ export const saleOrderService = {
                     throw new HttpError(
                         400,
                         `Stock insuficiente para "${item.product.name}". Disponible: ${item.product.stock}, requerido: ${item.quantity}`,
+                        "INSUFFICIENT_STOCK",
+                        { producto: item.product.name, disponible: item.product.stock, requerido: item.quantity },
                     );
                 }
 
@@ -190,8 +192,8 @@ export const saleOrderService = {
 
     async delete(id: string) {
         const existing = await prisma.saleOrder.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Orden de venta no encontrada");
-        if (existing.status === "SHIPPED") throw new HttpError(400, "No se puede eliminar una orden ya enviada");
+        if (!existing) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
+        if (existing.status === "SHIPPED") throw new HttpError(400, "No se puede eliminar una orden ya enviada", "CANNOT_DELETE_SHIPPED_ORDER");
 
         await prisma.saleOrder.delete({ where: { id } });
     },

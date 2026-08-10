@@ -47,21 +47,21 @@ export const usersService = {
 
     async getById(id: string) {
         const user = await prisma.user.findUnique({ where: { id }, select: USER_SELECT });
-        if (!user) throw new HttpError(404, "Usuario no encontrado");
+        if (!user) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
         return user;
     },
 
     async updateRole(id: string, role: $Enums.Role, requesterId: string) {
-        if (id === requesterId) throw new HttpError(400, "No puedes cambiar tu propio rol");
+        if (id === requesterId) throw new HttpError(400, "No puedes cambiar tu propio rol", "CANNOT_CHANGE_OWN_ROLE");
         const user = await prisma.user.findUnique({ where: { id } });
-        if (!user) throw new HttpError(404, "Usuario no encontrado");
+        if (!user) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
         return prisma.user.update({ where: { id }, data: { role }, select: USER_SELECT });
     },
 
     async setActive(id: string, isActive: boolean, requesterId: string) {
-        if (id === requesterId) throw new HttpError(400, "No puedes desactivar tu propia cuenta");
+        if (id === requesterId) throw new HttpError(400, "No puedes desactivar tu propia cuenta", "CANNOT_DEACTIVATE_OWN_ACCOUNT");
         const user = await prisma.user.findUnique({ where: { id } });
-        if (!user) throw new HttpError(404, "Usuario no encontrado");
+        if (!user) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
 
         // Al desactivar la cuenta se invalida la sesión
         const data: Record<string, unknown> = { isActive };

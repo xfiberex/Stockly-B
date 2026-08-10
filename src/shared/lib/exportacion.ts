@@ -77,6 +77,8 @@ export async function enviarExportacion(
         throw new HttpError(
             413,
             `La exportación tiene ${total} filas y el máximo es ${MAX_FILAS_EXPORTACION}. Filtra antes de exportar.`,
+            "EXPORT_TOO_LARGE",
+            { filas: total, maximo: MAX_FILAS_EXPORTACION },
         );
     }
 

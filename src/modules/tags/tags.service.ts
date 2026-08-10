@@ -9,13 +9,13 @@ export const tagsService = {
 
     async getById(id: string) {
         const tag = await prisma.tag.findUnique({ where: { id } });
-        if (!tag) throw new HttpError(404, "Etiqueta no encontrada");
+        if (!tag) throw new HttpError(404, "Etiqueta no encontrada", "TAG_NOT_FOUND");
         return tag;
     },
 
     async create(dto: CreateTagInput) {
         const existing = await prisma.tag.findUnique({ where: { name: dto.name } });
-        if (existing) throw new HttpError(409, "Ya existe una etiqueta con ese nombre");
+        if (existing) throw new HttpError(409, "Ya existe una etiqueta con ese nombre", "TAG_NAME_EXISTS");
         return prisma.tag.create({ data: dto });
     },
 
@@ -23,7 +23,7 @@ export const tagsService = {
         await tagsService.getById(id);
         if (dto.name) {
             const taken = await prisma.tag.findFirst({ where: { name: dto.name, NOT: { id } } });
-            if (taken) throw new HttpError(409, "Ya existe una etiqueta con ese nombre");
+            if (taken) throw new HttpError(409, "Ya existe una etiqueta con ese nombre", "TAG_NAME_EXISTS");
         }
         return prisma.tag.update({ where: { id }, data: dto });
     },

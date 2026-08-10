@@ -18,5 +18,10 @@ import { HttpError } from "@/shared/lib/httpError";
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction): void {
     // Se nombra el método además de la ruta: pedir una ruta que sí existe con el verbo
     // equivocado da también un 404, y sin el método el mensaje parece mentir.
-    next(new HttpError(404, `Ruta no encontrada: ${req.method} ${req.originalUrl}`));
+    next(
+        new HttpError(404, `Ruta no encontrada: ${req.method} ${req.originalUrl}`, "ROUTE_NOT_FOUND", {
+            metodo: req.method,
+            ruta: req.originalUrl,
+        }),
+    );
 }

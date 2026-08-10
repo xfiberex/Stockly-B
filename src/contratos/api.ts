@@ -96,6 +96,71 @@ export const sobreSchema = <T extends z.ZodTypeAny>(datos: T) =>
     z.object({ success: z.boolean(), message: z.string(), data: datos.optional() });
 
 /**
+ * Los códigos de error de la API (T4-04). **Esta lista es el contrato de verdad**; el
+ * `message` que va al lado es un respaldo legible, no la interfaz.
+ *
+ * Existe porque el criterio de T4-04 pide que también se traduzcan los errores que vienen
+ * del servidor, y un mensaje en español no se puede traducir en el cliente: hay que saber
+ * *qué* pasó, no *cómo se dijo*. El backend sigue mandando su frase —para quien consulte la
+ * API sin interfaz, y como red si el código todavía no está traducido—, pero lo que el
+ * frontend enseña sale de su catálogo.
+ *
+ * Un código nuevo aquí sin entrada en el catálogo del frontend **rompe su suite**: la
+ * guardia recorre este enum y exige `error.<CÓDIGO>` en los dos idiomas.
+ */
+export const CODIGOS_DE_ERROR = [
+    // 400 — la petición pide algo que el estado actual no permite
+    "ACCOUNT_NOT_FOUND_OR_VERIFIED",
+    "CANNOT_CANCEL_UNITS_CONSUMED",
+    "CANNOT_CHANGE_OWN_ROLE",
+    "CANNOT_DEACTIVATE_OWN_ACCOUNT",
+    "CANNOT_DELETE_RECEIVED_ORDER",
+    "CANNOT_DELETE_SHIPPED_ORDER",
+    "CANNOT_MODIFY_CANCELLED_ORDER",
+    "INACTIVE_PRODUCT_MOVEMENT",
+    "INSUFFICIENT_STOCK",
+    "INVALID_FILTER_VALUE",
+    "INVALID_OR_EXPIRED_TOKEN",
+    "ORDER_ALREADY_SHIPPED",
+    "PRODUCT_ALREADY_ACTIVE",
+    "STOCK_CANNOT_BE_NEGATIVE",
+    // 401 / 403 — quién eres y qué se te permite
+    "ACCOUNT_DISABLED",
+    "EMAIL_NOT_CONFIRMED",
+    "INVALID_CREDENTIALS",
+    "NOT_AUTHENTICATED",
+    "SESSION_EXPIRED",
+    "WRONG_CURRENT_PASSWORD",
+    // 404
+    "BRAND_NOT_FOUND",
+    "CATEGORY_NOT_FOUND",
+    "PRODUCT_NOT_FOUND",
+    "PURCHASE_ORDER_NOT_FOUND",
+    "ROUTE_NOT_FOUND",
+    "SALE_ORDER_NOT_FOUND",
+    "SUPPLIER_NOT_FOUND",
+    "TAG_NOT_FOUND",
+    "USER_NOT_FOUND",
+    // 409 — colisiones de unicidad
+    "BRAND_NAME_EXISTS",
+    "CATEGORY_NAME_EXISTS",
+    "EMAIL_ALREADY_REGISTERED",
+    "EMAIL_IN_USE",
+    "SUPPLIER_EMAIL_EXISTS",
+    "TAG_NAME_EXISTS",
+    // 413 / 422 — el cuerpo o el archivo
+    "EXPORT_TOO_LARGE",
+    "INVALID_IMAGE_FILE",
+    // 429 / 500 / 503 — el servidor
+    "EMAIL_NOT_CONFIGURED",
+    "INTERNAL_ERROR",
+    "RATE_LIMITED",
+    "UPLOAD_NOT_CONFIGURED",
+] as const;
+
+export const codigoDeErrorSchema = z.enum(CODIGOS_DE_ERROR);
+
+/**
  * La forma de cualquier respuesta de error. Comprobada contra los dos sitios que las
  * escriben, que no coinciden del todo:
  *
@@ -109,6 +174,18 @@ export const sobreSchema = <T extends z.ZodTypeAny>(datos: T) =>
 export const errorSchema = z.object({
     success: z.literal(false),
     message: z.string(),
+    /**
+     * Opcional a propósito: lo llevan los errores que la aplicación lanza a conciencia, no
+     * los que se escapan de una librería de terceros. Sin código, el cliente enseña el
+     * `message`, que es exactamente lo que hacía antes de T4-04.
+     */
+    code: codigoDeErrorSchema.optional(),
+    /**
+     * Los huecos del mensaje, para que el cliente pueda componer el suyo. «Stock insuficiente
+     * para "Teclado". Disponible: 3, requerido: 5» no se traduce sustituyendo palabras: hace
+     * falta el producto y los dos números por separado, porque en otro idioma van en otro orden.
+     */
+    params: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
     errors: z.array(z.object({ field: z.string(), message: z.string() })).optional(),
     requestId: z.string().optional(),
 });
@@ -417,6 +494,7 @@ export type EntidadAuditoria = z.infer<typeof entidadAuditoriaSchema>;
 export type Importe = z.infer<typeof importeSchema>;
 export type MetaPaginacion = z.infer<typeof metaPaginacionSchema>;
 export type RespuestaDeError = z.infer<typeof errorSchema>;
+export type CodigoDeError = z.infer<typeof codigoDeErrorSchema>;
 export type Referencia = z.infer<typeof referenciaSchema>;
 export type EtiquetaRef = z.infer<typeof etiquetaRefSchema>;
 

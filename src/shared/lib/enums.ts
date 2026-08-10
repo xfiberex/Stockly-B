@@ -28,5 +28,7 @@ export function filtroDeEnum<T extends Record<string, string>>(
     throw new HttpError(
         400,
         `El filtro «${campo}» no admite el valor «${valor}». Valores válidos: ${Object.keys(valores).join(", ")}.`,
+        "INVALID_FILTER_VALUE",
+        { campo, valor, validos: Object.keys(valores).join(", ") },
     );
 }

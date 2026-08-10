@@ -102,7 +102,7 @@ export const authController = {
 
     async refresh(req: Request, res: Response) {
         const rawRefreshToken = req.cookies?.["refreshToken"] as string | undefined;
-        if (!rawRefreshToken) throw new HttpError(401, "No autenticado");
+        if (!rawRefreshToken) throw new HttpError(401, "No autenticado", "NOT_AUTHENTICATED");
 
         const { user, rawRefreshToken: newRawToken } = await authService.refresh(rawRefreshToken);
         issueSessionCookies(res, user.id, newRawToken);
@@ -111,7 +111,7 @@ export const authController = {
 
     async me(req: Request, res: Response) {
         const user = await authService.getById(req.userId!);
-        if (!user) throw new HttpError(404, "Usuario no encontrado");
+        if (!user) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
         res.json({ data: user });
     },
 

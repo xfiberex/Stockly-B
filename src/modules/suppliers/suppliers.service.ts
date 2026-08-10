@@ -9,7 +9,7 @@ export const suppliersService = {
 
     async getById(id: string) {
         const supplier = await prisma.supplier.findUnique({ where: { id } });
-        if (!supplier) throw new HttpError(404, "Proveedor no encontrado");
+        if (!supplier) throw new HttpError(404, "Proveedor no encontrado", "SUPPLIER_NOT_FOUND");
         return supplier;
     },
 
@@ -18,7 +18,7 @@ export const suppliersService = {
 
         if (email) {
             const existing = await prisma.supplier.findUnique({ where: { email } });
-            if (existing) throw new HttpError(409, "Ya existe un proveedor con ese email");
+            if (existing) throw new HttpError(409, "Ya existe un proveedor con ese email", "SUPPLIER_EMAIL_EXISTS");
         }
 
         return prisma.supplier.create({ data: { ...dto, email } });
@@ -31,7 +31,7 @@ export const suppliersService = {
 
         if (email) {
             const taken = await prisma.supplier.findFirst({ where: { email, NOT: { id } } });
-            if (taken) throw new HttpError(409, "Ya existe un proveedor con ese email");
+            if (taken) throw new HttpError(409, "Ya existe un proveedor con ese email", "SUPPLIER_EMAIL_EXISTS");
         }
 
         return prisma.supplier.update({ where: { id }, data: { ...dto, email } });

@@ -121,7 +121,7 @@ export const productService = {
 
     async getById(id: string) {
         const product = await prisma.product.findUnique({ where: { id }, include: PRODUCT_INCLUDE });
-        if (!product) throw new HttpError(404, "Producto no encontrado");
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
         return product;
     },
 
@@ -163,7 +163,7 @@ export const productService = {
 
     async update(id: string, dto: UpdateProductDto, file?: Express.Multer.File) {
         const existing = await prisma.product.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Producto no encontrado");
+        if (!existing) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
         let imageUrl: string | null | undefined = existing.imageUrl;
         let imagePublicId: string | null | undefined = existing.imagePublicId;
@@ -243,7 +243,7 @@ export const productService = {
 
     async delete(id: string) {
         const existing = await prisma.product.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Producto no encontrado");
+        if (!existing) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
         if (existing.imagePublicId) await deleteFromCloudinary(existing.imagePublicId);
 
@@ -255,8 +255,8 @@ export const productService = {
 
     async restore(id: string) {
         const existing = await prisma.product.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Producto no encontrado");
-        if (existing.isActive) throw new HttpError(400, "El producto ya está activo");
+        if (!existing) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+        if (existing.isActive) throw new HttpError(400, "El producto ya está activo", "PRODUCT_ALREADY_ACTIVE");
 
         return prisma.product.update({ where: { id }, data: { isActive: true }, include: PRODUCT_INCLUDE });
     },
@@ -394,7 +394,7 @@ export const productService = {
 
     async getMovements(productId: string) {
         const product = await prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
-        if (!product) throw new HttpError(404, "Producto no encontrado");
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
         const movements = await prisma.stockMovement.findMany({
             where: { productId },
@@ -406,7 +406,7 @@ export const productService = {
 
     async exportMovements(productId: string) {
         const product = await prisma.product.findUnique({ where: { id: productId } });
-        if (!product) throw new HttpError(404, "Producto no encontrado");
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
         const movements = await prisma.stockMovement.findMany({
             where: { productId },
@@ -426,8 +426,8 @@ export const productService = {
 
     async createManualMovement(productId: string, dto: CreateManualMovementDto) {
         const product = await prisma.product.findUnique({ where: { id: productId } });
-        if (!product) throw new HttpError(404, "Producto no encontrado");
-        if (!product.isActive) throw new HttpError(400, "No se puede registrar movimientos en un producto inactivo");
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+        if (!product.isActive) throw new HttpError(400, "No se puede registrar movimientos en un producto inactivo", "INACTIVE_PRODUCT_MOVEMENT");
 
         const note = dto.note ? `${dto.reason} — ${dto.note}` : dto.reason;
 
@@ -450,7 +450,7 @@ export const productService = {
                     where: { id: productId, stock: { gte: dto.quantity } },
                     data: { stock: { decrement: dto.quantity } },
                 });
-                if (res.count === 0) throw new HttpError(400, "El stock no puede quedar negativo");
+                if (res.count === 0) throw new HttpError(400, "El stock no puede quedar negativo", "STOCK_CANNOT_BE_NEGATIVE");
                 const refreshed = await tx.product.findUniqueOrThrow({ where: { id: productId } });
                 resultingStock = refreshed.stock;
                 delta = -dto.quantity;
@@ -522,7 +522,7 @@ export const productService = {
 
     async getPriceHistory(productId: string) {
         const product = await prisma.product.findUnique({ where: { id: productId } });
-        if (!product) throw new HttpError(404, "Producto no encontrado");
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
         const history = await prisma.priceHistory.findMany({
             where: { productId },

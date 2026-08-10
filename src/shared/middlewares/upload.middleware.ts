@@ -12,6 +12,7 @@ function requireCloudinary(): void {
         throw new HttpError(
             503,
             "La subida de imágenes no está configurada. Define CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en el .env.",
+            "UPLOAD_NOT_CONFIGURED",
         );
     }
 }
@@ -87,6 +88,8 @@ export function verificarFirmaDeImagen(req: Request, _res: Response, next: NextF
         throw new HttpError(
             422,
             `El archivo no es una imagen válida. Se admiten: ${ALLOWED_TYPES.join(", ")}.`,
+            "INVALID_IMAGE_FILE",
+            { formatos: ALLOWED_TYPES.join(", ") },
         );
     }
 

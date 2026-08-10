@@ -1,7 +1,11 @@
 import rateLimit from "express-rate-limit";
 
 const json429 = (_req: unknown, res: { status: (c: number) => { json: (b: object) => void } }) =>
-    res.status(429).json({ success: false, message: "Demasiadas solicitudes. Espera un momento e intenta de nuevo." });
+    res.status(429).json({
+        success: false,
+        message: "Demasiadas solicitudes. Espera un momento e intenta de nuevo.",
+        code: "RATE_LIMITED",
+    });
 
 // Igual que el límite global: el E2E hace un login por prueba y se pasaba de 10.
 const authMax = Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX ?? "", 10) || 10;

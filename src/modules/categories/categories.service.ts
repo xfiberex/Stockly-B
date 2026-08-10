@@ -9,13 +9,13 @@ export const categoriesService = {
 
     async getById(id: string) {
         const category = await prisma.category.findUnique({ where: { id } });
-        if (!category) throw new HttpError(404, "Categoría no encontrada");
+        if (!category) throw new HttpError(404, "Categoría no encontrada", "CATEGORY_NOT_FOUND");
         return category;
     },
 
     async create(dto: CreateCategoryInput) {
         const existing = await prisma.category.findUnique({ where: { name: dto.name } });
-        if (existing) throw new HttpError(409, "Ya existe una categoría con ese nombre");
+        if (existing) throw new HttpError(409, "Ya existe una categoría con ese nombre", "CATEGORY_NAME_EXISTS");
 
         return prisma.category.create({ data: dto });
     },
@@ -24,7 +24,7 @@ export const categoriesService = {
         await categoriesService.getById(id);
 
         const taken = await prisma.category.findFirst({ where: { name: dto.name, NOT: { id } } });
-        if (taken) throw new HttpError(409, "Ya existe una categoría con ese nombre");
+        if (taken) throw new HttpError(409, "Ya existe una categoría con ese nombre", "CATEGORY_NAME_EXISTS");
 
         return prisma.category.update({ where: { id }, data: dto });
     },

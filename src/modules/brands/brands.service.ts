@@ -9,13 +9,13 @@ export const brandsService = {
 
     async getById(id: string) {
         const brand = await prisma.brand.findUnique({ where: { id } });
-        if (!brand) throw new HttpError(404, "Marca no encontrada");
+        if (!brand) throw new HttpError(404, "Marca no encontrada", "BRAND_NOT_FOUND");
         return brand;
     },
 
     async create(dto: CreateBrandInput) {
         const existing = await prisma.brand.findUnique({ where: { name: dto.name } });
-        if (existing) throw new HttpError(409, "Ya existe una marca con ese nombre");
+        if (existing) throw new HttpError(409, "Ya existe una marca con ese nombre", "BRAND_NAME_EXISTS");
 
         return prisma.brand.create({ data: dto });
     },
@@ -24,7 +24,7 @@ export const brandsService = {
         await brandsService.getById(id);
 
         const taken = await prisma.brand.findFirst({ where: { name: dto.name, NOT: { id } } });
-        if (taken) throw new HttpError(409, "Ya existe una marca con ese nombre");
+        if (taken) throw new HttpError(409, "Ya existe una marca con ese nombre", "BRAND_NAME_EXISTS");
 
         return prisma.brand.update({ where: { id }, data: dto });
     },
