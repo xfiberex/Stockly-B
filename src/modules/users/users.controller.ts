@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { usersService } from "./users.service";
+import type { $Enums } from "@/generated/prisma/client";
 
 export const usersController = {
     async getAll(req: Request, res: Response, next: NextFunction) {
@@ -18,7 +19,9 @@ export const usersController = {
 
     async updateRole(req: Request<{ id: string }>, res: Response, next: NextFunction) {
         try {
-            const { role } = req.body as { role: string };
+            // El `z.enum(["ADMIN", "USER"])` de la ruta ya lo garantiza; el cast solo
+            // traslada esa garantía al tipo, que desde T3-02 es el enum de Prisma.
+            const { role } = req.body as { role: $Enums.Role };
             const user = await usersService.updateRole(req.params.id, role, req.userId!);
             res.json({ success: true, message: "Rol actualizado exitosamente", data: user });
         } catch (error) { next(error); }

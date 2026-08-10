@@ -4,6 +4,7 @@ import { HttpError } from "@/shared/lib/httpError";
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
+import { filtroDeEnum } from "@/shared/lib/enums";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 const ORDER_INCLUDE = {
@@ -12,12 +13,13 @@ const ORDER_INCLUDE = {
     },
 } as const;
 
-// Solo acepta como filtro un status que sea miembro válido del enum.
+// T3-02 — antes esto era `status in $Enums.SaleOrderStatus`, y la guarda tenía un agujero:
+// los enums generados son objetos literales, así que heredan de `Object.prototype` y
+// `"toString" in $Enums.SaleOrderStatus` devuelve **verdadero**. `?status=toString` pasaba
+// el filtro, se casteaba a enum y reventaba dentro de Prisma con un 500. Reproducido antes
+// de cambiarlo. `filtroDeEnum` usa `Object.hasOwn` y responde 400.
 function parseStatusFilter(status?: string): $Enums.SaleOrderStatus | undefined {
-    if (status && status in $Enums.SaleOrderStatus) {
-        return status as $Enums.SaleOrderStatus;
-    }
-    return undefined;
+    return filtroDeEnum($Enums.SaleOrderStatus, status, "status");
 }
 
 export const saleOrderService = {

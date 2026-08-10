@@ -25,6 +25,30 @@ function errorExpuestoDeTercero(err: Error): { statusCode: number; message: stri
     return null;
 }
 
+/**
+ * T3-13 — quita del mensaje las rutas del sistema de archivos antes de enviarlo.
+ *
+ * Fuera de producción se responde `err.message` íntegro, y el de un error de Prisma no es
+ * una frase: incluye la consulta y **la ruta absoluta del archivo fuente**, que delata el
+ * usuario del sistema y la estructura de directorios. Reproducido durante T3-02, donde
+ * `?status=toString` devolvía `C:\Users\…\sale-orders.service.ts:32:30` en el cuerpo.
+ *
+ * Se sanea siempre, no solo cuando `NODE_ENV` está bien puesto. Una garantía que depende
+ * de que alguien recuerde una variable en el entorno de staging no es una garantía; el
+ * compose la fija, pero el compose no es el único sitio desde el que esto se despliega.
+ *
+ * El patrón exige que la ruta **termine en una extensión de código** para no morder texto
+ * corriente, y admite espacios dentro de los segmentos: la ruta real de este proyecto
+ * tiene dos (`Desarrollo y Proyectos`), y un patrón que cortara en el primer espacio
+ * habría dejado pasar justo la parte que identifica la máquina.
+ */
+const RUTA_DE_ARCHIVO =
+    /(?:[A-Za-z]:[\\/]|\/)(?:[^\\/\r\n]+[\\/])+[^\\/\r\n]*\.(?:ts|tsx|js|jsx|mjs|cjs|json|node)(?::\d+(?::\d+)?)?/g;
+
+export function sinRutasDeArchivo(mensaje: string): string {
+    return mensaje.replace(RUTA_DE_ARCHIVO, "[ruta oculta]");
+}
+
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
     try {
         if (err instanceof HttpError) {
@@ -46,7 +70,7 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
 
         res.status(500).json({
             success: false,
-            message: env.nodeEnv === "production" ? "Error interno del servidor" : err.message,
+            message: env.nodeEnv === "production" ? "Error interno del servidor" : sinRutasDeArchivo(err.message),
             // El cliente no ve el error real en producción, así que se le da el hilo
             // del que tirar: este identificador es el que hay que citar al reportarlo.
             requestId: res.getHeader("x-request-id"),

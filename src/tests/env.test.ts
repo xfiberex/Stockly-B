@@ -110,4 +110,42 @@ describe("validateEnv", () => {
         expect(warn).not.toHaveBeenCalled();
         warn.mockRestore();
     });
+
+    // T3-13: el error típico no es escribir mal NODE_ENV —«staging» ya lo rechaza el
+    // validador— sino no ponerlo, y caer a `development` en un servidor sin enterarse.
+    // La señal es FRONTEND_URL: si no es local, esto no es la máquina de nadie.
+    describe("Aviso de entorno desplegado sin NODE_ENV=production (T3-13)", () => {
+        it("avisa con un FRONTEND_URL público y NODE_ENV de desarrollo", () => {
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            process.env["NODE_ENV"] = "development";
+            process.env["FRONTEND_URL"] = "https://stockly.example.com";
+
+            validateEnv();
+
+            expect(warn).toHaveBeenCalledWith(expect.stringMatching(/NODE_ENV=production/));
+            warn.mockRestore();
+        });
+
+        it("no avisa en producción, aunque el frontend sea público", () => {
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            process.env["NODE_ENV"] = "production";
+            process.env["FRONTEND_URL"] = "https://stockly.example.com";
+
+            validateEnv();
+
+            expect(warn).not.toHaveBeenCalled();
+            warn.mockRestore();
+        });
+
+        it("no avisa en local, que es el caso de todos los días", () => {
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            process.env["NODE_ENV"] = "development";
+            process.env["FRONTEND_URL"] = "http://localhost:5173";
+
+            validateEnv();
+
+            expect(warn).not.toHaveBeenCalled();
+            warn.mockRestore();
+        });
+    });
 });

@@ -56,17 +56,19 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **339/339** | **395/395** |
-| Cobertura (sentencias) | 91.00 % *(suelo 85 %)* | 44.89 % *(suelo 42 %)* |
+| Tests | **357/357** | **409/409** |
+| Cobertura (sentencias) | 91.33 % *(suelo 85 %)* | 44.89 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-08-08): **9 pasados,
+de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · Total **83/107**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 7/15** · Total **89/107**.
 
-*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. **El Tier 2 queda cerrado el 2026-08-09.** Lo que sigue es Tier 3 (14 pendientes) y Tier 4, que la auditoría dejó fuera del alcance inmediato.*
+*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. **El Tier 2 quedó cerrado el 2026-08-09.** El 2026-08-10 se cerraron seis del Tier 3 —`T3-01`, `T3-02`, `T3-05`, `T3-08`, `T3-13`, `T3-14`—, quedan **8 pendientes** y el Tier 4, que la auditoría dejó fuera del alcance inmediato.*
+
+*Dos de esas seis merecen leerse antes de fiarse de una ficha: **la premisa de `T3-08` era falsa** (Heroicons ya emitía `aria-hidden`, así que el criterio se cumplía solo, y el fallo real era el opuesto) y **el enunciado de `T3-05` no describía el código** (el botón de la interfaz nunca tuvo dos rutas). Las fichas de la auditoría son buenas pistas, no descripciones verificadas: conviene medir antes de arreglar.*
 
 **Los tres primeros tiers de trabajo están cerrados** (Tier 0, 1 y 2). La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
@@ -75,14 +77,27 @@ para cuentas desactivadas, cinco listados que reventaban con un `page` no numér
 corregido, medido y con tests.
 
 **La salvedad de T1-21 está resuelta desde el 2026-08-09**, con Docker en marcha:
-`docker exec stockly_backend id` → `uid=1000(node)`, y `prisma migrate deploy` aplica las
-10 migraciones sin privilegios, incluida la de la extensión `pg_trgm`. La pila completa
+`docker exec stockly_backend id` → `uid=1000(node)`, y `prisma migrate deploy` aplica todas
+las migraciones sin privilegios, incluida la de la extensión `pg_trgm`. La pila completa
 —base, backend y frontend tras nginx— se levanta con `docker compose up -d --build` y el
 login funciona en el navegador contra `http://localhost:8080`.
 
 ---
 
 ## 4. Trampas del entorno, ya pagadas
+
+**Un servidor huérfano en el 3000 rompe el E2E siguiente, y no lo dice claro (2026-08-10).**
+Si una pasada de `pnpm test:e2e:full` se interrumpe, el `nodemon` del backend puede quedarse
+escuchando. La siguiente pasada falla de una de dos formas, ninguna de las cuales apunta al
+puerto: o **`Timed out waiting 120000ms from config.webServer`**, o —peor— **arranca contra el
+servidor viejo y fallan cuatro tests con datos que no cuadran**, porque el `global-setup`
+resiembra la base pero el proceso antiguo sigue con su estado. La primera vez costó pensar
+que los cambios habían roto algo. Antes de investigar un fallo de E2E, comprobar el puerto:
+
+```powershell
+Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }
+```
+
 
 Cada una costó un fallo antes de entenderse. No hace falta redescubrirlas.
 

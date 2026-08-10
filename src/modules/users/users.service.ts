@@ -1,6 +1,8 @@
 import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
+import { filtroDeEnum } from "@/shared/lib/enums";
+import { $Enums } from "@/generated/prisma/client";
 
 const USER_SELECT = {
     id: true,
@@ -22,9 +24,11 @@ export const usersService = {
             : query.isActive === "true" ? true
             : undefined;
 
+        const role = filtroDeEnum($Enums.Role, query.role, "role");
+
         const where = {
             ...(isActiveFilter !== undefined && { isActive: isActiveFilter }),
-            ...(query.role && { role: query.role }),
+            ...(role && { role }),
             ...(query.search && {
                 OR: [
                     { name: { contains: query.search, mode: "insensitive" as const } },
@@ -47,7 +51,7 @@ export const usersService = {
         return user;
     },
 
-    async updateRole(id: string, role: string, requesterId: string) {
+    async updateRole(id: string, role: $Enums.Role, requesterId: string) {
         if (id === requesterId) throw new HttpError(400, "No puedes cambiar tu propio rol");
         const user = await prisma.user.findUnique({ where: { id } });
         if (!user) throw new HttpError(404, "Usuario no encontrado");
@@ -59,7 +63,7 @@ export const usersService = {
         const user = await prisma.user.findUnique({ where: { id } });
         if (!user) throw new HttpError(404, "Usuario no encontrado");
 
-        // Invalidate session when deactivating
+        // Al desactivar la cuenta se invalida la sesión
         const data: Record<string, unknown> = { isActive };
         if (!isActive) {
             data.refreshToken = null;

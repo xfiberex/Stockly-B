@@ -102,7 +102,9 @@ export async function uploadToCloudinary(
     return new Promise((resolve, reject) => {
         cloudinary.uploader
             .upload_stream({ folder, resource_type: "image" }, (error, result) => {
-                if (error || !result) return reject(error ?? new Error("Upload failed"));
+                // Cloudinary puede llamar de vuelta sin error y sin resultado; el mensaje
+                // llega al usuario a través del manejador de errores, así que va en español.
+                if (error || !result) return reject(error ?? new Error("No se pudo subir la imagen"));
                 resolve({ url: result.secure_url, publicId: result.public_id });
             })
             .end(buffer);

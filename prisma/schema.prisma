@@ -31,6 +31,48 @@ enum StockMovementType {
   IMPORT
 }
 
+// T3-02 — los tres que la conversión a enums de 2026-06-01 dejó fuera.
+//
+// No es cosmética: mientras `role` fue `String`, la base aceptaba `"admin"`, `"ADMIN "`
+// o cualquier cadena, y el único filtro era el `z.enum` de la ruta. Todo lo que escriba
+// saltándose esa ruta —una migración, un seed, un `psql` a mano— podía dejar una cuenta
+// con un rol que `requireRole` no reconoce: sin permisos y sin error visible.
+enum Role {
+  ADMIN
+  USER
+}
+
+// Reflejan `AuditAction` y `AuditEntity` de `audit-logs.service.ts`, que ahora se
+// importan del cliente generado en vez de declararse dos veces. Añadir un valor aquí
+// es lo que lo hace existir para TypeScript, así que los dos lados no pueden separarse.
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  STOCK_MOVEMENT
+  BULK_STOCK
+  ORDER_RECEIVE
+  ORDER_CANCEL
+  USER_ROLE_CHANGE
+  USER_ACTIVATE
+  USER_DEACTIVATE
+  SALE_SHIP
+  SALE_CANCEL
+  REFRESH_REUSE
+}
+
+enum AuditEntity {
+  Product
+  PurchaseOrder
+  SaleOrder
+  User
+  Tag
+  Category
+  Brand
+  Supplier
+}
+
 model Category {
   id          String    @id @default(uuid())
   name        String    @unique
@@ -177,7 +219,7 @@ model User {
   name           String
   email          String    @unique
   password       String
-  role           String    @default("USER")
+  role           Role      @default(USER)
   isActive       Boolean   @default(true)
   isVerified     Boolean   @default(false)
   verifyToken    String?   @unique
@@ -213,8 +255,8 @@ model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
   userEmail String?
-  action    String
-  entity    String
+  action    AuditAction
+  entity    AuditEntity
   entityId  String?
   details   Json?
   createdAt DateTime @default(now())

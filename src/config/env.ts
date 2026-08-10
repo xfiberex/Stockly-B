@@ -53,6 +53,35 @@ export function durationToMs(value: string): number {
     return amount * factor;
 }
 
+const ES_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i;
+
+/**
+ * T3-13 — avisa cuando el proceso parece desplegado pero `NODE_ENV` no dice «production».
+ *
+ * Importa porque el comportamiento del manejador de errores depende de esa variable:
+ * fuera de producción responde el mensaje real del error. Desde T3-13 ese mensaje va
+ * saneado de rutas, así que la fuga grave ya no ocurre aunque nadie configure nada —pero
+ * sigue exponiendo detalles internos que en un servidor no pintan nada.
+ *
+ * `NODE_ENV=staging` no es una opción: `validNodeEnvs` lo rechaza. Un staging debe fijar
+ * `production`, y el error típico no es escribir mal el valor sino **no ponerlo**, en cuyo
+ * caso cae a `development` sin decir nada. La señal que se usa para detectarlo es
+ * `FRONTEND_URL`: si apunta fuera de `localhost`, esto no es la máquina de nadie.
+ *
+ * Es un aviso, no un fallo. La heurística puede equivocarse —alguien depurando en local
+ * contra un frontend desplegado— y tumbar el arranque por una sospecha sería peor.
+ */
+function avisarSiPareceDesplegadoSinProduccion(): void {
+    const frontend = process.env["FRONTEND_URL"] ?? "";
+    if (process.env["NODE_ENV"] === "production" || ES_LOCAL.test(frontend)) return;
+
+    console.warn(
+        `⚠️  NODE_ENV=${process.env["NODE_ENV"]} con FRONTEND_URL=${frontend}, que no es local. ` +
+            "Un entorno desplegado debe arrancar con NODE_ENV=production: en cualquier otro " +
+            "valor las respuestas de error incluyen el mensaje interno del fallo.",
+    );
+}
+
 export function validateEnv(): void {
     const missing: string[] = [];
 
@@ -82,6 +111,8 @@ export function validateEnv(): void {
 
     parsePort(process.env["PORT"], "PORT", 3000);
     parsePort(process.env["SMTP_PORT"], "SMTP_PORT", 587);
+
+    avisarSiPareceDesplegadoSinProduccion();
 
     // Un grupo a medias casi siempre es un despiste, no una decisión: se avisa.
     for (const group of Object.keys(optionalGroups) as Array<keyof typeof optionalGroups>) {

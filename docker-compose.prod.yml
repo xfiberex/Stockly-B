@@ -26,4 +26,9 @@ services:
   backend:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # T3-13 — **cualquier** entorno desplegado va aquí, staging incluido. No existe un
+      # `NODE_ENV=staging`: el validador solo admite development, test o production, y un
+      # servidor que arranque en development responde el mensaje interno de cada error.
+      # Si se despliega sin este archivo de superposición, fijar la variable a mano; el
+      # backend avisa por consola al arrancar cuando detecta que falta (`config/env.ts`).
       NODE_ENV: production

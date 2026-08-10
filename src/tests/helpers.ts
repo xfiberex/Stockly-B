@@ -1,6 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
 import { signToken } from "@/shared/lib/jwt";
 import { hashPassword } from "@/shared/lib/hash";
+import type { $Enums } from "@/generated/prisma/client";
 
 export async function cleanDb() {
     await prisma.saleOrderItem.deleteMany();
@@ -24,7 +25,9 @@ interface CreateUserOptions {
     email?: string;
     password?: string;
     isVerified?: boolean;
-    role?: string;
+    // T3-02: el enum de Prisma, no `string`. Así un rol mal escrito en un test falla al
+    // compilar en vez de al ejecutar contra la base.
+    role?: $Enums.Role;
 }
 
 export async function createUser(options: CreateUserOptions = {}) {

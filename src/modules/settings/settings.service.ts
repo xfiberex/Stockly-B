@@ -1,6 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 
-// Catalog of all available settings with their defaults and metadata
+// Catálogo de todos los ajustes disponibles, con sus valores por defecto y metadatos
 export const SETTINGS_CATALOG = [
     {
         key: "lowStockAlertEnabled",

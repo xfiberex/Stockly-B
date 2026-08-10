@@ -53,6 +53,14 @@ type ProductoExportado = {
 };
 
 /** `id` se pide para el cursor, pero no sale en el archivo: las columnas no cambian. */
+/**
+ * El orden de estas claves **es** el orden de las columnas del CSV: `buildCsv` y el
+ * escritor por lotes sacan la cabecera de `Object.keys` de la primera fila.
+ *
+ * T3-05: el frontend repite la misma lista en `EXPORT_HEADERS`, porque construye su
+ * propio CSV en el navegador y los dos repositorios no comparten paquete. Reordenar o
+ * añadir aquí obliga a tocar allí; el test de cabecera de cada lado lo delata.
+ */
 function filaDeExportacion(p: ProductoExportado) {
     return {
         name: p.name,

@@ -1132,21 +1132,29 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ## Tier 3 — Pulido y mantenimiento
 
-- [ ] **[T3-01] Traducir los comentarios y el mensaje de error en inglés**
+- [x] **[T3-01] Traducir los comentarios y el mensaje de error en inglés** ✅ *(2026-08-10)*
   - **Área:** Ortografía y redacción
   - **Ubicación:** `Stockly-B/src/modules/users/users.service.ts:63`, `settings/settings.service.ts:3`, `audit-logs/audit-logs.service.ts:38`, `shared/middlewares/upload.middleware.ts:28`
   - **Qué hacer:** Cuatro puntos en inglés en una base de código con comentarios íntegramente en español. El cuarto es un mensaje que llega al usuario: `new Error("Upload failed")` → `"No se pudo subir la imagen"`.
   - **Criterio de aceptación:** no quedan comentarios ni mensajes de usuario en inglés en `src/`.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** `verify` backend ✅ **357/357**. Un barrido sobre `src/` completo —no solo sobre las cuatro ubicaciones de la ficha— no devuelve ningún comentario ni mensaje en inglés fuera de `src/generated/`, que es código emitido por Prisma y no se toca.
+  - **Una de las cuatro ubicaciones estaba caducada.** La ficha señalaba `upload.middleware.ts:28`, pero ese archivo cambió con T2-32 y en la línea 28 ya no hay nada en inglés: el mensaje vive ahora en la 105. Buscar por contenido en vez de por número encontró exactamente los mismos cuatro puntos, ni uno más.
+  - **El cuarto no era un comentario, era un mensaje que llega al usuario.** `new Error("Upload failed")` sale del manejador de errores hacia el cliente cuando Cloudinary devuelve la llamada sin error y sin resultado. Ahora es «No se pudo subir la imagen», con una nota al lado explicando por qué va en español y no en inglés como el resto de errores de librería.
 
-- [ ] **[T3-02] Convertir `User.role` y los campos de `AuditLog` a enums de Prisma**
+- [x] **[T3-02] Convertir `User.role` y los campos de `AuditLog` a enums de Prisma** ✅ *(2026-08-10)*
   - **Área:** Código
   - **Ubicación:** `Stockly-B/prisma/schema.prisma:154,181-182`
   - **Qué hacer:** La migración `20260601200000` convirtió los estados de órdenes y movimientos a enums nativos, pero `role String @default("USER")` y `AuditLog.action`/`entity` quedaron fuera, pese a tener tipos unión bien definidos en TypeScript. Añadir `enum Role { ADMIN USER }` y los enums de auditoría con su migración.
   - **Criterio de aceptación:** la base de datos rechaza un rol inexistente; `requireRole` y la suite siguen pasando.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** `verify` backend ✅ **357/357**, cobertura **91.33 %** (9 tests nuevos). Criterio literal cumplido: un `INSERT` con `role = 'SUPERADMIN'` **por SQL crudo** —saltándose el `z.enum` de la ruta y los tipos de Prisma— es rechazado por la base con `invalid input value for enum`. `requireRole` sigue dando 200 a un ADMIN y 403 a un USER.
+  - **La migración se escribió a mano**, como la de 2026-06-01 que convirtió los estados: el diff automático de Prisma para pasar de `text` a enum es borrar la columna y crearla vacía. Con `USING` los datos se conservan y una fila fuera del enum haría fallar la migración en vez de perderse. Comprobados antes los valores presentes: ADMIN/USER en `users`, y CREATE, DELETE, SALE_SHIP, SALE_CANCEL sobre Product y SaleOrder en `audit_logs`.
+  - **Las uniones de TypeScript dejan de existir por duplicado.** `AuditAction` y `AuditEntity` se importan ahora del cliente generado, así que añadir una acción es tocar el enum y migrar; olvidar uno de los dos pasos lo detecta `tsc`.
+  - **El cambio destapó que los filtros aceptaban cualquier cadena.** Al tipar las columnas, `where: { role: query.role }` dejó de compilar, lo que obligó a decidir qué hacer con `?role=basura` —hasta ahora devolvía lista vacía por accidente—. Se responde **400**: ignorar el filtro sería peor, porque `?role=admin` en minúscula devolvería **todos** los usuarios en vez de ninguno.
+  - **Y destapó un 500 alcanzable desde la URL, que no estaba en la ficha.** La guarda de `sale-orders` era `status in $Enums.SaleOrderStatus`; los enums generados son objetos literales, así que heredan de `Object.prototype` y `"toString" in …` devuelve **verdadero**. `?status=toString` pasaba la guarda, se casteaba a enum y reventaba dentro de Prisma. Reproducido como 500 antes de arreglarlo; el ayudante compartido usa `Object.hasOwn` y responde 400.
 
 - [ ] **[T3-03] Unificar el estilo de exportación del módulo de productos**
   - **Área:** Refactorización
@@ -1164,13 +1172,19 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T3-05] Unificar las cabeceras de exportación CSV entre repos**
+- [x] **[T3-05] Unificar las cabeceras de exportación CSV entre repos** ✅ *(2026-08-10)*
   - **Área:** Refactorización
   - **Ubicación:** `Stockly-B/src/shared/lib/csv.ts:1-11`, `Stockly-F/src/modules/products/utils/importExport.ts:5-26`
   - **Qué hacer:** El escapado está duplicado literalmente (incluido el comentario) y las cabeceras difieren: el backend incluye `sku`, `minStock` y `tags`; el frontend no. El mismo botón «Exportar CSV» produce columnas distintas según la ruta. Unificar las cabeceras y, como mínimo, documentar la duplicación en ambos archivos.
   - **Criterio de aceptación:** ambas exportaciones producen las mismas columnas en el mismo orden; los tests de `importExport.test.ts` y `csv.test.ts` lo verifican.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** `verify` frontend ✅ **409/409**, `verify` backend ✅ **357/357**. Las dos exportaciones producen las **mismas once columnas en el mismo orden**, fijado en ambos repositorios como la misma cadena literal: `name,description,sku,price,stock,minStock,isActive,categoryName,brandName,supplierName,tags`.
+  - **El enunciado de la ficha no era exacto y conviene dejarlo dicho:** el botón «Exportar CSV» de la interfaz **no** tiene dos rutas. Siempre arma el archivo en el navegador a partir del JSON. Quien producía las once columnas era `GET /products/export?format=csv`, que la interfaz no usa pero está documentado en Swagger y es el que optimizó T2-05. La divergencia real era entre exportar por la aplicación y exportar por la API.
+  - **Los tres campos ya venían en la respuesta.** `filaDeExportacion` enviaba `sku`, `minStock` y `tags` desde el backend, y el frontend los descartaba porque `ExportedProduct` no los declaraba. No había que añadir datos, había que dejar de tirarlos.
+  - **`price` estaba mal tipado, y se comprobó sobre la respuesta real.** El frontend lo declaraba `number`; el backend lo serializa como cadena porque es `Decimal` en Prisma. Medido ejecutando la exportación: `{"price":"10.5", …}`. Es la misma clase de divergencia que T2-24 puso a vigilar.
+  - **La duplicación se queda, declarada en los dos archivos.** No hay paquete compartido entre repositorios, así que el escapado sigue repetido palabra por palabra. Lo que impide que se separen no es el comentario: es que cada repositorio fija la misma cabecera en un test suyo, y cambiar un lado pone en rojo ese lado.
+  - **De once columnas, la reimportación entiende siete.** `sku`, `minStock`, `supplierName` y `tags` se exportan pero el importador los ignora, aquí y en el `importProductsSchema` del backend. Un test lo fija: sobran sin descolocar el resto. Ampliar el importador es otra tarea y no se ha hecho.
 
 - [ ] **[T3-06] Decidir explícitamente sobre `.agents/skills/` en el control de versiones**
   - **Área:** Refactorización
@@ -1188,13 +1202,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** T0-01
 
-- [ ] **[T3-08] Marcar los iconos decorativos con `aria-hidden`**
+- [x] **[T3-08] Marcar los iconos decorativos con `aria-hidden`** ✅ *(2026-08-10)*
   - **Área:** Accesibilidad
   - **Ubicación:** transversal — Heroicons en `ProductTable.tsx`, `App.tsx`, `DashboardPage.tsx` y demás
   - **Qué hacer:** Solo `Select.tsx:43` marca su chevron como decorativo. Añadir `aria-hidden="true"` a los iconos que acompañan a texto para reducir el ruido en lectores de pantalla.
   - **Criterio de aceptación:** los iconos que duplican información textual no se anuncian.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** `verify` frontend ✅ **409/409** (8 tests nuevos), sobre el **DOM renderizado** y no sobre el JSX.
+  - **La premisa de la ficha era falsa y este es el hallazgo principal.** Decía que solo `Select.tsx` marcaba su icono como decorativo. Eso describe el código, no lo que lee un lector de pantalla: **Heroicons v2 emite `aria-hidden="true"` en todos sus iconos**, así que el atributo estaba en los 24 sitios aunque no se escribiera en ninguno. Comprobado en la fuente de la librería y sobre el DOM. El proyecto no usa ninguna otra fuente de iconos: cero `<svg>` escritos a mano, cero `role="img"`.
+  - **Los tests no añaden el atributo: fijan la garantía.** Hoy la da una dependencia externa, y una garantía así se pierde en silencio el día que se cambie de juego de iconos o se actualice a una versión que no lo haga.
+  - **El fallo real de esta familia es el contrario, y sí estaba presente.** Con los iconos ocultos, lo que se rompe es un botón sin nombre accesible. Los tres botones de acción de `ProductTable` **no estaban mudos** —`title` es el último recurso que contempla la especificación de accname, y así lo calcula Testing Library; comprobado antes de tocar nada—, pero el nombre era el mismo en todas las filas: en una tabla de cincuenta productos, cincuenta botones «Editar» no dicen cuál. Ahora llevan `aria-label` con el producto, como el enlace de historial de al lado desde T2-14, y un test comprueba que dos filas no comparten nombre.
+  - **Corregido durante la tarea:** la primera versión de la comprobación no contaba `title` como nombre accesible y acusaba a esos tres botones de estar mudos. Era un falso positivo; se midió el nombre calculado de verdad antes de escribir el arreglo.
 
 - [ ] **[T3-09] Evitar que el botón flotante tape la paginación en móvil**
   - **Área:** UI/UX
@@ -1228,21 +1247,30 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
 
-- [ ] **[T3-13] Asegurar `NODE_ENV=production` en entornos desplegados**
+- [x] **[T3-13] Asegurar `NODE_ENV=production` en entornos desplegados** ✅ *(2026-08-10)*
   - **Área:** Seguridad / DevOps
   - **Ubicación:** `Stockly-B/src/shared/middlewares/error.middleware.ts:18-21`, `docker-compose.yml:33-35`
   - **Qué hacer:** Fuera de producción el `errorHandler` devuelve `err.message` íntegro, que en un error de Prisma incluye la consulta completa y la ruta absoluta del archivo fuente. El compose ya fija `NODE_ENV: production` correctamente; documentar que cualquier entorno de staging debe hacer lo mismo y añadir la comprobación al arranque.
   - **Criterio de aceptación:** ningún entorno desplegado devuelve rutas del sistema de archivos en las respuestas de error.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** `verify` backend ✅ **357/357**, cobertura **91.33 %** (9 tests nuevos). **La fuga se reprodujo antes de arreglarla**, y no con un ejemplo inventado: durante T3-02, `?status=toString` provocaba un 500 cuyo cuerpo incluía `C:\Users\…\src\modules\sale-orders\sale-orders.service.ts:32:30`. Ese mensaje literal es el que usan los tests. Tres de los seis fallaban antes del cambio, uno de ellos a través de una petición completa.
+  - **Se sanea siempre, no solo cuando `NODE_ENV` está bien puesto.** El compose fija `production`, pero una garantía que depende de que alguien recuerde una variable en staging no es una garantía. El patrón exige que la ruta **termine en extensión de código** para no morder texto corriente, y admite espacios dentro de los segmentos: la ruta de este proyecto tiene dos, y un patrón que cortara en el primer espacio habría dejado pasar justo la parte que identifica la máquina.
+  - **La información no se pierde, cambia de canal.** El log sigue recibiendo el error entero, ruta incluida, y la respuesta conserva el `requestId` de T2-10, que es lo que permite ir de un cuerpo saneado a la línea completa. Un test lo comprueba, y otro que un mensaje normal pasa intacto.
+  - **La comprobación al arranque avisa, no aborta.** `NODE_ENV=staging` ya lo rechaza el validador, así que el error típico no es escribirlo mal sino **no ponerlo** y caer a `development` en un servidor sin enterarse. La señal es `FRONTEND_URL`: si no apunta a localhost, esto no es la máquina de nadie. Es una heurística y puede equivocarse —alguien depurando en local contra un frontend desplegado—, así que tumbar el arranque por una sospecha sería peor que avisar.
 
-- [ ] **[T3-14] Unificar la escala de radios y sombras**
+- [x] **[T3-14] Unificar la escala de radios y sombras** ✅ *(2026-08-10)*
   - **Área:** UI/UX / Refactorización
   - **Ubicación:** transversal, `Stockly-F/src/**/*.tsx`
   - **Qué hacer:** Medido: 81 utilidades de radio (40 `rounded-xl`, 28 `rounded-lg`, 12 `rounded-full`, **1 `rounded-md` huérfano**) y 11 de sombra repartidas entre `shadow-sm`, `shadow-lg` y `shadow-xl` sin criterio. Aplicar la convención fijada en T2-35 — `rounded-xl` para superficies (tarjetas, modales), `rounded-lg` para controles (botones, inputs), `rounded-full` para badges y avatares — y reducir las sombras a los dos tokens de elevación (`shadow-raised` para superficie elevada, `shadow-overlay` para modales y desplegables). La jerarquía la da el borde, no la sombra.
   - **Criterio de aceptación:** no queda ningún `rounded-md`; cada `shadow-*` del código es uno de los dos tokens de elevación.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-35
+  - **Verificado localmente (2026-08-10):** `verify` frontend ✅ **409/409** (3 tests nuevos). Criterio literal cumplido y medido por `grep` sobre `src/`: **cero radios fuera de los tres de la convención** (39 superficies, 32 controles, 13 píldoras) y **las once sombras son los dos tokens de elevación** (7 `raised`, 4 `overlay`).
+  - **Los tokens existían desde T2-35 y no los usaba nadie.** Estaban definidos en el `@theme` y su única aparición en el código era el test que comprueba que están definidos. Las once sombras seguían siendo utilidades de Tailwind repartidas entre tres tamaños: cinco tarjetas de autenticación, la tarjeta del panel, el botón flotante, el modal y el menú desplegable.
+  - **El reparto lo decide el papel, no el tamaño.** `raised` para lo que se despega del fondo —tarjetas—, `overlay` para lo que se pone por encima: modal, desplegable y el botón flotante, que flota sobre el contenido aunque no sea una capa.
+  - **La guarda es un test que recorre `src/`**, en el mismo estilo que el de colores crudos de T2-37 y por la misma razón: la convención solo dura lo que dure la memoria de quien la escribió. **Falsificado** introduciendo un archivo con un radio y una sombra prohibidos — los dos tests los señalan por nombre y archivo.
+  - **Detalle que costó una vuelta:** los comentarios que escribí explicando el cambio contenían los nombres de las clases prohibidas y contaminaban el recuento por `grep`, que es la forma de comprobar el criterio. Están reescritos para no nombrarlas literalmente, y el test se excluye a sí mismo por lo mismo.
 
 - [ ] **[T3-15] Documentar el sistema de diseño**
   - **Área:** Documentación / UI/UX
@@ -1526,6 +1554,13 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-09 | **T2-23** Cobertura de las zonas flojas — **completada** | `sale-orders.controller.ts` **69.44 → 86.11 %** (pide >75) y `upload.middleware.ts` **75.67 %** (pide >70). Global del backend **91.00 %**. `verify` ✅ **339/339** (6 nuevos) | Faltaban las tres rutas de solo lectura, las que nadie mira hasta que dejan de funcionar. El test del CSV comprueba que una orden de dos líneas produce **dos filas**: la diferencia entre contar órdenes y contar filas, que es lo que decide si el tope de T2-05 se queda corto. **`upload.middleware` llegó al umbral por otro camino** —T2-32— así que el test que proponía la ficha no habría medido nada nuevo. `nodemailer` se queda al 39 %: cubrirlo exige un SMTP falso y el criterio no lo pedía. |
 | 2026-08-09 | **T2-24** Contrato frontend ↔ backend — **completada** | Falsificado como pedía el criterio: cambiar `value: false` por `"false"` en el mock compartido hace fallar **dos archivos al cargarse**. `verify` ✅ **395/395** (6 nuevos) | La validación corre **al importar**, no dentro de un `it`: así falla cualquier test que use un mock desalineado, sin depender de que alguien invoque el de contrato. **Costó un intento:** el primer esquema declaraba `value: boolean \| number \| string` y aceptaba `{ type: "boolean", value: "false" }`, o sea el mock exacto que ocultó T1-06. Un contrato que acepta el defecto que debe cazar no vale nada. |
 
+| 2026-08-10 | **T3-01** Comentarios y mensajes en inglés — **completada** | Barrido sobre `src/` completo: cero comentarios y cero mensajes en inglés fuera de `src/generated/`. `verify` ✅ **357/357** | **Una de las cuatro ubicaciones estaba caducada:** `upload.middleware.ts:28` cambió con T2-32 y el mensaje vive ahora en la 105. Buscar por contenido encontró los mismos cuatro puntos, ni uno más. El cuarto no era un comentario sino un `Error("Upload failed")` que llega al usuario. |
+| 2026-08-10 | **T3-02** Enums de rol y auditoría — **completada** | Criterio literal: un `INSERT` con `role='SUPERADMIN'` **por SQL crudo** lo rechaza la base. `verify` ✅ **357/357**, cobertura **91.33 %** (9 nuevos) | Migración escrita a mano con `USING`, como la de 2026-06-01: el diff automático de Prisma para `text`→enum borra la columna. **Destapó dos cosas que no estaban en la ficha:** los filtros aceptaban cualquier cadena (ahora 400, porque ignorarlos haría que `?role=admin` devolviera **todos** los usuarios), y un **500 alcanzable desde la URL** — la guarda `status in $Enums…` daba verdadero para `toString`, porque los enums generados heredan de `Object.prototype`. |
+| 2026-08-10 | **T3-13** Rutas del sistema en errores — **completada** | 3 de 6 tests fallaban antes del cambio, uno a través de una petición completa. `verify` ✅ **357/357** | **La fuga se reprodujo, no se supuso:** el 500 de T3-02 devolvía `C:\Users\…\sale-orders.service.ts:32:30` en el cuerpo. Se sanea **siempre**, no solo con `NODE_ENV` bien puesto: una garantía que depende de recordar una variable en staging no es una garantía. El log conserva el error entero; el `requestId` de T2-10 une los dos. |
+| 2026-08-10 | **T3-05** Cabeceras CSV entre repos — **completada** | Las mismas **once columnas en el mismo orden**, fijadas como la misma cadena literal en un test de cada repositorio. `verify` ✅ **409/409** y ✅ **357/357** | **El enunciado no era exacto:** el botón de la interfaz no tiene dos rutas, siempre arma el CSV en el navegador; quien daba once columnas era la API. Los tres campos ya venían en la respuesta y el frontend los tiraba porque el tipo no los declaraba. `price` estaba mal tipado —llega como cadena, es `Decimal`—, comprobado sobre la respuesta real. |
+| 2026-08-10 | **T3-08** Iconos decorativos — **completada** | 8 tests nuevos sobre el **DOM renderizado**. `verify` ✅ **409/409** | **La premisa de la ficha era falsa:** Heroicons v2 ya emite `aria-hidden` en sus 24 usos, así que el criterio se cumplía solo. Los tests fijan una garantía que hoy da una dependencia externa. **El fallo real es el contrario:** los botones de acción no estaban mudos —`title` cuenta como nombre accesible, medido antes de tocar nada— pero repetían el mismo nombre en todas las filas. Ahora nombran el producto. |
+| 2026-08-10 | **T3-14** Radios y elevación — **completada** | Medido por `grep`: cero radios fuera de la convención (39/32/13) y las **once sombras** son los dos tokens (7 `raised`, 4 `overlay`). `verify` ✅ **409/409** | **Los tokens existían desde T2-35 y no los usaba nadie:** su única aparición era el test que comprueba que están definidos. La guarda recorre `src/` como la de colores crudos de T2-37, y está **falsificada** con un archivo infractor. Mis propios comentarios contaminaban el recuento por `grep` al nombrar las clases prohibidas; están reescritos. |
+
 ### Resumen por Tier
 
 | Tier | Completadas | Total | % |
@@ -1533,9 +1568,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
-| Tier 3 | 1 | 15 | 7 % |
+| Tier 3 | 7 | 15 | 47 % |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **83** | **107** | **78 %** |
+| **Total** | **89** | **107** | **83 %** |
 
 *El denominador ha crecido dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el porcentaje se mueve poco pese a cerrarse las siete. **Siguen siendo 17 las pendientes del Tier 2**, las mismas de antes: ninguna de las siete estaba en la lista de trabajo.*
 
@@ -1545,9 +1580,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-09) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **339/339** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.00 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **395/395** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **357/357** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **91.33 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **409/409** ✅ | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **44.89 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |

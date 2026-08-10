@@ -1,18 +1,17 @@
 import { prisma } from "@/shared/lib/prisma";
 import { parsePagination } from "@/shared/lib/pagination";
-import type { Prisma } from "@/generated/prisma/client";
+import { $Enums, type Prisma } from "@/generated/prisma/client";
+import { filtroDeEnum } from "@/shared/lib/enums";
 
-export type AuditAction =
-    | "CREATE" | "UPDATE" | "DELETE" | "RESTORE"
-    | "STOCK_MOVEMENT" | "BULK_STOCK"
-    | "ORDER_RECEIVE" | "ORDER_CANCEL"
-    | "USER_ROLE_CHANGE" | "USER_ACTIVATE" | "USER_DEACTIVATE"
-    | "SALE_SHIP" | "SALE_CANCEL"
-    // T2-31: reuso de un refresh token ya rotado. Es el único que no lo provoca una
-    // acción del usuario sino una anomalía, y por eso se registra sin actor conocido.
-    | "REFRESH_REUSE";
-
-export type AuditEntity = "Product" | "PurchaseOrder" | "SaleOrder" | "User" | "Tag" | "Category" | "Brand" | "Supplier";
+// T3-02 — los valores viven en `schema.prisma` y se importan de ahí. Antes se declaraban
+// aquí como uniones y en la base como `String`: dos listas sin nada que las obligara a
+// coincidir, y ningún error si dejaban de hacerlo. Ahora añadir una acción es tocar el
+// enum y migrar; olvidarlo lo detecta `tsc`, no la producción.
+//
+// (`REFRESH_REUSE`, de T2-31, es el único que no lo provoca una acción del usuario sino
+// una anomalía; por eso se registra sin actor conocido.)
+export type AuditAction = $Enums.AuditAction;
+export type AuditEntity = $Enums.AuditEntity;
 
 export interface AuditContext {
     userId?: string;
@@ -39,16 +38,19 @@ export const auditService = {
                 },
             });
         } catch {
-            // Audit logging must never break the main flow
+            // El registro de auditoría nunca debe romper el flujo principal
         }
     },
 
     async getAll(query: { page?: string; limit?: string; entity?: string; action?: string; userId?: string }) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 50 });
 
+        const entity = filtroDeEnum($Enums.AuditEntity, query.entity, "entity");
+        const action = filtroDeEnum($Enums.AuditAction, query.action, "action");
+
         const where = {
-            ...(query.entity && { entity: query.entity }),
-            ...(query.action && { action: query.action }),
+            ...(entity && { entity }),
+            ...(action && { action }),
             ...(query.userId && { userId: query.userId }),
         };
 
