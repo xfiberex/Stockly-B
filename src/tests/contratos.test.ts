@@ -7,7 +7,9 @@ import { $Enums } from "@/generated/prisma/client";
 import type { z } from "zod";
 import * as contrato from "@/contratos/api";
 
-const { contenidoGenerado, generar, ORIGEN, DESTINO } = require("../../scripts/generar-contratos.js");
+// Solo el ayudante de formato y las rutas: **este archivo no debe escribir nada**, ver la
+// nota del bloque de frescura más abajo.
+const { contenidoGenerado, ORIGEN, DESTINO } = require("../../scripts/generar-contratos.js");
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -72,11 +74,14 @@ describe("Contrato de la API (T4-01)", () => {
 
     describe("el sobre de respuesta", () => {
         it("envuelve los datos como `{ success, message, data }`", async () => {
-            const admin = await createUser({ email: "contrato_sobre@test.com", role: "ADMIN" });
+            // Correo aleatorio (el que pone `createUser` por defecto) y sin borrado
+            // explícito: con un correo fijo, una pasada interrumpida deja el usuario vivo
+            // y la siguiente choca contra la restricción de unicidad. La limpieza la hace
+            // el `cleanDb` del bloque de abajo.
+            const admin = await createUser({ role: "ADMIN" });
             const res = await request(app).get("/api/v1/tags").set("Cookie", getAuthCookie(admin.id));
 
             conforme(contrato.sobreSchema(contrato.etiquetaSchema.array()), res.body, "sobre de GET /tags");
-            await prisma.user.delete({ where: { id: admin.id } });
         });
 
         it("`data` puede faltar: hay respuestas sin cuerpo útil", () => {
@@ -104,16 +109,16 @@ describe("Contrato de la API (T4-01)", () => {
             expect(actual === esperado ? "al día" : "desfasada — ejecuta `pnpm contratos:generar`").toBe("al día");
         });
 
-        it("volver a generar sobre una copia al día no la toca", () => {
-            // Ejercita el generador de verdad, no solo su ayudante de formato. Es seguro
-            // porque el caso de arriba acaba de comprobar que la copia coincide: si
-            // coincide, `generar()` sale sin escribir. Y si escribiera, el `mtime` de
-            // abajo lo delataría.
-            const antes = fs.statSync(DESTINO).mtimeMs;
-            generar();
-
-            expect(fs.statSync(DESTINO).mtimeMs).toBe(antes);
-        });
+        // Aquí hubo un test que llamaba a `generar()` para ejercitar el generador entero.
+        // **Se retiró porque se autorreparaba**: con la copia desfasada, el caso de arriba
+        // fallaba y este, al ejecutarse después, la reescribía — así que la siguiente
+        // pasada salía verde y el aviso desaparecía. Lo vi en carne propia al añadir
+        // `errorSchema` al contrato: dos tests en rojo una vez y nunca más, con el archivo
+        // ya regenerado por la propia suite.
+        //
+        // Un guardián que arregla lo que vigila es peor que no tenerlo, y la cobertura que
+        // aportaba no vale ese precio. `generar()` se ejercita a mano con
+        // `pnpm contratos:generar`, que es su forma de uso real.
     });
 
     describe("las respuestas reales encajan en sus esquemas", () => {

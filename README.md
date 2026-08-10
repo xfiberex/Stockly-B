@@ -165,6 +165,11 @@ Tres tests sostienen la garantía: que los `z.enum` sean los de Prisma, que las 
 encajen en sus esquemas y que la copia esté al día. El porqué de copiar en vez de publicar un
 paquete está en [ADR 0006](docs/adr/0006-contrato-copiado-entre-repositorios.md).
 
+**El spec de Swagger sale de ahí también** (T4-02): `components.schemas` se genera desde el
+contrato —las respuestas— y desde los `*.validator.ts` —las peticiones—, así que la documentación
+no puede describir algo que el validador rechace. Cambiar un validador cambia el spec solo. Lo que
+sí se sigue escribiendo a mano son las **rutas**, en `src/swagger.paths.ts`.
+
 ### `pnpm verify`
 
 El proyecto **no usa CI**: la puerta de calidad se ejecuta en local y encadena

@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **392/392** | **421/421** *(+1 omitido)* |
-| Cobertura (sentencias) | 91.38 % *(suelo 85 %)* | 50.84 % *(suelo 45 %)* |
+| Tests | **402/402** | **421/421** *(+1 omitido)* |
+| Cobertura (sentencias) | 91.95 % *(suelo 85 %)* | 50.87 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -65,10 +65,11 @@ de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 1/10** · Total **98/107**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
-que la auditoría dejó fuera del alcance inmediato a propósito, se abordó **T4-01** el 2026-08-10
-por ser la causa raíz común de T0-03, T1-03 y T1-05; las nueve restantes siguen fuera de alcance,
-listadas para que no hacerlas sea una decisión consciente.
+**Tier 4: 2/10** · Total **99/107**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01** y **T4-02** el
+2026-08-10: la primera por ser la causa raíz común de T0-03, T1-03 y T1-05, la segunda porque
+dependía de ella. Las ocho restantes siguen fuera de alcance, listadas para que no hacerlas sea una
+decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -285,6 +286,14 @@ regla general: **antes de acusar al código de una tarea, comparar contra el est
 `git stash` en la misma máquina.** Ahí evitó dos diagnósticos equivocados, y también demostró que un
 `pnpm dev` olvidado ocupando un puerto falsea toda la medición.
 
+**Un test que repara lo que vigila se queda mudo para siempre, y parece un fallo intermitente.**
+El primer guardián de frescura del contrato tenía debajo otro caso que llamaba a `generar()` para
+ganar cobertura — y con eso **reescribía el archivo**. Con la copia desfasada, la primera pasada
+daba dos tests en rojo y de paso la arreglaba, así que la segunda salía verde y el aviso
+desaparecía. El síntoma es de los peores: un fallo que no se reproduce y que uno acaba achacando a
+la base de datos o al orden de los tests. **Regla: un test no escribe en el árbol.** Si hace falta
+ejercitar algo que escribe, se ejercita con su comando, no dentro de la suite.
+
 **Un `return` en el nivel superior de un `.js` rompe la cobertura, no los tests.** Node envuelve
 cada módulo CommonJS en una función, así que ahí es legal y el archivo funciona; babel lo parsea
 como módulo ES al instrumentar para cobertura y falla con «'return' outside of function». El
@@ -403,6 +412,21 @@ Tres reglas que no conviene deshacer:
 
 El porqué de copiar en vez de publicar un paquete, con las tres alternativas descartadas y su
 coste, está en [ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md).
+
+**Y el spec de OpenAPI se deriva de ahí** (T4-02). `components.schemas` no se escribe: lo genera
+`swagger.esquemas.ts` desde el contrato —las respuestas— y desde los `*.validator.ts` —las
+peticiones—, con `z.toJSONSchema()` de Zod 4 y `target: "openapi-3.0"`. Dos cosas que conviene no
+deshacer:
+
+- **No hace falta `zod-to-openapi`.** Zod 4.4 lo hace solo y en el dialecto exacto del spec. Añadir
+  esa dependencia —que es lo que pedía la ficha, escrita cuando Zod no sabía— sería tenerla por
+  costumbre.
+- **Las peticiones se generan con `io: "input"`.** Los validadores usan `z.coerce.number()`: lo que
+  aceptan no es lo que producen. Con la salida, el spec diría que `price` solo admite números y el
+  «Try it out» mentiría con los formularios.
+
+Las **rutas** siguen escritas a mano en `swagger.paths.ts` y así se quedan: qué endpoints hay, con
+qué resumen y qué códigos devuelven no se deduce de un esquema.
 
 ### Accesibilidad
 

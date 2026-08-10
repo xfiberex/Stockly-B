@@ -1,6 +1,7 @@
 import swaggerUi from "swagger-ui-express";
 import type { Express } from "express";
-import { rutasAdicionales, esquemasAdicionales, etiquetasAdicionales, postDeMovimientoManual } from "@/swagger.paths";
+import { rutasAdicionales, etiquetasAdicionales, postDeMovimientoManual } from "@/swagger.paths";
+import { generarEsquemas } from "@/swagger.esquemas";
 
 // Exportado para que los tests puedan comprobar que lo documentado y lo que acepta
 // el validador no se separen otra vez (T2-29).
@@ -16,114 +17,11 @@ export const spec = {
         securitySchemes: {
             cookieAuth: { type: "apiKey", in: "cookie", name: "token" },
         },
-        schemas: {
-            // Categoría, marca y proveedor son relaciones: se leen como objeto y se
-            // escriben por su id. El esquema las declaraba como un enum de cadenas y
-            // el `requestBody` exigía un campo `category` que el validador rechaza,
-            // así que seguir el «Try it out» acababa en 422.
-            NamedRef: {
-                type: "object",
-                nullable: true,
-                properties: {
-                    id: { type: "string", format: "uuid" },
-                    name: { type: "string", example: "Electrónica" },
-                },
-            },
-            Tag: {
-                type: "object",
-                properties: {
-                    id: { type: "string", format: "uuid" },
-                    name: { type: "string", example: "Oferta" },
-                    color: { type: "string", nullable: true, example: "#ef4444" },
-                },
-            },
-            Product: {
-                type: "object",
-                properties: {
-                    id: { type: "string", format: "uuid" },
-                    name: { type: "string", example: "Laptop Pro 15" },
-                    description: { type: "string", nullable: true },
-                    sku: { type: "string", nullable: true, example: "ELE-LAP-LAPT15" },
-                    price: { type: "number", example: 1299.99 },
-                    stock: { type: "integer", example: 15 },
-                    minStock: { type: "integer", example: 3 },
-                    category: { $ref: "#/components/schemas/NamedRef" },
-                    brand: { $ref: "#/components/schemas/NamedRef" },
-                    supplier: { $ref: "#/components/schemas/NamedRef" },
-                    tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
-                    imageUrl: { type: "string", nullable: true },
-                    isActive: { type: "boolean" },
-                    createdAt: { type: "string", format: "date-time" },
-                    updatedAt: { type: "string", format: "date-time" },
-                },
-            },
-            // Cuerpo real de creación y actualización: los mismos campos que acepta
-            // `createProductSchema`. `tagIds` se repite una vez por etiqueta porque
-            // multipart no tiene arrays; `""` significa «ninguna».
-            ProductWrite: {
-                type: "object",
-                properties: {
-                    name: { type: "string", example: "Laptop Pro 15" },
-                    description: { type: "string" },
-                    sku: { type: "string" },
-                    price: { type: "number", example: 1299.99 },
-                    stock: { type: "integer", example: 15 },
-                    minStock: { type: "integer", example: 3 },
-                    categoryId: { type: "string", format: "uuid" },
-                    brandId: { type: "string", format: "uuid" },
-                    supplierId: { type: "string", format: "uuid" },
-                    tagIds: { type: "array", items: { type: "string", format: "uuid" } },
-                    image: { type: "string", format: "binary" },
-                },
-            },
-            // La importación masiva tiene su propio contrato: categoría y marca van
-            // por nombre, no por id, y se crean si no existen.
-            ProductImport: {
-                type: "object",
-                required: ["name", "price"],
-                properties: {
-                    name: { type: "string", example: "Laptop Pro 15" },
-                    description: { type: "string" },
-                    price: { type: "number", example: 1299.99 },
-                    stock: { type: "integer", example: 15 },
-                    categoryName: { type: "string", example: "Electrónica" },
-                    brandName: { type: "string", example: "Genérica" },
-                    isActive: { type: "boolean" },
-                },
-            },
-            StockMovement: {
-                type: "object",
-                properties: {
-                    id: { type: "string", format: "uuid" },
-                    productId: { type: "string", format: "uuid" },
-                    type: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT", "IMPORT"] },
-                    delta: { type: "integer", description: "Positivo = entrada, negativo = salida" },
-                    stockAfter: { type: "integer", description: "Stock resultante tras el movimiento" },
-                    note: { type: "string", nullable: true },
-                    createdAt: { type: "string", format: "date-time" },
-                },
-            },
-            User: {
-                type: "object",
-                properties: {
-                    id: { type: "string", format: "uuid" },
-                    name: { type: "string" },
-                    email: { type: "string", format: "email" },
-                    role: { type: "string", enum: ["ADMIN", "USER"] },
-                    isVerified: { type: "boolean" },
-                    createdAt: { type: "string", format: "date-time" },
-                },
-            },
-            Error: {
-                type: "object",
-                properties: {
-                    success: { type: "boolean", example: false },
-                    message: { type: "string" },
-                },
-            },
-            // T2-30: los de los nueve módulos que faltaban, definidos en `swagger.paths.ts`.
-            ...esquemasAdicionales,
-        },
+        // T4-02 — derivados del contrato de respuestas (T4-01) y de los validadores de
+        // cada módulo, no escritos a mano. Ver `swagger.esquemas.ts`: lo que documenta
+        // este spec no puede separarse de lo que la API acepta y devuelve, porque sale
+        // de las mismas declaraciones que usan el servidor y el cliente.
+        schemas: generarEsquemas(),
     },
     security: [{ cookieAuth: [] }],
     tags: [
@@ -166,7 +64,9 @@ export const spec = {
         "/auth/me": {
             get: {
                 tags: ["Auth"], summary: "Obtener usuario autenticado",
-                responses: { "200": { description: "Datos del usuario", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/User" } } } } } }, "401": { description: "No autenticado" } },
+                // `Profile` y no `User`: el `select` de `getById` es más corto que
+                // `USER_SELECT` y no devuelve `updatedAt` (T4-02, derivado del contrato).
+                responses: { "200": { description: "Datos del usuario", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Profile" } } } } } }, "401": { description: "No autenticado" } },
             },
             put: {
                 tags: ["Auth"], summary: "Actualizar nombre/email",
@@ -222,7 +122,20 @@ export const spec = {
         "/products/export": {
             get: {
                 tags: ["Products"], summary: "Exportar todos los productos",
-                responses: { "200": { description: "Array de productos para exportar" } },
+                parameters: [{ name: "format", in: "query", schema: { type: "string", enum: ["json", "csv"], default: "json" } }],
+                responses: {
+                    // T4-02 — esta respuesta no declaraba ningún esquema, solo una frase.
+                    // `ProductExport` sale del contrato y fija las **once columnas** que
+                    // T3-05 alineó entre los dos repositorios.
+                    "200": {
+                        description: "Exportación completa. Se transmite por partes (T2-05); el CSV lleva marca de orden de bytes (T2-34).",
+                        content: {
+                            "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/ProductExport" } } },
+                            "text/csv": { schema: { type: "string" } },
+                        },
+                    },
+                    "413": { description: "La exportación supera el máximo de filas" },
+                },
             },
         },
         "/products/import": {

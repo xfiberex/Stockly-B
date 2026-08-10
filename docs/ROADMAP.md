@@ -5,13 +5,14 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-10 — **98 / 107**
+> ## Estado al 2026-08-10 — **99 / 107**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordó
-> **T4-01**, por ser la causa raíz común de T0-03, T1-03 y T1-05; las 9 restantes siguen fuera.
+> **T4-01** y **T4-02**: la primera por ser la causa raíz común de T0-03, T1-03 y T1-05, y la
+> segunda porque dependía de ella. Las 8 restantes siguen fuera de alcance.
 >
-> Backend **392/392** tests y 91.38 % de sentencias; frontend **421/421** y 50.84 %; E2E 9 pasados
+> Backend **402/402** tests y 91.95 % de sentencias; frontend **421/421** y 50.87 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -1356,13 +1357,21 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Alcance:** cubre la forma de **todo lo que llega** en los doce módulos. Los DTO de lo que **se envía** siguen en cada repositorio: los valida el backend con sus `*.validator.ts`, que ya son fuente de verdad de la petición, y unificarlos es otra tarea.
   - **Trampa nueva, que costó un `verify` en rojo:** un `return` en el nivel superior de un `.js` es legal en Node —envuelve cada módulo CommonJS en una función— pero babel lo parsea como módulo ES al instrumentar para cobertura y falla con «'return' outside of function». Síntoma despistante: `pnpm test` en verde y `pnpm test:coverage` en rojo, señalando el `require` del test en vez del archivo requerido.
 
-- [ ] **[T4-02] Generar el OpenAPI desde los esquemas Zod**
+- [x] **[T4-02] Generar el OpenAPI desde los esquemas Zod** ✅ *(2026-08-10)*
   - **Área:** Documentación
   - **Ubicación:** `Stockly-B/src/swagger.ts`
   - **Qué hacer:** Sustituir el objeto literal mantenido a mano por generación con `zod-to-openapi` desde los validadores, que ya son la fuente de verdad. Habilita además la generación de un cliente tipado para el frontend.
   - **Criterio de aceptación:** la documentación no puede desincronizarse de la validación, porque se deriva de ella.
   - **Esfuerzo:** alto
   - **Depende de:** T2-30, T4-01
+  - **Verificado localmente (2026-08-10):** `verify` backend ✅ **402/402** (10 nuevos), cobertura **91.95 %**; frontend ✅ **421/421 + 1 omitido**. Comprobado además **contra el servidor en marcha**: `GET /api/v1/docs` responde 200 y el spec que sirve Swagger UI trae los **23 esquemas** generados, las 43 rutas y las 67 operaciones de T2-30 intactas.
+  - **La dependencia que pedía la ficha no hace falta.** `zod-to-openapi` es de cuando Zod no sabía hacerlo solo: **Zod 4.4 trae `z.toJSONSchema()` con `target: "openapi-3.0"` nativo**, justo el dialecto del spec — emite `nullable: true` en vez de `type: [..., "null"]` y resuelve una referencia anulable con el idioma `nullable` + `allOf` que exige 3.0. Comprobado antes de escribir nada convirtiendo los 9 validadores y los 36 esquemas del contrato: **todos convierten**. Añadirla habría sido una dependencia por costumbre.
+  - **`io: "input"` en las peticiones, y no es un detalle.** Los validadores usan `z.coerce.number()` y `z.preprocess`: lo que **aceptan** no es lo que **producen**. Generado con la salida, el spec diría que `price` ha de ser un número, cuando el endpoint admite también la cadena que manda un formulario, y el «Try it out» mentiría por defecto.
+  - **Destapó que `/settings` estaba mal documentado en las dos direcciones:** decía `additionalProperties: { type: "string" }`, o sea un mapa de cadenas, y la API devuelve un **array de ajustes** cuyo `value` ya viene tipado. Es la misma clase de defecto que originó T2-29 y precisamente en el módulo cuya confusión de contrato costó T1-05 y T1-06 — documentar el valor como cadena invitaba a repetir que `"false"` se lea como verdadero.
+  - **Y que `/reports` documentaba cuatro de sus seis listas como `items: {}`**, «un array de algo»: quien leyera el spec no sabía qué campos trae una métrica de rotación. `/products/export` directamente no declaraba esquema, solo una frase.
+  - **Lo derivado y lo que sigue a mano.** Los 23 esquemas salen del contrato (respuestas) y de los validadores (peticiones); **las rutas siguen escritas a mano** y así se quedan: qué endpoints hay, con qué resumen, qué rol piden y qué códigos devuelven no se deduce de Zod. Una sola propiedad de todo el spec se escribe a mano —`ProductWrite.image`, que consume multer antes de llegar a Zod— y está declarada aparte para que se vea.
+  - **Falsificados los tres guardianes:** teclear mal un `$ref` tumba 2 tests; **hacer obligatorio el SKU en el validador cambia solo el `required` del spec** —de `["name","price"]` a `["name","sku","price"]`— y tumba 2, que es el criterio de aceptación demostrado; y volver a escribir un esquema a mano en el spec tumba el que compara con lo generado.
+  - **Un defecto propio, encontrado y corregido:** el primer test de frescura del contrato llamaba a `generar()` para ganar cobertura, **y con eso reescribía el archivo**. Con la copia desfasada fallaba una vez y se autorreparaba, así que la pasada siguiente salía verde y el aviso desaparecía. Lo vi al añadir `errorSchema`: dos tests en rojo una vez y nunca más. Se retiró el test. De paso, `scripts/` sale del informe de cobertura: es utillaje con su propio comando, y solo entraba cuando algún test lo importaba.
 
 - [ ] **[T4-03] Modo oscuro**
   - **Área:** UI/UX
@@ -1621,6 +1630,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-10 | **T3-03** Convención de exportación — **completada** | Los **doce** controladores y los doce servicios exportan objeto. `verify` ✅ **362/362** (5 nuevos) | **No era solo `products`, eran cinco**: `audit-logs`, `products`, `purchase-orders`, `reports` y `sale-orders`. Hay tensión con la ficha —«no justifica un cambio masivo aislado»— y se resuelve a favor del criterio, con una transformación mecánica y comprobada. Lo que gana no es estética: `product.routes.ts` importaba trece nombres sueltos. Guarda **falsificada** añadiendo un `export function` a `tags`. |
 | 2026-08-10 | **T3-06** `.agents/` en el control de versiones — **completada** | Decisión del propietario: **se comparten a propósito** (varias máquinas). Criterio cumplido: `git grep -il z.object` da 61 archivos, `git buscar-archivos` da **8**, todos en `src/` | La ficha se quedaba corta: `.claude/` también está rastreado y pesa más — **458 de 657 archivos** en el frontend. Ruido medido antes de atacarlo: 53 de 59 aciertos eran documentación. **`.gitattributes` con `-diff` se probó y no sirve** (git los trata como binarios, los sigue listando y rompe el diff de un cambio legítimo); lo que sí aporta es `linguist-vendored`. |
 | 2026-08-10 | **T3-11** Decisiones de arquitectura — **completada** | **Cinco** ADRs en `docs/adr/` con índice; las cuatro pedidas más una | Escritas leyendo el código, citando archivo. El apartado de consecuencias recoge lo que muerde al mantener: que `clearCookie` sin repetir el `path` **no borra nada**, que un token perdido solo se regenera. **La quinta no estaba en la ficha y es la que más falta hacía —«sin CI»—**: una ausencia no deja archivo que la explique, y quien vea 781 tests sin pipeline lo leerá como descuido. |
+| 2026-08-10 | **T4-02** OpenAPI derivado de Zod — **completada** | Contra el servidor en marcha: `/api/v1/docs` → **200** y el spec servido trae los **23 esquemas** generados, con las 43 rutas y 67 operaciones de T2-30 intactas. `verify` ✅ **402/402** | **La dependencia de la ficha no hacía falta:** Zod 4.4 trae `z.toJSONSchema()` con `target: "openapi-3.0"` nativo, el dialecto exacto del spec. Comprobado antes de escribir: convierten los 9 validadores y los 36 esquemas del contrato. **Peticiones con `io: "input"`**, o el spec diría que `price` solo admite números cuando el validador coerce la cadena de un formulario. **Destapó `/settings` mal documentado en las dos direcciones** —un mapa de cadenas donde hay un array de ajustes tipados—, `/reports` con cuatro listas como `items: {}` y `/products/export` sin esquema. Falsificación clave: hacer obligatorio el SKU en el validador cambia el `required` del spec **solo**. |
 | 2026-08-10 | **T4-01** Contrato compartido entre repositorios — **completada** | El criterio, medido: conectar el contrato produjo **12 errores de compilación** en el frontend (4 de producción, 8 de mocks) donde antes no había ninguno. `verify` ✅ backend **392/392** y frontend **421/421** | **La ficha pedía un paquete del workspace pnpm y eso no puede existir**: son dos repos git independientes con la carpeta madre sin versionar. Se copia desde una fuente única, con las tres alternativas descartadas por coste real ([ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md)). **Los tipos ya mentían:** `price` y los tres `unitPrice` decían `number` y llegan como cadena, sostenidos por dos `Number()` y un `z.coerce`. **`SettingEntry.value` seguía siendo la unión laxa que T2-24 rechazó por escrito** — endureció su espejo pero no el tipo de producción. Tres guardianes, los tres falsificados: 8 caídas, 1 y 1. |
 | 2026-08-10 | **T3-10** CHANGELOG y guía de contribución — **completada** | Ambos en la raíz de `Stockly-B`, más un `CONTRIBUTING.md` corto en `Stockly-F` que apunta al canónico. Enlaces relativos comprobados | **La ficha pedía documentar `pnpm lint`, y el backend no lo tiene**: se documenta `pnpm verify`, la puerta real, con las asimetrías escritas. El CHANGELOG **no inventa versiones** —no hay etiquetas y los `package.json` ni coinciden—, así que todo va bajo «Sin publicar». La convención de commits se documenta como objetivo y se dice el dato: 35 de 41 commits convencionales son `feat`. |
 
@@ -1632,12 +1642,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **1** | 10 | 10 % |
-| **Total** | **98** | **107** | **92 %** |
+| Tier 4 | **2** | 10 | 20 % |
+| **Total** | **99** | **107** | **93 %** |
 
 *El denominador creció dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el 91 % de arriba es sobre 107, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** De las 10 del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordó **T4-01** el 2026-08-10, por ser la causa raíz común de T0-03, T1-03 y T1-05. Las 9 restantes siguen fuera de alcance.*
+***Los cuatro tiers de trabajo están cerrados.** De las 10 del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01** y **T4-02** el 2026-08-10: la primera por ser la causa raíz común de T0-03, T1-03 y T1-05, la segunda porque dependía de ella. Las 8 restantes siguen fuera de alcance.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1645,12 +1655,13 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-10) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **392/392** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.38 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests backend | 198/198 ✅ | **402/402** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **91.95 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
 | Tests frontend | 181/181 ✅ | **421/421** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **50.84 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Cobertura frontend (sentencias) | 19.88 % | **50.87 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
 | Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
+| Esquemas del spec escritos a mano | 14 *(~180 líneas de objeto literal)* | **0** ✅ *(23 derivados; solo `ProductWrite.image` es manual, T4-02)* | que la documentación se derive de la validación |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |

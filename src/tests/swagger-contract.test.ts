@@ -32,9 +32,13 @@ describe("Contrato entre Swagger y el validador de productos", () => {
     it("`Product` expone las relaciones como objeto, no como enum de cadenas", () => {
         const producto = esquemas.Product!.properties!;
 
-        expect(producto.category).toEqual({ $ref: "#/components/schemas/NamedRef" });
+        // Desde T4-02 el esquema se genera, y una referencia anulable en OpenAPI 3.0 no
+        // se escribe con un `$ref` a secas —ahí `nullable` se ignoraría— sino envuelta en
+        // `allOf`. Se comprueba lo que la prueba quería decir: que apunta a `NamedRef` y
+        // que no es el enum de cadenas que documentaba antes de T2-29.
+        expect(JSON.stringify(producto.category)).toContain("#/components/schemas/NamedRef");
+        expect(producto.category).toMatchObject({ nullable: true });
         expect(producto.tags).toMatchObject({ type: "array" });
-        // El campo que existía antes era `category: { enum: [...] }`.
         expect(JSON.stringify(producto.category)).not.toMatch(/enum/);
     });
 

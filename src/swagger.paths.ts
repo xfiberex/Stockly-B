@@ -37,18 +37,16 @@ const PARAMS_PAGINA = [
     { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
 ];
 
-/** Sobre paginado real de la API: la lista va en `data.data`, junto a `data.meta`. */
+/**
+ * Sobre paginado real de la API: la lista va en `data.data`, junto a `data.meta`.
+ * El `meta` se referencia (T4-02): lo genera `swagger.esquemas.ts` desde el contrato,
+ * en vez de repetir aquí sus cuatro campos.
+ */
 const LISTA_PAGINADA = (ref: string) => ({
     type: "object",
     properties: {
         data: { type: "array", items: { $ref: ref } },
-        meta: {
-            type: "object",
-            properties: {
-                total: { type: "integer" }, page: { type: "integer" },
-                limit: { type: "integer" }, totalPages: { type: "integer" },
-            },
-        },
+        meta: { $ref: "#/components/schemas/PaginationMeta" },
     },
 });
 
@@ -115,76 +113,11 @@ const exportacion = (etiqueta: string, nombre: string): Ruta => ({
     },
 });
 
-/** Ítem de una orden, igual en compras y ventas salvo el nombre del contenedor. */
-const ITEM_DE_ORDEN = {
-    type: "object",
-    properties: {
-        id: { type: "string", format: "uuid" },
-        productId: { type: "string", format: "uuid", nullable: true },
-        productName: { type: "string" },
-        quantity: { type: "integer", example: 3 },
-        unitPrice: { type: "number", example: 149.99 },
-    },
-};
-
-export const esquemasAdicionales = {
-    Category: {
-        type: "object",
-        properties: {
-            id: { type: "string", format: "uuid" },
-            name: { type: "string", example: "Electrónica" },
-            description: { type: "string", nullable: true },
-            createdAt: { type: "string", format: "date-time" },
-        },
-    },
-    Brand: { $ref: "#/components/schemas/Category" },
-    Supplier: {
-        type: "object",
-        properties: {
-            id: { type: "string", format: "uuid" },
-            name: { type: "string", example: "Distribuidora Norte" },
-            email: { type: "string", format: "email", nullable: true },
-            phone: { type: "string", nullable: true },
-            notes: { type: "string", nullable: true },
-        },
-    },
-    PurchaseOrder: {
-        type: "object",
-        properties: {
-            id: { type: "string", format: "uuid" },
-            status: { type: "string", enum: ["PENDING", "RECEIVED", "CANCELLED"] },
-            supplier: { $ref: "#/components/schemas/NamedRef" },
-            notes: { type: "string", nullable: true },
-            items: { type: "array", items: ITEM_DE_ORDEN },
-            createdAt: { type: "string", format: "date-time" },
-        },
-    },
-    SaleOrder: {
-        type: "object",
-        properties: {
-            id: { type: "string", format: "uuid" },
-            status: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] },
-            customerName: { type: "string", nullable: true },
-            customerEmail: { type: "string", nullable: true },
-            customerPhone: { type: "string", nullable: true },
-            notes: { type: "string", nullable: true },
-            items: { type: "array", items: ITEM_DE_ORDEN },
-            createdAt: { type: "string", format: "date-time" },
-        },
-    },
-    AuditLog: {
-        type: "object",
-        properties: {
-            id: { type: "string", format: "uuid" },
-            userEmail: { type: "string", nullable: true },
-            action: { type: "string", example: "STOCK_MOVEMENT" },
-            entity: { type: "string", example: "Product" },
-            entityId: { type: "string", nullable: true },
-            details: { type: "object", nullable: true },
-            createdAt: { type: "string", format: "date-time" },
-        },
-    },
-};
+// T4-02 — aquí vivían `ITEM_DE_ORDEN` y `esquemasAdicionales`: ~70 líneas de objetos
+// literales que repetían de memoria la forma de las respuestas. Los genera ahora
+// `swagger.esquemas.ts` desde el contrato, y se referencian por `$ref` como el resto.
+// Lo que queda en este archivo son las **rutas**, que no se derivan de nada: qué
+// endpoints hay, con qué resumen, qué rol piden y qué códigos devuelven.
 
 /**
  * El `POST` de `/products/{id}/movements`, que se inserta **dentro** del objeto que
@@ -294,7 +227,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
         get: {
             tags: ["Products"], summary: "Historial de cambios de precio", parameters: [PARAM_ID],
             responses: {
-                "200": JSON_OK({ type: "array", items: { type: "object", properties: { oldPrice: { type: "number" }, newPrice: { type: "number" }, createdAt: { type: "string", format: "date-time" } } } }, "Historial"),
+                "200": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/PriceHistory" } }, "Historial"),
                 "404": ERROR("Producto no encontrado"),
             },
         },
@@ -389,17 +322,22 @@ export const rutasAdicionales: Record<string, Ruta> = {
             tags: ["Reports"], summary: "Resumen de inventario para el dashboard",
             parameters: [{ name: "format", in: "query", schema: { type: "string", enum: ["json", "pdf"], default: "json" } }],
             responses: {
+                // T4-02 — cuatro de las seis listas se documentaban como `items: {}`, o sea
+                // «un array de algo»: quien leyera esto no sabía qué campos trae una
+                // métrica de rotación. `ReportSummary` sale del contrato y las trae todas.
                 "200": {
                     description: "Resumen. Con `format=pdf` devuelve el informe en PDF.",
                     content: {
-                        "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "object", properties: {
-                            totals: { type: "object", properties: { totalProducts: { type: "integer" }, activeProducts: { type: "integer" }, inactiveProducts: { type: "integer" }, inventoryValue: { type: "number" }, lowStockCount: { type: "integer" } } },
-                            stockByCategory: { type: "array", items: { type: "object", properties: { name: { type: "string" }, stock: { type: "integer" }, value: { type: "number" } } } },
-                            topByValue: { type: "array", items: { type: "object" } },
-                            movementsByMonth: { type: "array", items: { type: "object" } },
-                            lowStockProducts: { type: "array", items: { type: "object" } },
-                            stockMetrics: { type: "array", items: { type: "object" } },
-                        } } } } },
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                properties: {
+                                    success: { type: "boolean" },
+                                    message: { type: "string" },
+                                    data: { $ref: "#/components/schemas/ReportSummary" },
+                                },
+                            },
+                        },
                         "application/pdf": { schema: { type: "string", format: "binary" } },
                     },
                 },
@@ -456,14 +394,33 @@ export const rutasAdicionales: Record<string, Ruta> = {
 
     // ── Configuración ────────────────────────────────────────────────────────
     "/settings": {
+        // T4-02 — esto documentaba un **mapa de cadenas** en las dos direcciones, y la API
+        // devuelve un **array de ajustes** cuyo `value` ya viene convertido según su
+        // `type`. Es la misma clase de defecto que originó T2-29, y justamente en el
+        // módulo cuya confusión de contrato costó T1-05 y T1-06: `"false"` es una cadena
+        // verdadera, así que documentarlo como cadena invitaba a repetir el fallo.
         get: {
             tags: ["Settings"], summary: "Leer la configuración de la aplicación",
-            responses: { "200": JSON_OK({ type: "object", additionalProperties: { type: "string" } }, "Configuración actual"), "401": ERROR("No autenticado") },
+            responses: {
+                "200": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/Setting" } }, "Configuración actual"),
+                "401": ERROR("No autenticado"),
+            },
         },
         patch: {
             tags: ["Settings"], summary: "Guardar configuración (ADMIN)",
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: { type: "string" } } } } },
-            responses: { "200": JSON_OK({ type: "object" }, "Guardada"), "403": ERROR("Requiere rol ADMIN"), "422": ERROR("Datos inválidos") },
+            description: "Lote de cambios: un objeto `{ clave: valor }` con el valor **ya tipado** —booleano, número o cadena— según el `type` del ajuste.",
+            requestBody: {
+                required: true,
+                content: { "application/json": { schema: {
+                    type: "object",
+                    additionalProperties: { oneOf: [{ type: "boolean" }, { type: "number" }, { type: "string" }] },
+                    example: { lowStockAlertEnabled: true },
+                } } },
+            },
+            responses: {
+                "200": JSON_OK({ type: "array", items: { type: "object", properties: { key: { type: "string" }, value: { oneOf: [{ type: "boolean" }, { type: "number" }, { type: "string" }] } } } }, "Ajustes guardados"),
+                "403": ERROR("Requiere rol ADMIN"), "422": ERROR("Datos inválidos"),
+            },
         },
     },
 

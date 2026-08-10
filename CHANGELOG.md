@@ -42,6 +42,10 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **La especificación OpenAPI deja de escribirse a mano.** Los 23 esquemas de
+  `components` se derivan del contrato (respuestas) y de los `*.validator.ts` (peticiones)
+  con la conversión nativa de Zod 4, sin dependencias nuevas; las rutas siguen escritas,
+  que es lo que no se deduce de un esquema (`T4-02`).
 - **Los tipos de las respuestas de la API dejan de declararse dos veces.** `Stockly-B/src/contratos/api.ts`
   es la fuente de verdad y `pnpm contratos:generar` copia el archivo al frontend, que compila
   contra él; tres tests vigilan que los enums sean los de Prisma, que las respuestas reales
@@ -76,6 +80,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   (`T4-01`).
 - La acción de auditoría `REFRESH_REUSE` no tenía color desde `T2-31` y se pintaba como un
   evento rutinario siendo una anomalía de seguridad; tampoco estaba en el filtro (`T4-01`).
+- La documentación de `/settings` describía un mapa de cadenas en las dos direcciones
+  cuando la API devuelve un array de ajustes ya tipados; `/reports` daba cuatro de sus seis
+  listas como «un array de algo» y `/products/export` no declaraba esquema (`T4-02`).
 
 ### Seguridad
 
@@ -106,7 +113,8 @@ se cerraron bloques de tareas.
 | 2026-08-09 | **Tier 1 cerrado** (26/26, al verificar `T1-21` con Docker) y **Tier 2 cerrado** (48/48) |
 | 2026-08-10 | Tier 3: pulido, documentación y decisiones de arquitectura |
 
-Al 2026-08-10: **98 de 107 tareas**. Los cuatro tiers de trabajo están cerrados; del Tier 4,
-fuera del alcance inmediato, se abordó `T4-01` por ser la causa raíz común de tres defectos
-anteriores. Backend **392 tests** y 91.4 % de cobertura de sentencias; frontend **421 tests**
-y 50.8 %; E2E 9 pasados y 1 omitido en `chromium` y en `Mobile Chrome`.
+Al 2026-08-10: **99 de 107 tareas**. Los cuatro tiers de trabajo están cerrados; del Tier 4,
+fuera del alcance inmediato, se abordaron `T4-01` —causa raíz común de tres defectos
+anteriores— y `T4-02`, que dependía de ella. Backend **402 tests** y 92.0 % de cobertura de
+sentencias; frontend **421 tests** y 50.9 %; E2E 9 pasados y 1 omitido en `chromium` y en
+`Mobile Chrome`.
