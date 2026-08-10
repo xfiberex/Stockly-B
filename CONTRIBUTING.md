@@ -83,6 +83,23 @@ mencionan el límite. Está documentado en `docs/CONTEXTO.md`.
 
 ---
 
+### Si tocas la forma de una respuesta de la API
+
+La declara **un solo archivo**, `Stockly-B/src/contratos/api.ts`, y `Stockly-F` compila contra
+una copia literal suya (T4-01, [ADR 0006](docs/adr/0006-contrato-copiado-entre-repositorios.md)):
+
+```bash
+# 1. editar Stockly-B/src/contratos/api.ts
+cd Stockly-B && pnpm contratos:generar   # 2. copiar al frontend
+# 3. commitear en LOS DOS repositorios
+```
+
+Ese archivo **solo puede importar `zod`**: cualquier otro import haría que la copia no compile
+del otro lado. Olvidar el paso 2 pone `pnpm verify` en rojo en ambos repos, con el comando en el
+mensaje de error.
+
+---
+
 ## Herramientas
 
 - **Gestor de paquetes: pnpm 11.21.0**, fijado en `packageManager` de ambos repositorios y

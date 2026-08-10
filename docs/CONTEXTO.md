@@ -56,18 +56,19 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **362/362** | **419/419** |
-| Cobertura (sentencias) | 91.23 % *(suelo 85 %)* | 49.74 % *(suelo 42 %)* |
+| Tests | **392/392** | **421/421** *(+1 omitido)* |
+| Cobertura (sentencias) | 91.38 % *(suelo 85 %)* | 50.84 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
 de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ · Total
-**97/107**. **Los cuatro tiers de trabajo están cerrados**; lo único pendiente es el **Tier 4**
-(10 tareas), que la auditoría dejó fuera del alcance inmediato a propósito — se listan para que la
-decisión de no hacerlas sea consciente, no para hacerlas ahora.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
+**Tier 4: 1/10** · Total **98/107**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+que la auditoría dejó fuera del alcance inmediato a propósito, se abordó **T4-01** el 2026-08-10
+por ser la causa raíz común de T0-03, T1-03 y T1-05; las nueve restantes siguen fuera de alcance,
+listadas para que no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -284,6 +285,13 @@ regla general: **antes de acusar al código de una tarea, comparar contra el est
 `git stash` en la misma máquina.** Ahí evitó dos diagnósticos equivocados, y también demostró que un
 `pnpm dev` olvidado ocupando un puerto falsea toda la medición.
 
+**Un `return` en el nivel superior de un `.js` rompe la cobertura, no los tests.** Node envuelve
+cada módulo CommonJS en una función, así que ahí es legal y el archivo funciona; babel lo parsea
+como módulo ES al instrumentar para cobertura y falla con «'return' outside of function». El
+síntoma despista mucho: `pnpm test` en verde y `pnpm test:coverage` en rojo, señalando el `require`
+del test en vez del archivo requerido. Pasó con `scripts/generar-contratos.js` (T4-01); la cura es
+meter el cuerpo en una función y llamarla.
+
 **Los archivos del frontend tienen finales de línea CRLF.** Un reemplazo de varias líneas
 escrito con `\n` no encuentra nada y **falla en silencio**: el script dice que terminó, el
 archivo sigue igual. Para cambios multilínea hay que usar las herramientas de edición, no
@@ -374,6 +382,27 @@ Lo que ese documento no recoge:
 - **Pendiente:** las paletas de los gráficos de Recharts siguen como hexadecimales dentro de los
   componentes. No son utilidades —`fill` y `stroke` son props—, así que ningún test las detecta;
   llevarlas a los tokens exige leer las variables CSS desde JS.
+
+### El contrato de la API
+
+**La forma de las respuestas se declara en un solo sitio: `src/contratos/api.ts`** (T4-01). El
+frontend no escribe la suya, recibe una copia literal generada con `pnpm contratos:generar` y
+versionada allí. Para cambiar una respuesta: se edita **aquí**, se genera, y se commitea en los
+**dos** repositorios — el generador lo recuerda al terminar.
+
+Tres reglas que no conviene deshacer:
+
+- **Ese archivo solo puede importar `zod`.** Es lo que permite copiarlo en vez de transformarlo.
+  Meterle un `import` de Prisma o de `@/…` rompe la compilación del otro lado.
+- **Los enums se repiten ahí a propósito**, por lo mismo. La duplicación no queda suelta:
+  `src/tests/contratos.test.ts` los compara con `$Enums` y falla si divergen.
+- **`price` y los `unitPrice` son `Importe`, o sea `string | number`.** No es indecisión: los
+  `Decimal` de Prisma se serializan como cadena y `/reports` es la excepción, porque su servicio
+  convierte con `Number(...)` antes de responder. Para pasar a número está `aNumero()`. Estrecharlo
+  a `number` «para simplificar» es volver a la mentira que costó esta tarea.
+
+El porqué de copiar en vez de publicar un paquete, con las tres alternativas descartadas y su
+coste, está en [ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md).
 
 ### Accesibilidad
 

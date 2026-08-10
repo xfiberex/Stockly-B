@@ -5,13 +5,13 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-10 — **97 / 107**
+> ## Estado al 2026-08-10 — **98 / 107**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
-> Tier 3 (15/15). Lo único abierto es el **Tier 4** (10 tareas), que la auditoría dejó fuera del
-> alcance inmediato a propósito — se listan para que no hacerlas sea una decisión consciente.
+> Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordó
+> **T4-01**, por ser la causa raíz común de T0-03, T1-03 y T1-05; las 9 restantes siguen fuera.
 >
-> Backend **362/362** tests y 91.23 % de sentencias; frontend **419/419** y 49.74 %; E2E 9 pasados
+> Backend **392/392** tests y 91.38 % de sentencias; frontend **421/421** y 50.84 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -1339,13 +1339,22 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 *Explícitamente fuera del alcance inmediato. Se listan para que la decisión de no hacerlos sea consciente.*
 
-- [ ] **[T4-01] Paquete compartido de contratos entre repositorios**
+- [x] **[T4-01] Paquete compartido de contratos entre repositorios** ✅ *(2026-08-10)*
   - **Área:** Arquitectura
   - **Ubicación:** `shared/` (nuevo paquete del workspace pnpm)
   - **Qué hacer:** Los tipos de request/response se declaran a mano y por duplicado en cada repo, sin nada que obligue a que coincidan. Es la causa raíz común de T0-03, T1-03 y T1-05. Extraer los esquemas Zod y los tipos inferidos a un paquete consumido por ambos lados.
   - **Criterio de aceptación:** una divergencia de contrato produce un error de compilación en lugar de un fallo silencioso en tiempo de ejecución.
   - **Esfuerzo:** alto
   - **Depende de:** T2-24
+  - **Verificado localmente (2026-08-10):** `verify` backend ✅ **392/392** (30 nuevos), cobertura **91.38 %**; frontend ✅ **421/421 + 1 omitido**, **50.84 %**. El criterio se cumple de forma medible: al conectar el contrato, `pnpm check` del frontend pasó de 0 a **12 errores de compilación** —4 en código de producción y 8 en mocks—, todos ellos divergencias reales que antes no señalaba nada.
+  - **La ubicación de la ficha no puede existir.** Pedía un paquete del workspace pnpm, y Stockly son **dos repositorios git independientes** (`xfiberex/Stockly-B` y `-F`) con la carpeta que los contiene sin versionar; el `pnpm-workspace.yaml` del backend ni siquiera declara `packages:`, solo `allowBuilds`. Ningún workspace puede abarcarlos: quien clone uno se quedaría sin la mitad. Se resuelve **copiando** —fuente única en `Stockly-B/src/contratos/api.ts`, copia generada y versionada en el frontend— con las tres alternativas descartadas por su coste real y no por gusto. Razonado en [ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md).
+  - **Los tipos ya mentían, y se midió antes de tocar nada.** `Product.price` y los tres `unitPrice` se declaraban `number` y llegan como **cadena** (`Decimal` de Prisma). No reventaba porque el código lo parcheaba en los bordes: `Number(...)` en `SaleOrdersPage` y `PurchaseOrdersPage`, `z.coerce.number()` en el formulario y un `formatearImporte` que acepta las dos cosas **y lo documenta**. El código sabía la verdad y el tipo no.
+  - **`SettingEntry.value` seguía siendo la unión laxa que T2-24 rechazó por escrito.** Su propia ficha decía que `boolean | number | string` acepta `{ type: "boolean", value: "false" }`, «el mock exacto que ocultó T1-06». T2-24 endureció el espejo de los tests y **no el tipo de producción**, que arrastraba un `esVerdadero(v) => v === true || v === "true"` como parche. Ahora es la unión discriminada del contrato, en un solo sitio para los dos lados.
+  - **El espejo de T2-24 desaparece.** `Stockly-F/src/tests/contratos/esquemas.ts` describía la API de memoria y nada lo ataba a ella. Ahora reexporta del contrato, que el backend comprueba **contra respuestas reales con una base viva**. Los `as unknown as …` de los fixtures se retiraron: eran el agujero del mecanismo, porque Zod ignora las claves de más pero no las de menos, así que a los mocks les faltaban `imagePublicId`, los `*Id` sueltos y el `product` de cada ítem sin que nadie lo viera.
+  - **Falsificados los tres guardianes**, uno a uno: declarar `price` como `z.number()` tumba **8** tests; quitar `REFRESH_REUSE` del enum tumba **1**, el que lo compara con `$Enums`; cambiar la fuente sin regenerar tumba **1**, el de frescura, con el comando a ejecutar en el mensaje de error.
+  - **Destapó que `REFRESH_REUSE` no tenía color desde T2-31.** `ACTION_VARIANTS` era `Record<string, …>` y la acción caía en el neutro por omisión, leyéndose como un evento rutinario cuando es una anomalía de seguridad. Al pasar a `Record<AuditAction, …>` el compilador lo exigió; ahora va en rojo y tiene entrada en el filtro.
+  - **Alcance:** cubre la forma de **todo lo que llega** en los doce módulos. Los DTO de lo que **se envía** siguen en cada repositorio: los valida el backend con sus `*.validator.ts`, que ya son fuente de verdad de la petición, y unificarlos es otra tarea.
+  - **Trampa nueva, que costó un `verify` en rojo:** un `return` en el nivel superior de un `.js` es legal en Node —envuelve cada módulo CommonJS en una función— pero babel lo parsea como módulo ES al instrumentar para cobertura y falla con «'return' outside of function». Síntoma despistante: `pnpm test` en verde y `pnpm test:coverage` en rojo, señalando el `require` del test en vez del archivo requerido.
 
 - [ ] **[T4-02] Generar el OpenAPI desde los esquemas Zod**
   - **Área:** Documentación
@@ -1612,6 +1621,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-10 | **T3-03** Convención de exportación — **completada** | Los **doce** controladores y los doce servicios exportan objeto. `verify` ✅ **362/362** (5 nuevos) | **No era solo `products`, eran cinco**: `audit-logs`, `products`, `purchase-orders`, `reports` y `sale-orders`. Hay tensión con la ficha —«no justifica un cambio masivo aislado»— y se resuelve a favor del criterio, con una transformación mecánica y comprobada. Lo que gana no es estética: `product.routes.ts` importaba trece nombres sueltos. Guarda **falsificada** añadiendo un `export function` a `tags`. |
 | 2026-08-10 | **T3-06** `.agents/` en el control de versiones — **completada** | Decisión del propietario: **se comparten a propósito** (varias máquinas). Criterio cumplido: `git grep -il z.object` da 61 archivos, `git buscar-archivos` da **8**, todos en `src/` | La ficha se quedaba corta: `.claude/` también está rastreado y pesa más — **458 de 657 archivos** en el frontend. Ruido medido antes de atacarlo: 53 de 59 aciertos eran documentación. **`.gitattributes` con `-diff` se probó y no sirve** (git los trata como binarios, los sigue listando y rompe el diff de un cambio legítimo); lo que sí aporta es `linguist-vendored`. |
 | 2026-08-10 | **T3-11** Decisiones de arquitectura — **completada** | **Cinco** ADRs en `docs/adr/` con índice; las cuatro pedidas más una | Escritas leyendo el código, citando archivo. El apartado de consecuencias recoge lo que muerde al mantener: que `clearCookie` sin repetir el `path` **no borra nada**, que un token perdido solo se regenera. **La quinta no estaba en la ficha y es la que más falta hacía —«sin CI»—**: una ausencia no deja archivo que la explique, y quien vea 781 tests sin pipeline lo leerá como descuido. |
+| 2026-08-10 | **T4-01** Contrato compartido entre repositorios — **completada** | El criterio, medido: conectar el contrato produjo **12 errores de compilación** en el frontend (4 de producción, 8 de mocks) donde antes no había ninguno. `verify` ✅ backend **392/392** y frontend **421/421** | **La ficha pedía un paquete del workspace pnpm y eso no puede existir**: son dos repos git independientes con la carpeta madre sin versionar. Se copia desde una fuente única, con las tres alternativas descartadas por coste real ([ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md)). **Los tipos ya mentían:** `price` y los tres `unitPrice` decían `number` y llegan como cadena, sostenidos por dos `Number()` y un `z.coerce`. **`SettingEntry.value` seguía siendo la unión laxa que T2-24 rechazó por escrito** — endureció su espejo pero no el tipo de producción. Tres guardianes, los tres falsificados: 8 caídas, 1 y 1. |
 | 2026-08-10 | **T3-10** CHANGELOG y guía de contribución — **completada** | Ambos en la raíz de `Stockly-B`, más un `CONTRIBUTING.md` corto en `Stockly-F` que apunta al canónico. Enlaces relativos comprobados | **La ficha pedía documentar `pnpm lint`, y el backend no lo tiene**: se documenta `pnpm verify`, la puerta real, con las asimetrías escritas. El CHANGELOG **no inventa versiones** —no hay etiquetas y los `package.json` ni coinciden—, así que todo va bajo «Sin publicar». La convención de commits se documenta como objetivo y se dice el dato: 35 de 41 commits convencionales son `feat`. |
 
 ### Resumen por Tier
@@ -1622,12 +1632,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | 0 | 10 | 0 % |
-| **Total** | **97** | **107** | **91 %** |
+| Tier 4 | **1** | 10 | 10 % |
+| **Total** | **98** | **107** | **92 %** |
 
 *El denominador creció dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el 91 % de arriba es sobre 107, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** Las 10 restantes son el Tier 4 entero, que la auditoría dejó fuera del alcance inmediato a propósito.*
+***Los cuatro tiers de trabajo están cerrados.** De las 10 del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordó **T4-01** el 2026-08-10, por ser la causa raíz común de T0-03, T1-03 y T1-05. Las 9 restantes siguen fuera de alcance.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1635,10 +1645,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-10) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **362/362** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.23 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **419/419** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **49.74 %** ✅ *(suelo en 42 %, T2-22)* | ≥ 45 % — **alcanzado** |
+| Tests backend | 198/198 ✅ | **392/392** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **91.38 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **421/421** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **50.84 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
+| Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |

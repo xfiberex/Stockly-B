@@ -145,7 +145,25 @@ pnpm test:coverage    # Reporte de cobertura
 
 pnpm smoke            # Arranca dist/server.js y comprueba /api/v1/health
 pnpm verify           # Puerta de calidad completa (ver abajo)
+
+pnpm contratos:generar  # Copia el contrato de la API a Stockly-F (ver abajo)
 ```
+
+### El contrato de la API
+
+`src/contratos/api.ts` es la **fuente de verdad** de la forma de las respuestas, y `Stockly-F`
+consume una copia literal de ese archivo. Al cambiar la forma de una respuesta:
+
+```bash
+# 1. editar src/contratos/api.ts
+pnpm contratos:generar   # 2. copiar al frontend
+# 3. commitear en LOS DOS repositorios
+```
+
+Olvidarse del paso 2 pone `pnpm verify` en rojo en los dos repos, con el comando en el mensaje.
+Tres tests sostienen la garantía: que los `z.enum` sean los de Prisma, que las respuestas **reales**
+encajen en sus esquemas y que la copia esté al día. El porqué de copiar en vez de publicar un
+paquete está en [ADR 0006](docs/adr/0006-contrato-copiado-entre-repositorios.md).
 
 ### `pnpm verify`
 

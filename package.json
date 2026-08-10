@@ -17,6 +17,7 @@
     "test:watch": "jest --watch --runInBand",
     "test:coverage": "jest --coverage --runInBand --forceExit",
     "smoke": "node scripts/smoke.js",
+    "contratos:generar": "node scripts/generar-contratos.js",
     "verify": "pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm run check && pnpm run test:coverage && pnpm run build && pnpm run smoke"
   },
   "keywords": [],

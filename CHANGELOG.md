@@ -42,6 +42,10 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **Los tipos de las respuestas de la API dejan de declararse dos veces.** `Stockly-B/src/contratos/api.ts`
+  es la fuente de verdad y `pnpm contratos:generar` copia el archivo al frontend, que compila
+  contra él; tres tests vigilan que los enums sean los de Prisma, que las respuestas reales
+  encajen y que la copia esté al día (`T4-01`, [ADR 0006](docs/adr/0006-contrato-copiado-entre-repositorios.md)).
 - `users.role` y los dos campos de texto de `audit_logs` pasan a enums nativos de
   PostgreSQL (`T3-02`).
 - Los doce módulos del backend exportan igual: un objeto por controlador y por servicio
@@ -67,6 +71,11 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   bytes (`T2-34`).
 - Un filtro de enum con un valor inesperado en la URL provocaba un **500** en vez de un 400, porque
   la guarda usaba `in` sobre un objeto que hereda de `Object.prototype` (`T3-02`).
+- Cuatro campos de importe (`price` y los tres `unitPrice`) se declaraban `number` en el
+  frontend y llegan como cadena, y `SettingEntry.value` admitía la forma que causó `T1-06`
+  (`T4-01`).
+- La acción de auditoría `REFRESH_REUSE` no tenía color desde `T2-31` y se pintaba como un
+  evento rutinario siendo una anomalía de seguridad; tampoco estaba en el filtro (`T4-01`).
 
 ### Seguridad
 
@@ -97,6 +106,7 @@ se cerraron bloques de tareas.
 | 2026-08-09 | **Tier 1 cerrado** (26/26, al verificar `T1-21` con Docker) y **Tier 2 cerrado** (48/48) |
 | 2026-08-10 | Tier 3: pulido, documentación y decisiones de arquitectura |
 
-Al 2026-08-10: **97 de 107 tareas**, con el Tier 4 explícitamente fuera del alcance
-inmediato. Backend **362 tests** y 91 % de cobertura de sentencias; frontend **419 tests** y
-49.7 %; E2E 9 pasados y 1 omitido en `chromium` y en `Mobile Chrome`.
+Al 2026-08-10: **98 de 107 tareas**. Los cuatro tiers de trabajo están cerrados; del Tier 4,
+fuera del alcance inmediato, se abordó `T4-01` por ser la causa raíz común de tres defectos
+anteriores. Backend **392 tests** y 91.4 % de cobertura de sentencias; frontend **421 tests**
+y 50.8 %; E2E 9 pasados y 1 omitido en `chromium` y en `Mobile Chrome`.

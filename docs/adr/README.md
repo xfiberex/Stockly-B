@@ -14,6 +14,7 @@ evidente es la equivocada. Si algo se hizo de la forma obvia, no necesita una en
 | [0003](0003-path-restringido-de-la-cookie-de-refresh.md) | `path` restringido en la cookie de refresh | Aceptada |
 | [0004](0004-correo-fuera-de-la-transaccion.md) | El correo se envía fuera de la transacción | Aceptada |
 | [0005](0005-sin-integracion-continua.md) | Sin integración continua: la puerta de calidad es local | Aceptada |
+| [0006](0006-contrato-copiado-entre-repositorios.md) | El contrato de la API se copia entre repositorios, no se comparte como paquete | Aceptada |
 
 ## Formato
 
