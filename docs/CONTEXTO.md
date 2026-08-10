@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **402/402** | **421/421** *(+1 omitido)* |
-| Cobertura (sentencias) | 91.95 % *(suelo 85 %)* | 50.87 % *(suelo 45 %)* |
+| Tests | **402/402** | **448/448** *(+1 omitido)* |
+| Cobertura (sentencias) | 91.95 % *(suelo 85 %)* | 50.96 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -65,11 +65,11 @@ de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 2/10** · Total **99/107**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
-que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01** y **T4-02** el
-2026-08-10: la primera por ser la causa raíz común de T0-03, T1-03 y T1-05, la segunda porque
-dependía de ella. Las ocho restantes siguen fuera de alcance, listadas para que no hacerlas sea una
-decisión consciente.
+**Tier 4: 3/10** · Total **100/107**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
+**T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
+consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. Las siete
+restantes siguen fuera de alcance, listadas para que no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -286,6 +286,15 @@ regla general: **antes de acusar al código de una tarea, comparar contra el est
 `git stash` en la misma máquina.** Ahí evitó dos diagnósticos equivocados, y también demostró que un
 `pnpm dev` olvidado ocupando un puerto falsea toda la medición.
 
+**Tailwind incrusta el color de las sombras, así que sus tokens no se pueden redefinir por
+media query.** Las utilidades de color compilan a `var(--color-…)` y flipean solas con el
+tema; las de sombra no: `.shadow-overlay` sale como `--tw-shadow: 0 8px 24px
+var(--tw-shadow-color, #0f172a1f)`, con el literal dentro. Redefinir `--shadow-overlay` bajo
+`prefers-color-scheme` **no hace nada y no se nota** — el token queda escrito y un test que
+lea el CSS lo da por bueno. Se descubrió midiendo el modal en el navegador, que devolvía
+`rgba(15, 23, 42, 0.12)` en tema oscuro. Lo que sí funciona es sobrescribir
+`--tw-shadow-color` en la clase, que además conserva la composición con `ring-*`.
+
 **Un test que repara lo que vigila se queda mudo para siempre, y parece un fallo intermitente.**
 El primer guardián de frescura del contrato tenía debajo otro caso que llamaba a `generar()` para
 ganar cobertura — y con eso **reescribía el archivo**. Con la copia desfasada, la primera pasada
@@ -374,6 +383,23 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
 tipografía, radios, elevación, densidad, estados, iconos y movimiento, cada sección con el test que
 la vigila. **Es lectura previa a tocar una pantalla**, y no es opcional: media docena de esas
 reglas ponen `pnpm verify` en rojo si se incumplen.
+
+**El modo oscuro es capa semántica, no clases `dark:`** (T4-03). Sigue la preferencia del
+sistema, no hay conmutador, y no se tocó ni una pantalla: las utilidades de color compilan a
+`var(--color-…)`, así que redefinir los tokens bajo `prefers-color-scheme` cambia la
+aplicación entera. Si algún día se añade un selector manual, la capa ya está: lo que falta es
+persistencia y un tercer estado «auto». Tres cosas que no conviene deshacer:
+
+- **No inviertas la paleta.** Los estados se aclaran y desaturan; un `#b91c1c` sobre fondo
+  oscuro es casi negro. Los ratios están medidos y `theme.test.ts` los recalcula **en los dos
+  temas**.
+- **Los rellenos se pintan `bg-primary text-surface`, nunca `text-white`.** Es lo que hace que
+  el botón primario se invierta solo al cambiar de tema. Escribir `text-white` en un botón
+  rompe el modo oscuro sin que ningún test de color lo vea.
+- **Los colores de los gráficos son `var(--color-chart-N)` en las props de Recharts.** Funciona
+  porque un atributo de presentación de SVG se parsea como valor CSS, y reacciona al tema sin
+  volver a renderizar. Lo que sea un **estado** —entradas, salidas, stock mínimo— va con su
+  token de estado, no con la paleta categórica.
 
 Lo que ese documento no recoge:
 

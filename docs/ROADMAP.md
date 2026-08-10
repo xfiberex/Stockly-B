@@ -5,14 +5,15 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-10 — **99 / 107**
+> ## Estado al 2026-08-10 — **100 / 107**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordó
-> **T4-01** y **T4-02**: la primera por ser la causa raíz común de T0-03, T1-03 y T1-05, y la
-> segunda porque dependía de ella. Las 8 restantes siguen fuera de alcance.
+> **T4-01**, **T4-02** y **T4-03**: las dos primeras por ser la causa raíz común de T0-03,
+> T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37 ya habían hecho el
+> trabajo caro. Las 7 restantes siguen fuera de alcance.
 >
-> Backend **402/402** tests y 91.95 % de sentencias; frontend **421/421** y 50.87 %; E2E 9 pasados
+> Backend **402/402** tests y 91.95 % de sentencias; frontend **448/448** y 50.96 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -1373,13 +1374,22 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Falsificados los tres guardianes:** teclear mal un `$ref` tumba 2 tests; **hacer obligatorio el SKU en el validador cambia solo el `required` del spec** —de `["name","price"]` a `["name","sku","price"]`— y tumba 2, que es el criterio de aceptación demostrado; y volver a escribir un esquema a mano en el spec tumba el que compara con lo generado.
   - **Un defecto propio, encontrado y corregido:** el primer test de frescura del contrato llamaba a `generar()` para ganar cobertura, **y con eso reescribía el archivo**. Con la copia desfasada fallaba una vez y se autorreparaba, así que la pasada siguiente salía verde y el aviso desaparecía. Lo vi al añadir `errorSchema`: dos tests en rojo una vez y nunca más. Se retiró el test. De paso, `scripts/` sale del informe de cobertura: es utillaje con su propio comando, y solo entraba cuando algún test lo importaba.
 
-- [ ] **[T4-03] Modo oscuro**
+- [x] **[T4-03] Modo oscuro** ✅ *(2026-08-10)*
   - **Área:** UI/UX
   - **Ubicación:** `Stockly-F/src/index.css`, transversal
   - **Qué hacer:** Cero clases `dark:` y ningún soporte de `prefers-color-scheme` (curiosamente, las plantillas de correo sí declaran `color-scheme: light dark`). Si se aborda, hacerlo con tokens semánticos en `@theme` de Tailwind 4 antes que con clases `dark:` dispersas por 20 páginas. **Ese prerrequisito es exactamente lo que construyen T2-35 a T2-37:** una vez la interfaz consume tokens en lugar de 561 literales, el modo oscuro se reduce a redefinir la capa semántica bajo `prefers-color-scheme`, no a editar 20 páginas — de ahí que el esfuerzo baje de alto a medio. El estilo elegido soporta modo oscuro completo (`✓ Full`) según su propia ficha. Recordar que el modo oscuro no se construye invirtiendo colores, sino con variantes tonales desaturadas y contraste verificado por separado.
   - **Criterio de aceptación:** la aplicación respeta la preferencia del sistema y mantiene el contraste AA en ambos temas.
   - **Esfuerzo:** medio *(alto si se aborda antes que T2-37)*
   - **Depende de:** T2-35, T2-37
+  - **Verificado localmente (2026-08-10):** `verify` frontend ✅ **448/448 + 1 omitido** (27 nuevos), cobertura **50.96 %**; E2E **9 pasados, 1 omitido**. Comprobado **en el navegador** con la preferencia del sistema emulada en las dos direcciones: dashboard, reportes, catálogo y un modal, más los tokens resueltos en vivo (`--color-surface` → `#151d2c`, texto `rgb(230, 236, 245)`, `color-scheme: light dark`).
+  - **La ficha acertaba en lo esencial:** con la capa de tokens de T2-35–T2-37 ya montada, el modo oscuro es redefinir la capa semántica bajo `prefers-color-scheme` y nada más. **Cero clases `dark:`** y ninguna pantalla tocada — las utilidades de color compilan a `var(--color-…)`, así que cambiar la variable cambia la aplicación entera.
+  - **La inversión de los rellenos salió gratis por una decisión vieja.** Los botones se pintan `bg-primary text-surface`, nunca `text-white` —que no aparece **ni una vez** en `src/`—: al oscurecer `surface` y aclarar `primary`, el botón primario pasa solo a claro con texto oscuro. Sin ese trabajo de T2-36, habría hecho falta un token nuevo para «texto sobre relleno».
+  - **No es la paleta invertida**, como avisaba la ficha: los estados se aclaran y desaturan (un `#b91c1c` sobre fondo oscuro es casi negro) y las superficies suben en escalones cortos, porque en oscuro la jerarquía la da la luminancia y no la sombra. Diseñada y **medida antes de escribirla**: de veinte pares comprobados, diecinueve pasaron a la primera.
+  - **El borde se calibró contra el tema claro, no contra un número inventado.** Mi primer mínimo de 1.5:1 era más estricto que el propio proyecto, que en claro da **1.23:1**. El valor oscuro (1.47:1) contrasta más que el claro, y el test usa 1.2 como listón porque es el que el proyecto ya aceptaba.
+  - **Los gráficos eran el bloqueo real, y ningún test los veía.** Recharts recibe los colores por props (`fill`, `stroke`), no por clases, así que `tokens.test.ts` nunca detectó los ~40 hexadecimales de tres componentes; con el modo oscuro dejaban de ser deuda estética y se quedaban en tonos claros sobre fondo oscuro. Se comprobó en el navegador que **`var()` funciona en un atributo de presentación de SVG y reacciona al cambio de tema sin volver a renderizar** —`rgb(59, 130, 246)` en claro, `rgb(96, 165, 250)` en oscuro—, lo que evitó tener que montar un hook con `matchMedia`. De paso, lo que era estado pasó a token de estado: entradas en `success`, salidas en `danger`, ajustes en `info`, stock mínimo en `warning`.
+  - **Dos defectos propios, encontrados midiendo y no leyendo.** (1) **Las sombras no se podían redefinir por token**: Tailwind incrusta el color literal en la utilidad (`--tw-shadow: … var(--tw-shadow-color, #0f172a1f)`) en vez de referenciar `var(--shadow-overlay)`, al revés que los colores. El token quedaba escrito, mi test lo daba por bueno y el modal seguía con sombra azul translúcida —medido: `rgba(15, 23, 42, 0.12)`—. Se arregla sobrescribiendo `--tw-shadow-color`, que además conserva la composición con `ring-*`, y el test pasó a afirmar el mecanismo que sí funciona. (2) **El `body` no pintaba fondo**: solo lo hacía un envoltorio repetido en nueve pantallas, así que al rebotar el desplazamiento asomaba el lienzo blanco del navegador.
+  - **Salvedad:** los colores de etiqueta **no cambian con el tema**, y es correcto: los elige el usuario y se guardan en la base, así que son datos. Su legibilidad la sigue resolviendo `textoLegibleSobre()` contra el color real.
+  - **No hay conmutador manual.** El criterio pide seguir la preferencia del sistema y eso es lo que hace; un selector en la interfaz exigiría persistencia y un tercer estado («auto»), que es otra tarea.
 
 - [ ] **[T4-04] Internacionalización**
   - **Área:** UI/UX
@@ -1630,6 +1640,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-10 | **T3-03** Convención de exportación — **completada** | Los **doce** controladores y los doce servicios exportan objeto. `verify` ✅ **362/362** (5 nuevos) | **No era solo `products`, eran cinco**: `audit-logs`, `products`, `purchase-orders`, `reports` y `sale-orders`. Hay tensión con la ficha —«no justifica un cambio masivo aislado»— y se resuelve a favor del criterio, con una transformación mecánica y comprobada. Lo que gana no es estética: `product.routes.ts` importaba trece nombres sueltos. Guarda **falsificada** añadiendo un `export function` a `tags`. |
 | 2026-08-10 | **T3-06** `.agents/` en el control de versiones — **completada** | Decisión del propietario: **se comparten a propósito** (varias máquinas). Criterio cumplido: `git grep -il z.object` da 61 archivos, `git buscar-archivos` da **8**, todos en `src/` | La ficha se quedaba corta: `.claude/` también está rastreado y pesa más — **458 de 657 archivos** en el frontend. Ruido medido antes de atacarlo: 53 de 59 aciertos eran documentación. **`.gitattributes` con `-diff` se probó y no sirve** (git los trata como binarios, los sigue listando y rompe el diff de un cambio legítimo); lo que sí aporta es `linguist-vendored`. |
 | 2026-08-10 | **T3-11** Decisiones de arquitectura — **completada** | **Cinco** ADRs en `docs/adr/` con índice; las cuatro pedidas más una | Escritas leyendo el código, citando archivo. El apartado de consecuencias recoge lo que muerde al mantener: que `clearCookie` sin repetir el `path` **no borra nada**, que un token perdido solo se regenera. **La quinta no estaba en la ficha y es la que más falta hacía —«sin CI»—**: una ausencia no deja archivo que la explique, y quien vea 781 tests sin pipeline lo leerá como descuido. |
+| 2026-08-10 | **T4-03** Modo oscuro — **completada** | Emulando la preferencia del sistema en las dos direcciones sobre la aplicación en marcha: dashboard, reportes, catálogo y un modal. Tokens resueltos en vivo (`--color-surface` → `#151d2c`) y **cero clases `dark:`**. `verify` ✅ **448/448**, E2E ✅ | **La ficha acertaba:** con la capa de tokens de T2-35–T2-37 ya montada, esto es redefinir la capa semántica y nada más. **La inversión de los rellenos salió gratis** porque los botones usan `text-surface` y no `text-white`, que no aparece ni una vez en `src/`. **No es la paleta invertida:** los estados se aclaran y desaturan, medido antes de escribirlo (19 de 20 pares a la primera), y el borde se calibró contra el claro —1.23:1— en vez de contra un número inventado. **Dos defectos propios encontrados midiendo:** las sombras **no se pueden redefinir por token** —Tailwind incrusta el literal, mi test lo daba por bueno y el modal seguía en `rgba(15,23,42,0.12)`— y el `body` no pintaba fondo. Los ~40 hexadecimales de los gráficos, que ninguna guardia veía, salen ya de tokens. |
 | 2026-08-10 | **T4-02** OpenAPI derivado de Zod — **completada** | Contra el servidor en marcha: `/api/v1/docs` → **200** y el spec servido trae los **23 esquemas** generados, con las 43 rutas y 67 operaciones de T2-30 intactas. `verify` ✅ **402/402** | **La dependencia de la ficha no hacía falta:** Zod 4.4 trae `z.toJSONSchema()` con `target: "openapi-3.0"` nativo, el dialecto exacto del spec. Comprobado antes de escribir: convierten los 9 validadores y los 36 esquemas del contrato. **Peticiones con `io: "input"`**, o el spec diría que `price` solo admite números cuando el validador coerce la cadena de un formulario. **Destapó `/settings` mal documentado en las dos direcciones** —un mapa de cadenas donde hay un array de ajustes tipados—, `/reports` con cuatro listas como `items: {}` y `/products/export` sin esquema. Falsificación clave: hacer obligatorio el SKU en el validador cambia el `required` del spec **solo**. |
 | 2026-08-10 | **T4-01** Contrato compartido entre repositorios — **completada** | El criterio, medido: conectar el contrato produjo **12 errores de compilación** en el frontend (4 de producción, 8 de mocks) donde antes no había ninguno. `verify` ✅ backend **392/392** y frontend **421/421** | **La ficha pedía un paquete del workspace pnpm y eso no puede existir**: son dos repos git independientes con la carpeta madre sin versionar. Se copia desde una fuente única, con las tres alternativas descartadas por coste real ([ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md)). **Los tipos ya mentían:** `price` y los tres `unitPrice` decían `number` y llegan como cadena, sostenidos por dos `Number()` y un `z.coerce`. **`SettingEntry.value` seguía siendo la unión laxa que T2-24 rechazó por escrito** — endureció su espejo pero no el tipo de producción. Tres guardianes, los tres falsificados: 8 caídas, 1 y 1. |
 | 2026-08-10 | **T3-10** CHANGELOG y guía de contribución — **completada** | Ambos en la raíz de `Stockly-B`, más un `CONTRIBUTING.md` corto en `Stockly-F` que apunta al canónico. Enlaces relativos comprobados | **La ficha pedía documentar `pnpm lint`, y el backend no lo tiene**: se documenta `pnpm verify`, la puerta real, con las asimetrías escritas. El CHANGELOG **no inventa versiones** —no hay etiquetas y los `package.json` ni coinciden—, así que todo va bajo «Sin publicar». La convención de commits se documenta como objetivo y se dice el dato: 35 de 41 commits convencionales son `feat`. |
@@ -1642,12 +1653,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **2** | 10 | 20 % |
-| **Total** | **99** | **107** | **93 %** |
+| Tier 4 | **3** | 10 | 30 % |
+| **Total** | **100** | **107** | **93 %** |
 
 *El denominador creció dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el 91 % de arriba es sobre 107, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** De las 10 del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01** y **T4-02** el 2026-08-10: la primera por ser la causa raíz común de T0-03, T1-03 y T1-05, la segunda porque dependía de ella. Las 8 restantes siguen fuera de alcance.*
+***Los cuatro tiers de trabajo están cerrados.** De las 10 del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10. Las 7 restantes siguen fuera de alcance.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1657,8 +1668,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **402/402** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.95 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **421/421** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **50.87 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests frontend | 181/181 ✅ | **448/448** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **50.96 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
 | Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
 | Esquemas del spec escritos a mano | 14 *(~180 líneas de objeto literal)* | **0** ✅ *(23 derivados; solo `ProductWrite.image` es manual, T4-02)* | que la documentación se derive de la validación |
@@ -1683,7 +1694,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Tokens semánticos en `@theme` | 1 (`--font-sans`) | **21** ✅ *(17 colores, 2 sombras, easing y tipografía)* | capa completa (T2-35) |
 | Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | **0** ✅ *(con test que lo vigila)* | 0 fuera de excepciones |
 | Variantes de `Badge` sin significado | 4 de 7 | **0 de 5** ✅ | 0 |
-| Clases `dark:` | 0 | 0 | (T4-03) |
+| Temas con contraste AA verificado | 1 *(solo claro)* | **2** ✅ *(claro y oscuro, recalculados por test, T4-03)* | 2 |
+| Clases `dark:` | 0 | **0** ✅ *(el modo oscuro es capa semántica, no clases)* | 0 |
+| Hexadecimales en los gráficos | 40 *(que ningún test veía)* | **0** ✅ *(tokens + guardia propia, T4-03)* | 0 |
 
 ### Hallazgos nuevos del 2026-08-07/08 (no estaban en la auditoría)
 
