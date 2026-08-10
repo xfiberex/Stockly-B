@@ -4,3 +4,9 @@ allowBuilds:
   esbuild: true
   prisma: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - nodemailer@9.0.1
+  - pnpm@11.4.0
+  - pnpm@11.5.3
+  - pnpm@11.7.0
+  - pnpm@11.8.0
