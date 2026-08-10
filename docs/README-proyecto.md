@@ -8,7 +8,7 @@ Aplicación full-stack para el control de inventario de productos, con backend R
 │   ├── docker-compose.yml        # PostgreSQL + backend en contenedores
 │   └── docs/                     # Documentación viva de TODO el proyecto
 │       ├── README-proyecto.md    # este archivo
-│       ├── ROADMAP.md            # 104 tareas, dependencias y progreso
+│       ├── ROADMAP.md            # 107 tareas, dependencias y progreso
 │       └── INFORME-AUDITORIA.md  # hallazgos que justifican cada tarea
 └── Stockly-F/                    # SPA (React 19 / TypeScript / Vite / TailwindCSS)
 ```

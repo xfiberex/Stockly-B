@@ -1,0 +1,23 @@
+# Configuración de git que viaja con el repositorio (T3-06).
+#
+# Git no lee este archivo por su cuenta. Se activa una vez por máquina con:
+#
+#     git config --local include.path ../.gitconfig-stockly
+#
+# (la ruta es relativa a `.git/`, así que `../` es la raíz del repositorio). Queda
+# anotado en `.git/config`, que no se versiona: por eso hay que repetirlo en cada
+# clon, y por eso está en el README.
+#
+# Existe porque `.agents/` y `.claude/` se versionan a propósito —el proyecto se
+# trabaja desde varias máquinas y el tooling debe viajar con él—, pero son 113 de
+# los 278 archivos del repositorio y ahogan cualquier búsqueda por texto: de los
+# 53 archivos que mencionan `z.object`, 43 son documentación de tooling.
+
+[alias]
+	# Busca solo en el código de la aplicación, excluyendo el tooling de IA.
+	#   git buscar useForm
+	#   git buscar -i "z.object"
+	buscar = "!f() { git grep -n \"$@\" -- ':!.agents' ':!.claude' ':!.codegraph'; }; f"
+
+	# Lo mismo, pero listando solo los archivos que coinciden.
+	buscar-archivos = "!f() { git grep -ln \"$@\" -- ':!.agents' ':!.claude' ':!.codegraph'; }; f"

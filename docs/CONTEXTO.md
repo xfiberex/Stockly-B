@@ -56,21 +56,33 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **357/357** | **409/409** |
-| Cobertura (sentencias) | 91.33 % *(suelo 85 %)* | 44.89 % *(suelo 42 %)* |
+| Tests | **362/362** | **419/419** |
+| Cobertura (sentencias) | 91.23 % *(suelo 85 %)* | 49.74 % *(suelo 42 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
 de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 7/15** · Total **89/107**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ · Total **97/107**.
 
-*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. **El Tier 2 quedó cerrado el 2026-08-09.** El 2026-08-10 se cerraron seis del Tier 3 —`T3-01`, `T3-02`, `T3-05`, `T3-08`, `T3-13`, `T3-14`—, quedan **8 pendientes** y el Tier 4, que la auditoría dejó fuera del alcance inmediato.*
+**Los cuatro tiers de trabajo están cerrados.** Lo único pendiente es el **Tier 4** (10 tareas), que la auditoría dejó explícitamente fuera del alcance inmediato: se listan para que la decisión de no hacerlas sea consciente, no para hacerlas ahora.
 
-*Dos de esas seis merecen leerse antes de fiarse de una ficha: **la premisa de `T3-08` era falsa** (Heroicons ya emitía `aria-hidden`, así que el criterio se cumplía solo, y el fallo real era el opuesto) y **el enunciado de `T3-05` no describía el código** (el botón de la interfaz nunca tuvo dos rutas). Las fichas de la auditoría son buenas pistas, no descripciones verificadas: conviene medir antes de arreglar.*
+*La cobertura del frontend cruzó por fin el objetivo del roadmap (**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño.*
 
-**Los tres primeros tiers de trabajo están cerrados** (Tier 0, 1 y 2). La aplicación pasó de tener el guardado de
+*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. **El Tier 2 quedó cerrado el 2026-08-09.** **El Tier 3 se cerró entero el 2026-08-10**, catorce tareas en un día. Queda el Tier 4, fuera del alcance inmediato.*
+
+*Cuatro de ellas merecen leerse antes de fiarse de una ficha: **la premisa de `T3-08` era falsa** (Heroicons ya emitía `aria-hidden`, así que el criterio se cumplía solo, y el fallo real era el opuesto); **el enunciado de `T3-05` no describía el código** (el botón de la interfaz nunca tuvo dos rutas); **`T3-09` se quedaba corta** —el botón flotante no «probablemente solapaba» la paginación, la dejaba **sin poder pulsarse**, y no solo en móvil—; y **`T3-03` contaba mal**: decía que solo `products` divergía en el estilo de exportación, y eran cinco módulos. Las fichas de la auditoría son buenas pistas, no descripciones verificadas: conviene medir antes de arreglar, y medir otra vez después.*
+
+*Documentación nueva del 2026-08-10, toda enlazada desde `CLAUDE.md`:*
+
+- *[`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) — lectura previa a tocar cualquier pantalla.*
+- *[`docs/adr/`](adr/) — **cinco decisiones de arquitectura**. Léelas antes de simplificar algo que parezca complicado de más; están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo.*
+- *[`CONTRIBUTING.md`](../CONTRIBUTING.md) y [`CHANGELOG.md`](../CHANGELOG.md) — puerta de calidad, convención de commits y registro de cambios de los dos repositorios.*
+
+*Y una decisión que pidió el propietario y conviene no revertir: **`.agents/` y `.claude/` se versionan a propósito**, porque el proyecto se trabaja desde varias máquinas. Como son la mayoría de los archivos rastreados, para buscar en el código está el alias `git buscar` —una activación por clon, documentada en el README—.*
+
+**Los cuatro tiers de trabajo están cerrados** (Tier 0, 1, 2 y 3). La aplicación pasó de tener el guardado de
 configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
 para cuentas desactivadas, cinco listados que reventaban con un `page` no numérico, ningún
 índice en la base, `logout` expuesto a CSRF y el correo saliendo en claro, a tener todo eso
@@ -86,13 +98,25 @@ login funciona en el navegador contra `http://localhost:8080`.
 
 ## 4. Trampas del entorno, ya pagadas
 
-**Un servidor huérfano en el 3000 rompe el E2E siguiente, y no lo dice claro (2026-08-10).**
-Si una pasada de `pnpm test:e2e:full` se interrumpe, el `nodemon` del backend puede quedarse
-escuchando. La siguiente pasada falla de una de dos formas, ninguna de las cuales apunta al
-puerto: o **`Timed out waiting 120000ms from config.webServer`**, o —peor— **arranca contra el
-servidor viejo y fallan cuatro tests con datos que no cuadran**, porque el `global-setup`
-resiembra la base pero el proceso antiguo sigue con su estado. La primera vez costó pensar
-que los cambios habían roto algo. Antes de investigar un fallo de E2E, comprobar el puerto:
+**Un servidor huérfano en el 3000 rompe el E2E siguiente, y la culpa es del rate limiter (2026-08-10).**
+Si una pasada de `pnpm test:e2e:full` se interrumpe, el backend puede quedarse escuchando.
+`playwright.config.ts` usa `reuseExistingServer: true`, así que la siguiente pasada **no
+arranca uno nuevo: reutiliza ese**, y el huérfano no lleva el `RATE_LIMIT_MAX: 100000` que
+el E2E inyecta a los servidores que él mismo levanta. El resultado depende de cuántas
+peticiones llevara acumuladas:
+
+- **Aún por debajo del techo:** Playwright lo reutiliza, y los tests agotan las 100
+  peticiones/15 min a mitad de recorrido. Fallan por 429 unas cuantas pruebas, con síntomas
+  que no mencionan el límite —esperas agotadas al rellenar un formulario, listas vacías—.
+- **Ya por encima:** `/api/v1/health` responde **429**, Playwright no lo da por listo,
+  intenta arrancar el suyo sobre un puerto ocupado y muere con **`Timed out waiting
+  120000ms from config.webServer`**.
+
+Comprobado: con el huérfano en marcha, `fetch("http://localhost:3000/api/v1/health")`
+devolvía `429 {"message":"Demasiadas peticiones…"}`. La primera vez lo achaqué a que la
+base se resembraba y el proceso viejo se quedaba con datos antiguos; **eso era falso**, y
+la explicación correcta es esta. Antes de investigar un fallo de E2E, comprobar el puerto —
+y si hay algo escuchando, mirar qué devuelve `/health` antes de matarlo:
 
 ```powershell
 Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }

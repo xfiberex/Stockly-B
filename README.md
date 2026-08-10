@@ -268,6 +268,38 @@ Todas las rutas cuelgan del prefijo **`/api/v1`**. La documentación interactiva
 
 ---
 
+## Tooling de IA versionado (`.agents/`, `.claude/`)
+
+**Están en el repositorio a propósito.** No es un descuido ni un `.gitignore` que falta:
+Stockly se trabaja desde varias máquinas y las skills tienen que viajar con el proyecto,
+igual que el `README`. Quien clone Stockly-B se lleva el mismo tooling que quien lo escribió.
+
+La contrapartida está medida: **104 archivos bajo `.agents/` y 9 bajo
+`.claude/`, de 278 rastreados en total**. Eso ensucia dos cosas, y cada una tiene su
+remedio:
+
+| Ruido | Remedio |
+|---|---|
+| GitHub cuenta esos markdown como el lenguaje del proyecto | `.gitattributes` los marca `linguist-vendored` |
+| Las búsquedas por texto devuelven sobre todo documentación | El alias `git buscar` de `.gitconfig-stockly` |
+
+El alias hay que activarlo **una vez por clon**, porque vive en `.git/config`, que no se
+versiona:
+
+```bash
+git config --local include.path ../.gitconfig-stockly
+```
+
+A partir de ahí:
+
+```bash
+git buscar useForm            # solo código de la aplicación
+git buscar-archivos -i zod    # solo los archivos que coinciden
+```
+
+La diferencia es la que hace falta: ``git grep -il z.object` devuelve 53 archivos; `git buscar-archivos` devuelve 10`. Sin activarlo, el equivalente a mano es
+`git grep X -- ':!.agents' ':!.claude'`.
+
 ## Seguridad
 
 | Mecanismo | Detalle |

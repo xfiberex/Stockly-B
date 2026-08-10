@@ -1156,21 +1156,31 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **El cambio destapó que los filtros aceptaban cualquier cadena.** Al tipar las columnas, `where: { role: query.role }` dejó de compilar, lo que obligó a decidir qué hacer con `?role=basura` —hasta ahora devolvía lista vacía por accidente—. Se responde **400**: ignorar el filtro sería peor, porque `?role=admin` en minúscula devolvería **todos** los usuarios en vez de ninguno.
   - **Y destapó un 500 alcanzable desde la URL, que no estaba en la ficha.** La guarda de `sale-orders` era `status in $Enums.SaleOrderStatus`; los enums generados son objetos literales, así que heredan de `Object.prototype` y `"toString" in …` devuelve **verdadero**. `?status=toString` pasaba la guarda, se casteaba a enum y reventaba dentro de Prisma. Reproducido como 500 antes de arreglarlo; el ayudante compartido usa `Object.hasOwn` y responde 400.
 
-- [ ] **[T3-03] Unificar el estilo de exportación del módulo de productos**
+- [x] **[T3-03] Unificar el estilo de exportación del módulo de productos** ✅ *(2026-08-10)*
   - **Área:** Refactorización
   - **Ubicación:** `Stockly-B/src/modules/products/product.controller.ts`, `product.service.ts`
   - **Qué hacer:** `products` exporta funciones sueltas mientras los otros once módulos exportan objetos (`usersController`, `settingsService`, …). Alinear con el estilo mayoritario al tocar el módulo; no justifica un cambio masivo aislado.
   - **Criterio de aceptación:** los doce módulos siguen la misma convención de exportación.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-13
+  - **Verificado localmente (2026-08-10):** los **doce** controladores y los **doce** servicios exportan un objeto con nombre. `verify` backend ✅ **362/362**, cobertura **91.23 %** (5 tests nuevos).
+  - **No era solo `products`, eran cinco.** La ficha decía que los otros once módulos ya exportaban objetos; medido, exportaban funciones sueltas **`audit-logs`, `products`, `purchase-orders`, `reports` y `sale-orders`**, frente a siete que sí. Los doce servicios, en cambio, ya eran objeto: la convención existía y lo que fallaba era el lado del controlador.
+  - **Aquí hay una tensión con la propia ficha, y se resuelve a favor del criterio.** «No justifica un cambio masivo aislado» se escribió suponiendo que divergía un módulo; con cinco, el criterio —«los doce siguen la misma convención»— solo se cumple tocándolos todos. Se hizo, pero con una transformación mecánica y comprobada: se verificó antes que esos archivos no tienen nada en el nivel superior salvo imports y funciones exportadas, y que ninguna función llama a otra del mismo archivo, que es lo que rompería al pasar a métodos de objeto.
+  - **Lo que gana no es estética:** con dos estilos conviviendo, `product.routes.ts` importaba **trece nombres sueltos** y renombrar un manejador obligaba a tocar la lista entera. Ahora cada archivo de rutas nombra su módulo una vez.
+  - **La guarda recorre el directorio**, no una lista: un módulo nuevo entra solo. Comprueba las dos mitades —que exista el objeto y que **no** queden funciones sueltas exportadas—, porque tener ambas cosas a la vez es justo el estado de un refactor a medias. **Falsificada** añadiendo un `export function` a `tags`: el test lo señala por nombre.
 
-- [ ] **[T3-04] Simplificar el intercalado de enlaces de la navegación**
+- [x] **[T3-04] Simplificar el intercalado de enlaces de la navegación** ✅ *(2026-08-10)*
   - **Área:** Refactorización
   - **Ubicación:** `Stockly-F/src/App.tsx:195-208`
   - **Qué hacer:** Señalado ya en la revisión de 2026-07-15 y aún presente: `navLinks.slice(0, 1)` y `navLinks.slice(1)` para colocar los desplegables entre «Dashboard» y «Reportes». Sustituir por un único array de elementos discriminados por `kind: "link" | "dropdown"`.
   - **Criterio de aceptación:** añadir un enlace a la barra no requiere entender aritmética de índices; la navegación renderiza en el mismo orden.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** `verify` frontend ✅ **419/419** (5 tests nuevos). El orden de escritorio sigue siendo Dashboard · Catálogo · Órdenes · Reportes · Admin, y el de móvil —los dos enlaces sueltos arriba, las secciones debajo— también.
+  - **El orden no estaba en ningún sitio, y ese era el problema de fondo.** Los dos enlaces vivían juntos en `navLinks` y se separaban al pintarlos con `slice(0, 1)` y `slice(1)`: para saber dónde caía «Reportes» había que leer las dos expresiones a la vez y reconstruirlo mentalmente. Ahora el array **es** el orden, con `kind: "link" | "dropdown"` en cada elemento.
+  - **Se movieron al array dos cosas que estaban sueltas en el cuerpo del componente:** `catalogActive` y `ordersActive`, que ahora son la función `activoEn` de cada desplegable, y la condición de administrador, que es una propiedad `soloAdmin` en vez de un `&&` en medio del JSX.
+  - **El móvil sigue agrupando por tipo a propósito**, no por el orden de la barra. Es una decisión de diseño previa —enlaces planos arriba, secciones con subtítulo debajo— y unificarla habría sido un cambio de comportamiento que la ficha no pedía. Lo que antes era un `slice` es ahora un `filter` que dice qué agrupa.
+  - **Nada comprobaba el orden hasta ahora**, que es lo que hacía arriesgado el refactor: la única verificación posible era abrir la aplicación y mirar. Los cinco tests nuevos lo fijan, incluido el resaltado del desplegable de la sección activa.
 
 - [x] **[T3-05] Unificar las cabeceras de exportación CSV entre repos** ✅ *(2026-08-10)*
   - **Área:** Refactorización
@@ -1186,13 +1196,19 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **La duplicación se queda, declarada en los dos archivos.** No hay paquete compartido entre repositorios, así que el escapado sigue repetido palabra por palabra. Lo que impide que se separen no es el comentario: es que cada repositorio fija la misma cabecera en un test suyo, y cambiar un lado pone en rojo ese lado.
   - **De once columnas, la reimportación entiende siete.** `sku`, `minStock`, `supplierName` y `tags` se exportan pero el importador los ignora, aquí y en el `importProductsSchema` del backend. Un test lo fija: sobran sin descolocar el resto. Ampliar el importador es otra tarea y no se ha hecho.
 
-- [ ] **[T3-06] Decidir explícitamente sobre `.agents/skills/` en el control de versiones**
+- [x] **[T3-06] Decidir explícitamente sobre `.agents/skills/` en el control de versiones** ✅ *(2026-08-10)*
   - **Área:** Refactorización
   - **Ubicación:** `Stockly-B/.agents/skills/**`, `Stockly-F/.agents/skills/**`
   - **Qué hacer:** Cientos de archivos markdown de tooling de IA (zod, vitest, prisma, react-best-practices…) están rastreados por git en ambos repos, generando ruido en clones, diffs y búsquedas por texto. Si es tooling personal, añadir `.agents/` al `.gitignore` y sacarlo del índice; si se comparte deliberadamente, documentarlo en el README para que no parezca un descuido.
   - **Criterio de aceptación:** hay una decisión aplicada y documentada; `git grep` sobre el código de aplicación no devuelve resultados de estos archivos.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Decisión del propietario del proyecto (2026-08-10): se comparten a propósito.** Stockly se trabaja desde varias máquinas y el tooling debe viajar con el repositorio. Queda documentado en el README y en el `CLAUDE.md` de **ambos** repositorios, para que no se lea como un `.gitignore` que falta.
+  - **La ficha se quedaba corta en el alcance:** hablaba de `.agents/skills/`, pero `.claude/` también está rastreado y en el frontend pesa más. Medido: **294 archivos bajo `.agents/` y 164 bajo `.claude/` de 649 rastreados** en `Stockly-F` —el 71 %—, y **104 + 9 de 278** en `Stockly-B`.
+  - **El ruido de búsqueda estaba medido antes de atacarlo:** de los 59 archivos de `Stockly-F` que mencionan `z.object`, **53 son documentación de tooling**; con `useForm`, 48 de 62.
+  - **Criterio cumplido con un alias versionado**, `git buscar`, que vive en `.gitconfig-stockly` y se activa una vez por clon con `git config --local include.path ../.gitconfig-stockly`. Comprobado: `git grep -il z.object` devuelve **59** archivos y `git buscar-archivos` devuelve **6**, todos en `src/`. En el backend, 53 → 10.
+  - **Se probó antes `.gitattributes` con `-diff` y no sirve**, así que se descartó con la razón escrita en el propio archivo: git pasa a tratarlos como binarios, `git grep` los sigue listando —«Binary file … matches», los mismos 53 de 59— y encima deja de poder verse el diff de un cambio legítimo en una skill.
+  - **Lo que sí aporta `.gitattributes` es `linguist-vendored`**, que ataca el otro ruido: sin él, GitHub cuenta esos cientos de markdown como el lenguaje del proyecto y la barra de lenguajes dice que Stockly-F es mayormente Markdown.
 
 - [x] **[T3-07] Limpiar los artefactos de build antes de compilar**
   - **Área:** Refactorización
@@ -1215,37 +1231,56 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **El fallo real de esta familia es el contrario, y sí estaba presente.** Con los iconos ocultos, lo que se rompe es un botón sin nombre accesible. Los tres botones de acción de `ProductTable` **no estaban mudos** —`title` es el último recurso que contempla la especificación de accname, y así lo calcula Testing Library; comprobado antes de tocar nada—, pero el nombre era el mismo en todas las filas: en una tabla de cincuenta productos, cincuenta botones «Editar» no dicen cuál. Ahora llevan `aria-label` con el producto, como el enlace de historial de al lado desde T2-14, y un test comprueba que dos filas no comparten nombre.
   - **Corregido durante la tarea:** la primera versión de la comprobación no contaba `title` como nombre accesible y acusaba a esos tres botones de estar mudos. Era un falso positivo; se midió el nombre calculado de verdad antes de escribir el arreglo.
 
-- [ ] **[T3-09] Evitar que el botón flotante tape la paginación en móvil**
+- [x] **[T3-09] Evitar que el botón flotante tape la paginación en móvil** ✅ *(2026-08-10)*
   - **Área:** UI/UX
   - **Ubicación:** `Stockly-F/src/modules/products/components/ProductsPage.tsx:224-238`
   - **Qué hacer:** El botón «Movimiento manual» es `fixed bottom-6 right-6 z-50` y los controles de paginación son estáticos al final del contenido; en pantallas estrechas con un producto seleccionado es probable que lo solape. **Verificar primero en navegador a 375 px** — este hallazgo está marcado como pendiente de verificación en el informe. Si se confirma, añadir `pb-24` al contenedor cuando el botón esté visible, o anclar la acción a la barra de acciones masivas que ya existe arriba.
   - **Criterio de aceptación:** a 375 px de ancho con un producto seleccionado, los botones «Anterior» y «Siguiente» son visibles y pulsables.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10) en navegador**, que es lo que la ficha dejaba pendiente. `verify` frontend ✅ **419/419** (3 tests nuevos).
+  - **Confirmado, y peor que «es probable que lo solape»: los botones no se podían pulsar.** Con la página al final del scroll y un producto seleccionado, `document.elementFromPoint` en el centro de «Anterior» y de «Siguiente» devolvía **«Movimiento manual»**. No era un problema estético: la pulsación no llegaba a la paginación. Medido a 375 px —flotante en 588-632, paginación en 604-648— y capturado en pantalla.
+  - **La ficha lo daba por un problema de móvil y no lo es.** A 1280×800 ocurre igual con «Siguiente»: lo que junta a los dos elementos no es el ancho sino que ambos viven abajo a la derecha —la paginación alineada a la derecha, el flotante en `bottom-6 right-6`—. Por eso el arreglo no lleva punto de ruptura.
+  - **El hueco se reserva solo cuando el botón existe.** Un `pb` fijo en el contenedor dejaría espacio muerto al final de la página el resto del tiempo, que es la mayor parte.
+  - **Tras el cambio, medido otra vez en los dos anchos:** `elementFromPoint` devuelve «Anterior» y «Siguiente». A 375 px la paginación queda en 524-568 y el flotante en 588-632.
+  - **Lo que los tests no cubren, y se dice:** la geometría. jsdom no calcula diseño —`getBoundingClientRect` devuelve ceros—, así que el solape no se puede reproducir en la suite. Los tests fijan la decisión que lo evita: que el hueco aparezca y desaparezca exactamente con el botón.
 
-- [ ] **[T3-10] Añadir CHANGELOG y guía de contribución**
+- [x] **[T3-10] Añadir CHANGELOG y guía de contribución** ✅ *(2026-08-10)*
   - **Área:** Documentación
   - **Ubicación:** `CHANGELOG.md`, `CONTRIBUTING.md` (nuevos, raíz)
   - **Qué hacer:** No existe ninguno de los dos. CHANGELOG con formato *Keep a Changelog*; guía de contribución con la convención de commits, el flujo de ramas y los comandos de verificación previos a un PR (`pnpm check`, `pnpm lint`, `pnpm test`).
   - **Criterio de aceptación:** ambos archivos existen y la guía referencia los comandos reales del proyecto.
   - **Esfuerzo:** bajo
   - **Depende de:** T1-09
+  - **Verificado localmente (2026-08-10):** existen [`CHANGELOG.md`](../CHANGELOG.md) y [`CONTRIBUTING.md`](../CONTRIBUTING.md) en la raíz de `Stockly-B`, más un `CONTRIBUTING.md` corto en `Stockly-F` que apunta al canónico —GitHub lo enseña por repositorio, y duplicar la guía entera la haría divergir—. Todos los enlaces relativos comprobados uno a uno.
+  - **La ficha pedía referenciar `pnpm check`, `pnpm lint` y `pnpm test`, y eso habría sido incorrecto: el backend no tiene `lint`.** Su comprobación estática es `pnpm check`; ESLint solo existe en el frontend. La guía documenta `pnpm verify` —la puerta real— y deja escritas las dos asimetrías, incluida que `smoke` solo existe en el backend.
+  - **El CHANGELOG no inventa versiones.** Ningún repositorio tiene etiquetas y sus `package.json` ni coinciden (`1.0.0` en el backend, `0.0.0` en el frontend); todo va bajo **Sin publicar**, con esa discrepancia anotada como algo que reconciliar al cortar la primera versión. El histórico por fases se reconstruye de la tabla de progreso, con fechas reales.
+  - **La convención de commits se documenta como objetivo, no como descripción.** Medido: de 52 commits del backend solo 41 llevan prefijo convencional, y **35 de esos 41 son `feat`**, incluidos los que solo tocan documentación o tests. Decirlo evita que la guía parezca describir algo que no existe.
+  - **El flujo de ramas se describe como es**, no como debería ser en un equipo grande: historial lineal sobre `main`, con la condición que sí es innegociable —`verify` en verde en la máquina desde la que se hace push, porque no hay CI que lo repita— y la receta de rama por tarea para cuando deje de ser una persona.
 
-- [ ] **[T3-11] Registrar las decisiones de arquitectura como ADRs**
+- [x] **[T3-11] Registrar las decisiones de arquitectura como ADRs** ✅ *(2026-08-10)*
   - **Área:** Documentación
   - **Ubicación:** `docs/adr/` (nuevo)
   - **Qué hacer:** El proyecto ha tomado decisiones no obvias y bien fundadas que hoy solo viven en comentarios dispersos y se perderían si cambia de manos: decremento condicional para cerrar la carrera de stock, tokens de verificación y reset hasheados con SHA-256 en base de datos, `path` restringido de la cookie de refresh, y envío de correos fuera de la transacción. Una entrada corta por decisión (contexto, decisión, consecuencias).
   - **Criterio de aceptación:** existen al menos cuatro ADRs, una por cada decisión citada.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** existen **cinco** ADRs en [`docs/adr/`](adr/), con índice propio. Las cuatro que pedía la ficha, una por decisión citada, más una quinta.
+  - **Cada entrada se escribió leyendo el código, no de memoria**, y cita el archivo: el `updateMany` con la condición en el `WHERE` de `product.service.ts`, el SHA-256 de `shared/lib/tokens.ts`, el `path: "/api/v1/auth/refresh"` de `auth.controller.ts` y el registro de promesas en vuelo de `shared/lib/stockAlerts.ts`.
+  - **El apartado de consecuencias es el que justifica el formato.** Recoge lo que muerde al mantener: que `updateMany` para una sola fila parece un error y no lo es; que `clearCookie` sin repetir el `path` **no borra nada**; que un token perdido no se puede recuperar, solo regenerar; que los tests tienen que llamar a `esperarAlertasEnVuelo()` porque el correo ya no se espera.
+  - **La quinta ADR no estaba en la ficha y es la que más falta hacía: «sin integración continua».** Es la decisión que más probablemente se deshaga por reflejo, porque una ausencia no deja archivo que la explique y cualquiera que vea dos repositorios con 781 tests y sin CI lo leerá como un descuido. Ahora hay dónde apuntar antes de crear un `.github/workflows/`.
+  - **Corregido de paso:** `CLAUDE.md` de ambos repositorios y `docs/README-proyecto.md` seguían diciendo «104 tareas» cuando son 107 desde el 2026-08-09.
 
-- [ ] **[T3-12] Declarar explícitamente que la aplicación no debe indexarse**
+- [x] **[T3-12] Declarar explícitamente que la aplicación no debe indexarse** ✅ *(2026-08-10)*
   - **Área:** SEO
   - **Ubicación:** `Stockly-F/public/robots.txt` (nuevo)
   - **Qué hacer:** La aplicación está íntegramente detrás de autenticación y no tiene contenido público indexable —por lo que la ausencia de SSR, sitemap y datos estructurados es la decisión correcta—, pero conviene declararlo: `User-agent: *` / `Disallow: /`.
   - **Criterio de aceptación:** `GET /robots.txt` devuelve el archivo en el build de producción.
   - **Esfuerzo:** bajo
   - **Depende de:** ninguna
+  - **Verificado localmente (2026-08-10):** criterio literal, sirviendo `dist/` como lo hace nginx. `GET /robots.txt` → **200 `text/plain`** con el archivo; `GET /catalog/products` → **200 `text/html`**, que cae al `index.html` de la SPA. `verify` frontend ✅ **419/419** (2 tests nuevos).
+  - **Se añade además `noindex` en el `index.html`, y no es redundante.** `Disallow: /` prohíbe **rastrear**, no **indexar**: un buscador que reciba un enlace a esta URL puede listarla igualmente, sin descripción, porque no puede entrar a comprobar que no debe. La etiqueta sí lo prohíbe, y se lee en el caso en que el `robots.txt` de la raíz no sea de esta aplicación —por ejemplo montada bajo un subdirectorio ajeno—. Cada uno cubre el hueco del otro.
+  - Los dos archivos llevan escrita esa interacción, porque es contraintuitiva y la reacción natural al verlos juntos es borrar uno.
 
 - [x] **[T3-13] Asegurar `NODE_ENV=production` en entornos desplegados** ✅ *(2026-08-10)*
   - **Área:** Seguridad / DevOps
@@ -1272,13 +1307,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **La guarda es un test que recorre `src/`**, en el mismo estilo que el de colores crudos de T2-37 y por la misma razón: la convención solo dura lo que dure la memoria de quien la escribió. **Falsificado** introduciendo un archivo con un radio y una sombra prohibidos — los dos tests los señalan por nombre y archivo.
   - **Detalle que costó una vuelta:** los comentarios que escribí explicando el cambio contenían los nombres de las clases prohibidas y contaminaban el recuento por `grep`, que es la forma de comprobar el criterio. Están reescritos para no nombrarlas literalmente, y el test se excluye a sí mismo por lo mismo.
 
-- [ ] **[T3-15] Documentar el sistema de diseño**
+- [x] **[T3-15] Documentar el sistema de diseño** ✅ *(2026-08-10)*
   - **Área:** Documentación / UI/UX
   - **Ubicación:** `Stockly-F/docs/design-system.md` (nuevo)
   - **Qué hacer:** Sin un documento de referencia, el sistema se erosiona en el siguiente PR y se vuelve a las 561 utilidades crudas. Recoger: la tabla de tokens con sus contrastes, la convención de radios y elevación, el semáforo de estado con sus iconos, el perfil de densidad con la excepción táctil de móvil, la escala tipográfica con sus roles, y la regla que lo gobierna todo — **el color comunica estado, nunca decora**. Enlazarlo desde el README del frontend.
   - **Criterio de aceptación:** un colaborador puede añadir una página nueva coherente con el resto sin elegir un solo valor hexadecimal.
   - **Esfuerzo:** bajo
   - **Depende de:** T2-35, T2-36, T2-37, T2-38, T2-39, T2-40, T2-41, T3-14
+  - **Verificado localmente (2026-08-10):** existe [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md), enlazado desde el README del frontend con una sección propia. `verify` frontend ✅ **419/419**.
+  - **Recoge lo que pedía la ficha, con los valores reales**: los tokens de color con su contraste medido y el fondo contra el que se midió, las cinco medidas tipográficas con su papel, la convención de radios y las dos elevaciones, el perfil de densidad con la excepción táctil de móvil, los cinco conjuntos del semáforo de estado con sus iconos, y la regla que gobierna el resto — **el color comunica estado, nunca decora**.
+  - **Cada sección dice qué test la vigila.** Es lo que separa este documento de una guía de estilo: la mitad de sus reglas no dependen de que alguien las lea, porque una utilidad cruda de la paleta, un radio fuera de los tres o una sombra que no sea uno de los dos tokens hacen fallar `pnpm verify`. Lo que el documento aporta sobre los tests es el **porqué**, que es justo lo que no cabe en una aserción.
+  - **Termina con una receta de página nueva**, que es la forma de comprobar el criterio de aceptación: contenedor, título, tarjeta, controles, estados y la regla de reservar hueco para lo que flota. Ninguno de esos pasos obliga a elegir un valor.
+  - **Corregido de paso un error del README:** la fila de `Badge` seguía listando las variantes decorativas —`orange`, `blue`, `purple`, `teal`, `gray`— que T2-36 retiró hace días. La documentación que describe algo que ya no existe es peor que la que falta.
 
 ---
 
@@ -1561,6 +1601,16 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-10 | **T3-08** Iconos decorativos — **completada** | 8 tests nuevos sobre el **DOM renderizado**. `verify` ✅ **409/409** | **La premisa de la ficha era falsa:** Heroicons v2 ya emite `aria-hidden` en sus 24 usos, así que el criterio se cumplía solo. Los tests fijan una garantía que hoy da una dependencia externa. **El fallo real es el contrario:** los botones de acción no estaban mudos —`title` cuenta como nombre accesible, medido antes de tocar nada— pero repetían el mismo nombre en todas las filas. Ahora nombran el producto. |
 | 2026-08-10 | **T3-14** Radios y elevación — **completada** | Medido por `grep`: cero radios fuera de la convención (39/32/13) y las **once sombras** son los dos tokens (7 `raised`, 4 `overlay`). `verify` ✅ **409/409** | **Los tokens existían desde T2-35 y no los usaba nadie:** su única aparición era el test que comprueba que están definidos. La guarda recorre `src/` como la de colores crudos de T2-37, y está **falsificada** con un archivo infractor. Mis propios comentarios contaminaban el recuento por `grep` al nombrar las clases prohibidas; están reescritos. |
 
+| 2026-08-10 | **T3-04** Navegación sin aritmética de índices — **completada** | Orden intacto en escritorio y móvil, ahora fijado por 5 tests. `verify` ✅ **419/419** | El orden no estaba en ningún sitio: había que leer `slice(0, 1)` y `slice(1)` a la vez para reconstruirlo. Ahora el array **es** el orden. Se movieron al array `catalogActive`/`ordersActive` y la condición de administrador. **Nada comprobaba el orden hasta ahora**, que es lo que hacía arriesgado el refactor. |
+| 2026-08-10 | **T3-09** Botón flotante sobre la paginación — **completada** | Verificado **en navegador**: antes, `elementFromPoint` en el centro de «Anterior» y «Siguiente» devolvía «Movimiento manual»; después, devuelve cada botón. `verify` ✅ **419/419** | **Peor de lo que decía la ficha: los botones no se podían pulsar**, no es que se vieran mal. Y **no es un problema de móvil**: pasa igual a 1280×800, porque lo que junta a los dos elementos no es el ancho sino que ambos viven abajo a la derecha. El hueco solo se reserva cuando el botón existe. jsdom no calcula diseño, así que los tests fijan la decisión, no la geometría. |
+| 2026-08-10 | **T3-12** No indexar la aplicación — **completada** | Criterio literal contra el build: `GET /robots.txt` → **200 text/plain**; una ruta de la SPA → **200 text/html**. `verify` ✅ **419/419** | Se añade además `noindex` en el `index.html`, y **no es redundante**: `Disallow` prohíbe rastrear, no indexar — un buscador con un enlace puede listar la URL igualmente, porque no puede entrar a ver que no debe. Cada uno cubre el hueco del otro, y ambos archivos lo explican para que nadie borre uno por parecer duplicado. |
+| 2026-08-10 | **T3-15** Sistema de diseño documentado — **completada** | `Stockly-F/docs/design-system.md`, enlazado desde el README. `verify` ✅ **419/419** | **Cada sección dice qué test la vigila:** la mitad de las reglas no dependen de que alguien lea el documento, porque incumplirlas hace fallar `verify`. Lo que aporta sobre los tests es el **porqué**. Termina con una receta de página nueva, que es la forma de comprobar el criterio. Corregido de paso el README, que seguía listando las variantes de `Badge` que T2-36 retiró. |
+
+| 2026-08-10 | **T3-03** Convención de exportación — **completada** | Los **doce** controladores y los doce servicios exportan objeto. `verify` ✅ **362/362** (5 nuevos) | **No era solo `products`, eran cinco**: `audit-logs`, `products`, `purchase-orders`, `reports` y `sale-orders`. Hay tensión con la ficha —«no justifica un cambio masivo aislado»— y se resuelve a favor del criterio, con una transformación mecánica y comprobada. Lo que gana no es estética: `product.routes.ts` importaba trece nombres sueltos. Guarda **falsificada** añadiendo un `export function` a `tags`. |
+| 2026-08-10 | **T3-06** `.agents/` en el control de versiones — **completada** | Decisión del propietario: **se comparten a propósito** (varias máquinas). Criterio cumplido: `git grep -il z.object` da 59 archivos, `git buscar-archivos` da **6**, todos en `src/` | La ficha se quedaba corta: `.claude/` también está rastreado y pesa más — **458 de 649 archivos** en el frontend. Ruido medido antes de atacarlo: 53 de 59 aciertos eran documentación. **`.gitattributes` con `-diff` se probó y no sirve** (git los trata como binarios, los sigue listando y rompe el diff de un cambio legítimo); lo que sí aporta es `linguist-vendored`. |
+| 2026-08-10 | **T3-11** Decisiones de arquitectura — **completada** | **Cinco** ADRs en `docs/adr/` con índice; las cuatro pedidas más una | Escritas leyendo el código, citando archivo. El apartado de consecuencias recoge lo que muerde al mantener: que `clearCookie` sin repetir el `path` **no borra nada**, que un token perdido solo se regenera. **La quinta no estaba en la ficha y es la que más falta hacía —«sin CI»—**: una ausencia no deja archivo que la explique, y quien vea 781 tests sin pipeline lo leerá como descuido. |
+| 2026-08-10 | **T3-10** CHANGELOG y guía de contribución — **completada** | Ambos en la raíz de `Stockly-B`, más un `CONTRIBUTING.md` corto en `Stockly-F` que apunta al canónico. Enlaces relativos comprobados | **La ficha pedía documentar `pnpm lint`, y el backend no lo tiene**: se documenta `pnpm verify`, la puerta real, con las asimetrías escritas. El CHANGELOG **no inventa versiones** —no hay etiquetas y los `package.json` ni coinciden—, así que todo va bajo «Sin publicar». La convención de commits se documenta como objetivo y se dice el dato: 35 de 41 commits convencionales son `feat`. |
+
 ### Resumen por Tier
 
 | Tier | Completadas | Total | % |
@@ -1568,9 +1618,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 0** | **8** | **8** | **100 %** ✅ |
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
-| Tier 3 | 7 | 15 | 47 % |
+| **Tier 3** | **15** | **15** | **100 %** ✅ |
 | Tier 4 | 0 | 10 | 0 % |
-| **Total** | **89** | **107** | **83 %** |
+| **Total** | **97** | **107** | **91 %** |
 
 *El denominador ha crecido dos veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45) y tres el 2026-08-09 (T2-46 a T2-48)—, así que el porcentaje se mueve poco pese a cerrarse las siete. **Siguen siendo 17 las pendientes del Tier 2**, las mismas de antes: ninguna de las siete estaba en la lista de trabajo.*
 
@@ -1580,10 +1630,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-09) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **357/357** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.33 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **409/409** ✅ | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **44.89 %** *(suelo en 42 %, T2-22)* | ≥ 45 % |
+| Tests backend | 198/198 ✅ | **362/362** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **91.23 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **419/419** ✅ | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **49.74 %** ✅ *(suelo en 42 %, T2-22)* | ≥ 45 % — **alcanzado** |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |

@@ -1,0 +1,19 @@
+# T3-06 — el tooling de IA se versiona a propósito, pero no es código del proyecto.
+#
+# `.agents/` y `.claude/` viajan con el repositorio porque Stockly se trabaja desde
+# varias máquinas y las skills deben estar en todas. La contrapartida es que son la
+# mayoría de los archivos rastreados, y sin esto GitHub cuenta sus ~110 markdown como
+# si fueran el lenguaje del proyecto: la barra de lenguajes diría que Stockly-B es
+# mayormente Markdown, no TypeScript.
+#
+# `linguist-vendored` los declara como material de terceros. No los oculta ni los
+# excluye de nada local: `git grep` los sigue leyendo, y para eso está el alias
+# `git buscar` de `.gitconfig-stockly`.
+#
+# Se probó también `-diff`, y **no sirve**: git los trata entonces como binarios, así
+# que `git grep` los sigue listando —«Binary file … matches», 53 de 59 aciertos— y
+# encima deja de poder verse el diff de un cambio legítimo en una skill.
+
+.agents/** linguist-vendored
+.claude/** linguist-vendored
+.codegraph/** linguist-vendored

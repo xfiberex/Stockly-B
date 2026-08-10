@@ -15,9 +15,12 @@ Está en [`docs/`](docs/), y cubre **los dos repositorios**:
 | Archivo | Qué es |
 |---|---|
 | [docs/CONTEXTO.md](docs/CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado actual, decisiones vivas, trampas del entorno ya pagadas y por dónde seguir |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 104 tareas con dependencias, progreso y métricas. La fuente de verdad del trabajo pendiente |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 107 tareas con dependencias, progreso y métricas. La fuente de verdad del trabajo pendiente |
 | [docs/INFORME-AUDITORIA.md](docs/INFORME-AUDITORIA.md) | Los hallazgos que justifican cada tarea del roadmap |
 | [docs/README-proyecto.md](docs/README-proyecto.md) | Visión de conjunto y arranque de los dos repositorios |
+| [docs/adr/](docs/adr/) | Decisiones de arquitectura no obvias: por qué algo está hecho así antes de simplificarlo |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
+| [CHANGELOG.md](CHANGELOG.md) | Registro de cambios de los dos repositorios |
 
 Vive aquí porque la carpeta que contiene ambos repositorios no está bajo control de versiones. Las rutas del tipo `Stockly-F/src/...` que aparecen en esos documentos se refieren al repositorio hermano.
 
@@ -47,4 +50,5 @@ Requisitos para que `verify` pase:
 
 - Gestor de paquetes: **pnpm 11.21.0** (fijado en `packageManager` y en el `Dockerfile`). No usar npm ni yarn. Se subió desde 11.2.2 el 2026-08-09: las versiones `<11.8.0` arrastraban avisos de path traversal y de ejecución de lifecycle scripts.
 - Comentarios y documentación **en español**, como el resto del código.
+- **`.agents/` y `.claude/` se versionan a propósito** (T3-06): el proyecto se trabaja desde varias máquinas y el tooling viaja con él. Son la mayoría de los archivos rastreados, así que para buscar en el código conviene excluirlos: `git buscar X` —tras activar una vez `git config --local include.path ../.gitconfig-stockly`— o `git grep X -- ":!.agents" ":!.claude"`.
 - Nunca versionar credenciales reales. El `.env` está ignorado y debe seguir así: una fuga de este tipo ya obligó a reescribir el historial del repositorio (tarea T0-06).
