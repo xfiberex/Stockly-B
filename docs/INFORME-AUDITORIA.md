@@ -4,6 +4,32 @@
 **Auditores:** revisión senior (arquitectura, seguridad, QA, accesibilidad, documentación)
 **Revisión previa:** revisión del 2026-07-15 (documento retirado el 2026-08-05 al quedar absorbido por este informe; sus mediciones de navegador se conservan en [ROADMAP.md → Línea base de navegador](ROADMAP.md#línea-base-de-navegador-2026-07-15))
 
+---
+
+> # ⚠ Documento congelado — describe el 2026-08-04, no el estado actual
+>
+> **Todo lo que sigue está escrito en presente y ya no lo es.** De los 70 hallazgos, **97 de las
+> 107 tareas que generaron están cerradas** al 2026-08-10: los cuatro tiers de trabajo (0, 1, 2 y
+> 3) están completos y solo queda el Tier 4, fuera del alcance inmediato. En particular, **los
+> cinco problemas del resumen ejecutivo están todos corregidos y verificados** — el build arranca,
+> la imagen Docker construye y sirve, las cancelaciones revierten stock, Configuración guarda y las
+> etiquetas se asignan.
+>
+> **No se actualiza a propósito:** es el registro de un momento, y reescribirlo destruiría lo único
+> que aporta hoy — la evidencia medida de por qué existe cada tarea. Para el estado real:
+>
+> | Para saber… | Mira |
+> |---|---|
+> | Qué está hecho y qué falta | [ROADMAP.md](ROADMAP.md) — casillas, Progreso y Métricas |
+> | Qué hallazgo produjo qué tarea | [ROADMAP.md → Trazabilidad](ROADMAP.md#trazabilidad-hallazgo--tarea) |
+> | En qué estado está el proyecto hoy | [CONTEXTO.md](CONTEXTO.md) |
+>
+> Lo que sigue vigente de este informe son las [zonas no cubiertas](#6-zonas-no-cubiertas) —lo que
+> nunca se llegó a medir— y los [puntos fuertes](#5-puntos-fuertes), que son lo que **no** hay que
+> tocar al refactorizar.
+
+---
+
 ## Contexto del proyecto *(verificado, no asumido)*
 
 | Campo | Valor |
@@ -1754,15 +1780,15 @@ Lo que **no** se pudo revisar en esta pasada, y qué haría falta para hacerlo:
 | Zona | Motivo | Qué se necesitaría |
 |---|---|---|
 | **Auditoría de navegador (Lighthouse, contraste real, lectores de pantalla)** | No se levantó la aplicación en un navegador en esta sesión. Los hallazgos de accesibilidad son estáticos. | Ejecutar Lighthouse y un recorrido con NVDA/VoiceOver sobre la app en marcha. La revisión de 2026-07-15 reportó 96/100 y esas correcciones se confirman en el código. |
-| **Rendimiento real de base de datos** | No se ejecutaron pruebas de carga ni `EXPLAIN ANALYZE`. P-01 a P-04 derivan del análisis de esquema y código. | Un conjunto de datos representativo (10–100k productos, 1M movimientos) y `EXPLAIN ANALYZE` sobre las consultas listadas en P-01. |
+| **Rendimiento real de base de datos** | **Cubierto en parte (2026-08-09).** T2-09, T2-02, T2-05 y T2-43 midieron con `EXPLAIN ANALYZE` sobre 40 000 productos y movimientos: búsqueda 24.9 → 0.35 ms, histórico 5.709 → 0.747 ms, dashboard 200 → 27 ms. Falta la **carga sostenida** contra el pool de 10 conexiones. | Prueba de carga con k6 sobre movimientos de stock — es lo que queda de T4-08. |
 | **Core Web Vitals** | Requiere la app desplegada y build de producción servido. Solo se midieron tamaños de bundle. | Medición de LCP/CLS/INP sobre el build de producción tras un despliegue real. |
 | ~~**Verificación del despliegue Docker**~~ | **Cubierto durante la auditoría.** Se ejecutó `docker compose build` con el daemon activo y se inspeccionó la imagen construida: AR-02 pasa de deducción estática a hecho verificado, con cinco causas en lugar de las tres previstas. | — |
-| **E2E de Playwright** | Requiere backend y frontend simultáneamente, más la credencial de S-02. | Resolver Q-04 (arranque compuesto) y ejecutar la suite. |
+| ~~**E2E de Playwright**~~ | **Cubierto (T1-24).** `pnpm test:e2e:full` levanta base, backend y frontend sin pasos previos, y corre en `chromium` y `Mobile Chrome`: 9 pasados, 1 omitido. La credencial de S-02 se sustituyó por la del seed. | — |
 | **Integración con Cloudinary** | Siempre mockeada en los tests (`upload.middleware.ts` al 47 % de cobertura). El flujo real de subida y borrado de imágenes nunca se ejerció. | Un entorno con credenciales de Cloudinary y tests de integración contra una carpeta de pruebas. |
 | **Envío real de correo** | `nodemailer` siempre mockeado (31.8 % de cobertura). No se verificó la renderización en clientes reales. | Un servidor SMTP de captura (Mailpit / MailHog) y revisión en Gmail, Outlook y Apple Mail. |
 | **Auditoría de dependencias (SCA) y licencias** | No se ejecutó `pnpm audit` ni un análisis de licencias. | `pnpm audit --prod` en ambos repos y un informe de licencias (`license-checker`). Nota: `Stockly-B` declara licencia `ISC` en `package.json` pero incluye un archivo `LICENSE` — conviene verificar que coinciden. |
 | **Comportamiento bajo concurrencia real** | Los tests cubren concurrencia a nivel de transacción, pero no carga sostenida contra el pool de 10 conexiones (ver P-07). | Prueba de carga con k6 o Artillery sobre los endpoints de movimientos de stock. |
-| **U-02 (bucle de render en Configuración) y U-06 (solape del botón flotante)** | Detectados estáticamente; no reproducidos en navegador. Marcados como *pendientes de verificación* en sus fichas. | Abrir `/settings` con la red ralentizada y observar la consola; y `/catalog/products` a 375 px con un producto seleccionado. |
+| ~~**U-02 (bucle de render en Configuración) y U-06 (solape del botón flotante)**~~ | **Cubiertos (T1-08/T1-10 y T3-09).** U-06 se reprodujo en navegador con `elementFromPoint` y resultó **peor que lo descrito**: los controles de paginación no se podían pulsar, y no solo en móvil — pasa igual a 1280×800. | — |
 
 ---
 

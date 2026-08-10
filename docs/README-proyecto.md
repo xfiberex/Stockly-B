@@ -1,55 +1,70 @@
 # Stockly — Sistema de gestión de inventario
 
-Aplicación full-stack para el control de inventario de productos, con backend REST y frontend SPA.
+Aplicación full-stack para el control de inventario, con API REST y SPA. **Son dos repositorios
+que se clonan uno al lado del otro:**
 
 ```
 01-Stockly/
-├── Stockly-B/                    # API REST (Node.js / Express / Prisma / PostgreSQL)
+├── Stockly-B/                    # API REST (Node 22 / Express 5 / Prisma 7 / PostgreSQL 16)
 │   ├── docker-compose.yml        # PostgreSQL + backend en contenedores
 │   └── docs/                     # Documentación viva de TODO el proyecto
-│       ├── README-proyecto.md    # este archivo
-│       ├── ROADMAP.md            # 107 tareas, dependencias y progreso
-│       └── INFORME-AUDITORIA.md  # hallazgos que justifican cada tarea
-└── Stockly-F/                    # SPA (React 19 / TypeScript / Vite / TailwindCSS)
+└── Stockly-F/                    # SPA (React 19 / TypeScript 6 / Vite 8 / TailwindCSS 4)
 ```
 
-> **Por qué los docs viven en `Stockly-B/docs/`:** cubren los dos repositorios, pero la carpeta que los contiene no está bajo control de versiones. Alojarlos en el backend —que ya se clona— es lo que garantiza que viajen entre equipos con un `git pull`. Al leerlos, las rutas del tipo `Stockly-F/src/...` se refieren al repositorio hermano, no a una subcarpeta del backend.
+> **Por qué los docs viven en `Stockly-B/docs/`:** cubren los dos repositorios, pero la carpeta que
+> los contiene no está bajo control de versiones. Alojarlos en el backend —que ya se clona— es lo
+> que garantiza que viajen entre equipos con un `git pull`. Al leerlos, las rutas del tipo
+> `Stockly-F/src/...` se refieren al repositorio hermano.
+
+**Este archivo es solo el arranque desde cero.** Para lo demás:
+
+| Documento | Para qué |
+|---|---|
+| [CONTEXTO.md](CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado, decisiones vivas y trampas del entorno ya pagadas |
+| [ROADMAP.md](ROADMAP.md) | Las 107 tareas con progreso y métricas |
+| [adr/](adr/) | Decisiones de arquitectura no obvias: por qué algo está así antes de simplificarlo |
+| [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | La auditoría del 2026-08-04. **Congelada**: describe un estado que ya no existe |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, flujo de ramas y convención de commits |
+| [backend](../README.md) · [frontend](../../Stockly-F/README.md) | Referencia de cada repositorio: variables, comandos, endpoints |
+| [design-system.md](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
 
 ---
 
 ## Requisitos previos
 
-| Herramienta | Versión mínima |
+| Herramienta | Versión |
 |---|---|
-| Node.js | 20 LTS |
-| pnpm | 11.2+ |
-| Docker + Docker Compose | cualquier versión reciente |
+| Node.js | 22 LTS |
+| pnpm | **11.21.0**, fijado en `packageManager` de ambos repos — no usar npm ni yarn |
+| Docker + Docker Compose | opcional: solo si no hay un PostgreSQL instalado |
 
 ---
 
-## Inicio rápido
+## Arranque desde cero
 
 ### 1. Base de datos
 
-Con Docker, **desde `Stockly-B/`** (ahí vive el `docker-compose.yml`):
+Sirve cualquier PostgreSQL 16 con la base `Stockly` creada. Con Docker, **desde `Stockly-B/`**, que
+es donde vive el `docker-compose.yml`:
 
 ```bash
 cd Stockly-B
 docker compose up db -d
 ```
 
-Levanta PostgreSQL 16 en `localhost:5432` con la base de datos `Stockly`.
-
-También sirve un PostgreSQL instalado en la máquina: solo tiene que existir la base y coincidir el puerto de `DATABASE_URL` en el `.env`.
+> **El puerto no se fija aquí a propósito.** El proyecto se trabaja desde varios equipos y no es el
+> mismo en todos; el valor bueno es el del `.env` local, que no viaja en git. Si algo falla al
+> conectar, eso es lo primero que hay que mirar. `POSTGRES_HOST_PORT` cambia el que publica el
+> contenedor.
 
 ### 2. Backend
 
 ```bash
 cd Stockly-B
-cp .env.example .env   # completar variables (ver Stockly-B/README.md)
+cp .env.example .env   # bastan 4: DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, FRONTEND_URL
 pnpm install
 pnpm db:migrate
-pnpm db:seed
+pnpm db:seed           # sin esto no existe ningún administrador
 pnpm dev               # http://localhost:3000
 ```
 
@@ -57,49 +72,45 @@ pnpm dev               # http://localhost:3000
 
 ```bash
 cd Stockly-F
+cp .env.example .env   # solo VITE_API_URL
 pnpm install
 pnpm dev               # http://localhost:5173
 ```
 
----
-
-## Credenciales del seed
-
-| Rol | Email | Contraseña |
-|---|---|---|
-| ADMIN | `admin@stockly.app` | `Admin1234!` |
-| USER | `laura@stockly.app` | `User1234!` |
-
----
-
-## Docker (producción)
-
-Desde `Stockly-B/`:
-
-```bash
-docker compose up --build
-```
-
-Levanta PostgreSQL + backend Express. El frontend se sirve por separado (Vite / Nginx).
+Tras el seed, el administrador es `admin@stockly.app` / `Admin1234!`; la lista completa está en el
+[README del backend](../README.md#seed). **El registro público crea siempre usuarios `USER`**, así
+que en un despliegue nuevo nadie es administrador hasta ejecutar `pnpm db:seed` —o hasta que un
+ADMIN promueva a alguien con `PATCH /api/v1/users/:id/role`—.
 
 ---
 
 ## Verificación
 
-Sin CI: todo se comprueba en local. Antes de dar por cerrada una tarea, en cada repositorio:
+**El proyecto no usa CI**, y es una decisión deliberada
+([ADR 0005](adr/0005-sin-integracion-continua.md)). La puerta de calidad se ejecuta en local, en el
+repositorio que hayas tocado, antes de cada push:
 
 ```bash
 pnpm verify
 ```
 
-En el backend encadena `prisma generate → migrate deploy → check → test:coverage → build → smoke` (el último arranca `dist/server.js` de verdad y consulta `/api/v1/health`). En el frontend, `check → lint → test:coverage → build`.
+Qué encadena en cada repositorio y qué necesita para pasar, en
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
-## Documentación
+## Producción con Docker
 
-- Backend API (Swagger): `http://localhost:3000/api/v1/docs` — no se monta con `NODE_ENV=production`
-- README Backend: [../README.md](../README.md)
-- README Frontend: [../../Stockly-F/README.md](../../Stockly-F/README.md)
-- Roadmap: [ROADMAP.md](ROADMAP.md)
-- Auditoría: [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md)
+Desde `Stockly-B/`:
+
+```bash
+docker compose up -d --build
+```
+
+Levanta PostgreSQL, el backend y el frontend tras nginx —que sirve la SPA y hace de proxy de `/api`,
+así que hay un solo origen— en `http://localhost:8080`. La pila **no se siembra sola**: aplica las
+migraciones al arrancar pero no ejecuta el seed, de modo que el login responde 401 hasta que se
+lance a mano y parece un fallo de credenciales.
+
+La documentación interactiva de la API (Swagger) está en `/api/v1/docs` y **no se monta con
+`NODE_ENV=production`**.

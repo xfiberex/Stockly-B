@@ -37,6 +37,8 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - Sistema de diseño documentado en [`Stockly-F/docs/design-system.md`](../Stockly-F/docs/design-system.md)
   (`T3-15`), decisiones de arquitectura en [`docs/adr/`](docs/adr/) (`T3-11`) y esta guía de
   contribución (`T3-10`).
+- Alias `git buscar` y `git buscar-archivos` en `.gitconfig-stockly`, que excluyen el tooling de IA
+  versionado de las búsquedas por texto. Requieren una activación por clon (`T3-06`).
 
 ### Cambiado
 
@@ -63,6 +65,8 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   en móvil y en escritorio (`T3-09`).
 - Acentos rotos al abrir en Excel las exportaciones CSV, por falta de marca de orden de
   bytes (`T2-34`).
+- Un filtro de enum con un valor inesperado en la URL provocaba un **500** en vez de un 400, porque
+  la guarda usaba `in` sobre un objeto que hereda de `Object.prototype` (`T3-02`).
 
 ### Seguridad
 

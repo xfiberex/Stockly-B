@@ -1,6 +1,19 @@
 # Stockly — Backend
 
-API REST modular para el sistema de gestión de inventario Stockly.
+API REST modular para el sistema de gestión de inventario Stockly. El frontend vive en un
+repositorio hermano, `Stockly-F`, que se clona al lado de este.
+
+Este README documenta **la API**. La documentación que cubre los dos repositorios está en
+[`docs/`](docs/), porque la carpeta que los contiene no está bajo control de versiones:
+
+| Documento | Para qué |
+|---|---|
+| [docs/CONTEXTO.md](docs/CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado, decisiones vivas y trampas del entorno ya pagadas |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Las 107 tareas con progreso y métricas. La fuente de verdad del trabajo |
+| [docs/README-proyecto.md](docs/README-proyecto.md) | Arranque desde cero de los dos repositorios |
+| [docs/adr/](docs/adr/) | Decisiones de arquitectura: por qué algo está hecho así, antes de simplificarlo |
+| [docs/INFORME-AUDITORIA.md](docs/INFORME-AUDITORIA.md) | La auditoría del 2026-08-04. **Congelada**: describe un estado que ya no existe |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) | Puerta de calidad y convención de commits; registro de cambios |
 
 ---
 
@@ -19,7 +32,7 @@ API REST modular para el sistema de gestión de inventario Stockly.
 | PDFs | PDFKit 0.18 |
 | Documentación | Swagger UI (`/api/v1/docs`, desactivada en producción) |
 | Tests | Jest + Supertest |
-| Package manager | PNPM 11+ |
+| Package manager | PNPM 11.21.0 *(fijado en `packageManager`; no usar npm ni yarn)* |
 
 ---
 
@@ -297,7 +310,8 @@ git buscar useForm            # solo código de la aplicación
 git buscar-archivos -i zod    # solo los archivos que coinciden
 ```
 
-La diferencia es la que hace falta: ``git grep -il z.object` devuelve 57 archivos; `git buscar-archivos` devuelve 14`. Sin activarlo, el equivalente a mano es
+La diferencia es la que hace falta: `git grep -il z.object` devuelve **57** archivos y
+`git buscar-archivos` devuelve **14**. Sin activarlo, el equivalente a mano es
 `git grep X -- ':!.agents' ':!.claude'`.
 
 ## Seguridad

@@ -1,4 +1,4 @@
-# Contexto de trabajo — sesión del 2026-08-07
+# Contexto de trabajo — al 2026-08-10
 
 Arranque en frío para continuar en otro equipo. El detalle de cada tarea está en
 [ROADMAP.md](ROADMAP.md); esto es lo que ese documento no cuenta.
@@ -64,39 +64,53 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ · Total **97/107**.
+**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ · Total
+**97/107**. **Los cuatro tiers de trabajo están cerrados**; lo único pendiente es el **Tier 4**
+(10 tareas), que la auditoría dejó fuera del alcance inmediato a propósito — se listan para que la
+decisión de no hacerlas sea consciente, no para hacerlas ahora.
 
-**Los cuatro tiers de trabajo están cerrados.** Lo único pendiente es el **Tier 4** (10 tareas), que la auditoría dejó explícitamente fuera del alcance inmediato: se listan para que la decisión de no hacerlas sea consciente, no para hacerlas ahora.
+La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
+una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
+`page` no numérico, ningún índice en la base, `logout` expuesto a CSRF y el correo saliendo en
+claro, a tener todo eso corregido, medido y con tests. La pila completa —base, backend y frontend
+tras nginx— se levanta con `docker compose up -d --build` y el login funciona contra
+`http://localhost:8080`.
 
-*La cobertura del frontend cruzó por fin el objetivo del roadmap (**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño.*
+*Dos apuntes sobre las cifras. La cobertura del frontend cruzó por fin el objetivo del roadmap
+(**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño. Y el
+denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la
+aplicación en marcha anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**,
+porque ninguno estaba en ella.*
 
-*El denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la aplicación en marcha, anotados ya cerrados: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella. **El Tier 2 quedó cerrado el 2026-08-09.** **El Tier 3 se cerró entero el 2026-08-10**, catorce tareas en un día. Queda el Tier 4, fuera del alcance inmediato.*
+**Las fichas de la auditoría son pistas, no descripciones verificadas.** Cuatro se comprobaron
+equivocadas al abordarlas: la premisa de `T3-08` era **falsa** (Heroicons ya emitía `aria-hidden`,
+así que el criterio se cumplía solo, y el fallo real era el opuesto); el enunciado de `T3-05` no
+describía el código —el botón de la interfaz nunca tuvo dos rutas—; `T3-09` se quedaba corta, porque
+el botón flotante no «probablemente solapaba» la paginación, la dejaba **sin poder pulsarse** y no
+solo en móvil; y `T3-03` contaba mal, decía un módulo divergente y eran cinco. Conviene medir antes
+de arreglar, y medir otra vez después.
 
-*Cuatro de ellas merecen leerse antes de fiarse de una ficha: **la premisa de `T3-08` era falsa** (Heroicons ya emitía `aria-hidden`, así que el criterio se cumplía solo, y el fallo real era el opuesto); **el enunciado de `T3-05` no describía el código** (el botón de la interfaz nunca tuvo dos rutas); **`T3-09` se quedaba corta** —el botón flotante no «probablemente solapaba» la paginación, la dejaba **sin poder pulsarse**, y no solo en móvil—; y **`T3-03` contaba mal**: decía que solo `products` divergía en el estilo de exportación, y eran cinco módulos. Las fichas de la auditoría son buenas pistas, no descripciones verificadas: conviene medir antes de arreglar, y medir otra vez después.*
+### La documentación del proyecto
 
-*Documentación nueva del 2026-08-10, toda enlazada desde `CLAUDE.md`:*
+| Documento | Para qué |
+|---|---|
+| [ROADMAP.md](ROADMAP.md) | Las 107 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
+| [adr/](adr/) | **Cinco decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
+| [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
+| [CHANGELOG.md](../CHANGELOG.md) | Registro de cambios de los dos repositorios |
+| [README-proyecto.md](README-proyecto.md) | Arranque desde cero de los dos repositorios |
 
-- *[`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) — lectura previa a tocar cualquier pantalla.*
-- *[`docs/adr/`](adr/) — **cinco decisiones de arquitectura**. Léelas antes de simplificar algo que parezca complicado de más; están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo.*
-- *[`CONTRIBUTING.md`](../CONTRIBUTING.md) y [`CHANGELOG.md`](../CHANGELOG.md) — puerta de calidad, convención de commits y registro de cambios de los dos repositorios.*
-
-*Y una decisión que pidió el propietario y conviene no revertir: **`.agents/` y `.claude/` se versionan a propósito**, porque el proyecto se trabaja desde varias máquinas. Como son la mayoría de los archivos rastreados, para buscar en el código está el alias `git buscar` —una activación por clon, documentada en el README—.*
-
-**Los cuatro tiers de trabajo están cerrados** (Tier 0, 1, 2 y 3). La aplicación pasó de tener el guardado de
-configuración roto, las etiquetas de producto inertes, una ventana de 15 minutos de acceso
-para cuentas desactivadas, cinco listados que reventaban con un `page` no numérico, ningún
-índice en la base, `logout` expuesto a CSRF y el correo saliendo en claro, a tener todo eso
-corregido, medido y con tests.
-
-**La salvedad de T1-21 está resuelta desde el 2026-08-09**, con Docker en marcha:
-`docker exec stockly_backend id` → `uid=1000(node)`, y `prisma migrate deploy` aplica todas
-las migraciones sin privilegios, incluida la de la extensión `pg_trgm`. La pila completa
-—base, backend y frontend tras nginx— se levanta con `docker compose up -d --build` y el
-login funciona en el navegador contra `http://localhost:8080`.
+**Una decisión del propietario que conviene no revertir:** `.agents/` y `.claude/` **se versionan a
+propósito**, porque el proyecto se trabaja desde varias máquinas. Como son la mayoría de los
+archivos rastreados, para buscar en el código está el alias `git buscar` — ver §5.
 
 ---
 
 ## 4. Trampas del entorno, ya pagadas
+
+*Cada una costó un fallo antes de entenderse. No hace falta redescubrirlas.*
 
 **Un servidor huérfano en el 3000 rompe el E2E siguiente, y la culpa es del rate limiter (2026-08-10).**
 Si una pasada de `pnpm test:e2e:full` se interrumpe, el backend puede quedarse escuchando.
@@ -121,9 +135,6 @@ y si hay algo escuchando, mirar qué devuelve `/health` antes de matarlo:
 ```powershell
 Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }
 ```
-
-
-Cada una costó un fallo antes de entenderse. No hace falta redescubrirlas.
 
 **El formato multipart no se puede probar por HTTP en la suite del backend.**
 `upload.middleware` está mockeado en `products.test.ts`, así que multer —que es quien
@@ -186,14 +197,11 @@ cookie `csrfToken` y reenviarla en la cabecera `x-csrf-token`. En `NODE_ENV=test
 omite. Desde **T1-19** solo quedan exentas siete rutas públicas de `/auth`: `logout`,
 `PUT /me` y `PATCH /me/password` **exigen token**.
 
-**El rate limit se agota con el E2E.** Cien peticiones por IP cada 15 minutos es poco para
-una pasada de navegador: el 429 hace fallar pruebas que no van de eso, e incluso la
-comprobación de salud del `webServer`. `RATE_LIMIT_MAX` y `AUTH_RATE_LIMIT_MAX` suben el
-techo (ya vienen puestas en `playwright.config.ts`); el limitador y CSRF siguen activos.
-**Y ojo con los servidores huérfanos:** `reuseExistingServer` reaprovecha lo que haya en el
-puerto, así que un backend que quedó vivo de una pasada anterior llega con su cupo gastado y
-responde **429 hasta en `/health`** — Playwright se queda esperando y muere con «Timed out
-waiting 120000ms from config.webServer». Se mata el proceso del 3000 y del 5173 y se repite.
+**El rate limit se agota con el E2E.** Cien peticiones por IP cada 15 minutos es poco para una
+pasada de navegador: el 429 hace fallar pruebas que no van de eso. `RATE_LIMIT_MAX` y
+`AUTH_RATE_LIMIT_MAX` suben el techo y ya vienen puestas en `playwright.config.ts`; el limitador y
+CSRF siguen activos. Es la otra mitad de la trampa del servidor huérfano, al principio de esta
+sección.
 
 **Un *transport* de pino cuesta caro con el E2E delante.** `pino-pretty` no formatea en
 proceso: levanta un hilo de trabajo y le pasa cada línea por un canal. Con cuatro
@@ -233,6 +241,48 @@ Reportes, ir a Dashboard dejaba la página en 202 px y el título en −113. Aho
 manda `window.scrollTo(0, 0)` y enfoca con `preventScroll`, para que no haya dos mecanismos
 decidiendo dónde queda la página. **En `POP` no se toca**: atrás y adelante restauran la
 posición guardada, y forzar el principio borraría justo lo que se espera recuperar.
+
+**Medir un color justo después de un clic o un `hover` da el color de antes.** Los controles llevan
+`transition-colors`, que dura 150–200 ms: `getComputedStyle` leído inmediatamente devuelve el
+fotograma inicial —`rgba(0,0,0,0)` en un fondo que va a ser azul— y parece que la clase no se
+aplica. Con `waitForTimeout(400)` sale el valor real. Costó media hora y dos hipótesis falsas al
+ajustar los menús: llegué a creer que Tailwind no generaba las utilidades. **Regla:** para un
+estado con transición, o se espera a que termine, o se mira una captura.
+
+**Y al medir, hacerlo sobre el elemento que se tocó.** Un `document.querySelectorAll(...).find(...)`
+dentro de `page.evaluate` puede caer en otro nodo con el mismo texto —la interfaz duplica la
+navegación en escritorio y móvil—. `locator.evaluate()` mide justo el que Playwright pulsó.
+
+**Tailwind solo genera las utilidades que aparecen escritas en el código.** Una contraprueba con
+una clase que no está en ningún archivo no mide nada, porque esa clase no existe en el CSS
+compilado: hay que tocar la propiedad por JS (`style.fontVariantNumeric`). Pasó al verificar las
+cifras tabulares de T2-39.
+
+**Los dos proyectos del E2E corren en paralelo contra la misma base**, así que un test que pulse «el
+primero de la lista» puede operar sobre lo que acaba de crear el otro proyecto. Pasó con el
+escenario de la venta cancelada: `chromium` enviaba la orden de `Mobile Chrome` y el stock nunca
+bajaba. La cura no fue serializar, sino **nombrar**: las acciones de fila llevan el número de orden
+en su `aria-label` y el test localiza la suya. Vale como regla: **si un test necesita `.first()`,
+casi siempre falta un nombre accesible.** Y si una pasada se interrumpe, deja órdenes y productos
+`E2E-*` a medias en la base de desarrollo, que ensucian la siguiente.
+
+**Un `overflow-x-auto` ensancha el viewport de diseño en Chrome de Android** con el ancho de su
+contenido, aunque lo recorte visualmente, y todo lo `position: fixed` se dimensiona contra ese
+viewport: con la tabla de productos en pantalla, un `fixed inset-0` medía **663 px sobre una
+pantalla de 393**, así que el modal se centraba en 663 y su botón primario quedaba fuera del borde.
+La cura es `contain: paint` en el scroller, y `desbordes.test.ts` falla si falta. Los tres
+candidatos evidentes **no funcionan**, comprobado uno a uno: `body{overflow:hidden}` no influye
+—el viewport ya estaba ensanchado sin ningún modal—, `html{overflow-x:hidden}` no cambia nada, y
+quitar el `min-w-160` de la tabla tampoco, porque el ancho mínimo intrínseco de las celdas ya supera
+la pantalla.
+
+**Un fallo de Playwright puede nombrar un elemento que no tiene nada que ver.** El de arriba decía
+«el `<label>` de *Stock mínimo* intercepta el clic», que era solo lo que había bajo las coordenadas.
+Medir la geometría —una sonda `position: fixed` y los rectángulos reales— costó cuatro pasadas y
+descartó tres hipótesis; hacer caso al mensaje habría llevado a arreglar el formulario. Vale la
+regla general: **antes de acusar al código de una tarea, comparar contra el estado anterior con
+`git stash` en la misma máquina.** Ahí evitó dos diagnósticos equivocados, y también demostró que un
+`pnpm dev` olvidado ocupando un puerto falsea toda la medición.
 
 **Los archivos del frontend tienen finales de línea CRLF.** Un reemplazo de varias líneas
 escrito con `\n` no encuentra nada y **falla en silencio**: el script dice que terminó, el
@@ -292,198 +342,83 @@ incluida la extensión `pg_trgm` de T2-09.
 
 ---
 
-## 6. Por dónde seguir
+## 6. Decisiones vivas: lo que no conviene deshacer
 
-**Los cuatro tiers están cerrados** (97/107). Lo único pendiente es el **Tier 4**, diez
-tareas que la auditoría dejó fuera del alcance inmediato a propósito: se listan para que no
-hacerlas sea una decisión consciente, no un olvido.
+**Por dónde seguir:** no queda trabajo asignado. Los cuatro tiers están cerrados y lo único abierto
+es el **Tier 4** (10 tareas), que la auditoría dejó fuera del alcance inmediato a propósito.
 
-*Lo que sigue en esta sección es el poso de los Tiers 2 y 3 —qué quedó montado y qué no
-conviene deshacer— y se escribió sobre la marcha, así que el orden es cronológico y no
-temático.*
+*Lo que sigue son las decisiones que costaron una medición y que una sesión nueva podría revertir
+por reflejo, agrupadas por tema. El relato tarea a tarea vive en las filas de
+[Progreso](ROADMAP.md#progreso); aquí solo está el poso.*
 
-De los arrastres del Tier 1 quedaron cerrados **T2-03 + T2-04** (órdenes de compra
-paginadas; ya no queda ninguna lista de la API sin techo), **T2-29** (esquema de Swagger,
-atado al validador por un test) y **T2-17** (conmutadores de etiqueta accesibles).
+### Diseño
 
-**El sistema de diseño ya está en su sitio** (T2-35, T2-36 y T2-37): la capa semántica
-existe, los primitivos la consumen y **no queda ninguna utilidad de color cruda** en la
-interfaz — eran 561. Cambiar la paleta es ahora editar `index.css`.
+La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md): color,
+tipografía, radios, elevación, densidad, estados, iconos y movimiento, cada sección con el test que
+la vigila. **Es lectura previa a tocar una pantalla**, y no es opcional: media docena de esas
+reglas ponen `pnpm verify` en rojo si se incumplen.
 
-Los tests que lo sostienen no conviene desactivarlos: `theme.test.ts` recalcula los
-contrastes desde el CSS, `tokens.test.ts` recorre todos los archivos buscando utilidades
-crudas, los de `Button`/`Badge` comprueban que ninguna variante emita una, y
-`estados.test.tsx` exige que dos estados del mismo conjunto no dibujen el mismo icono.
-La regla al escribir interfaz es nombrar el papel, no el valor: `bg-surface`, no `bg-white`.
+Lo que ese documento no recoge:
 
-**Con T2-38, el estado ya no se comunica solo por color.** Etiqueta, color e icono de cada
-estado salen de un descriptor único en `Stockly-F/src/shared/lib/estados.ts`, y `EstadoBadge`
-lo pinta entero: no hay forma de poner uno sin los otros. Al añadir un estado nuevo hay que
-elegir icono ahí mismo, y el test lo comprueba comparando la **geometría del trazo** del SVG,
-no el nombre del componente importado. La tarea destapó que «bajo» y «agotado» eran el mismo
-triángulo ámbar, indistinguibles incluso con color.
+- **Los ítems de menú son cajas delimitadas** (T2-46, a petición de diseño). Salen todos de
+  `clasesDeItemDeMenu()` en `Stockly-F/src/shared/lib/`: borde transparente en reposo —para que el
+  texto no baile un píxel al señalar— que se pinta en `hover` y en `focus-visible`, nunca en `focus`
+  a secas, o se quedaría pegado tras un clic de ratón. Al añadir un desplegable, usar ese helper y
+  `CLASES_PANEL_DE_MENU`. La separación entre ítems (`gap-1`) **no es estética**: sin ella, dos
+  recuadros contiguos comparten línea y parecen solaparse — un defecto que no existía antes de
+  delimitarlos.
+- **La fila de la tabla de productos se quedó en 48 px**, no en los 36 del perfil denso de T2-40.
+  No es un descuido: relleno 6+6, nombre 20 y SKU 16 ya suman 48, y la celda de la miniatura, 44.
+  Bajar a 36 exige quitar el SKU de la tabla o encoger la miniatura a 24 px, y eso es una decisión
+  de producto.
+- **Pendiente:** las paletas de los gráficos de Recharts siguen como hexadecimales dentro de los
+  componentes. No son utilidades —`fill` y `stroke` son props—, así que ningún test las detecta;
+  llevarlas a los tokens exige leer las variables CSS desde JS.
 
-**Las tablas ya piden cifras tabulares desde `index.css`** (T2-39), no celda a celda: una
-tabla de inventario existe para comparar cifras en vertical, así que la próxima que se
-escriba nace alineada. Fuera de tablas la utilidad `tabular-nums` va explícita. Aviso para
-quien mida esto en el navegador: **Tailwind solo genera las utilidades que aparecen escritas
-en el código**, así que una contraprueba con `proportional-nums` no mide nada si esa clase no
-está en ningún archivo; hay que tocar `style.fontVariantNumeric`.
+### Accesibilidad
 
-**Dos densidades, un solo componente** (T2-40): `min-h-11` (44 px, mínimo táctil) hasta `md`
-y `md:min-h-9` (36 px) a partir de ahí. Al añadir un control nuevo hay que llevar el par
-entero; `densidad.test.tsx` falla si falta una de las dos clases. Lo que no puede crecer sin
-dejar de parecer lo que es —la casilla de 16 px, el interruptor de 24— recibe el toque en su
-envoltorio, no en el dibujo.
+- **`<main id="contenido" tabIndex={-1}>` es un destino, no un adorno.** Sin ese `tabIndex` el foco
+  no viaja y el enlace de saltar al contenido (T2-11) queda en decoración: el navegador desplaza,
+  pero el siguiente Tab vuelve al principio del menú. **T2-18 usa el mismo destino** — en cada
+  cambio de ruta, `AnuncioDeRuta` mueve allí el foco y cambia el texto de una región `aria-live`.
+- **Un desplegable de navegación no es un `menu`.** La ficha de T2-16 pedía `role="menu"` y
+  `role="menuitem"` en `NavDropdown`, y **no se aplicó a propósito**: ese rol es para comandos de
+  aplicación; con él, los enlaces de Catálogo/Órdenes/Admin dejan de anunciarse como enlaces y
+  desaparecen de la lista de enlaces del lector de pantalla. Se quedó en *disclosure*
+  (`aria-haspopup` + `aria-expanded` + `aria-controls` + Escape). `UserMenu` sí conserva
+  `role="menu"`, que ya tenía: ahí dentro hay un comando de verdad («Cerrar sesión»). **Lo destapó
+  el E2E**, que dejó de encontrar «Productos» por rol de enlace: una prueba ajena señalando un
+  problema real, no un selector viejo.
+- **Al añadir una ruta hay que darle título** en `Stockly-F/src/shared/lib/titulos.ts`, o
+  `titulos.test.ts` falla — a propósito: sin entrada, al llegar a esa sección se anunciaría «Página
+  no encontrada», que es peor que el silencio. No se leen del `<h1>` porque, con las rutas en
+  `lazy()`, al cambiar de ruta todavía no hay `<h1>` que leer. Ese archivo pone además el
+  `document.title` de cada pestaña.
 
-**Salvedad de T2-40 que conviene no dar por hecha:** la fila de la tabla de productos se
-quedó en **48 px**, no en los 36 del perfil denso. No es un descuido: relleno 6+6, nombre 20
-y SKU 16 ya suman 48, y la celda de la miniatura, 44. Bajar a 36 exige quitar el SKU de la
-tabla o encoger la miniatura a 24 px, y eso es una decisión de producto.
+### Backend
 
-**La escala tipográfica está cerrada, no solo documentada** (T2-41). `index.css` borra los
-espacios de nombres de Tailwind (`--text-*: initial`, `--font-weight-*: initial`) y declara
-cinco tamaños y cuatro pesos: **un `text-3xl` escrito por inercia no pinta nada**. Si algo se
-ve con el tamaño equivocado, es la primera sospecha; `tipografia.test.ts` lo señala por
-archivo. De Inter se cargan solo los subconjuntos latinos: los `@fontsource/inter/400.css`
-traen siete `@font-face` por peso (cirílico, griego, vietnamita…) y los `latin-*.css`, uno.
+- **Hay observabilidad** (T2-10): `pino` + `pino-http` con `requestId` por petición, devuelto en
+  `x-request-id` y presente en cada línea; en producción, JSON. Al depurar un fallo, pedir ese
+  identificador es lo primero. Las cabeceras van redactadas (`cookie`, `authorization`): sin eso,
+  pino-http registra la sesión completa en cada llamada.
+- **Las alertas de bajo stock no bloquean la respuesta** (T2-07). Se disparan sin esperar y sus
+  fallos se registran; `esperarAlertasEnVuelo()` existe para que los tests puedan esperarlas de
+  verdad. Si añades otro aviso por correo, sigue ese patrón.
+- **La asimetría al cancelar una venta es intencionada** (T2-42). Cancelar una orden *pendiente* es
+  un clic directo, porque no toca inventario; cancelar una *enviada* abre un diálogo que dice
+  cuántas unidades vuelven y de qué productos. Lo que se confirma es el movimiento de stock, no el
+  cambio de estado. El recuento **excluye los ítems sin `productId`**, porque el backend repone con
+  `where: { productId: { not: null } }` y prometer esas unidades sería mentir. Si algún día se añade
+  otra transición que mueva inventario, ese es el patrón a repetir.
 
-**El bloque de diseño está terminado** (T2-35 a T2-41): color, estados, cifras, densidad y
-tipografía. Los cinco tests que lo sostienen —`theme`, `tokens`, `estados`, `densidad`,
-`tipografia`, más los de `Button`/`Badge`— no son decorativos: cada uno cerró un agujero que
-ya se había colado una vez. `textoLegibleSobre()` de `shared/lib/color.ts` sigue disponible
-por si hace falta.
+### Verificar un cambio de interfaz en el navegador
 
-**Ya hay observabilidad** (T2-10): `pino` + `pino-http` con `requestId` por petición,
-devuelto en `x-request-id` y presente en cada línea; en producción, JSON. Al depurar un
-fallo, pedir ese identificador es lo primero. Las cabeceras van redactadas (`cookie`,
-`authorization`): sin eso, pino-http registra la sesión completa en cada llamada.
+`pnpm dev` en los dos repositorios y entrar con `admin@stockly.app`. Si hace falta un estado que la
+base de desarrollo no tiene —un producto agotado, una venta pendiente o enviada—, crearlo por la API
+con el token CSRF de la cookie **y borrarlo después**. Ojo: una venta ya enviada no se puede borrar
+por la API, así que la limpieza pide un script con el cliente de Prisma (`pnpm exec tsx`, importando
+`./src/shared/lib/prisma`, que es quien tiene el adaptador configurado; construir un `PrismaClient`
+a pelo falla).
 
-Con el log en su sitio, **las alertas de bajo stock ya no bloquean la respuesta** (T2-07).
-Se disparan sin esperar y sus fallos se registran; `esperarAlertasEnVuelo()` existe para que
-los tests puedan esperarlas de verdad. Si añades otro aviso por correo, sigue ese patrón.
-
-**El enlace de saltar al contenido** (T2-11) es ahora el primer elemento enfocable, y
-`<main id="contenido" tabIndex={-1}>` es su destino. Ese `tabIndex` no se puede quitar: sin
-él el foco no viaja y el enlace pasa a ser decoración. **T2-18 usa ese mismo destino**: en
-cada cambio de ruta, `AnuncioDeRuta` mueve allí el foco y cambia el texto de una región
-`aria-live`, así que el Tab siguiente ya cae dentro del contenido y no al principio del menú.
-
-**El bloque de accesibilidad del Tier 2 está cerrado** (T2-11 a T2-18): salto al contenido,
-foco y anuncio al navegar, ARIA y Escape en los desplegables, nombres en los selectores de
-color y en las casillas de fila, fin del `<button>` dentro de `<a>` y respeto por
-`prefers-reduced-motion`.
-
-**Los ítems de menú son cajas delimitadas** (2026-08-09, a petición de diseño). Menú de
-usuario, Catálogo/Órdenes/Admin, Exportar y el menú móvil salen todos de
-`clasesDeItemDeMenu()` en `Stockly-F/src/shared/lib/`: borde **transparente en reposo** —para
-que el texto no baile un píxel al señalar— que se pinta en `hover` y en `focus-visible`. La
-opción activa y la acción destructiva se delimitan en su propio color (azul de sección, rojo
-de peligro). Al añadir un desplegable nuevo, usar ese helper y `CLASES_PANEL_DE_MENU`, que da
-al panel relleno por los cuatro lados: con los ítems delimitados, un borde pegado al borde del
-panel se lee como un fallo de dibujo, y **los ítems se separan entre sí** (`gap-1`): pegados,
-dos recuadros contiguos comparten línea y parecen solaparse — no se notaba mientras no tenían
-borde. **Los disparadores siguen la misma regla** y además
-conservan el borde **mientras el menú está abierto**, para leerse como una pieza con el panel.
-El menú de usuario lleva cabecera con nombre y correo: en el disparador el nombre se recorta a
-144 px y en pantallas pequeñas ni aparece, así que es el único sitio donde la cuenta se lee
-entera.
-
-**Medir un color justo después de un clic o un `hover` da el color de antes.** Los controles
-llevan `transition-colors`, que dura 150–200 ms: `getComputedStyle` leído inmediatamente
-devuelve el fotograma inicial —`rgba(0,0,0,0)` en un fondo que va a ser azul— y parece que la
-clase no se aplica. Con `waitForTimeout(400)` sale el valor real. Costó media hora y dos
-hipótesis falsas al ajustar los menús: llegué a creer que Tailwind no generaba las utilidades.
-**Regla:** para un estado con transición, o se espera a que termine, o se mira una captura.
-
-**Y al medir, hacerlo sobre el elemento que se tocó.** Un `document.querySelectorAll(...).find(...)`
-dentro de `page.evaluate` puede caer en otro nodo con el mismo texto —la interfaz duplica la
-navegación en escritorio y móvil—. `locator.evaluate()` mide justo el que Playwright pulsó.
-
-**Los dos proyectos del E2E corren en paralelo contra la misma base**, así que un test que
-pulse «el primero de la lista» puede operar sobre lo que acaba de crear el otro proyecto.
-Pasó con el escenario de la venta cancelada: `chromium` enviaba la orden de `Mobile Chrome` y
-el stock nunca bajaba. La cura no fue serializar, sino **nombrar**: las acciones de fila de las
-órdenes de venta llevan el número de la orden en su `aria-label`, y el test localiza la suya.
-Vale como regla: si un test necesita `.first()`, casi siempre falta un nombre accesible.
-Y si una pasada se interrumpe, deja órdenes y productos `E2E-*` a medias en la base de
-desarrollo, que ensucian la siguiente.
-
-**Un desplegable de navegación no es un `menu`.** La ficha de T2-16 pedía `role="menu"` y
-`role="menuitem"` en `NavDropdown`, y **no se aplicó a propósito**: ese rol es para comandos
-de aplicación; con él, los enlaces de Catálogo/Órdenes/Admin dejan de anunciarse como enlaces
-y desaparecen de la lista de enlaces del lector de pantalla. Se quedó en *disclosure*
-(`aria-haspopup` + `aria-expanded` + `aria-controls` + Escape). `UserMenu` sí conserva
-`role="menu"`, que ya tenía: ahí dentro hay un comando de verdad («Cerrar sesión»).
-**Lo destapó el E2E**, que dejó de encontrar «Productos» por rol de enlace: un fallo de una
-prueba ajena señalando un problema real, no un selector viejo.
-
-**Al añadir una ruta hay que darle título** en `Stockly-F/src/shared/lib/titulos.ts`, o
-`titulos.test.ts` falla — a propósito: sin entrada, al llegar a esa sección se anunciaría
-«Página no encontrada», que es peor que el silencio. No se leen del `<h1>` porque, con las
-rutas en `lazy()`, al cambiar de ruta todavía no hay `<h1>` que leer. Ese archivo es también
-el que pone el `document.title` de cada pestaña.
-
-**Pendiente relacionado:** las paletas de los gráficos de Recharts siguen como hex dentro
-de los componentes. No son utilidades —`fill`/`stroke` son props—, así que ningún test las
-detecta; llevarlas a los tokens exige leer las variables CSS desde JS.
-
-Como relleno entre tareas grandes, las de esfuerzo bajo y sin dependencias: T2-01, T2-32,
-T2-33, T2-27, T2-06, T2-34, T2-08 y la tanda de accesibilidad T2-13/14/15/16.
-
-Las tareas de Docker (**T2-25, T2-26, T2-28**) conviene agruparlas con la verificación
-pendiente de **T1-21**, para una sesión en un equipo donde el daemon arranque.
-
-Los **tres hallazgos que el cierre del Tier 1 dejó sin tarea ya la tienen** (2026-08-08), y el
-Tier 2 pasa por eso de 41 a 44 tareas — y a **45** con T2-45, que salió de verificar la primera:
-
-- **T2-42 ✅ hecha** — la interfaz ya permite cancelar una orden de venta enviada, así que la
-  reposición de stock de T0-03 **deja de ser inalcanzable desde la aplicación**. Es la única de
-  las tres que le faltaba al usuario.
-- **T2-43 ✅ hecha** — `products` ya tiene índice por `createdAt`, y el de `isActive` **no se
-  retiró: se amplió** a `(isActive, createdAt)`. Hacen falta los dos porque el filtro por estado
-  es opcional: el listado sin filtro no lo sirve el compuesto, cuya primera columna no es la
-  fecha. El listado del catálogo pasa de `Seq Scan` de 10.3 ms a `Index Scan Backward` de 0.016.
-- **T2-44 ✅ hecha** — `formatearImporte()` en `shared/lib/moneda.ts` es el único sitio donde se
-  da forma a un importe, y también el único que escribe el `$`. Dos exclusiones a propósito: las
-  etiquetas compactas de los ejes de las gráficas y `dailyVelocity`, que no es dinero.
-
-**Los cuatro hallazgos del 2026-08-08 están cerrados** (T2-42, T2-43, T2-44 y T2-45).
-
-**Con T2-42, la asimetría de confirmación es intencionada:** cancelar una orden *pendiente* sigue
-siendo un clic directo, porque no toca inventario; cancelar una *enviada* abre un diálogo que dice
-cuántas unidades vuelven y de qué productos. Lo que se confirma es el movimiento de stock, no el
-cambio de estado. El recuento del diálogo **excluye los ítems sin `productId`**, porque el backend
-repone con `where: { productId: { not: null } }` y prometer esas unidades sería mentir. Si algún
-día se añade otra transición que mueva inventario, ese es el patrón a repetir.
-
-**Para ejecutar el E2E en este equipo** faltaban los navegadores de Playwright:
-`pnpm exec playwright install chromium` (113 MB, una sola vez).
-
-**T2-45 salió de verificar T2-42, y es la trampa de móvil que conviene no volver a pagar.** Los
-dos escenarios que pasan por el formulario de producto fallaban en `Mobile Chrome` con un mensaje
-que señalaba a otro sitio: «el `<label>` de *Stock mínimo* intercepta el clic». No era el modal ni
-el formulario. **Un contenedor `overflow-x-auto` ensancha el viewport de diseño de Chrome de
-Android con el ancho de su contenido aunque lo recorte visualmente**, y todo lo `position: fixed`
-se dimensiona contra ese viewport: con la tabla de productos en pantalla, un `fixed inset-0` medía
-**663 px sobre una pantalla de 393**, así que el modal se centraba en 663 y su mitad derecha —el
-botón primario— quedaba fuera del borde. El `<label>` era solo lo que había bajo las coordenadas.
-
-La cura es `contain: paint` en el scroller, y los tres candidatos evidentes **no funcionan**,
-comprobado uno a uno: `body { overflow: hidden }` (lo que pone el modal) no influye, porque el
-viewport ya estaba ensanchado sin ningún modal abierto; `html { overflow-x: hidden }` no cambia
-nada; y quitar el `min-w-160` de la tabla tampoco, porque el ancho mínimo intrínseco de las celdas
-ya supera la pantalla. Al añadir una tabla nueva hay que llevar `contain-paint` en su scroller:
-`desbordes.test.ts` falla si falta.
-
-**Moraleja repetida:** el fallo de Playwright nombraba un elemento que no tenía nada que ver.
-Medir la geometría —una sonda `position: fixed` y los rectángulos reales— costó cuatro pasadas y
-descartó tres hipótesis; leer el mensaje de error habría llevado a arreglar el formulario.
-
-**Para verificar cambios de interfaz en el navegador**, el camino corto: `pnpm dev` en los
-dos repositorios, entrar con `admin@stockly.app` / `Admin1234!` y, si hace falta un estado
-que la base de desarrollo no tiene (un producto agotado, una venta pendiente o enviada),
-crearlo por la API con el token CSRF de la cookie **y borrarlo después**. Ojo: una venta ya
-enviada no se puede borrar por la API, así que la limpieza pide un script con el cliente de
-Prisma —`pnpm exec tsx`, importando `./src/shared/lib/prisma`, que es quien tiene el adaptador
-configurado; construir un `PrismaClient` a pelo falla.
+Los navegadores de Playwright se instalan aparte, una sola vez:
+`pnpm exec playwright install chromium` (113 MB).
