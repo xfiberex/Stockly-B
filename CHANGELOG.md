@@ -19,6 +19,15 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Copia de seguridad, restauración y política de reversión** (`T4-05`). `pnpm db:backup`
+  vuelca la base en formato `custom`, **verifica el archivo antes de podar** y aplica una
+  retención de 14 días que nunca deja menos de tres copias; `pnpm db:restaurar` restaura y
+  cuenta lo restaurado, en una base de ensayo salvo que se le pase `--forzar`. El
+  procedimiento —y el registro de la primera restauración de prueba, con sus cifras— está
+  en [`docs/operaciones.md`](docs/operaciones.md), junto con la política de migraciones
+  **solo hacia adelante** que impone Prisma. `backups/` y `*.dump` quedan fuera de git: un
+  volcado contiene la base entera, hashes de contraseña incluidos.
+
 - **Interfaz en dos idiomas, español e inglés, con selector en Configuración** (`T4-04`).
   Tres estados —automático, español, inglés—, guardados por dispositivo, con el `lang` de
   `<html>` siguiendo al idioma efectivo. El catálogo vive en `Stockly-F/src/shared/i18n/`,

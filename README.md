@@ -138,6 +138,8 @@ pnpm db:migrate       # Ejecutar migraciones pendientes
 pnpm db:seed          # Poblar la base de datos con datos de ejemplo
 pnpm db:reset         # Resetear DB y re-ejecutar migraciones + seed
 pnpm db:studio        # Abrir Prisma Studio en el navegador
+pnpm db:backup        # Volcar la base a backups/, con retención (docs/operaciones.md)
+pnpm db:restaurar     # Restaurar un volcado — por defecto en una base de ensayo
 
 pnpm test             # Suite completa de tests
 pnpm test:watch       # Modo watch

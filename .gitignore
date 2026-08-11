@@ -13,6 +13,12 @@ dist/
 !.env.example
 *.local
 
+# Copias de seguridad (T4-05). Un volcado es la base entera: datos de clientes y los
+# hashes de contraseña de `users`. Versionarlo publica en el historial lo mismo que el
+# `.env`, y con la misma dificultad para retirarlo después (T0-06).
+backups/
+*.dump
+
 # Test coverage
 coverage/
 

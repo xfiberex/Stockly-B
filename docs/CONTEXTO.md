@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-11): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 5/12** · Total **102/109**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 6/13** · Total **103/110**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -74,8 +74,12 @@ selector de tema— se añadió ese mismo día y no viene de la auditoría, sino
 propio cierre de T4-03 dejó anotada. El 2026-08-11 se cerró **T4-04**, la internacionalización, que
 venía a medias del otro equipo: estaba el mecanismo —códigos de error, catálogo, motor y selector—
 y faltaba el trabajo de verdad, extraer los textos de las 25 pantallas restantes. Dejó anotada
-**T4-12**, los correos, que siguen saliendo solo en español. Las siete restantes siguen fuera de
-alcance, listadas para que no hacerlas sea una decisión consciente.
+**T4-12**, los correos, que siguen saliendo solo en español. Ese mismo día se cerró **T4-05**: ya
+hay copia de seguridad (`pnpm db:backup`) y una restauración **ejecutada y medida**, no solo
+descrita — el procedimiento entero está en [operaciones.md](operaciones.md). También dejó anotada
+**T4-13**: el servidor de desarrollo de este equipo es PostgreSQL **17.10** y el compose levanta
+**`postgres:16-alpine`**, y un volcado de 17 no se restaura en un 16. Las siete restantes siguen
+fuera de alcance, listadas para que no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -87,8 +91,9 @@ tras nginx— se levanta con `docker compose up -d --build` y el login funciona 
 *Dos apuntes sobre las cifras. La cobertura del frontend cruzó por fin el objetivo del roadmap
 (**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño. Y el
 denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la
-aplicación en marcha anotados ya cerrados, a 108 el 2026-08-10 con `T4-11` y a 109 el 2026-08-11 con
-`T4-12`: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella.*
+aplicación en marcha anotados ya cerrados, a 108 el 2026-08-10 con `T4-11` y a 110 el 2026-08-11 con
+`T4-12` y `T4-13`: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en
+ella.*
 
 **Las fichas de la auditoría son pistas, no descripciones verificadas.** Cuatro se comprobaron
 equivocadas al abordarlas: la premisa de `T3-08` era **falsa** (Heroicons ya emitía `aria-hidden`,
@@ -102,7 +107,8 @@ de arreglar, y medir otra vez después.
 
 | Documento | Para qué |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 109 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [ROADMAP.md](ROADMAP.md) | Las 110 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [operaciones.md](operaciones.md) | Copia de seguridad, restauración y reversión. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
 | [adr/](adr/) | **Siete decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |

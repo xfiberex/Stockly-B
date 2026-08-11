@@ -5,15 +5,16 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-11 — **102 / 109**
+> ## Estado al 2026-08-11 — **103 / 110**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordaron
-> **T4-01**, **T4-02**, **T4-03**, **T4-11** y **T4-04**: las dos primeras por ser la causa raíz
-> común de T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37 ya habían
-> hecho el trabajo caro; la cuarta —que no viene de la auditoría— porque el cierre de T4-03 dejó
-> anotado que faltaba el conmutador manual, y la quinta porque el contrato de T4-01 ya permitía
-> que los errores viajaran con código. Las 7 restantes siguen fuera de alcance.
+> **T4-01**, **T4-02**, **T4-03**, **T4-11**, **T4-04** y **T4-05**: las dos primeras por ser la
+> causa raíz común de T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37
+> ya habían hecho el trabajo caro; la cuarta —que no viene de la auditoría— porque el cierre de
+> T4-03 dejó anotado que faltaba el conmutador manual; la quinta porque el contrato de T4-01 ya
+> permitía que los errores viajaran con código, y la sexta porque el valor del sistema es un
+> histórico de inventario del que no había ninguna copia. Las 7 restantes siguen fuera de alcance.
 >
 > Backend **402/402** tests y 91.96 % de sentencias; frontend **493/493** y 53.14 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
@@ -32,10 +33,10 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
 | **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
-| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 12 | 1 / 6 / 5 |
-| | **Total** | **109** | **79 / 25 / 5** |
+| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 13 | 2 / 6 / 5 |
+| | **Total** | **110** | **80 / 25 / 5** |
 
-*Nueve tareas no vienen de la auditoría, y por eso el total pasa de 100 a 109: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, y `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04.*
+*Diez tareas no vienen de la auditoría, y por eso el total pasa de 100 a 110: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, y `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1410,13 +1411,21 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Los dos huecos de la API.** El **422** de `validate.middleware` no llevaba código —era el único sitio que respondía sin él—, así que su «Error de validación» salía en español pasara lo que pasara; ahora lleva `VALIDATION_ERROR`. Y los **rótulos de `/settings`**, que vienen del servidor en español: la interfaz prefiere el suyo del catálogo y cae al del servidor solo si el ajuste es tan nuevo que aquí no tiene traducción, comprobado con `existeClave` para no pintar la clave en crudo.
   - **Salvedades, las dos anotadas en el ADR.** Los mensajes **por campo** de un 422 siguen en español: son de regla, no de caso, y traducirlos exige un código por regla de Zod. Y los **correos** salen en español, porque la preferencia es de dispositivo y el servidor no la conoce; llevarla allí pide una columna por usuario. → Queda como **T4-12**.
 
-- [ ] **[T4-05] Documentar la estrategia de backup y rollback**
+- [x] **[T4-05] Documentar la estrategia de backup y rollback** ✅ *(2026-08-11)*
   - **Área:** DevOps
-  - **Ubicación:** `docs/operaciones.md` (nuevo)
+  - **Ubicación:** [`docs/operaciones.md`](operaciones.md), `scripts/backup.js`, `scripts/restaurar.js`, `scripts/postgres.js`
   - **Qué hacer:** No hay procedimiento de copia de seguridad ni de reversión. Documentar un `pg_dump` programado con retención definida, un procedimiento de restauración **probado**, y la política de migraciones hacia adelante (Prisma no genera *down migrations*). Especialmente relevante en un sistema cuyo valor es la integridad de un histórico de inventario.
   - **Criterio de aceptación:** existe un procedimiento escrito y se ha ejecutado con éxito una restauración de prueba.
   - **Esfuerzo:** medio
   - **Depende de:** T2-28
+  - **La restauración se ejecutó, no se describió.** El criterio pedía una prueba y el registro con sus cifras está en [operaciones.md §5](operaciones.md#5-ensayo-de-restauración--registro): 31 MB de base → volcado de 76.7 KB en 0.2 s, restaurada en 0.3 s en una base nueva. Comparadas las siete tablas de negocio, las 12 migraciones, un `md5` de las 52 filas de inventario, y el esquema entero con `pg_dump --schema-only` línea a línea —idéntico salvo el testigo aleatorio que 17.10 escribe en cada volcado—. Encima, `prisma migrate status` da «up to date» y **la aplicación real arranca contra la copia**: `GET /api/v1/ready`, que sondea la base, responde 200.
+  - **Se escribieron dos guiones porque un procedimiento que se copia y pega a mano no se ejecuta.** `pnpm db:backup` y `pnpm db:restaurar`, en Node y no en `.sh`: el proyecto se trabaja desde Windows y la copia tiene que poder programarse en el Programador de tareas igual que en `cron`, y un guion de shell obligaría a mantener dos.
+  - **El ensayo por defecto no puede ser el comando del desastre.** `db:restaurar` sin `--a` restaura en `Stockly_restauracion`; apuntar a la base de la aplicación exige `--forzar` escrito a mano. Una copia que no se ha restaurado nunca no es una copia, es un archivo, así que el ensayo tiene que salir barato y sin riesgo.
+  - **Cuatro trampas encontradas montándolo**, las cuatro silenciosas: el `DATABASE_URL` del `.env` **no le vale a `pg_dump`** —la `@` sin codificar de la contraseña hace que libpq parta por la primera y busque un socket `@localhost`, con un error que no menciona la contraseña—; **`pg_restore` termina con código 0 aunque falle** salvo `--exit-on-error`, así que una restauración a medias se anuncia como buena; un cliente **más nuevo** que el servidor vuelca sin protestar y el problema sale al restaurar; y `dropdb` se queda esperando con un Prisma Studio olvidado abierto.
+  - **La retención lleva una guardia contra sí misma.** 14 días, pero **nunca menos de 3 copias**, y la poda solo corre si el volcado nuevo pasa `pg_restore --list`. Si los volcados llevan un mes fallando y nadie mira el registro, una poda por antigüedad a secas borra la última copia buena el día en que es lo único que queda.
+  - **Un paso clásico que aquí no hace falta:** las claves primarias son `text` (cuid), no `serial`. La base no tiene ni una secuencia, así que no hay `setval` de reajuste que olvidar tras restaurar.
+  - **Destapó una discrepancia de versión que no se puede arreglar desde aquí:** el servidor de desarrollo es PostgreSQL **17.10** y el compose levanta **`postgres:16-alpine`**. Un volcado de 17 no se restaura en un 16. → **T4-13**.
+  - **`backups/` y `*.dump` van al `.gitignore`.** Un volcado es la base entera, incluidos los hashes de `users`: versionarlo publica en el historial lo mismo que el `.env`, y con la misma dificultad para retirarlo después (T0-06).
 
 - [ ] **[T4-06] Monitorización y alertas**
   - **Área:** DevOps
@@ -1484,6 +1493,15 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** un usuario con la interfaz en inglés recibe en inglés los tres correos que la aplicación envía.
   - **Esfuerzo:** medio
   - **Depende de:** T4-04
+
+- [ ] **[T4-13] La versión de PostgreSQL no coincide entre el desarrollo y el compose**
+  - **Área:** DevOps
+  - **Ubicación:** `docker-compose.yml`, `docs/README-proyecto.md`, `docs/operaciones.md`
+  - **Origen:** no viene de la auditoría. La destapó el ensayo de restauración de T4-05.
+  - **Qué hacer:** el servidor de desarrollo de este equipo es **PostgreSQL 17.10** y el compose levanta **`postgres:16-alpine`** (el README dice «PostgreSQL 16»). Un volcado tomado de un servidor 17 **no se restaura** en uno 16: es un fallo duro, y aparece el día de la recuperación, que es cuando peor viene. Decidir una versión y alinear las tres cosas. No se hizo dentro de T4-05 porque cambiar la imagen invalida el directorio de datos del volumen existente: exige `pg_upgrade` o un ciclo de volcado y restauración, con su propio ensayo.
+  - **Criterio de aceptación:** un volcado tomado en cualquier equipo del proyecto se restaura en la pila del compose sin error de versión.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T4-05
 
 ---
 
@@ -1559,7 +1577,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | V-03 Sin healthcheck de aplicación | Medio | T2-25 |
 | V-04 Credenciales por defecto en compose | Medio | T2-27 |
 | V-05 Frontend sin despliegue | Medio | T2-28 |
-| V-06 Sin backup ni monitorización | Bajo | T4-05, T4-06 |
+| V-06 Sin backup ni monitorización | Bajo | T4-05 ✅ *(backup y restauración)*, T4-06 |
 | SEO — sin `robots.txt` | Bajo | T3-12 |
 | Zonas no cubiertas — SCA y licencias | — | T4-07 |
 | Zonas no cubiertas — pruebas de carga | — | T4-08 |
@@ -1589,6 +1607,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-11 | **T4-05** Backup, restauración y reversión — **completada** | **Restauración ejecutada, no descrita** ([registro](operaciones.md#5-ensayo-de-restauración--registro)): 31 MB → volcado de 76.7 KB en 0.2 s, restaurado en 0.3 s. Siete tablas de negocio, 12 migraciones y un `md5` de las 52 filas de inventario **idénticos**; `pg_dump --schema-only` comparado línea a línea sin diferencias reales; `prisma migrate status` «up to date»; y la aplicación arrancada contra la copia responde **200** en `/api/v1/ready`, que sondea la base | **Dos guiones, porque un procedimiento que se copia y pega a mano no se ejecuta**: `pnpm db:backup` y `pnpm db:restaurar`, en Node y no en `.sh` —el proyecto se trabaja desde Windows y la copia debe programarse igual en el Programador de tareas que en `cron`—. **El ensayo por defecto no es el comando del desastre:** restaura en `Stockly_restauracion` y apuntar a la base real exige `--forzar`. **Cuatro trampas silenciosas encontradas montándolo:** el `DATABASE_URL` del `.env` **no le vale a `pg_dump`** (la `@` sin codificar hace que libpq busque un socket `@localhost`, con un error que no la menciona); **`pg_restore` sale con código 0 aunque falle** salvo `--exit-on-error`; un cliente más nuevo que el servidor vuelca sin protestar y rompe al restaurar; `dropdb` se cuelga con un Prisma Studio abierto. **La retención lleva guardia contra sí misma** —mínimo 3 copias y podar solo tras verificar el volcado—, porque una poda por antigüedad a secas borra la última copia buena el día en que es lo único que queda. **Destapó que el servidor de desarrollo es 17.10 y el compose levanta `postgres:16-alpine`**: un volcado de 17 no entra en un 16 → **T4-13**. |
 | 2026-08-10 | **T4-11** Selector de tema en Configuración — **completada** | Sobre el build de producción, con CPU a 1/20 y red «Slow 3G»: con preferencia «claro» y sistema en oscuro, el **primer `requestAnimationFrame`** ya pinta `rgb(248, 250, 252)` **con React sin montar**. Falsificado quitando el script del `dist/index.html`: el mismo frame pasa a `rgb(11, 18, 32)`. `verify` ✅ **471/471**, E2E ✅ | **El conmutador obligó a rehacer la capa de tokens, a mejor:** una media query no se anula desde la aplicación, y duplicar la paleta bajo `[data-tema]` dejaba cada color en tres sitios. Cada token pasa a `light-dark(claro, oscuro)`, el bloque de 40 líneas de T4-03 **desaparece** y el conmutador entero son tres reglas de `color-scheme`. **Deja obsoleto el apaño de las sombras** de T4-03: con el par dentro del token, el literal que Tailwind incrusta ya lleva los dos valores. **Defecto encontrado midiendo:** `ring-offset-2` rellena el hueco con `#fff` de fábrica, así que el anillo de foco dibujaba un halo blanco en oscuro —`rgb(255,255,255)` medido, `rgb(21,29,44)` tras el arreglo—. La preferencia va en `localStorage` y no en `/settings`, que es global a todos los usuarios. Nueve mutaciones, nueve guardias caídas. |
 | 2026-08-04 | **T0-01** Alias `@/` en el build | `pnpm build && node dist/server.js` arranca y conecta con la BD | `tsc-alias@1.9.1` como devDependency; `build` pasa a `tsc && tsc-alias`. Se añadió también un `prebuild` que limpia `dist/` sin dependencias nuevas — **absorbe T3-07**. |
 | 2026-08-04 | **T0-02** Imagen Docker (5 fallos) | `docker compose up --build` → migraciones aplicadas + `GET /api/v1/health` **200** | Dentro de la imagen: `pnpm 11.2.2`, `prisma.config.ts` presente, CLI de Prisma disponible. `prisma` movida a `dependencies`; `packageManager` fijado; `pnpm-workspace.yaml` copiado; `ARG DATABASE_URL` para `prisma generate`. **Absorbe el anclaje de versión de T2-26.** |
@@ -1698,7 +1717,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 *El denominador creció cuatro veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y una el 2026-08-11 (T4-12)—, así que el 94 % de arriba es sobre 109, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerró **T4-04**, la internacionalización. Las 7 restantes siguen fuera de alcance, y una de ellas —**T4-12**, los correos, que tampoco viene de la auditoría— la dejó anotada el propio cierre de T4-04.*
+***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, y **T4-05**, la copia de seguridad. Las 7 restantes siguen fuera de alcance, y dos de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04, y **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1721,6 +1740,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
+| Copias de seguridad de la base | 0 *(ni procedimiento ni archivo)* | **`pnpm db:backup`, retención de 14 días y mínimo 3 copias** ✅ *(T4-05)* | una copia diaria automática |
+| Restauraciones probadas | 0 *(nunca se había intentado)* | **1** ✅ *(2026-08-11: 31 MB restaurados en 0.3 s, `/ready` 200 contra la copia)* | una al mes, con su fila en el registro |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | Índices no-únicos en el esquema | 0 | **19** ✅ *(T2-43 los del orden por `createdAt`; T2-09 los GIN de trigramas)* | cubrir FK, ordenaciones y búsqueda |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
