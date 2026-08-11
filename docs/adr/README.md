@@ -15,6 +15,7 @@ evidente es la equivocada. Si algo se hizo de la forma obvia, no necesita una en
 | [0004](0004-correo-fuera-de-la-transaccion.md) | El correo se envía fuera de la transacción | Aceptada |
 | [0005](0005-sin-integracion-continua.md) | Sin integración continua: la puerta de calidad es local | Aceptada |
 | [0006](0006-contrato-copiado-entre-repositorios.md) | El contrato de la API se copia entre repositorios, no se comparte como paquete | Aceptada |
+| [0007](0007-i18n-propio.md) | La internacionalización se hace con un motor propio, no con `i18next` | Aceptada |
 
 ## Formato
 

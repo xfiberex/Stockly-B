@@ -5,16 +5,17 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-10 — **101 / 108**
+> ## Estado al 2026-08-11 — **102 / 109**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordaron
-> **T4-01**, **T4-02**, **T4-03** y **T4-11**: las dos primeras por ser la causa raíz común de
-> T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37 ya habían hecho
-> el trabajo caro, y la cuarta —que no viene de la auditoría— porque el cierre de T4-03 dejó
-> anotado que faltaba el conmutador manual. Las 7 restantes siguen fuera de alcance.
+> **T4-01**, **T4-02**, **T4-03**, **T4-11** y **T4-04**: las dos primeras por ser la causa raíz
+> común de T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37 ya habían
+> hecho el trabajo caro; la cuarta —que no viene de la auditoría— porque el cierre de T4-03 dejó
+> anotado que faltaba el conmutador manual, y la quinta porque el contrato de T4-01 ya permitía
+> que los errores viajaran con código. Las 7 restantes siguen fuera de alcance.
 >
-> Backend **402/402** tests y 91.95 % de sentencias; frontend **471/471** y 52.17 %; E2E 9 pasados
+> Backend **402/402** tests y 91.96 % de sentencias; frontend **493/493** y 53.14 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -31,10 +32,10 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
 | **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
-| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 11 | 1 / 5 / 5 |
-| | **Total** | **108** | **79 / 24 / 5** |
+| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 12 | 1 / 6 / 5 |
+| | **Total** | **109** | **79 / 25 / 5** |
 
-*Ocho tareas no vienen de la auditoría, y por eso el total pasa de 100 a 108: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, y `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada.*
+*Nueve tareas no vienen de la auditoría, y por eso el total pasa de 100 a 109: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, y `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1392,13 +1393,22 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Salvedad:** los colores de etiqueta **no cambian con el tema**, y es correcto: los elige el usuario y se guardan en la base, así que son datos. Su legibilidad la sigue resolviendo `textoLegibleSobre()` contra el color real.
   - **No hay conmutador manual.** El criterio pide seguir la preferencia del sistema y eso es lo que hace; un selector en la interfaz exigiría persistencia y un tercer estado («auto»), que es otra tarea. → Esa tarea es **T4-11**, cerrada el mismo día: al añadir el selector, la media query de esta ficha desaparece y el apaño de `--tw-shadow-color` deja de hacer falta, porque cada token pasa a declarar sus dos valores con `light-dark()`.
 
-- [ ] **[T4-04] Internacionalización**
+- [x] **[T4-04] Internacionalización** ✅ *(2026-08-11)*
   - **Área:** UI/UX
   - **Ubicación:** transversal, ambos repos
   - **Qué hacer:** Todos los textos están incrustados en los componentes y el backend devuelve mensajes de error en español. Requeriría extraer cadenas en ambos repos y que la API devuelva códigos de error en lugar de mensajes. Configurable desde la sección configuración del proyecto. El usuario podra elegir idioma o dejarlo en automático.
   - **Criterio de aceptación:** cambiar el idioma traduce toda la interfaz, incluidos los mensajes de error procedentes de la API.
   - **Esfuerzo:** alto
   - **Depende de:** T4-01
+  - **Verificado localmente (2026-08-11):** `verify` backend ✅ **402/402**, cobertura **91.96 %**; frontend ✅ **493/493 + 1 omitido** (22 nuevos), cobertura **53.14 %** *(desde 52.17)*. Medido con la misma regla a los dos lados del cambio —la guardia aplicada al árbol en `HEAD` y al de ahora—: **289 textos escritos a mano en 47 archivos → 0**.
+  - **Se hizo en dos tandas y desde dos equipos.** La primera —el 2026-08-10— montó el mecanismo: los códigos de error en el backend, el catálogo, el motor, el selector de idioma y cinco componentes de muestra. Esta segunda hace el trabajo de verdad: **extraer los textos de las 25 pantallas restantes**, los hooks, los esquemas Zod y los formatos de fecha, y cerrar los dos huecos que quedaban en la API.
+  - **Sin `i18next`, y no por gusto.** El motor propio son ~30 líneas porque lo que la librería resuelve —respaldo entre variantes regionales, espacios de nombres, carga diferida, seis formas de plural, detección por cabecera— este proyecto no lo tiene: dos idiomas, un catálogo de dos archivos y `Intl.PluralRules` en el navegador. Lo que se renuncia (`Trans`, extracción automática, contexto gramatical) está escrito con su contrapartida en [ADR 0007](adr/0007-i18n-propio.md).
+  - **El compilador vigila el catálogo y un test vigila las pantallas.** `en.ts` es un `Record<keyof typeof es, string>`, así que una clave sin traducir **no compila**; eso ya estaba. Lo que faltaba —y era el agujero real— es que nada impedía escribir `<h1>Productos</h1>` en una pantalla nueva: compila, se ve bien en español y está roto en inglés. Ahora `literales.test.ts` recorre `src/`, mira el contenido de los nodos JSX, seis props visibles y los `toast`, y falla si encuentra una cadena a mano. **Está falsificado** con cuatro casos, y comprueba además que la lista de archivos no se quede vacía —el defecto que T4-02 encontró en su propio guardián—.
+  - **Lo destapó dos textos que llevaban meses sin traducir y nadie veía:** el aviso de límite de peticiones de `axios.ts` y los dos de `useSettings`. Ninguno está en una pantalla, así que ninguna revisión visual los habría encontrado.
+  - **Componer frases con el nombre de la entidad no sobrevive a un idioma más.** `CatalogItemSection` armaba `Nueva ${entityLabel.toLowerCase()}` y `No hay ${...}s registradas`: ya cojeaba en español —el artículo concuerda en género, el plural no siempre es «+s»— y en inglés el adjetivo va delante. Cada pantalla pasa a traer sus frases enteras. Lo mismo con los cuatro plurales resueltos con `${n !== 1 ? "s" : ""}`, que ahora piden `tn()`.
+  - **Lo que **no** se traduce, y por qué.** Las **exportaciones** salen siempre en el idioma de referencia: un CSV es formato de intercambio y sus columnas están emparejadas con las del backend por el test de T3-05. Los **motivos de un movimiento de stock** se guardan en la base, así que el valor es dato y solo se traduce la etiqueta de la lista. Y los **importes** no cambian de formato: `es-MX` y `en-US` agrupan igual y solo cambiaría el símbolo a «MX$», que en un sistema de una sola moneda es ruido. Las **fechas** sí, y por eso existe `shared/lib/fechas.ts`: un `toLocaleDateString("es-MX")` deja «15 ago 2026» en una interfaz en inglés, y eso ninguna guardia de literales lo ve, porque el idioma está en el argumento.
+  - **Los dos huecos de la API.** El **422** de `validate.middleware` no llevaba código —era el único sitio que respondía sin él—, así que su «Error de validación» salía en español pasara lo que pasara; ahora lleva `VALIDATION_ERROR`. Y los **rótulos de `/settings`**, que vienen del servidor en español: la interfaz prefiere el suyo del catálogo y cae al del servidor solo si el ajuste es tan nuevo que aquí no tiene traducción, comprobado con `existeClave` para no pintar la clave en crudo.
+  - **Salvedades, las dos anotadas en el ADR.** Los mensajes **por campo** de un 422 siguen en español: son de regla, no de caso, y traducirlos exige un código por regla de Zod. Y los **correos** salen en español, porque la preferencia es de dispositivo y el servidor no la conoce; llevarla allí pide una columna por usuario. → Queda como **T4-12**.
 
 - [ ] **[T4-05] Documentar la estrategia de backup y rollback**
   - **Área:** DevOps
@@ -1465,6 +1475,15 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Radios nativos y no botones con `aria-pressed`:** un grupo de radio se recorre con las flechas, entra con un solo tabulador y se anuncia como «2 de 3». Van `sr-only` y pinta la etiqueta que los envuelve, con `has-[:checked]`.
   - **Nueve mutaciones, nueve guardias caídas:** un color sin `light-dark()`, un bloque de tema por media query, la regla de «oscuro» borrada, una sombra con un solo color, un `ring-offset` sin token, la clave del script en línea cambiada, ese script convertido en módulo, y las dos mitades de `elegirTema` —aplicar y avisar— por separado.
   - **Salvedad:** el E2E no cubre el selector. Sus radios son `sr-only`, así que habría que pulsar la etiqueta, y lo que aporta sobre los tests de unidad —que el atributo sobreviva a una recarga real— ya se comprobó a mano en el navegador.
+
+- [ ] **[T4-12] Los correos siguen saliendo solo en español**
+  - **Área:** UI/UX
+  - **Ubicación:** `Stockly-B/src/shared/templates/`, `schema.prisma`, registro y perfil
+  - **Origen:** no viene de la auditoría. Sale del cierre de T4-04, que dejó traducida toda la interfaz y **no los correos**.
+  - **Qué hacer:** la preferencia de idioma es de **dispositivo** y vive en el `localStorage` del navegador, así que el servidor no la conoce: verificación de cuenta, recuperación de contraseña y aviso de bajo stock salen siempre en español. Llevarla al servidor pide una columna `idioma` por usuario, enviarla en el registro y al cambiarla, y duplicar las plantillas —que hoy son HTML con el texto dentro—.
+  - **Criterio de aceptación:** un usuario con la interfaz en inglés recibe en inglés los tres correos que la aplicación envía.
+  - **Esfuerzo:** medio
+  - **Depende de:** T4-04
 
 ---
 
@@ -1663,6 +1682,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | 2026-08-10 | **T4-03** Modo oscuro — **completada** | Emulando la preferencia del sistema en las dos direcciones sobre la aplicación en marcha: dashboard, reportes, catálogo y un modal. Tokens resueltos en vivo (`--color-surface` → `#151d2c`) y **cero clases `dark:`**. `verify` ✅ **448/448**, E2E ✅ | **La ficha acertaba:** con la capa de tokens de T2-35–T2-37 ya montada, esto es redefinir la capa semántica y nada más. **La inversión de los rellenos salió gratis** porque los botones usan `text-surface` y no `text-white`, que no aparece ni una vez en `src/`. **No es la paleta invertida:** los estados se aclaran y desaturan, medido antes de escribirlo (19 de 20 pares a la primera), y el borde se calibró contra el claro —1.23:1— en vez de contra un número inventado. **Dos defectos propios encontrados midiendo:** las sombras **no se pueden redefinir por token** —Tailwind incrusta el literal, mi test lo daba por bueno y el modal seguía en `rgba(15,23,42,0.12)`— y el `body` no pintaba fondo. Los ~40 hexadecimales de los gráficos, que ninguna guardia veía, salen ya de tokens. |
 | 2026-08-10 | **T4-02** OpenAPI derivado de Zod — **completada** | Contra el servidor en marcha: `/api/v1/docs` → **200** y el spec servido trae los **23 esquemas** generados, con las 43 rutas y 67 operaciones de T2-30 intactas. `verify` ✅ **402/402** | **La dependencia de la ficha no hacía falta:** Zod 4.4 trae `z.toJSONSchema()` con `target: "openapi-3.0"` nativo, el dialecto exacto del spec. Comprobado antes de escribir: convierten los 9 validadores y los 36 esquemas del contrato. **Peticiones con `io: "input"`**, o el spec diría que `price` solo admite números cuando el validador coerce la cadena de un formulario. **Destapó `/settings` mal documentado en las dos direcciones** —un mapa de cadenas donde hay un array de ajustes tipados—, `/reports` con cuatro listas como `items: {}` y `/products/export` sin esquema. Falsificación clave: hacer obligatorio el SKU en el validador cambia el `required` del spec **solo**. |
 | 2026-08-10 | **T4-01** Contrato compartido entre repositorios — **completada** | El criterio, medido: conectar el contrato produjo **12 errores de compilación** en el frontend (4 de producción, 8 de mocks) donde antes no había ninguno. `verify` ✅ backend **392/392** y frontend **421/421** | **La ficha pedía un paquete del workspace pnpm y eso no puede existir**: son dos repos git independientes con la carpeta madre sin versionar. Se copia desde una fuente única, con las tres alternativas descartadas por coste real ([ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md)). **Los tipos ya mentían:** `price` y los tres `unitPrice` decían `number` y llegan como cadena, sostenidos por dos `Number()` y un `z.coerce`. **`SettingEntry.value` seguía siendo la unión laxa que T2-24 rechazó por escrito** — endureció su espejo pero no el tipo de producción. Tres guardianes, los tres falsificados: 8 caídas, 1 y 1. |
+| 2026-08-11 | **T4-04** Internacionalización — **completada** | Medido con la misma regla a los dos lados: **289 textos a mano en 47 archivos → 0**. `verify` backend ✅ **402/402** (91.96 %) y frontend ✅ **493/493 + 1 omitido** (53.14 %), E2E ✅ | **Sin `i18next`:** lo que la librería resuelve —variantes regionales, espacios de nombres, seis formas de plural, detección por cabecera— este proyecto no lo tiene, y `Intl.PluralRules` ya viene en el navegador ([ADR 0007](adr/0007-i18n-propio.md)). **El compilador ya vigilaba el catálogo; lo que faltaba era vigilar las pantallas**, porque nada impedía escribir `<h1>Productos</h1>` en una nueva: compila, se ve bien en español y está roto en inglés. `literales.test.ts` lo detecta, está falsificado con cuatro casos y comprueba que la lista de archivos no se vacíe —el defecto que T4-02 encontró en su propio guardián—. **Destapó dos avisos que llevaban meses sin traducir y que ninguna revisión visual habría visto**: el 429 de `axios.ts` y los de `useSettings`. **Componer frases con el nombre de la entidad no sobrevive a un idioma más:** `Nueva ${entityLabel}` ya cojeaba en español —el artículo concuerda en género— y en inglés el adjetivo va delante. **Lo que no se traduce está razonado:** exportaciones y motivos de movimiento son datos, no pantalla, y los importes agrupan igual en los dos idiomas; las fechas sí, y por eso existe `shared/lib/fechas.ts`. Quedan dos salvedades anotadas: los mensajes por campo de un 422 y los correos (**T4-12**). |
 | 2026-08-10 | **T3-10** CHANGELOG y guía de contribución — **completada** | Ambos en la raíz de `Stockly-B`, más un `CONTRIBUTING.md` corto en `Stockly-F` que apunta al canónico. Enlaces relativos comprobados | **La ficha pedía documentar `pnpm lint`, y el backend no lo tiene**: se documenta `pnpm verify`, la puerta real, con las asimetrías escritas. El CHANGELOG **no inventa versiones** —no hay etiquetas y los `package.json` ni coinciden—, así que todo va bajo «Sin publicar». La convención de commits se documenta como objetivo y se dice el dato: 35 de 41 commits convencionales son `feat`. |
 
 ### Resumen por Tier
@@ -1673,23 +1693,26 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **4** | 11 | 36 % |
-| **Total** | **101** | **108** | **94 %** |
+| Tier 4 | **5** | 12 | 42 % |
+| **Total** | **102** | **109** | **94 %** |
 
-*El denominador creció tres veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48) y una el 2026-08-10 (T4-11)—, así que el 94 % de arriba es sobre 108, no sobre las 100 originales.*
+*El denominador creció cuatro veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y una el 2026-08-11 (T4-12)—, así que el 94 % de arriba es sobre 109, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, y ese mismo día se añadió y cerró **T4-11**, que no venía de la auditoría sino de una limitación anotada al cerrar T4-03. Las 7 restantes siguen fuera de alcance.*
+***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerró **T4-04**, la internacionalización. Las 7 restantes siguen fuera de alcance, y una de ellas —**T4-12**, los correos, que tampoco viene de la auditoría— la dejó anotada el propio cierre de T4-04.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
 ### Métricas
 
-| Métrica | Inicial (auditoría) | Actual (2026-08-10) | Objetivo |
+| Métrica | Inicial (auditoría) | Actual (2026-08-11) | Objetivo |
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **402/402** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.95 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **471/471** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **52.17 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Cobertura backend (sentencias) | 86.92 % | **91.96 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **493/493** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
+| Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
+| Errores de la API con código estable | 0 *(solo `message`, siempre en español)* | **42 códigos** ✅ *(el cliente compone la frase en su idioma, T4-04)* | que ningún mensaje de error dependa del idioma del servidor |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
 | Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
 | Esquemas del spec escritos a mano | 14 *(~180 líneas de objeto literal)* | **0** ✅ *(23 derivados; solo `ProductWrite.image` es manual, T4-02)* | que la documentación se derive de la validación |

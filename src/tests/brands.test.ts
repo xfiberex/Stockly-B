@@ -88,6 +88,11 @@ describe("Brands API", () => {
                 .send({ name: "" });
 
             expect(res.status).toBe(422);
+            // T4-04: el sobre de un fallo de validación también lleva código, que es lo
+            // que el cliente puede enseñar traducido. Los mensajes por campo siguen
+            // siendo los del validador, en español, y eso está razonado en el contrato.
+            expect(res.body.code).toBe("VALIDATION_ERROR");
+            expect(res.body.errors[0]).toMatchObject({ field: "name" });
         });
     });
 

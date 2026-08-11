@@ -19,6 +19,15 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Interfaz en dos idiomas, español e inglés, con selector en Configuración** (`T4-04`).
+  Tres estados —automático, español, inglés—, guardados por dispositivo, con el `lang` de
+  `<html>` siguiendo al idioma efectivo. El catálogo vive en `Stockly-F/src/shared/i18n/`,
+  con motor propio en vez de `i18next` ([ADR 0007](docs/adr/0007-i18n-propio.md)), y dos
+  garantías lo sostienen: el compilador exige que la traducción exista y un test exige que
+  ninguna pantalla conserve un texto escrito a mano. Del lado de la API, los errores viajan
+  con un **código estable** y sus parámetros, así que el mensaje se compone en el idioma de
+  quien mira en vez de llegar hecho desde el servidor.
+
 - **Modo oscuro** (`T4-03`) y **selector de tema en Configuración** —claro, oscuro o
   automático— (`T4-11`). Sin clases `dark:` ni segunda paleta: cada color declara sus dos
   valores con `light-dark()` y todo el conmutador es `color-scheme`. La elección se guarda

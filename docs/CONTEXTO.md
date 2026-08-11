@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-08-10
+# Contexto de trabajo — al 2026-08-11
 
 Arranque en frío para continuar en otro equipo. El detalle de cada tarea está en
 [ROADMAP.md](ROADMAP.md); esto es lo que ese documento no cuenta.
@@ -56,22 +56,26 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **402/402** | **471/471** *(+1 omitido)* |
-| Cobertura (sentencias) | 91.95 % *(suelo 85 %)* | 52.17 % *(suelo 45 %)* |
+| Tests | **402/402** | **493/493** *(+1 omitido)* |
+| Cobertura (sentencias) | 91.96 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-08-10): **9 pasados,
-1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45.
+de datos, el backend y el frontend—. En este equipo (2026-08-11): **9 pasados,
+1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
+puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 4/11** · Total **101/108**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 5/12** · Total **102/109**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
 selector de tema— se añadió ese mismo día y no viene de la auditoría, sino de una limitación que el
-propio cierre de T4-03 dejó anotada. Las siete restantes siguen fuera de alcance, listadas para que
-no hacerlas sea una decisión consciente.
+propio cierre de T4-03 dejó anotada. El 2026-08-11 se cerró **T4-04**, la internacionalización, que
+venía a medias del otro equipo: estaba el mecanismo —códigos de error, catálogo, motor y selector—
+y faltaba el trabajo de verdad, extraer los textos de las 25 pantallas restantes. Dejó anotada
+**T4-12**, los correos, que siguen saliendo solo en español. Las siete restantes siguen fuera de
+alcance, listadas para que no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -83,8 +87,8 @@ tras nginx— se levanta con `docker compose up -d --build` y el login funciona 
 *Dos apuntes sobre las cifras. La cobertura del frontend cruzó por fin el objetivo del roadmap
 (**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño. Y el
 denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la
-aplicación en marcha anotados ya cerrados, y a 108 el 2026-08-10 con `T4-11`: **no descontaron ni
-una tarea de la lista de trabajo**, porque ninguno estaba en ella.*
+aplicación en marcha anotados ya cerrados, a 108 el 2026-08-10 con `T4-11` y a 109 el 2026-08-11 con
+`T4-12`: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en ella.*
 
 **Las fichas de la auditoría son pistas, no descripciones verificadas.** Cuatro se comprobaron
 equivocadas al abordarlas: la premisa de `T3-08` era **falsa** (Heroicons ya emitía `aria-hidden`,
@@ -98,9 +102,9 @@ de arreglar, y medir otra vez después.
 
 | Documento | Para qué |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 108 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [ROADMAP.md](ROADMAP.md) | Las 109 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
-| [adr/](adr/) | **Seis decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
+| [adr/](adr/) | **Siete decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
 | [CHANGELOG.md](../CHANGELOG.md) | Registro de cambios de los dos repositorios |
@@ -140,6 +144,31 @@ y si hay algo escuchando, mirar qué devuelve `/health` antes de matarlo:
 Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }
 ```
 
+**Y el 5173 puede tenerlo otro proyecto, no un huérfano de este (2026-08-11).** Es la otra
+cara de lo anterior y despista más, porque el síntoma no dice nada de puertos: nueve pruebas
+en rojo buscando textos que «no existen» —«Correo electrónico», «Productos»—, como si la
+interfaz hubiera cambiado de idioma. Lo que había en el 5173 era el `vite` de **otro
+repositorio del disco**, y `reuseExistingServer: true` no comprueba *qué* responde, solo que
+algo responda. Se ve en un segundo pidiendo la página y mirando el `<title>`:
+
+```powershell
+(Invoke-WebRequest http://localhost:5173 -UseBasicParsing).Content -match "<title>(.*)</title>"
+```
+
+Sin matar el servidor ajeno, la pasada se hace en otro puerto: `E2E_BASE_URL` se lo dice a
+Playwright y Vite se corre solo al siguiente libre. **Y hay que mover con él `FRONTEND_URL`**,
+o el backend rechaza por CORS al recién llegado y el síntoma cambia de sitio sin mejorar: el
+login se queda en la página con «No se pudo conectar con el servidor», que parece la API
+caída. Playwright pasa el entorno del proceso a los servidores que arranca, así que basta
+con exportarlas las dos:
+
+```powershell
+$env:E2E_BASE_URL="http://localhost:5174"; $env:FRONTEND_URL="http://localhost:5174"
+pnpm test:e2e:full
+```
+
+Con eso: **9 pasados, 1 omitido, 0 fallos**, los mismos de siempre.
+
 **El formato multipart no se puede probar por HTTP en la suite del backend.**
 `upload.middleware` está mockeado en `products.test.ts`, así que multer —que es quien
 parsea ese cuerpo— nunca corre y un `.field()` acaba en 422 con `req.body` sin parsear. La
@@ -164,6 +193,15 @@ z.ZodTypeAny>` y un bucle.
 
 **No borrar productos en los tests del backend**: los de otros bloques tienen movimientos
 de stock asociados y la FK lo impide. Basta con limpiar lo propio.
+
+**En un equipo nuevo, la base de tests está vacía y la suite entera falla por eso (2026-08-11).**
+Pasó al retomar el proyecto en la otra máquina: 260 de 402 tests en rojo con
+`no existe el tipo «public.Role»`. No es el código, es que `Stockly_test` nunca se sincronizó
+aquí. La cura es la de siempre —`prisma db push` apuntando a esa base, más `pg_trgm` una vez—,
+y **Prisma 7 pide consentimiento explícito** si detecta que quien lo invoca es un agente: hay que
+pasarle `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` con el texto literal de la autorización.
+Antes de investigar un fallo masivo de la suite, mirar si el mensaje habla del **esquema** y no
+de la lógica.
 
 **La base de tests `Stockly_test` no tiene tabla `_prisma_migrations`.** `migrate deploy`
 contra ella falla con **P3005** («the database schema is not empty»). Se sincroniza con
@@ -387,7 +425,34 @@ incluida la extensión `pg_trgm` de T2-09.
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
 **Por dónde seguir:** no queda trabajo asignado. Los cuatro tiers están cerrados y lo único abierto
-es el **Tier 4** (10 tareas), que la auditoría dejó fuera del alcance inmediato a propósito.
+es el **Tier 4** (7 tareas), que la auditoría dejó fuera del alcance inmediato a propósito. La más
+cercana es **T4-12** —los correos siguen saliendo solo en español—, que no viene de la auditoría
+sino de lo que dejó anotado el cierre de T4-04.
+
+### Los textos de la interfaz
+
+**Ningún texto se escribe en un componente** (T4-04). Todo sale de `Stockly-F/src/shared/i18n/es.ts`,
+que es el catálogo de referencia, y se pinta con `t()` / `tn()` de `useT()`. Dos cosas lo sostienen y
+conviene no deshacerlas:
+
+- **`en.ts` es un `Record` sobre las claves de `es.ts`**, así que una traducción que falte no compila.
+  No hace falta ninguna herramienta de sincronización; es la misma idea que el contrato de T4-01.
+- **`literales.test.ts` recorre `src/`** y falla si aparece una cadena escrita a mano en un nodo JSX,
+  en una prop visible o en un `toast`. Sin CI, esa guardia es lo único que impide que la traducción
+  se erosione pantalla a pantalla — y encontró dos textos que llevaban meses sin traducir.
+
+Tres decisiones que parecen descuidos y no lo son: las **exportaciones** salen siempre en español
+—un CSV es formato de intercambio, y sus columnas están emparejadas con las del backend por el test
+de T3-05—; los **motivos de un movimiento** se guardan en la base, así que el valor es dato y solo se
+traduce la etiqueta; y los **importes** no cambian de formato, porque `es-MX` y `en-US` agrupan igual
+y lo único que cambiaría es el símbolo. Las **fechas** sí siguen al idioma, y para eso está
+`shared/lib/fechas.ts`. El porqué del motor propio, en
+[ADR 0007](adr/0007-i18n-propio.md).
+
+**En el backend, un error que se lance lleva código**: `new HttpError(status, "mensaje", "CODIGO", params)`,
+con el código dado de alta en `CODIGOS_DE_ERROR`. El `message` en español se queda —es lo que ve quien
+llama a la API sin interfaz— pero deja de ser lo que se pinta. Un código nuevo sin traducción rompe la
+suite del frontend en cuanto se regenera el contrato.
 
 *Lo que sigue son las decisiones que costaron una medición y que una sesión nueva podría revertir
 por reflejo, agrupadas por tema. El relato tarea a tarea vive en las filas de
