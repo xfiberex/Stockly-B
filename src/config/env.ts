@@ -134,6 +134,27 @@ export const env = {
     // ensuciar la salida del suite; los que comprueban el log lo suben a mano.
     logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "test" ? "silent" : "info"),
     databaseUrl: process.env.DATABASE_URL!,
+    /**
+     * T4-06 — quién puede raspar `/metrics`.
+     *
+     * Sin token el endpoint queda **cerrado en producción** y abierto fuera de ella. Es al
+     * revés de lo cómodo, y a propósito: lo que expone no son secretos, pero sí el mapa de
+     * rutas, el volumen de tráfico y la versión de Node, que es material de reconocimiento
+     * gratis para quien busca por dónde entrar. Un despliegue que se olvide de configurarlo
+     * se queda sin métricas —se nota y se arregla—; el fallo contrario no se nota nunca.
+     */
+    metricsToken: process.env.METRICS_TOKEN,
+    /** T4-06 — pico de errores 5xx: cuántos, en cuánto tiempo y cada cuánto se repite el aviso. */
+    alerta5xx: {
+        // En `test` va apagada salvo que se pida: cualquier suite que provoque un 500
+        // acabaría mandando correo de verdad, porque el `.env` sí trae credenciales SMTP.
+        habilitada: process.env.ALERTA_5XX_HABILITADA
+            ? process.env.ALERTA_5XX_HABILITADA !== "false"
+            : process.env.NODE_ENV !== "test",
+        umbral: Number.parseInt(process.env.ALERTA_5XX_UMBRAL ?? "", 10) || 5,
+        ventanaMinutos: Number.parseInt(process.env.ALERTA_5XX_VENTANA_MIN ?? "", 10) || 5,
+        enfriamientoMinutos: Number.parseInt(process.env.ALERTA_5XX_ENFRIAMIENTO_MIN ?? "", 10) || 30,
+    },
     cloudinary: {
         // `configured` distingue «no hay credenciales» de «las credenciales fallan».
         configured: groupIsConfigured("cloudinary"),

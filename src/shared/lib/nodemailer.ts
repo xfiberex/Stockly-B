@@ -136,3 +136,67 @@ export async function sendLowStockAlertEmail(
         }),
     });
 }
+
+/**
+ * Aviso de pico de errores 5xx (T4-06).
+ *
+ * A diferencia del resto de correos de este archivo, este **no lo provoca una persona**:
+ * lo dispara el propio servidor al detectar que está fallando. Por eso dice qué mirar y
+ * dónde —las rutas afectadas y un `requestId` con el que recuperar la traza entera— en vez
+ * de mandar a nadie a la interfaz: cuando llega esto, la interfaz es lo que no funciona.
+ */
+export async function sendServerErrorAlertEmail(
+    to: string,
+    adminName: string,
+    resumen: {
+        total: number;
+        ventanaMinutos: number;
+        rutas: Array<{ ruta: string; total: number }>;
+        requestId?: string;
+    },
+) {
+    requireSmtp();
+    const safeAdmin = escapeHtml(adminName);
+
+    const filas = resumen.rutas
+        .slice(0, 5)
+        .map(
+            ({ ruta, total }) => `
+        <tr>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">${escapeHtml(ruta)}</td>
+            <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#b91c1c;border-bottom:1px solid ${BRAND.border};">${total}</td>
+        </tr>`,
+        )
+        .join("");
+
+    const tabla = `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:4px 0 8px;border:1px solid ${BRAND.border};border-radius:8px;">
+        ${filas}
+    </table>`;
+
+    const bodyHtml =
+        emailParagraph(`Hola <strong>${safeAdmin}</strong>,`) +
+        emailParagraph(
+            `El servidor devolvió <strong>${resumen.total} errores 5xx</strong> en los últimos ` +
+                `${resumen.ventanaMinutos} minutos. Estas son las rutas afectadas:`,
+        ) +
+        tabla +
+        (resumen.requestId
+            ? emailNote(
+                `Para investigar, busca en el registro por <strong>${escapeHtml(resumen.requestId)}</strong>: ` +
+                    "es el identificador de una de las peticiones que falló y recupera todas sus líneas.",
+            )
+            : "") +
+        emailNote("No se repetirá este aviso durante el periodo de enfriamiento, aunque los errores continúen.");
+
+    await transporter.sendMail({
+        from: env.smtp.from,
+        to,
+        subject: `🚨 Pico de errores 5xx: ${resumen.total} en ${resumen.ventanaMinutos} min — Stockly`,
+        html: renderEmail({
+            preheader: `${resumen.total} errores 5xx en ${resumen.ventanaMinutos} minutos.`,
+            heading: "Pico de errores del servidor",
+            bodyHtml,
+        }),
+    });
+}

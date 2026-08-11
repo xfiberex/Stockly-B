@@ -1,6 +1,9 @@
 import { Router } from "express";
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/shared/lib/prisma";
 import { logger } from "@/shared/lib/logger";
+import { env } from "@/config/env";
+import { exponer } from "@/shared/lib/metricas";
 import { productRouter } from "@/modules/products";
 import { authRouter } from "@/modules/auth";
 import { categoriesRouter } from "@/modules/categories";
@@ -48,6 +51,47 @@ router.get("/ready", async (req, res) => {
         (req.log ?? logger).warn({ err: error }, "La sonda de disponibilidad no pudo consultar la base de datos");
         res.status(503).json({ success: false, message: "La base de datos no está disponible" });
     }
+});
+
+/**
+ * T4-06 — métricas en formato Prometheus.
+ *
+ * **No lleva `authMiddleware`.** Un raspador no tiene sesión ni cookies: pedirle un JWT
+ * obliga a guardarle credenciales de usuario a un proceso automático, que es peor que lo
+ * que se quiere evitar. El control es un token compartido, que es lo que Prometheus sabe
+ * mandar (`authorization` en la configuración de `scrape_configs`).
+ *
+ * Sin `METRICS_TOKEN` configurado el endpoint **no existe en producción**: responde 404 y
+ * no 401, para no confirmar siquiera que está ahí. Fuera de producción queda abierto,
+ * porque tenerlo a mano es la mitad de su utilidad mientras se desarrolla.
+ */
+router.get("/metrics", async (req, res, next) => {
+    const token = env.metricsToken;
+
+    if (!token) {
+        // `next()` y no un 404 escrito aquí: así la respuesta la compone el mismo
+        // `notFoundHandler` que el resto, con su sobre y su registro, y esta ruta queda
+        // indistinguible de una que no existe.
+        if (env.nodeEnv === "production") return void next();
+    } else {
+        const cabecera = req.get("authorization") ?? "";
+        const presentado = cabecera.startsWith("Bearer ") ? cabecera.slice(7) : "";
+
+        // Comparación en tiempo constante: un `!==` filtra por cuánto tarda en fallar
+        // cuántos caracteres iniciales se acertaron, y con eso el token se adivina a
+        // trozos. `timingSafeEqual` exige longitudes iguales, de ahí la comprobación
+        // previa —que no filtra nada útil, la longitud no es secreta—.
+        const a = Buffer.from(presentado);
+        const b = Buffer.from(token);
+        const valido = a.length === b.length && timingSafeEqual(a, b);
+
+        if (!valido) {
+            return void res.status(401).json({ success: false, message: "Token de métricas inválido", code: "UNAUTHORIZED" });
+        }
+    }
+
+    const { cuerpo, tipo } = await exponer();
+    res.set("content-type", tipo).send(cuerpo);
 });
 
 router.use("/auth", authRouter);

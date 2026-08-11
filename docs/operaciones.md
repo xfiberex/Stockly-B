@@ -1,7 +1,7 @@
-# Operaciones — copia de seguridad, restauración y reversión
+# Operaciones — copia de seguridad, restauración, reversión y alertas
 
-> **T4-05.** Este documento cubre lo que hay que hacer **cuando algo ya ha pasado**: recuperar la
-> base de datos y deshacer un despliegue. El arranque normal está en
+> **T4-05** y **T4-06.** Este documento cubre lo que hay que hacer **cuando algo ya ha pasado**:
+> enterarse (§8), recuperar la base de datos y deshacer un despliegue. El arranque normal está en
 > [README-proyecto.md](README-proyecto.md); la puerta de calidad, en
 > [CONTRIBUTING.md](../CONTRIBUTING.md).
 
@@ -210,6 +210,106 @@ apunta a otro sitio.
   las herramientas en el `PATH`; ahí está la autodetección de `C:\Program Files\PostgreSQL\*\bin`.
 - **`dropdb` se queda esperando** si alguien tiene la base abierta —un Prisma Studio olvidado, el
   `pnpm dev`—, y parece que la restauración se ha colgado. Se usa `--force`.
+
+---
+
+## 8. Monitorización y alertas (T4-06)
+
+Antes de esto, un incidente en producción se detectaba de una sola forma: alguien lo
+contaba. La respuesta tiene **dos capas que no se sustituyen**, y conviene entender por qué
+antes de quitar una.
+
+| | Alerta en proceso | Prometheus + Alertmanager |
+|---|---|---|
+| Dónde vive | Dentro del backend, `src/shared/lib/alertas5xx.ts` | Dos contenedores aparte |
+| Qué detecta | Un pico de 5xx, contando sucesos | 5xx, latencia, bucle de eventos y **el servicio caído** |
+| Cuánto tarda | Inmediato: al 5.º error de la ventana | ~8 min y medio desde el primer error *(medido, ver abajo)* |
+| Qué no puede hacer | Avisar de que el proceso ha muerto — un proceso muerto no manda correos | Nada, si nadie la despliega |
+| Requisitos | Ninguno | Infraestructura que hay que mantener |
+
+### La capa que no depende de nada
+
+El backend cuenta sus propios 5xx en una ventana deslizante. Al cruzar el umbral escribe
+una línea de nivel `error` con el marcador `alerta: "pico_5xx"` —las rutas afectadas y un
+`requestId` con el que recuperar la traza entera (T2-10)— y **avisa por correo a los
+administradores**, por el mismo camino que la alerta de bajo stock.
+
+| Variable | Por defecto | Qué es |
+|---|---|---|
+| `ALERTA_5XX_HABILITADA` | `true` *(en `test`, `false`)* | Apagarla del todo |
+| `ALERTA_5XX_UMBRAL` | `5` | Errores que disparan el aviso |
+| `ALERTA_5XX_VENTANA_MIN` | `5` | Ventana deslizante, en minutos |
+| `ALERTA_5XX_ENFRIAMIENTO_MIN` | `30` | Silencio tras un aviso |
+
+El enfriamiento no es un detalle: una avería real produce cientos de 5xx por minuto y sin
+él el aviso útil queda enterrado bajo sus propias repeticiones. En `test` viene apagada
+porque el `.env` trae credenciales SMTP de verdad y cualquier suite que provoque un 500
+acabaría enviando correo.
+
+### `/metrics`
+
+`GET /api/v1/metrics` expone el formato de Prometheus: `http_requests_total`,
+`http_request_duration_seconds` (histograma), `http_server_errors_total` y las métricas del
+proceso —retraso del bucle de eventos, montón, recolector de basura—, que son las que
+distinguen «la API va lenta» de «la base va lenta».
+
+**Está protegido, y por defecto cerrado en producción.** Con `METRICS_TOKEN` configurado
+exige `Authorization: Bearer`; sin él, en producción responde **404** —no 401: confirmar
+que la ruta existe ya es media pista—. Un despliegue que se olvide del token se queda sin
+métricas, que se nota; el descuido contrario no se notaría nunca.
+
+Las etiquetas usan la **plantilla** de la ruta (`/api/v1/products/:id`), nunca la URL
+pedida. Con la URL, cada identificador crearía una serie temporal nueva y cualquiera desde
+fuera podría hacer crecer la memoria del proceso pidiendo URLs inventadas.
+
+### La capa que mira desde fuera
+
+```bash
+# 1. Preparar lo que no se versiona (ni Prometheus ni Alertmanager expanden ${VARIABLES})
+cp observabilidad/alertmanager.example.yml observabilidad/alertmanager.yml   # y rellenar los CAMBIAR_*
+mkdir -p observabilidad/secretos
+printf %s "$METRICS_TOKEN" > observabilidad/secretos/metrics-token
+printf %s "$SMTP_PASS"     > observabilidad/secretos/smtp-password
+
+# 2. Levantar
+docker compose -f docker-compose.yml -f docker-compose.observabilidad.yml up -d
+```
+
+Prometheus queda en `127.0.0.1:9090` y Alertmanager en `127.0.0.1:9093`, **solo en el bucle
+local**: la interfaz de Prometheus no tiene autenticación y enseña el tráfico entero del
+servicio. Para verla desde fuera, un túnel SSH.
+
+Las cinco reglas están en [`observabilidad/alertas.yml`](../observabilidad/alertas.yml):
+servicio caído, proporción de 5xx por encima del 5 %, sonda de base de datos en 503, p95 de
+latencia por encima de 1 s y bucle de eventos atascado.
+
+### Las reglas están probadas, no solo escritas
+
+Una regla de alerta es código que **solo se ejecuta el día del incidente**: un `job=` mal
+escrito o un umbral con el signo cambiado no se descubre hasta que hace falta, y ese día lo
+que se nota es el silencio, indistinguible de que todo va bien.
+
+```bash
+docker run --rm --entrypoint promtool -v "$PWD/observabilidad:/o" \
+  prom/prometheus:v3.1.0 test rules /o/pruebas-alertas.yml     # → SUCCESS
+```
+
+[`pruebas-alertas.yml`](../observabilidad/pruebas-alertas.yml) reproduce series sintéticas y
+comprueba las dos mitades: que la alerta **dispara** con un 20 % de errores y que **no**
+dispara con tráfico sano. De ahí sale un dato que a ojo no se ve: entre el primer 5xx y la
+alerta pasan ~8 min y medio, y el `for: 2m` solo explica dos de ellos — el resto lo pone la
+ventana de `rate(...[5m])`, que arrastra los minutos sanos anteriores. **Ese hueco es
+exactamente lo que cubre la alerta en proceso.**
+
+### Agregación de logs
+
+No hay agregador desplegado, y no hace falta añadir nada al código para ponerlo: desde
+T2-10 los logs de producción ya salen en **JSON por línea** con nivel, `requestId` y
+credenciales censuradas, que es lo que cualquier recolector espera. Basta apuntar el que se
+use (Loki, Vector, el agente del proveedor) a la salida estándar del contenedor. El campo
+sobre el que alertar sin depender de Prometheus es `alerta: "pico_5xx"`.
+
+---
 
 > ⚠️ **Discrepancia de versión abierta.** El servidor de desarrollo de este equipo es **PostgreSQL
 > 17.10** y el `docker-compose.yml` levanta **`postgres:16-alpine`**. Un volcado tomado de 17 **no

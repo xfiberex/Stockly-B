@@ -115,6 +115,11 @@ cp .env.example .env
 | `SMTP_USER` | Usuario SMTP | Solo con correos |
 | `SMTP_PASS` | Contraseña SMTP | Solo con correos |
 | `SMTP_FROM` | Dirección de envío | Solo con correos |
+| `METRICS_TOKEN` | Token de `GET /api/v1/metrics`. **Sin él, en producción el endpoint responde 404** | Solo con métricas |
+| `ALERTA_5XX_HABILITADA` | Alerta por pico de 5xx (default `true`; en `test`, `false`) | No |
+| `ALERTA_5XX_UMBRAL` | Errores que disparan el aviso (default `5`) | No |
+| `ALERTA_5XX_VENTANA_MIN` | Ventana deslizante en minutos (default `5`) | No |
+| `ALERTA_5XX_ENFRIAMIENTO_MIN` | Silencio tras un aviso, en minutos (default `30`) | No |
 
 > **Cuatro variables bastan para arrancar.** Sin las credenciales de Cloudinary, la subida
 > de imágenes responde **503** con un mensaje que dice qué falta; sin las de SMTP, ocurre
@@ -303,6 +308,14 @@ Todas las rutas cuelgan del prefijo **`/api/v1`**. La documentación interactiva
 |---|---|---|
 | `GET` | `/` | KPIs, stock por categoría, top productos, movimientos por mes, bajo stock, **métricas de rotación** |
 | `GET` | `/?format=pdf` | Descargar reporte completo en PDF |
+
+### Operación — sin prefijo de módulo
+
+| Método | Ruta | Descripción | Auth |
+|---|---|---|---|
+| `GET` | `/health` | Vivacidad: responde 200 mientras el proceso viva, aunque la base esté caída | No |
+| `GET` | `/ready` | Disponibilidad: `SELECT 1` contra la base; **503** si falla (T2-25) | No |
+| `GET` | `/metrics` | Métricas en formato Prometheus (T4-06). Ver [operaciones.md §8](docs/operaciones.md) | `METRICS_TOKEN` |
 
 ---
 

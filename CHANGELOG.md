@@ -19,6 +19,15 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Monitorización y alertas** (`T4-06`). `GET /api/v1/metrics` expone métricas en formato
+  Prometheus —peticiones, duración, 5xx y las del proceso—, protegido por `METRICS_TOKEN` y
+  **cerrado en producción si no se configura**. Además, el backend detecta por su cuenta un
+  pico de errores 5xx y avisa por correo sin depender de nada externo: es lo que hace que
+  el sistema deje de estar mudo aunque no se despliegue Prometheus. Para cuando se
+  despliegue, `observabilidad/` trae el overlay de compose, cinco reglas de alerta y sus
+  **pruebas unitarias** (`promtool test rules`). Detalle en
+  [`docs/operaciones.md §8`](docs/operaciones.md).
+
 - **Copia de seguridad, restauración y política de reversión** (`T4-05`). `pnpm db:backup`
   vuelca la base en formato `custom`, **verifica el archivo antes de podar** y aplica una
   retención de 14 días que nunca deja menos de tres copias; `pnpm db:restaurar` restaura y

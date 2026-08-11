@@ -1,0 +1,48 @@
+# Prometheus para Stockly (T4-06).
+#
+# Se levanta con el overlay de observabilidad, no con la pila normal:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.observabilidad.yml up -d
+#
+# El intervalo de raspado no es lo que manda en el retardo, y conviene no confundirse:
+# medido con `promtool test rules` (ver `pruebas-alertas.yml`), entre el primer 5xx y la
+# alerta disparada pasan **~8 min y medio**, y de ellos el `for: 2m` solo explica dos. El
+# resto lo pone la ventana de `rate(...[5m])`, que arrastra los minutos sanos anteriores.
+# Bajar el raspado a 5 s no cambiaría eso; lo que cubre esos primeros minutos es la alerta
+# en proceso del backend (`src/shared/lib/alertas5xx.ts`), que cuenta sucesos y no tasas.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    entorno: produccion
+
+rule_files:
+  - /etc/prometheus/alertas.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: stockly-backend
+    metrics_path: /api/v1/metrics
+    # El token que protege el endpoint, **leído de un archivo**.
+    #
+    # Aquí no valen `${METRICS_TOKEN}` ni nada parecido: Prometheus **no expande variables
+    # de entorno** en su configuración, y lo que se escribe entre llaves se manda tal cual
+    # como token. El fallo se manifiesta como un objetivo caído con 401, sin ninguna pista
+    # de que la culpa es del `${…}`. Por eso el archivo va sin secretos y se versiona; el
+    # token vive fuera, en un directorio ignorado por git.
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secretos/metrics-token
+    static_configs:
+      - targets: ["backend:3000"]
+
+  # Prometheus se raspa a sí mismo. Sin esto, que el propio Prometheus esté enfermo
+  # —sin memoria, sin disco— no lo ve nadie, y con él se van todas las demás alertas.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

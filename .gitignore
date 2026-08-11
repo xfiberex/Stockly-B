@@ -13,6 +13,12 @@ dist/
 !.env.example
 *.local
 
+# Observabilidad (T4-06). Ni Prometheus ni Alertmanager expanden variables de entorno en
+# su configuración, así que el token de métricas y la contraseña SMTP van en archivos y
+# `alertmanager.yml` lleva los valores escritos. Lo versionado es la plantilla `.example`.
+observabilidad/secretos/
+observabilidad/alertmanager.yml
+
 # Copias de seguridad (T4-05). Un volcado es la base entera: datos de clientes y los
 # hashes de contraseña de `users`. Versionarlo publica en el historial lo mismo que el
 # `.env`, y con la misma dificultad para retirarlo después (T0-06).

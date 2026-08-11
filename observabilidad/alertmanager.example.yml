@@ -1,0 +1,51 @@
+# Alertmanager (T4-06) — a quién se avisa y cada cuánto.
+#
+# **Esta es la plantilla; el archivo que se monta es `alertmanager.yml`, sin `.example`, y
+# está ignorado por git.** Igual que con el `.env`:
+#
+#   cp observabilidad/alertmanager.example.yml observabilidad/alertmanager.yml
+#   # y rellenar los CAMBIAR_*
+#
+# El motivo de la copia es que Alertmanager **no expande variables de entorno** en su
+# configuración —Prometheus tampoco—, así que los valores van escritos. Lo único
+# verdaderamente secreto, la contraseña SMTP, se lee de un archivo aparte y no se escribe
+# aquí; el resto son datos de despliegue, no credenciales.
+
+global:
+  smtp_smarthost: "CAMBIAR_SMTP_HOST:587"
+  smtp_from: "Stockly <noreply@stockly.app>"
+  smtp_auth_username: "CAMBIAR_SMTP_USER"
+  smtp_auth_password_file: /etc/alertmanager/secretos/smtp-password
+  smtp_require_tls: true
+
+route:
+  receiver: correo-administracion
+  # Agrupar por nombre de alerta: una caída dispara varias reglas a la vez y sin esto
+  # llegan cuatro correos del mismo incidente.
+  group_by: [alertname]
+  # Margen para que las alertas relacionadas entren en el mismo correo.
+  group_wait: 30s
+  group_interval: 5m
+  # Cada cuánto se repite una alerta que sigue activa. Cuatro horas es el punto en que
+  # todavía recuerda que el problema existe sin convertirse en ruido de fondo.
+  repeat_interval: 4h
+
+  routes:
+    # Lo que solo es un aviso no repite tan a menudo: no justifica interrumpir a nadie.
+    - matchers: [gravedad="aviso"]
+      receiver: correo-administracion
+      repeat_interval: 24h
+
+receivers:
+  - name: correo-administracion
+    email_configs:
+      - to: "CAMBIAR_correo_de_quien_recibe_las_alertas@example.com"
+        headers:
+          subject: '🚨 [{{ .Status | toUpper }}] {{ .CommonAnnotations.resumen }}'
+
+inhibit_rules:
+  # Si el servicio está caído, la latencia y el 5xx son consecuencia, no información: se
+  # callan para que el correo diga una sola cosa, que es la que hay que arreglar.
+  - source_matchers: [alertname="StocklyCaido"]
+    target_matchers: [gravedad="aviso"]
+    equal: [entorno]

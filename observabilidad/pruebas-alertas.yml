@@ -1,0 +1,83 @@
+# Pruebas unitarias de las reglas de alerta (T4-06).
+#
+#   docker run --rm --entrypoint promtool -v "$PWD/observabilidad:/o" \
+#     prom/prometheus:v3.1.0 test rules /o/pruebas-alertas.yml
+#
+# **Una regla de alerta es código que solo se ejecuta el día del incidente.** Sin esto, un
+# `job=` mal escrito o un umbral con el signo cambiado no se descubre hasta que hace falta
+# —y ese día lo que se nota es el silencio, que es indistinguible de que todo va bien—.
+# `promtool` reproduce series temporales sintéticas y comprueba qué dispara y cuándo.
+
+rule_files:
+  - alertas.yml
+
+evaluation_interval: 15s
+
+tests:
+  # El criterio de aceptación de la tarea, en la capa que mira desde fuera.
+  - interval: 15s
+    name: Un pico de 5xx dispara la alerta; el tráfico sano, no
+    input_series:
+      # 10 peticiones cada 15 s durante 20 min.
+      - series: 'http_requests_total{job="stockly-backend"}'
+        values: "0+10x80"
+      # Los 5xx empiezan en el minuto 5: nada hasta la muestra 20, y a partir de ahí
+      # 2 de cada 10 peticiones fallan (20 %, muy por encima del 5 % del umbral).
+      - series: 'http_server_errors_total{job="stockly-backend"}'
+        values: "0+0x20 0+2x60"
+      - series: 'up{job="stockly-backend"}'
+        values: "1x80"
+    alert_rule_test:
+      # Minuto 4: todo sano. Que la alerta **no** salte aquí es la mitad de la prueba —una
+      # regla que dispara siempre también «detecta» todos los incidentes—.
+      - eval_time: 4m
+        alertname: Stockly5xxElevado
+        exp_alerts: []
+
+      # Minuto 6: ya hay errores, pero la proporción aún no ha cruzado el 5 %. La ventana
+      # de `rate[5m]` todavía arrastra los cuatro minutos sanos: medida aquí, la proporción
+      # es del 4 %.
+      - eval_time: 6m
+        alertname: Stockly5xxElevado
+        exp_alerts: []
+
+      # Minuto 8: **tampoco**, y esto es lo que la prueba enseña y a ojo no se ve. La
+      # proporción cruzó el umbral hacia el minuto 6:20 y el `for: 2m` la deja en «pending»
+      # hasta el 8:20. Entre el primer error y el correo pasan ~8 min y medio con este
+      # ritmo de tráfico: el retardo no lo pone el `for`, lo pone la ventana del `rate`.
+      # Es exactamente el hueco que cubre la alerta en proceso de `alertas5xx.ts`.
+      - eval_time: 8m
+        alertname: Stockly5xxElevado
+        exp_alerts: []
+
+      # Minuto 10: la ventana ya es casi toda de errores —19 %— y la alerta está disparada.
+      - eval_time: 10m
+        alertname: Stockly5xxElevado
+        exp_alerts:
+          - exp_labels:
+              gravedad: critica
+            exp_annotations:
+              resumen: "Más del 5 % de las peticiones falla con 5xx"
+              detalle: >-
+                Proporción actual: 19%. Buscar en el registro por `alerta:"pico_5xx"`, que trae las rutas afectadas y un requestId.
+
+  # Lo que la alerta en proceso no puede hacer: un servicio muerto no manda correos.
+  - interval: 15s
+    name: El backend caído dispara StocklyCaido
+    input_series:
+      - series: 'up{job="stockly-backend"}'
+        values: "1x8 0x20"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: StocklyCaido
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: StocklyCaido
+        exp_alerts:
+          - exp_labels:
+              gravedad: critica
+              job: stockly-backend
+            exp_annotations:
+              resumen: "El backend de Stockly no responde al raspado"
+              detalle: >-
+                Prometheus lleva 1 minuto sin poder leer /api/v1/metrics. Comprobar `docker compose ps` y `GET /api/v1/ready`, que es la sonda que consulta la base.

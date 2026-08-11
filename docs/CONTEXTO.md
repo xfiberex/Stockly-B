@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **402/402** | **493/493** *(+1 omitido)* |
-| Cobertura (sentencias) | 91.96 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
+| Tests | **414/414** | **494/494** *(+1 omitido)* |
+| Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-11): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 6/13** · Total **103/110**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 7/13** · Total **104/110**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -78,8 +78,13 @@ y faltaba el trabajo de verdad, extraer los textos de las 25 pantallas restantes
 hay copia de seguridad (`pnpm db:backup`) y una restauración **ejecutada y medida**, no solo
 descrita — el procedimiento entero está en [operaciones.md](operaciones.md). También dejó anotada
 **T4-13**: el servidor de desarrollo de este equipo es PostgreSQL **17.10** y el compose levanta
-**`postgres:16-alpine`**, y un volcado de 17 no se restaura en un 16. Las siete restantes siguen
-fuera de alcance, listadas para que no hacerlas sea una decisión consciente.
+**`postgres:16-alpine`**, y un volcado de 17 no se restaura en un 16.
+
+Y detrás de esa, **T4-06**, porque de nada sirve saber restaurar si nadie se entera de que hay que
+hacerlo: el sistema ya no está mudo. Hay `/metrics`, una alerta por pico de 5xx que **no depende de
+nada externo** y reglas de Prometheus **probadas con `promtool`**, no solo escritas (§8 de
+[operaciones.md](operaciones.md)). Las seis restantes siguen fuera de alcance, listadas para que no
+hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -108,7 +113,7 @@ de arreglar, y medir otra vez después.
 | Documento | Para qué |
 |---|---|
 | [ROADMAP.md](ROADMAP.md) | Las 110 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
-| [operaciones.md](operaciones.md) | Copia de seguridad, restauración y reversión. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
+| [operaciones.md](operaciones.md) | Copia de seguridad, restauración, reversión y **alertas**. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
 | [adr/](adr/) | **Siete decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |

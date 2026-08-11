@@ -9,6 +9,7 @@ import { logger, generarRequestId } from "@/shared/lib/logger";
 import { router } from "@/routes";
 import { errorHandler } from "@/shared/middlewares/error.middleware";
 import { csrfProtection } from "@/shared/middlewares/csrf.middleware";
+import { metricas } from "@/shared/middlewares/metricas.middleware";
 import { notFoundHandler } from "@/shared/middlewares/notFound.middleware";
 import { registerSwagger } from "@/swagger";
 
@@ -42,6 +43,13 @@ app.use(pinoHttp({
     customSuccessMessage: (req, res) => `${req.method} ${rutaPedida(req)} → ${res.statusCode}`,
     customErrorMessage: (req, res, err) => `${req.method} ${rutaPedida(req)} → ${res.statusCode}: ${err.message}`,
 }));
+
+// Métricas y detección de picos de 5xx (T4-06). Va justo detrás del log y **antes** del
+// rate limit por el mismo motivo que aquel: un 429 o un 403 de CSRF son peticiones
+// atendidas y tienen que contarse. Instrumentar después del router —el sitio donde
+// intuitivamente se pone— no mediría nada: las peticiones responden dentro de él y nunca
+// llegan a lo que hay detrás.
+app.use(metricas);
 
 // T2-33 — el cuerpo grande solo donde se justifica.
 //

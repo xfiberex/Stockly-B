@@ -1,0 +1,63 @@
+# Stockly — capa de observabilidad (T4-06).
+#
+# Overlay, como `docker-compose.prod.yml`, y no un servicio más del compose de siempre:
+# esto sirve para producción y estorba en desarrollo, donde levantar dos procesos más para
+# ver una gráfica no compensa.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.observabilidad.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#                  -f docker-compose.observabilidad.yml up -d      # en producción
+#
+# Antes de levantarlo, dos preparativos (el detalle, en `docs/operaciones.md` §8):
+#
+#   cp observabilidad/alertmanager.example.yml observabilidad/alertmanager.yml   # y rellenar
+#   mkdir -p observabilidad/secretos
+#   printf %s "$METRICS_TOKEN" > observabilidad/secretos/metrics-token
+#   printf %s "$SMTP_PASS"     > observabilidad/secretos/smtp-password
+#
+# `observabilidad/secretos/` y `alertmanager.yml` están en el `.gitignore`. Ni Prometheus
+# ni Alertmanager expanden variables de entorno en sus archivos de configuración, así que
+# esto no se puede resolver con `${VAR}`: lo que se escriba entre llaves viaja tal cual.
+# Sin el token, el raspado devuelve 404 y Prometheus marca el objetivo como caído —que es
+# lo correcto—, pero conviene saberlo antes de perseguir el fallo.
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: stockly_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # 30 días: suficiente para investigar un incidente y comparar con «la semana pasada»,
+      # que es lo que se pregunta de verdad.
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./observabilidad/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observabilidad/alertas.yml:/etc/prometheus/alertas.yml:ro
+      - ./observabilidad/secretos:/etc/prometheus/secretos:ro
+      - prometheus_data:/prometheus
+    ports:
+      # Solo en el bucle local: la interfaz de Prometheus no tiene autenticación y enseña
+      # todo el tráfico del servicio. Para verla desde fuera, un túnel SSH.
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    container_name: stockly_alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./observabilidad/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./observabilidad/secretos:/etc/alertmanager/secretos:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+
+volumes:
+  prometheus_data:
+  alertmanager_data:

@@ -5,7 +5,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-11 — **103 / 110**
+> ## Estado al 2026-08-11 — **104 / 110**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordaron
@@ -13,10 +13,11 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > causa raíz común de T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37
 > ya habían hecho el trabajo caro; la cuarta —que no viene de la auditoría— porque el cierre de
 > T4-03 dejó anotado que faltaba el conmutador manual; la quinta porque el contrato de T4-01 ya
-> permitía que los errores viajaran con código, y la sexta porque el valor del sistema es un
-> histórico de inventario del que no había ninguna copia. Las 7 restantes siguen fuera de alcance.
+> permitía que los errores viajaran con código; la sexta porque el valor del sistema es un
+> histórico de inventario del que no había ninguna copia, y **T4-06** porque de nada sirve saber
+> restaurar si nadie se entera de que hay que hacerlo. Las 6 restantes siguen fuera de alcance.
 >
-> Backend **402/402** tests y 91.96 % de sentencias; frontend **493/493** y 53.14 %; E2E 9 pasados
+> Backend **414/414** tests y 91.83 % de sentencias; frontend **494/494** y 53.14 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -1427,13 +1428,22 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Destapó una discrepancia de versión que no se puede arreglar desde aquí:** el servidor de desarrollo es PostgreSQL **17.10** y el compose levanta **`postgres:16-alpine`**. Un volcado de 17 no se restaura en un 16. → **T4-13**.
   - **`backups/` y `*.dump` van al `.gitignore`.** Un volcado es la base entera, incluidos los hashes de `users`: versionarlo publica en el historial lo mismo que el `.env`, y con la misma dificultad para retirarlo después (T0-06).
 
-- [ ] **[T4-06] Monitorización y alertas**
+- [x] **[T4-06] Monitorización y alertas** ✅ *(2026-08-11)*
   - **Área:** DevOps
-  - **Ubicación:** transversal
+  - **Ubicación:** `src/shared/lib/metricas.ts`, `src/shared/lib/alertas5xx.ts`, `src/shared/middlewares/metricas.middleware.ts`, `observabilidad/`, [`docs/operaciones.md §8`](operaciones.md#8-monitorización-y-alertas-t4-06)
   - **Qué hacer:** No hay recogida de métricas, agregación de logs ni alertas: un incidente en producción se detectaría por el reporte de un usuario. Añadir un endpoint `/metrics` y un agregador de logs cuando el proyecto entre en producción real.
   - **Criterio de aceptación:** un pico de errores 5xx genera una alerta antes de que lo reporte un usuario.
   - **Esfuerzo:** medio
   - **Depende de:** T2-10, T2-25
+  - **Dos capas, y ninguna sobra.** La ficha pedía «un endpoint `/metrics` y un agregador de logs», que es la respuesta estándar y **no cumple el criterio por sí sola**: exige desplegar Prometheus para que el sistema deje de estar mudo. Así que hay también una alerta **dentro del proceso** —ventana deslizante de 5xx, umbral, enfriamiento— que avisa por correo sin depender de nada externo. Lo que esa no puede hacer es avisar de que el proceso ha muerto: un proceso muerto no manda correos. Eso lo cubre `up == 0` en Prometheus. Las dos, o queda un hueco.
+  - **Las reglas de alerta están probadas, no solo escritas.** Una regla es código que solo se ejecuta el día del incidente, y ese día el fallo se manifiesta como silencio, que es indistinguible de que todo va bien. `observabilidad/pruebas-alertas.yml` las ejecuta con `promtool test rules` sobre series sintéticas y comprueba las dos mitades: que dispara con un 20 % de errores y **que no dispara con tráfico sano**. `promtool check config` y `amtool check-config` validan los dos archivos.
+  - **De ahí salió el dato que justifica la capa doble:** entre el primer 5xx y la alerta de Prometheus pasan **~8 min y medio**, y el `for: 2m` solo explica dos —el resto lo pone la ventana de `rate(...[5m])`, que arrastra los minutos sanos anteriores—. A ojo se habría dado por bueno «2 minutos». La alerta en proceso cubre justo ese hueco porque cuenta sucesos, no tasas.
+  - **La cardinalidad es el fallo que convierte una métrica en una fuga de memoria.** Con la URL pedida en la etiqueta, cada `GET /products/<cuid>` crea una serie temporal nueva y **cualquiera desde fuera** puede hacer crecer la memoria del proceso pidiendo URLs inventadas —los escáneres piden `/wp-login.php` todo el día—. Se etiqueta con la plantilla (`/api/v1/products/:id`) y lo que no casa con ninguna ruta va a una etiqueta fija. Hay test de las dos cosas.
+  - **Defecto encontrado con un test en rojo:** `req.baseUrl + req.route.path` —lo que se escribe primero— da `/:id` en Express 5, que restaura `baseUrl` al desapilar el router; con un 5xx es peor, porque responde `errorHandler`, que vive fuera. Los doce módulos habrían caído en la misma serie. La plantilla se reconstruye desde `originalUrl`, que no depende de cuándo se lea.
+  - **Segundo defecto, este del despliegue:** ni Prometheus ni Alertmanager **expanden variables de entorno** en su configuración. El `${METRICS_TOKEN}` que escribí primero viajaba tal cual como token y el síntoma era un objetivo caído con 401, sin ninguna pista del porqué. Se resuelve con `credentials_file`/`smtp_auth_password_file` y una plantilla `.example` para lo que no es secreto pero sí propio de cada despliegue.
+  - **`/metrics` va cerrado por defecto en producción:** sin `METRICS_TOKEN` responde **404**, no 401 —confirmar que la ruta existe ya es media pista—. Lo que expone no son secretos, pero sí el mapa de rutas y el volumen de tráfico. El despliegue que olvide el token se queda sin métricas, y eso se nota; el descuido contrario no se notaría nunca.
+  - **El agregador de logs no necesitó código.** Desde T2-10 la salida ya es JSON por línea con nivel, `requestId` y credenciales censuradas: basta apuntar el recolector a la salida estándar. El campo `alerta: "pico_5xx"` permite alertar desde ahí sin Prometheus, que es la tercera vía por si las otras dos fallan.
+  - **`prom-client` sí se gana el sitio**, al revés que `i18next` (ADR 0007) o `zod-to-openapi` (T4-02). No por los contadores —eso es un `Map`— sino por `collectDefaultMetrics`: el retraso del bucle de eventos es la métrica que distingue «la API va lenta» de «la base va lenta», y no se escribe a mano.
 
 - [ ] **[T4-07] Auditoría de dependencias y licencias**
   - **Área:** Seguridad
@@ -1577,7 +1587,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | V-03 Sin healthcheck de aplicación | Medio | T2-25 |
 | V-04 Credenciales por defecto en compose | Medio | T2-27 |
 | V-05 Frontend sin despliegue | Medio | T2-28 |
-| V-06 Sin backup ni monitorización | Bajo | T4-05 ✅ *(backup y restauración)*, T4-06 |
+| V-06 Sin backup ni monitorización | Bajo | T4-05 ✅, T4-06 ✅ |
 | SEO — sin `robots.txt` | Bajo | T3-12 |
 | Zonas no cubiertas — SCA y licencias | — | T4-07 |
 | Zonas no cubiertas — pruebas de carga | — | T4-08 |
@@ -1607,6 +1617,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-11 | **T4-06** Monitorización y alertas — **completada** | **El criterio, ejecutado por HTTP contra la aplicación entera:** provocados 5xx reales hasta cruzar el umbral, sale el aviso por correo con las rutas y un `requestId`, y no sale por debajo del umbral ni durante el enfriamiento. Las reglas de Prometheus pasan `promtool test rules` ✅ —disparan con un 20 % de errores y **no** con tráfico sano—, y los dos archivos de configuración, `promtool check config` y `amtool check-config` ✅. `verify` ✅ **414/414**, cobertura 91.83 % | **Dos capas, y ninguna sobra:** la alerta en proceso avisa sin desplegar nada, pero no puede avisar de que el proceso ha muerto —un proceso muerto no manda correos—; eso es `up == 0` en Prometheus. **La prueba de las reglas destapó el número que justifica esa duplicidad:** de la primera 5xx a la alerta de Prometheus pasan **~8 min y medio**, y el `for: 2m` solo explica dos; el resto lo pone la ventana del `rate[5m]`. A ojo se habría dado por bueno «dos minutos». **Dos defectos propios encontrados midiendo:** `req.baseUrl + req.route.path` da `/:id` en Express 5 —restaura `baseUrl` al desapilar el router, y con un 5xx responde `errorHandler`, que vive fuera—, así que los doce módulos habrían caído en una sola serie; y ni Prometheus ni Alertmanager **expanden `${VARIABLES}`** en su configuración, cosa que se manifiesta como un objetivo caído con 401 y ninguna pista. **La cardinalidad se trata como lo que es**, un agujero de memoria explotable desde fuera: se etiqueta con la plantilla de ruta y lo no casado va a una etiqueta fija. `/metrics` responde **404** en producción sin token. El agregador de logs no necesitó código: T2-10 ya dejó JSON por línea con `requestId`. |
 | 2026-08-11 | **T4-05** Backup, restauración y reversión — **completada** | **Restauración ejecutada, no descrita** ([registro](operaciones.md#5-ensayo-de-restauración--registro)): 31 MB → volcado de 76.7 KB en 0.2 s, restaurado en 0.3 s. Siete tablas de negocio, 12 migraciones y un `md5` de las 52 filas de inventario **idénticos**; `pg_dump --schema-only` comparado línea a línea sin diferencias reales; `prisma migrate status` «up to date»; y la aplicación arrancada contra la copia responde **200** en `/api/v1/ready`, que sondea la base | **Dos guiones, porque un procedimiento que se copia y pega a mano no se ejecuta**: `pnpm db:backup` y `pnpm db:restaurar`, en Node y no en `.sh` —el proyecto se trabaja desde Windows y la copia debe programarse igual en el Programador de tareas que en `cron`—. **El ensayo por defecto no es el comando del desastre:** restaura en `Stockly_restauracion` y apuntar a la base real exige `--forzar`. **Cuatro trampas silenciosas encontradas montándolo:** el `DATABASE_URL` del `.env` **no le vale a `pg_dump`** (la `@` sin codificar hace que libpq busque un socket `@localhost`, con un error que no la menciona); **`pg_restore` sale con código 0 aunque falle** salvo `--exit-on-error`; un cliente más nuevo que el servidor vuelca sin protestar y rompe al restaurar; `dropdb` se cuelga con un Prisma Studio abierto. **La retención lleva guardia contra sí misma** —mínimo 3 copias y podar solo tras verificar el volcado—, porque una poda por antigüedad a secas borra la última copia buena el día en que es lo único que queda. **Destapó que el servidor de desarrollo es 17.10 y el compose levanta `postgres:16-alpine`**: un volcado de 17 no entra en un 16 → **T4-13**. |
 | 2026-08-10 | **T4-11** Selector de tema en Configuración — **completada** | Sobre el build de producción, con CPU a 1/20 y red «Slow 3G»: con preferencia «claro» y sistema en oscuro, el **primer `requestAnimationFrame`** ya pinta `rgb(248, 250, 252)` **con React sin montar**. Falsificado quitando el script del `dist/index.html`: el mismo frame pasa a `rgb(11, 18, 32)`. `verify` ✅ **471/471**, E2E ✅ | **El conmutador obligó a rehacer la capa de tokens, a mejor:** una media query no se anula desde la aplicación, y duplicar la paleta bajo `[data-tema]` dejaba cada color en tres sitios. Cada token pasa a `light-dark(claro, oscuro)`, el bloque de 40 líneas de T4-03 **desaparece** y el conmutador entero son tres reglas de `color-scheme`. **Deja obsoleto el apaño de las sombras** de T4-03: con el par dentro del token, el literal que Tailwind incrusta ya lleva los dos valores. **Defecto encontrado midiendo:** `ring-offset-2` rellena el hueco con `#fff` de fábrica, así que el anillo de foco dibujaba un halo blanco en oscuro —`rgb(255,255,255)` medido, `rgb(21,29,44)` tras el arreglo—. La preferencia va en `localStorage` y no en `/settings`, que es global a todos los usuarios. Nueve mutaciones, nueve guardias caídas. |
 | 2026-08-04 | **T0-01** Alias `@/` en el build | `pnpm build && node dist/server.js` arranca y conecta con la BD | `tsc-alias@1.9.1` como devDependency; `build` pasa a `tsc && tsc-alias`. Se añadió también un `prebuild` que limpia `dist/` sin dependencias nuevas — **absorbe T3-07**. |
@@ -1717,7 +1728,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 *El denominador creció cuatro veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y una el 2026-08-11 (T4-12)—, así que el 94 % de arriba es sobre 109, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, y **T4-05**, la copia de seguridad. Las 7 restantes siguen fuera de alcance, y dos de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04, y **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05.*
+***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, **T4-05**, la copia de seguridad, y **T4-06**, monitorización y alertas. Las 6 restantes siguen fuera de alcance, y dos de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04, y **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1725,9 +1736,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-11) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **402/402** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.96 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **493/493** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests backend | 198/198 ✅ | **414/414** ✅ | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **494/494** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
@@ -1740,6 +1751,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
+| Tiempo hasta enterarse de un pico de 5xx | *nunca: lo reportaba un usuario* | **inmediato** ✅ *(alerta en proceso al 5.º error; ~8 min y medio la de Prometheus, medido con `promtool`, T4-06)* | antes que el usuario |
+| Métricas expuestas por el servicio | 0 | **3 propias + las del proceso** ✅ *(peticiones, duración, 5xx, bucle de eventos, montón, GC)* | que un incidente se pueda reconstruir |
+| Reglas de alerta probadas | 0 *(no había reglas)* | **5 escritas, 2 con prueba unitaria** ✅ *(`promtool test rules`)* | que ninguna regla llegue sin ejecutarse antes |
 | Copias de seguridad de la base | 0 *(ni procedimiento ni archivo)* | **`pnpm db:backup`, retención de 14 días y mínimo 3 copias** ✅ *(T4-05)* | una copia diaria automática |
 | Restauraciones probadas | 0 *(nunca se había intentado)* | **1** ✅ *(2026-08-11: 31 MB restaurados en 0.3 s, `/ready` 200 contra la copia)* | una al mes, con su fila en el registro |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |

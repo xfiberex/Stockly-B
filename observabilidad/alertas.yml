@@ -1,0 +1,86 @@
+# Reglas de alerta (T4-06).
+#
+# Cada regla contesta a «¿qué le pasa al usuario ahora mismo?», no a «¿qué valor tiene
+# esta métrica?». Un umbral sobre algo que el usuario no nota produce avisos que se
+# aprenden a ignorar, y una alerta ignorada es peor que no tenerla: ocupa el sitio.
+#
+# `for:` es lo que separa una alerta de un pitido. Sin él, un pico de dos segundos
+# despierta a alguien.
+
+groups:
+  - name: stockly-disponibilidad
+    rules:
+      # La razón de ser de esta pila. La alerta en proceso de `alertas5xx.ts` no puede
+      # avisar de esto: un proceso muerto no manda correos.
+      - alert: StocklyCaido
+        expr: up{job="stockly-backend"} == 0
+        for: 1m
+        labels:
+          gravedad: critica
+        annotations:
+          resumen: "El backend de Stockly no responde al raspado"
+          detalle: >-
+            Prometheus lleva 1 minuto sin poder leer /api/v1/metrics. Comprobar
+            `docker compose ps` y `GET /api/v1/ready`, que es la sonda que consulta la base.
+
+      # Se mide en **proporción**, no en cuenta absoluta: cinco errores sobre cinco
+      # peticiones es una avería y cinco sobre cincuenta mil es ruido, y un umbral fijo
+      # confunde las dos. El `> 0` del denominador evita dividir por cero de madrugada,
+      # cuando no hay tráfico y la división daría NaN.
+      - alert: Stockly5xxElevado
+        expr: >-
+          sum(rate(http_server_errors_total{job="stockly-backend"}[5m]))
+            /
+          sum(rate(http_requests_total{job="stockly-backend"}[5m])) > 0.05
+        for: 2m
+        labels:
+          gravedad: critica
+        annotations:
+          resumen: "Más del 5 % de las peticiones falla con 5xx"
+          detalle: >-
+            Proporción actual: {{ $value | humanizePercentage }}. Buscar en el registro por
+            `alerta:"pico_5xx"`, que trae las rutas afectadas y un requestId.
+
+      # La sonda de disponibilidad devuelve 503 cuando la base no contesta. Se separa del
+      # 5xx general porque la acción es distinta: aquí no se mira el código de la API.
+      - alert: StocklyBaseDeDatosInaccesible
+        expr: >-
+          sum(rate(http_requests_total{job="stockly-backend", route="/api/v1/ready", status="503"}[5m])) > 0
+        for: 2m
+        labels:
+          gravedad: critica
+        annotations:
+          resumen: "La sonda de disponibilidad no alcanza PostgreSQL"
+          detalle: "El backend está en pie pero no puede consultar la base. El problema está en la base o en la red entre ambos."
+
+  - name: stockly-rendimiento
+    rules:
+      # p95 sobre el histograma. Sube antes que los errores: un servicio que se degrada
+      # primero va lento y solo después empieza a fallar, así que esto es el aviso previo.
+      - alert: StocklyLatenciaAlta
+        expr: >-
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{job="stockly-backend"}[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          gravedad: aviso
+        annotations:
+          resumen: "El p95 de latencia supera 1 s"
+          detalle: >-
+            p95 actual: {{ $value | humanizeDuration }}. Con los índices de T2-09 y T2-43
+            en su sitio, la referencia medida es de milisegundos: esto apunta a una consulta
+            sin índice, a un bloqueo en la base o a saturación del proceso.
+
+      # Node es de un solo hilo: con el bucle de eventos atascado, *todo* va lento aunque
+      # la base esté perfecta. Es la métrica que evita perseguir a PostgreSQL por un fallo
+      # que está en el proceso —un JSON gigante, un bucle síncrono—.
+      - alert: StocklyBucleDeEventosAtascado
+        expr: nodejs_eventloop_lag_seconds{job="stockly-backend"} > 0.5
+        for: 5m
+        labels:
+          gravedad: aviso
+        annotations:
+          resumen: "El bucle de eventos acumula más de 0,5 s de retraso"
+          detalle: "Hay trabajo síncrono bloqueando el proceso. La base puede estar perfectamente."
