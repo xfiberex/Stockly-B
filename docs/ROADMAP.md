@@ -16,22 +16,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > escrito en su ficha y en [accesibilidad.md](accesibilidad.md), no dado por bueno. Cualquier otra
 > lectura de este 114/114 es más generosa de lo que los hechos permiten.
 >
-> Las
-> dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su consecuencia directa;
-> **T4-03** porque T2-35–T2-37 ya habían hecho el trabajo caro; **T4-11** —que no viene de la
-> auditoría— porque el cierre de T4-03 dejó anotado que faltaba el conmutador manual; **T4-04**
-> porque el contrato de T4-01 ya permitía que los errores viajaran con código; **T4-05** porque el
-> valor del sistema es un histórico de inventario del que no había ninguna copia; **T4-06** porque
-> de nada sirve saber restaurar si nadie se entera de que hay que hacerlo; y **T4-10** la última,
-> porque era lo que decía su propia ficha: es un cambio de layout que toca T2-16, T2-18 y T3-04, y
-> ninguna de las tres debía rehacerse dos veces.
->
 > **Las dos últimas las abrió la prueba de carga**, y las dos se cerraron midiendo: T4-15 y T4-16
 > dejan la carga sostenida en **90.82 req/s frente a los 18.55 de línea base**, con 0 % de errores
 > y el dashboard en **337 ms de p(95)** donde estaba en 1.91 s. Detalle en
 > [rendimiento.md](rendimiento.md).
 >
-> Backend **481/481** tests y 91.83 % de sentencias; frontend **535/535** y 1 omitido; E2E 9
+> Backend **481/481** tests y 91.83 % de sentencias; frontend **536/536** y 1 omitido; E2E 9
 > pasados y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
@@ -39,9 +29,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > tarea hay que tocar **la casilla, la cabecera, el índice y Progreso**, y es el índice el que se
 > queda atrás cuando se abre una tarea nueva.
 >
-> **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
-> se comprobaron equivocadas al abordarlas (`T3-03`, `T3-05`, `T3-08`, `T3-09`); la corrección está
-> en su fila de [Progreso](#progreso). Medir antes de arreglar, y medir otra vez después.
+> **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.**
+> **Siete** se comprobaron equivocadas al abordarlas, y no de la misma manera: `T3-03` contaba mal,
+> `T3-05` no describía el código, `T3-08` partía de una **premisa falsa**, `T3-09` se quedaba corta,
+> `T4-14` señalaba la **causa equivocada**, `T4-15` daba por resuelto lo que no lo estaba y `T4-16`
+> proponía el **remedio equivocado**. La corrección de cada una está en su fila de
+> [Progreso](#progreso). Medir antes de arreglar, y medir otra vez después.
 
 ---
 
@@ -53,12 +46,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
 | **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
-| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 17 | 2 / 10 / 5 |
+| **Tier 4** | Futuro / opcional — lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 | 2 / 10 / 5 |
 | | **Total** | **114** | **80 / 29 / 5** |
 
 *Catorce tareas no vienen de la auditoría, y por eso el total pasa de 100 a 114: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05, y `T4-14`–`T4-17` el 2026-08-11, de lo que destaparon T4-07 (el árbol de producción que infla la CLI de Prisma), T4-08 (el histórico sin paginar y el `work_mem`) y T4-09 (el lector de pantalla que no se pudo ejecutar).*
 
-*Que **las dos abiertas las abriera un cierre anterior** no es un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. Ninguna de las dos se habría visto sin ejecutar la prueba de carga de T4-08. De aquel grupo, `T4-17` se descartó por decisión de alcance y `T4-14` se cerró, ambas el 2026-08-12.*
+*Que **catorce tareas las abriera un cierre anterior** no fue un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. `T4-15` y `T4-16` —las dos últimas en cerrarse— no se habrían visto sin ejecutar la prueba de carga de T4-08, y la mitad del valor de aquella tarea está justamente ahí.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1865,7 +1858,7 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 0
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **481/481** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **535/535** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **536/536** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |

@@ -196,6 +196,12 @@ Los tests corren siempre contra la base `Stockly_test`, que `jest.setup.js` deri
 Todas las rutas cuelgan del prefijo **`/api/v1`**. La documentación interactiva está en
 `http://localhost:3000/api/v1/docs` (no se monta cuando `NODE_ENV=production`).
 
+**Ningún listado se devuelve entero.** Todos aceptan `page` y `limit` —con techo de 100— y
+responden `{ data, meta }`, donde `meta` trae `total`, `page`, `limit` y `totalPages`. Sus
+filtros se aplican **en la base**, nunca en el cliente. La última excepción era el histórico de
+un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15, medido en
+[docs/rendimiento.md](docs/rendimiento.md)).
+
 ### Autenticación — `/api/v1/auth`
 
 | Método | Ruta | Descripción | Auth |
@@ -226,9 +232,9 @@ Todas las rutas cuelgan del prefijo **`/api/v1`**. La documentación interactiva
 | `GET` | `/export` | Exportar todos como JSON (default) | USER+ |
 | `GET` | `/export?format=csv` | Exportar todos como CSV | USER+ |
 | `PATCH` | `/bulk-stock` | Ajuste masivo de stock | ADMIN |
-| `GET` | `/:id/movements` | Historial de movimientos | USER+ |
+| `GET` | `/:id/movements` | Historial de movimientos — **paginado** (`page`, `limit`) y filtrable (`type`, `dateFrom`, `dateTo`) | USER+ |
 | `POST` | `/:id/movements` | Registrar movimiento manual | ADMIN |
-| `GET` | `/:id/movements/export?format=csv` | Exportar movimientos como CSV | USER+ |
+| `GET` | `/:id/movements/export?format=csv` | Exportar movimientos como CSV — acepta los **mismos filtros** que el listado | USER+ |
 | `GET` | `/:id/price-history` | Historial de precios | USER+ |
 
 ### Etiquetas — `/api/v1/tags`

@@ -276,6 +276,14 @@ printf %s "$SMTP_PASS"     > observabilidad/secretos/smtp-password
 docker compose -f docker-compose.yml -f docker-compose.observabilidad.yml up -d
 ```
 
+**El paso 1 no se puede saltar «para probar».** Docker no falla cuando el origen de un
+*bind mount* no existe: **lo crea como directorio vacío**. La pila levanta, Prometheus monta
+una carpeta sin `metrics-token`, el raspado sale 404 y el objetivo aparece caído — el
+síntoma apunta a la API, no al montaje. En Windows deja además rastro en el repositorio: la
+traducción de rutas mete el sufijo del montaje en el nombre y aparecen carpetas como
+`observabilidad;O` (de `:ro`) en la raíz. Están vacías y no las ve `git status` —git no
+registra directorios vacíos—, así que sobreviven a cualquier limpieza que se guíe por él.
+
 Prometheus queda en `127.0.0.1:9090` y Alertmanager en `127.0.0.1:9093`, **solo en el bucle
 local**: la interfaz de Prometheus no tiene autenticación y enseña el tráfico entero del
 servicio. Para verla desde fuera, un túnel SSH.

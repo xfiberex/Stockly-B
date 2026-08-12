@@ -20,6 +20,11 @@
 # esto no se puede resolver con `${VAR}`: lo que se escriba entre llaves viaja tal cual.
 # Sin el token, el raspado devuelve 404 y Prometheus marca el objetivo como caído —que es
 # lo correcto—, pero conviene saberlo antes de perseguir el fallo.
+#
+# El `mkdir` no es opcional: Docker **crea el origen de un bind mount que no existe**, y en
+# Windows además con el nombre estropeado —`observabilidad;O`, del sufijo `:ro`—. La pila
+# arranca, Prometheus monta un directorio vacío y falla por falta de token, y el rastro que
+# queda son carpetas basura en la raíz del repositorio.
 
 services:
 

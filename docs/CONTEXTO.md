@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-08-11
+# Contexto de trabajo — al 2026-08-12
 
 Arranque en frío para continuar en otro equipo. El detalle de cada tarea está en
 [ROADMAP.md](ROADMAP.md); esto es lo que ese documento no cuenta.
@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **481/481** | **535/535** *(+1 omitido)* |
+| Tests | **481/481** | **536/536** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -66,125 +66,49 @@ de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · Total **114/114** *(una de ellas, T4-17, **descartada** y no hecha: el 114/114 no significa «todo comprobado»)*. **No queda ninguna tarea abierta.** Del Tier 4,
-que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
-**T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
-consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
-selector de tema— se añadió ese mismo día y no viene de la auditoría, sino de una limitación que el
-propio cierre de T4-03 dejó anotada. El 2026-08-11 se cerró **T4-04**, la internacionalización, que
-venía a medias del otro equipo: estaba el mecanismo —códigos de error, catálogo, motor y selector—
-y faltaba el trabajo de verdad, extraer los textos de las 25 pantallas restantes. Dejó anotada
-**T4-12**, los correos, que siguen saliendo solo en español. Ese mismo día se cerró **T4-05**: ya
-hay copia de seguridad (`pnpm db:backup`) y una restauración **ejecutada y medida**, no solo
-descrita — el procedimiento entero está en [operaciones.md](operaciones.md). También dejó anotada
-**T4-13**, ya cerrada: el compose levantaba `postgres:16-alpine` mientras el servidor de desarrollo
-era **17.10**, y un volcado de 17 no se restaura en un 16.
+**Tier 4: 17/17** ✅ · Total **114/114**.
 
-Y detrás de esa, **T4-06**, porque de nada sirve saber restaurar si nadie se entera de que hay que
-hacerlo: el sistema ya no está mudo. Hay `/metrics`, una alerta por pico de 5xx que **no depende de
-nada externo** y reglas de Prometheus **probadas con `promtool`**, no solo escritas (§8 de
-[operaciones.md](operaciones.md)).
+**Ese 114/114 no significa «todo comprobado».** Una de las tareas, **T4-17** —el recorrido con
+lector de pantalla—, está **descartada y no hecha**: se cerró por decisión de alcance porque no hay
+NVDA ni VoiceOver en las máquinas del proyecto. Lo que sí es el listón verificado de accesibilidad
+está en [accesibilidad.md](accesibilidad.md).
 
-Ese mismo día se cerró **T4-07**, el análisis de composición que la auditoría no llegó a hacer:
-`pnpm verify` termina ahora en `pnpm auditoria` en los dos repositorios y para el gate ante una
-vulnerabilidad **alta** en producción o una licencia sin revisar. El resultado de hoy es limpio —0
-vulnerabilidades sobre 296 + 118 paquetes, sin copyleft fuerte—, así que lo que vale es la puerta,
-no la foto; el informe y lo que **no** cubre están en [dependencias.md](dependencias.md). Dejó
-anotada **T4-14**, ya cerrada — y con la causa **al revés de como la contaba**: `prisma` no
-arrastraba nada por estar en `dependencies`, lo arrastra **`@prisma/client`, que lo declara como
-peer opcional**. Bajarlo a `devDependencies` no cambia ni un paquete.
+**La crónica tarea a tarea no vive aquí, vive en la tabla de
+[Progreso del ROADMAP](ROADMAP.md#progreso)**, con lo verificado y lo aprendido en cada una — y
+duplicarla aquí solo garantizaba que las dos se separasen. Este documento se queda con lo que esa
+tabla no cuenta. De todo el recorrido, cuatro cosas conviene saberlas antes de tocar nada:
 
-Y **T4-08**, que es la primera vez que este proyecto mide algo bajo carga: 100 000 productos y
-1 100 000 movimientos en una base aparte, los índices de T1-15 comprobados quitándolos y
-reponiéndolos sobre el mismo dato —el histórico de un producto, de **62.7 ms a 0.2 ms**— y una
-prueba de k6 con diez usuarios sostenidos. Destapó lo que el análisis de esquema no podía ver:
-**`GET /products/:id/movements` no pagina**, y con un producto de 100 000 movimientos hunde la
-API entera a 5.27 req/s (→ **T4-15**); y el dashboard tarda 1.91 s en el p(95), en parte porque
-`work_mem` está en 4 MB y sus ordenaciones se van a disco (→ **T4-16**). Todo en
-[rendimiento.md](rendimiento.md).
+- **La aplicación arrancó rota en sitios que no se veían.** El guardado de configuración no
+  guardaba, las etiquetas de producto eran inertes, una cuenta desactivada conservaba 15 minutos de
+  acceso, cinco listados reventaban con un `page` no numérico, la base no tenía ni un índice,
+  `logout` estaba expuesto a CSRF y el correo salía en claro. Todo eso está corregido, medido y con
+  tests; la pila entera se levanta con `docker compose up -d --build` y el login funciona contra
+  `http://localhost:8080`.
+- **Medir cambió el plan más de una vez.** T4-08 fue la primera medición bajo carga del proyecto y
+  abrió sola dos tareas; T4-16 acabó **no tocando `work_mem`**, que era justo lo que pedía su
+  ficha, porque reescribir la consulta daba seis veces más; y T4-14 descubrió que la causa que le
+  atribuían era falsa. Los números están en [rendimiento.md](rendimiento.md) y
+  [dependencias.md](dependencias.md).
+- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay siete
+  [ADR](adr/). La 0005 —**no hay CI**— es la que más fácilmente se deshace por reflejo.
+- **Lo que se decidió no hacer está escrito**, no omitido: T4-17 aquí arriba, y los tres cabos
+  sueltos del §6.
 
-**T4-09** llevó Lighthouse y el teclado a la aplicación desplegada, y encontró que el criterio no
-se cumplía justo donde peor sienta: el **login estaba en 93**. Las cuatro pantallas medidas están
-hoy en 100. La mitad de lector de pantalla **no se pudo hacer** —no hay NVDA ni VoiceOver en esta
-máquina— y quedó como **T4-17** en vez de darse por buena. **El 2026-08-12 esa tarea se descartó
-por decisión de alcance:** el listón de accesibilidad del proyecto es **teclado más árbol de
-accesibilidad**, que es lo que se puede ejecutar y repetir aquí. Lo que eso deja sin cubrir —si la
-secuencia se entiende de oído— está escrito en [accesibilidad.md](accesibilidad.md) §4, asumido y
-no comprobado.
+**Las fichas son pistas, no descripciones verificadas — y esto es lo más útil de todo el
+documento.** Siete se comprobaron equivocadas al abordarlas, y de siete maneras distintas:
 
-Y **T4-10**, la última del bloque de interfaz: de 1024 px en adelante la navegación es una **barra
-lateral** con los doce destinos desplegados, así que ninguna sección cuesta ya dos clics, y la
-cabecera —que se queda con la marca y la sesión— pasa de `<nav>` a `<header>`. `NavDropdown` se
-retiró: sin barra horizontal no lo usaba nadie. El hallazgo que no estaba en la ficha es que había
-**dos recorridos de navegación**, uno para móvil y otro para escritorio, con órdenes distintos; hoy
-son un array y dos envoltorios, y un test lo vigila.
+| Ficha | En qué fallaba |
+|---|---|
+| `T3-03` | Contaba mal: decía un módulo divergente y eran **cinco** |
+| `T3-05` | El enunciado no describía el código — el botón nunca tuvo dos rutas |
+| `T3-08` | La **premisa era falsa**: Heroicons ya emitía `aria-hidden`, y el fallo real era el opuesto |
+| `T3-09` | Se quedaba corta: el botón flotante no «probablemente solapaba» la paginación, la dejaba **sin poder pulsarse**, y no solo en móvil |
+| `T4-14` | **La causa era otra**: no la arrastraba `dependencies`, sino un *peer opcional* de `@prisma/client` |
+| `T4-15` | **El alcance era mayor**: daba por resuelta una exportación que no lo estaba |
+| `T4-16` | **El remedio era el equivocado** (`work_mem`), y nombraba una consulta cuando eran dos |
 
-Y **T4-12**, que cierra lo que T4-04 dejó a medias: los correos ya no salen siempre en español. Hay
-una columna `users.idioma` y un catálogo por idioma con el mismo mecanismo que el frontend —el
-inglés es un `Record` sobre las claves del español, así que **una frase sin traducir no compila**—.
-Lo que no era obvio es **de dónde sale el idioma en cada envío**: el registro lo saca de
-`Accept-Language`, porque es el único correo hacia alguien que aún no tiene fila; los demás, de la
-columna. Las alertas de stock y de 5xx **no tienen ninguna petición detrás** de la que deducirlo.
-Los correos además eran **cuatro y no los tres de la ficha**: T4-06 añadió el de pico de errores
-después de escribirla.
-
-Y **T4-13**: el compose pasa a **`postgres:17-alpine`**. La elección tiene dirección — `pg_restore`
-solo va hacia adelante, así que subir acepta los volcados de 16 y los de 17, mientras que quedarse
-en 16 rechazaba los de todos los equipos. **La regla que queda:** la imagen nunca por debajo del
-servidor más nuevo que se use en cualquier máquina del proyecto. Alinear los números no bastaba,
-porque la próxima vez que se separen nadie lo notaría hasta el día de la recuperación: `pnpm
-db:restaurar` compara ahora la versión del volcado con la del destino **antes de borrar la base**.
-Subir la imagen **invalida el volumen de datos**; el ciclo está en [operaciones.md §9](operaciones.md).
-
-Y **T4-14**, que dejó la imagen del backend en **426 MB desde 1.81 GB** y su árbol en **183
-paquetes desde 313**. Tres cambios, y hacían falta los tres: las migraciones salen del `CMD` a un
-servicio `migrate` que corre antes y termina —de paso, con varias réplicas cada una lanzaba
-`migrate deploy` a la vez—; el árbol se poda **por alcanzabilidad** y no por lista; y el runner
-**copia** ese árbol en vez de instalarlo y podarlo, porque borrar en una capa posterior no quita
-nada de la imagen. Dentro viajaban una interfaz gráfica de 42 MB, TypeScript y un PostgreSQL para
-navegador.
-
-Y las dos últimas, **T4-15** y **T4-16**, las que abrió la prueba de carga. Juntas dejan la carga
-sostenida en **90.82 req/s frente a los 18.55 de línea base**, con 0 % de errores y el dashboard en
-**337 ms de p(95)** donde estaba en 1.91 s.
-
-**T4-15** pagina el histórico de un producto —de **3.17 s y 19 MB a 57 ms y 0.01 MB**— y baja los
-filtros al servidor, que no es opcional: filtrar en el navegador una página filtra lo traído, y el
-resultado dependería de en qué página estabas. La ficha decía que la exportación ya estaba
-resuelta y **no lo estaba**; al arreglarla apareció que el tope de filas rechazaba el producto
-caliente con un «filtra antes de exportar» imposible de seguir, porque ese endpoint no aceptaba
-filtros. Ahora los acepta.
-
-**T4-16** es la que más se aleja de su ficha. Pedía subir `work_mem` y **no se ha tocado**: el
-ajuste daba ×3.3 y reescribir la consulta da ×20 con el valor de fábrica —de 401.6 ms a 20.0—, sin
-comprometer memoria, porque `work_mem` se reserva por conexión y por nodo de ordenación. Nombraba
-además una consulta y eran dos: «movimientos por mes» también se iba a disco, y por otro motivo
-—agrupa por una expresión, así que PostgreSQL no tiene estadísticas, descarta el `HashAggregate` y
-**ordena 360 725 filas para devolver 24**—. Las dos reescrituras devuelven exactamente lo mismo,
-comprobado fila a fila. Todo en [rendimiento.md](rendimiento.md) §5 y §6.
-
-La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
-una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
-`page` no numérico, ningún índice en la base, `logout` expuesto a CSRF y el correo saliendo en
-claro, a tener todo eso corregido, medido y con tests. La pila completa —base, backend y frontend
-tras nginx— se levanta con `docker compose up -d --build` y el login funciona contra
-`http://localhost:8080`.
-
-*Dos apuntes sobre las cifras. La cobertura del frontend cruzó por fin el objetivo del roadmap
-(**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño. Y el
-denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la
-aplicación en marcha anotados ya cerrados, a 108 el 2026-08-10 con `T4-11`, a 110 el 2026-08-11 con
-`T4-12` y `T4-13`, y a 114 ese mismo día con `T4-14`–`T4-17`: **no descontaron ni una tarea de la
-lista de trabajo**, porque ninguno estaba en ella. Que cuatro de las seis abiertas las abrieran los
-propios cierres es lo que pasa cuando una tarea se cierra midiendo en vez de mirando.*
-
-**Las fichas de la auditoría son pistas, no descripciones verificadas.** Cuatro se comprobaron
-equivocadas al abordarlas: la premisa de `T3-08` era **falsa** (Heroicons ya emitía `aria-hidden`,
-así que el criterio se cumplía solo, y el fallo real era el opuesto); el enunciado de `T3-05` no
-describía el código —el botón de la interfaz nunca tuvo dos rutas—; `T3-09` se quedaba corta, porque
-el botón flotante no «probablemente solapaba» la paginación, la dejaba **sin poder pulsarse** y no
-solo en móvil; y `T3-03` contaba mal, decía un módulo divergente y eran cinco. Conviene medir antes
-de arreglar, y medir otra vez después.
+Medir antes de arreglar, y medir otra vez después. La corrección de cada una está en su fila de
+[Progreso](ROADMAP.md#progreso).
 
 ### La documentación del proyecto
 

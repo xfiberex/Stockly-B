@@ -165,6 +165,12 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Corregido
 
+- **Ocho claves muertas fuera del catálogo de idiomas**, y una guardia para que no vuelvan a
+  acumularse. El compilador ya comprobaba que español e inglés declaren lo mismo, pero **no
+  que alguien las lea**: `comun.buscar`, `comun.cargando`, `ordenes.eliminar` y cinco más
+  quedaron de pantallas que cambiaron de forma. `catalogo.test.ts` las detecta ahora,
+  eximiendo **una a una** las familias cuya clave se compone en ejecución (`error.*`,
+  `auditoria.*`, `ajuste.*`).
 - **El histórico de un producto ya no se devuelve entero** (`T4-15`).
   `GET /products/:id/movements` acepta `page`, `limit` y los filtros de tipo y fecha, y los
   aplica **en la base**. Con el producto caliente de la prueba de carga —100 000 movimientos—
