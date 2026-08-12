@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **424/424** | **518/518** *(+1 omitido)* |
+| Tests | **424/424** | **522/522** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-11): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 9/16** · Total **106/113**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 10/17** · Total **107/114**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -129,10 +129,11 @@ de arreglar, y medir otra vez después.
 
 | Documento | Para qué |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 113 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [ROADMAP.md](ROADMAP.md) | Las 114 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
 | [operaciones.md](operaciones.md) | Copia de seguridad, restauración, reversión y **alertas**. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
 | [dependencias.md](dependencias.md) | Vulnerabilidades y licencias del árbol de producción de los dos repos, y cómo funciona la puerta de `pnpm auditoria` — incluida **la lista de lo que no cubre** |
 | [rendimiento.md](rendimiento.md) | Lo que pasa con 100 000 productos: índices medidos antes y después, latencias bajo carga y los dos cuellos que salieron |
+| [accesibilidad.md](accesibilidad.md) | Lighthouse y recorrido de teclado sobre la pila desplegada, y **la mitad del criterio que no se pudo comprobar** |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
 | [adr/](adr/) | **Siete decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |

@@ -1480,13 +1480,22 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **La prueba de carga no entra en `pnpm verify`, y es deliberado:** tarda minutos, necesita Docker y sus números dependen de la máquina. Un umbral que falla porque el portátil está compilando otra cosa enseña a ignorar la puerta.
   - **k6 va en Docker** porque no está instalado en el equipo y no hace falta que lo esté. El conjunto de datos vive en **`Stockly_carga`**, una base aparte, y los guiones abortan si el nombre coincide con el de `DATABASE_URL`.
 
-- [ ] **[T4-09] Auditoría de navegador y de lector de pantalla**
+- [x] **[T4-09] Auditoría de navegador y de lector de pantalla** ✅ *(2026-08-11, **con una salvedad**: ver la última nota)*
   - **Área:** Accesibilidad / Rendimiento
-  - **Ubicación:** aplicación desplegada
+  - **Ubicación:** aplicación desplegada, [`docs/accesibilidad.md`](accesibilidad.md), `Stockly-F/src/tests/accesibilidad.test.ts`, `Stockly-F/src/shared/lib/clasesDeMarco.ts`
   - **Qué hacer:** Los hallazgos de accesibilidad de esta auditoría son estáticos; no se ejecutó Lighthouse ni un recorrido con lector de pantalla. La única medición sobre la aplicación en marcha es la del 2026-07-15, recogida en [Línea base de navegador](#línea-base-de-navegador-2026-07-15) al final de este documento: 96 en accesibilidad, y las correcciones de contraste, modal y menú móvil que motivaron esa nota se confirman aplicadas en el código actual. Tras completar el Tier 2 de accesibilidad, ejecutar Lighthouse sobre el build de producción, medir Core Web Vitals reales contra esa línea base y recorrer los flujos principales con NVDA o VoiceOver.
   - **Criterio de aceptación:** Lighthouse ≥ 95 en accesibilidad sobre el build de producción y los flujos de alta de producto y movimiento de stock son completables solo con teclado y lector de pantalla.
   - **Esfuerzo:** alto
   - **Depende de:** T2-11, T2-12, T2-13, T2-14, T2-15, T2-16, T2-17, T2-18, T2-28
+  - **Auditado sobre la pila del compose**, no sobre `vite dev`: build de producción tras nginx, que es lo que pedía la ficha. `vite preview` tampoco valía de sustituto —no aplica `server.proxy` y la SPA se quedaría sin API—.
+  - **El criterio no se cumplía: el login estaba en 93.** Y es la primera pantalla del producto. Las cuatro pantallas auditadas quedan en **100** (login 93, productos 94, movimientos 95, dashboard ya en 100).
+  - **Tres fallos, y ninguno se notaba mirando la pantalla.** **Ocho desplegables sin nombre accesible** en cuatro pantallas —el texto visible es la opción elegida, que dice el *valor* y no de qué es el filtro—; **las siete pantallas sin sesión sin landmark `<main>`**, porque no pasan por `App.tsx` y llevaban el marco copiado; y **enlaces distinguidos solo por el color** en login y registro, con el subrayado reservado al `hover` (WCAG 1.4.1, la misma regla por la que aquí ningún estado se comunica solo con color).
+  - **Un cuarto que Lighthouse no marca**, encontrado leyendo el árbol de accesibilidad: el menú de usuario enseñaba «Admin Principal» y se anunciaba «Menú de usuario» (WCAG 2.5.3). Quien maneja el ordenador **por voz** dice lo que ve y no pasaba nada.
+  - **Los dos flujos, recorridos sin ratón.** El de movimiento de stock **ejecutado de verdad**: el stock pasó de 10 a 15. La trampa de foco del modal se comprobó **por sus dos bordes**, que es donde se rompe —`Tab` en el último elemento y `Shift+Tab` en el primero—, y `Escape` devuelve el foco al disparador.
+  - **Core Web Vitals mejor que la línea base:** LCP **420 ms** en producción frente a 556 ms en desarrollo (2 ms de TTFB, el resto arranque de la SPA), CLS **0.02** igual, cero errores de consola.
+  - **El 63 de SEO no es una regresión, es la decisión de T3-12.** Lighthouse penaliza que la página esté bloqueada para indexar, y un inventario privado debe estarlo. Lo mismo con «agentic browsing», que mide si hay `llms.txt`.
+  - **Descartado tras comprobarlo:** el árbol anunciaba el campo «Cantidad» con mínimo 1 y **máximo 0**, que parecía un `max` mal puesto. En el DOM no hay atributo `max`: es como Chrome serializa su ausencia.
+  - **Salvedad, y es parte del criterio: no se ha ejecutado NVDA ni VoiceOver.** Esta máquina no tiene ninguno, y «ejecutarlo» sin escuchar la salida no demuestra nada. Lo comprobado es el árbol de accesibilidad —que es lo que un lector lee— y que los flujos se completan sin ratón; no es lo mismo, porque el árbol dice qué se anunciaría, no si el recorrido resulta comprensible al oído. → **T4-17**.
 
 - [ ] **[T4-10] Navegación lateral en pantallas anchas**
   - **Área:** UI/UX
@@ -1549,6 +1558,15 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** con el conjunto de carga y el producto caliente, `pnpm carga:ejecutar` cumple sus umbrales y el rendimiento se mantiene en el orden de la línea base (~18 req/s); la pantalla de movimientos sigue funcionando con su paginación.
   - **Esfuerzo:** medio
   - **Depende de:** T4-08
+
+- [ ] **[T4-17] Recorrido real con lector de pantalla**
+  - **Área:** Accesibilidad
+  - **Ubicación:** aplicación desplegada
+  - **Origen:** es la mitad del criterio de T4-09 que **no se pudo comprobar**, no un hallazgo nuevo.
+  - **Qué hacer:** T4-09 dejó las cuatro pantallas principales en 100 de Lighthouse y verificó que los flujos de alta de producto y movimiento de stock se completan **solo con teclado**, leyendo además el árbol de accesibilidad, que es la fuente de lo que anuncia un lector. Lo que no se hizo es escucharlo: la máquina de trabajo no tiene NVDA ni VoiceOver. Y no es lo mismo — el árbol dice **qué** se anunciaría, no si la secuencia se entiende de oído: un orden razonable en el DOM puede resultar incomprensible leído, los avisos de las notificaciones pueden no llegar a anunciarse y una tabla puede recitar sus cabeceras en cada celda. Recorrer los dos flujos con NVDA (Windows) o VoiceOver (macOS) y anotar lo que suene mal.
+  - **Criterio de aceptación:** los dos flujos se completan con lector de pantalla y sin mirar la pantalla, y queda anotado lo que haya que corregir.
+  - **Esfuerzo:** medio
+  - **Depende de:** T4-09
 
 - [ ] **[T4-16] El dashboard a escala: `work_mem` y la consulta de rotación**
   - **Área:** Rendimiento
@@ -1637,7 +1655,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | SEO — sin `robots.txt` | Bajo | T3-12 |
 | Zonas no cubiertas — SCA y licencias | — | T4-07 ✅ |
 | Zonas no cubiertas — pruebas de carga | — | T4-08 ✅ |
-| Zonas no cubiertas — auditoría de navegador | — | T4-09 |
+| Zonas no cubiertas — auditoría de navegador | — | T4-09 ✅ |
 
 ### Consultoría de diseño (2026-08-05)
 
@@ -1663,6 +1681,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-11 | **T4-09** Auditoría de navegador y de lector de pantalla — **completada, con una salvedad** | Lighthouse sobre la **pila del compose** (build de producción tras nginx): login **93 → 100**, productos **94 → 100**, movimientos **95 → 100**, dashboard 100. Buenas prácticas 100 en las cuatro. Core Web Vitals mejor que la línea base: **LCP 420 ms** frente a 556 ms, **CLS 0.02**, cero errores de consola. Los dos flujos recorridos **solo con teclado**, y el de movimiento **ejecutado**: stock de 10 a 15. `verify` ✅ frontend **522/522** | **El criterio no se cumplía: el login estaba en 93**, y es la primera pantalla del producto. **Tres fallos que no se ven mirando:** ocho desplegables sin nombre accesible en cuatro pantallas —lo visible es la opción elegida, que dice el *valor*, no de qué es el filtro—; las siete pantallas sin sesión **sin landmark `<main>`**, con el marco copiado en las siete; y enlaces distinguidos **solo por el color**, con el subrayado reservado al `hover`. **Un cuarto lo dio el árbol de accesibilidad, no Lighthouse:** el menú de usuario enseñaba «Admin Principal» y se anunciaba «Menú de usuario» (WCAG 2.5.3) — por voz se dice lo que se ve y no pasaba nada. **La trampa de foco se comprobó por sus dos bordes**, que es donde se rompe. **Descartado tras mirarlo:** el «máximo 0» del campo Cantidad es cómo Chrome serializa un `max` ausente. **El 63 de SEO no es regresión**, es el bloqueo de indexación que decidió T3-12. **Salvedad: no se ejecutó NVDA ni VoiceOver** —no hay ninguno en esta máquina— → **T4-17**. |
 | 2026-08-11 | **T4-08** Pruebas de carga sobre los flujos de inventario — **completada** | Conjunto de **100 000 productos y 1 100 000 movimientos** (467 MB) en una base aparte. **Antes/después de los índices sobre el mismo dato**, quitándolos y reponiéndolos: el histórico de un producto pasa de `Parallel Seq Scan` a `Bitmap Heap Scan` y de **62.7 ms a 0.2 ms** (×384); cuatro consultas mejoran entre ×143 y ×384. Carga sostenida de 10 usuarios × 60 s: **1495 peticiones, 18.55 req/s, 0 % de errores**, umbrales cumplidos. Informe en [rendimiento.md](rendimiento.md) | **T1-15 confirmada, y con una sorpresa:** dos consultas salen *peor* con índices, y no por el índice — el plan deja de ser paralelo y el `Sort` de encima se va a disco con `work_mem` de 4 MB. A 64 MB la rotación pasa de **480 ms a 121 ms**. **El hallazgo grande no estaba en la ficha:** `GET /products/:id/movements` **no pagina**; con un producto de 100 000 movimientos el rendimiento cae a **5.27 req/s**, se transfieren **1.6 GB** y el histórico de un producto *normal* pasa de 177 ms a **3.17 s**. La base tarda **15 ms**: el resto es serializar 19 MB de JSON en el bucle de eventos. → **T4-15** y **T4-16**. **Dos defectos del propio banco de pruebas, ambos creíbles y falsos:** categoría y estado activo derivados del mismo módulo dejaban **una categoría entera inactiva** —la consulta del catálogo devolvía cero filas y el índice parecía empeorarla—; y **un umbral de k6 sin muestras se da por cumplido**, así que una pasada que reventó en `setup` informó de cuatro `p(95)=0s` en verde. |
 | 2026-08-11 | **T4-07** Auditoría de dependencias y licencias — **completada** | **0 vulnerabilidades** en las 296 dependencias de producción del backend y las 118 del frontend, en todas las severidades, y **ni GPL, ni LGPL, ni AGPL, ni SSPL** en ninguno de los dos árboles. La puerta se demuestra **en rojo** con informes fabricados (18 tests entre los dos repos), porque con el árbol limpio ejecutarla no distingue una comprobación que funciona de una que no mira nada. `verify` ✅ backend **424/424**, frontend **518/518** | **La trampa:** `pnpm audit --json` con el registro caído **sigue imprimiendo un informe con las cinco severidades a cero** — la auditoría que nunca se hizo se lee igual que la limpia. Se distinguen por la clave `error` del JSON, no por el código de salida. **Sin red avisa y no falla** (`--estricto` invierte eso): sin CI, `verify` corre en portátiles, y una puerta que se pone roja sin conexión se acaba esquivando. La de **licencias sí es dura y no necesita red**: sale del lockfile y para el gate ante una licencia sin revisar. **Dos listas y no una compartida** —el navegador trae MPL-2.0 y OFL-1.1, el servidor EPL-2.0—, porque la unión dejaría pasar en un repositorio lo revisado solo para el otro. **Una obligación real sin cumplir:** los `.woff2` de Inter se copian a `dist/`, así que la aplicación distribuye la tipografía y la OFL exige que el aviso la acompañe → `public/AVISOS-DE-TERCEROS.txt`, generado leyendo la licencia de los 118 paquetes. **Confirmada la incoherencia que la ficha anticipaba** (`ISC` declarada, `LICENSE` MIT). **Hallazgo nuevo:** `prisma` en `dependencies` arrastra `@prisma/studio-core` y su árbol de gráficos — ahí está la única EPL-2.0 y la diferencia entre 296 paquetes y los ~100 necesarios → **T4-14**. |
 | 2026-08-11 | **T4-06** Monitorización y alertas — **completada** | **El criterio, ejecutado por HTTP contra la aplicación entera:** provocados 5xx reales hasta cruzar el umbral, sale el aviso por correo con las rutas y un `requestId`, y no sale por debajo del umbral ni durante el enfriamiento. Las reglas de Prometheus pasan `promtool test rules` ✅ —disparan con un 20 % de errores y **no** con tráfico sano—, y los dos archivos de configuración, `promtool check config` y `amtool check-config` ✅. `verify` ✅ **414/414**, cobertura 91.83 % | **Dos capas, y ninguna sobra:** la alerta en proceso avisa sin desplegar nada, pero no puede avisar de que el proceso ha muerto —un proceso muerto no manda correos—; eso es `up == 0` en Prometheus. **La prueba de las reglas destapó el número que justifica esa duplicidad:** de la primera 5xx a la alerta de Prometheus pasan **~8 min y medio**, y el `for: 2m` solo explica dos; el resto lo pone la ventana del `rate[5m]`. A ojo se habría dado por bueno «dos minutos». **Dos defectos propios encontrados midiendo:** `req.baseUrl + req.route.path` da `/:id` en Express 5 —restaura `baseUrl` al desapilar el router, y con un 5xx responde `errorHandler`, que vive fuera—, así que los doce módulos habrían caído en una sola serie; y ni Prometheus ni Alertmanager **expanden `${VARIABLES}`** en su configuración, cosa que se manifiesta como un objetivo caído con 401 y ninguna pista. **La cardinalidad se trata como lo que es**, un agujero de memoria explotable desde fuera: se etiqueta con la plantilla de ruta y lo no casado va a una etiqueta fija. `/metrics` responde **404** en producción sin token. El agregador de logs no necesitó código: T2-10 ya dejó JSON por línea con `requestId`. |
@@ -1771,12 +1790,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **9** | 16 | 56 % |
-| **Total** | **106** | **113** | **94 %** |
+| Tier 4 | **10** | 17 | 59 % |
+| **Total** | **107** | **114** | **94 %** |
 
 *El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que el 94 % de arriba es sobre 113, no sobre las 100 originales.*
 
-*Estas cifras estuvieron desviadas: la tabla decía 102/109 mientras las casillas del documento sumaban 104/110, porque los cierres de T4-05 y T4-06 y el alta de T4-13 no llegaron aquí. **Se cuentan las casillas** —8+26+48+15+9 hechas y 7 pendientes— y esta tabla y la de [CONTEXTO §3](CONTEXTO.md) dicen lo mismo. Al cerrar una tarea hay que tocar los dos sitios.*
+*Estas cifras estuvieron desviadas: la tabla decía 102/109 mientras las casillas del documento sumaban 104/110, porque los cierres de T4-05 y T4-06 y el alta de T4-13 no llegaron aquí. **Se cuentan las casillas** —8+26+48+15+10 hechas y 7 pendientes— y esta tabla y la de [CONTEXTO §3](CONTEXTO.md) dicen lo mismo. Al cerrar una tarea hay que tocar los dos sitios.*
 
 ***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, **T4-05**, la copia de seguridad, **T4-06**, monitorización y alertas, **T4-07**, el análisis de composición de dependencias, y **T4-08**, las pruebas de carga. Las 7 restantes siguen fuera de alcance, y cinco de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04; **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05; **T4-14**, el CLI de Prisma en el árbol de producción, que destapó T4-07; y **T4-15** y **T4-16**, el histórico sin paginar y el coste del dashboard a escala, que midió T4-08.*
 
@@ -1788,7 +1807,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **424/424** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **518/518** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **522/522** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
@@ -1858,11 +1877,13 @@ y se cerró como T2-45. **Los siete están hoy corregidos.**
 
 Única medición sobre la aplicación en marcha. Se tomó con el servidor de desarrollo (sin minificar), por lo que en producción cabe esperar mejores cifras. Es el «antes» contra el que debe compararse T4-09; la auditoría del 2026-08-04 fue estática y no volvió a medir.
 
-| Métrica | 2026-07-15 | Objetivo (T4-09) |
-|---|---|---|
-| Lighthouse — Accesibilidad | 96 *(fallo: contraste de color, ya corregido)* | ≥ 95 sobre build de producción |
-| Lighthouse — Buenas prácticas | 100 | mantener |
-| Lighthouse — SEO | 82 *(faltaban `lang` y meta description, ya corregidos)* | reevaluar tras T3-12 |
-| LCP (dashboard, dev) | 556 ms | medir sobre build de producción |
-| CLS | 0.02 | < 0.1 |
-| Errores de consola | ninguno | ninguno |
+| Métrica | 2026-07-15 (dev) | **Medido en T4-09** (producción, 2026-08-11) | Objetivo |
+|---|---|---|---|
+| Lighthouse — Accesibilidad | 96 *(fallo: contraste de color, ya corregido)* | **100** ✅ *(login 93, productos 94, movimientos 95 antes de los arreglos)* | ≥ 95 |
+| Lighthouse — Buenas prácticas | 100 | **100** ✅ | mantener |
+| Lighthouse — SEO | 82 *(faltaban `lang` y meta description, ya corregidos)* | **63** — *y está bien*: penaliza el bloqueo de indexación que decidió T3-12 | no aplica a una aplicación privada |
+| LCP (dashboard) | 556 ms | **420 ms** ✅ *(2 ms de TTFB; el resto, arranque de la SPA)* | < 2.5 s |
+| CLS | 0.02 | **0.02** ✅ | < 0.1 |
+| Errores de consola | ninguno | **ninguno** ✅ | ninguno |
+
+*El detalle, con lo que **no** se comprobó, en [accesibilidad.md](accesibilidad.md).*

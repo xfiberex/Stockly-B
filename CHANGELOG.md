@@ -145,6 +145,17 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   calendario—: ahora el adorno nativo se apaga, el icono lo pinta la aplicación, hay una
   pista de formato traducida cuando el campo está vacío y **toda la caja abre el
   calendario**, no solo el icono de la esquina.
+- **La primera pantalla del producto era la menos accesible** (`T4-09`). Auditada con
+  Lighthouse sobre el build de producción tras nginx, el login puntuaba **93** —el criterio
+  del proyecto es ≥ 95— y productos y movimientos, 94 y 95. Las cuatro pantallas quedan en
+  **100**. Los fallos comparten forma: **ocho desplegables sin nombre accesible** —lo que se
+  ve es la opción elegida, que dice el valor y no de qué es el filtro—, **las siete pantallas
+  sin sesión sin landmark `<main>`** y **enlaces que solo se distinguían por el color**, con
+  el subrayado reservado al paso del ratón. Ninguno se nota mirando la pantalla, que es
+  justamente el problema. Informe en [`docs/accesibilidad.md`](docs/accesibilidad.md).
+- **El menú de usuario se anunciaba con un nombre distinto del que enseña** (`T4-09`). Decía
+  «Admin Principal» y respondía a «Menú de usuario»: quien maneja el ordenador **por voz**
+  dice lo que ve, y no ocurría nada (WCAG 2.5.3).
 - **La licencia declarada no era la del proyecto** (`T4-07`). `Stockly-B/package.json` decía
   `ISC` mientras su archivo `LICENSE` es MIT. Los dos repositorios declaran ahora `MIT` y su
   autor, que es lo que dicen los dos archivos `LICENSE`.
