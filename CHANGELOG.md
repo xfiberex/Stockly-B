@@ -165,6 +165,18 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Corregido
 
+- **Los modales también se miden a 412 px.** El repaso de móvil llegó a las pantallas y no
+  a lo que se abre encima. En el detalle de producto, las dos acciones eran `flex-1` en una
+  fila y `flex-1` **no reparte a partes iguales** —el mínimo de un elemento flexible es su
+  contenido—: «Ver movimientos» salía a 146 px partido en dos líneas y «Editar producto» a
+  178 en una. Ahora se apilan hasta `sm` y miden los dos 348. Los campos pasan a una columna
+  —a dos quedaban 116 px de texto, y «12 ago 2026, 10:36 a.m.» ocupaba tres líneas—, la
+  miniatura baja a 64 px y el `Modal` usa `px-4` hasta `sm`, como el contenedor de página.
+- **Una acción que navega vuelve a ser un solo control.** El botón de «Ver movimientos» era
+  un `<Button>` dentro de un `<Link>`: HTML inválido y **dos paradas de tabulación para una
+  sola acción**, el mismo defecto que T2-14 quitó de la tabla de productos y que volvió aquí.
+  Como reaparecer es lo que lo convierte en regla, ahora lo vigila `accesibilidad.test.ts`
+  en todo `src/`.
 - **Repaso de la interfaz en móvil, medido a 412 px** (Galaxy S20 Ultra). El valor del
   inventario se salía de su tarjeta en Reportes; los filtros de Productos cabían dos por
   fila pero ninguno dejaba leer la opción elegida; en las órdenes de compra y venta las
