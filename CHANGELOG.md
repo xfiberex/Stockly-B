@@ -99,6 +99,17 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **La navegación en pantallas anchas pasa a una barra lateral** (`T4-10`). De 1024 px en
+  adelante, los doce destinos están desplegados y **ninguna sección cuesta ya dos clics**:
+  antes nueve de los doce módulos vivían dentro de uno de los tres desplegables de la barra
+  superior. La cabecera se queda con la marca y la sesión, y **deja de ser `<nav>` para ser
+  `<header>`** — un *landmark* de navegación que no lleva a ninguna parte solo estorba a
+  quien recorre la página por regiones. Por debajo de 1024 px no cambia nada: sigue el panel
+  desplegable de siempre. La sección actual se marca con color **y** con `aria-current`.
+  - Con ello, **`NavDropdown` se retira**: sin barra horizontal se quedó sin usuarios.
+  - Y desaparece la duplicidad que no estaba en la ficha: móvil y escritorio tenían **dos
+    recorridos con órdenes distintos**, así que cada destino nuevo había que darlo de alta
+    dos veces. Ahora los dos envoltorios pintan la misma lista.
 - **La especificación OpenAPI deja de escribirse a mano.** Los 23 esquemas de
   `components` se derivan del contrato (respuestas) y de los `*.validator.ts` (peticiones)
   con la conversión nativa de Zod 4, sin dependencias nuevas; las rutas siguen escritas,

@@ -56,17 +56,17 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **424/424** | **522/522** *(+1 omitido)* |
+| Tests | **424/424** | **520/520** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-08-11): **9 pasados,
+de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 10/17** · Total **107/114**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 12/17** · Total **109/114** *(una de ellas, T4-17, **descartada** y no hecha)*. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -100,8 +100,24 @@ prueba de k6 con diez usuarios sostenidos. Destapó lo que el análisis de esque
 **`GET /products/:id/movements` no pagina**, y con un producto de 100 000 movimientos hunde la
 API entera a 5.27 req/s (→ **T4-15**); y el dashboard tarda 1.91 s en el p(95), en parte porque
 `work_mem` está en 4 MB y sus ordenaciones se van a disco (→ **T4-16**). Todo en
-[rendimiento.md](rendimiento.md). Las siete restantes siguen fuera de alcance, listadas para
-que no hacerlas sea una decisión consciente.
+[rendimiento.md](rendimiento.md).
+
+**T4-09** llevó Lighthouse y el teclado a la aplicación desplegada, y encontró que el criterio no
+se cumplía justo donde peor sienta: el **login estaba en 93**. Las cuatro pantallas medidas están
+hoy en 100. La mitad de lector de pantalla **no se pudo hacer** —no hay NVDA ni VoiceOver en esta
+máquina— y quedó como **T4-17** en vez de darse por buena. **El 2026-08-12 esa tarea se descartó
+por decisión de alcance:** el listón de accesibilidad del proyecto es **teclado más árbol de
+accesibilidad**, que es lo que se puede ejecutar y repetir aquí. Lo que eso deja sin cubrir —si la
+secuencia se entiende de oído— está escrito en [accesibilidad.md](accesibilidad.md) §4, asumido y
+no comprobado.
+
+Y **T4-10**, la última del bloque de interfaz: de 1024 px en adelante la navegación es una **barra
+lateral** con los doce destinos desplegados, así que ninguna sección cuesta ya dos clics, y la
+cabecera —que se queda con la marca y la sesión— pasa de `<nav>` a `<header>`. `NavDropdown` se
+retiró: sin barra horizontal no lo usaba nadie. El hallazgo que no estaba en la ficha es que había
+**dos recorridos de navegación**, uno para móvil y otro para escritorio, con órdenes distintos; hoy
+son un array y dos envoltorios, y un test lo vigila. Las cinco restantes siguen fuera de alcance,
+listadas para que no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -113,9 +129,10 @@ tras nginx— se levanta con `docker compose up -d --build` y el login funciona 
 *Dos apuntes sobre las cifras. La cobertura del frontend cruzó por fin el objetivo del roadmap
 (**49.74 %**, meta ≥ 45 %) al cubrir `ProductsPage`, la navegación y los guardianes de diseño. Y el
 denominador subió de 104 a 107 el 2026-08-09 con `T2-46`–`T2-48`, tres hallazgos de un repaso de la
-aplicación en marcha anotados ya cerrados, a 108 el 2026-08-10 con `T4-11` y a 110 el 2026-08-11 con
-`T4-12` y `T4-13`: **no descontaron ni una tarea de la lista de trabajo**, porque ninguno estaba en
-ella.*
+aplicación en marcha anotados ya cerrados, a 108 el 2026-08-10 con `T4-11`, a 110 el 2026-08-11 con
+`T4-12` y `T4-13`, y a 114 ese mismo día con `T4-14`–`T4-17`: **no descontaron ni una tarea de la
+lista de trabajo**, porque ninguno estaba en ella. Que cuatro de las seis abiertas las abrieran los
+propios cierres es lo que pasa cuando una tarea se cierra midiendo en vez de mirando.*
 
 **Las fichas de la auditoría son pistas, no descripciones verificadas.** Cuatro se comprobaron
 equivocadas al abordarlas: la premisa de `T3-08` era **falsa** (Heroicons ya emitía `aria-hidden`,
@@ -589,6 +606,11 @@ qué resumen y qué códigos devuelven no se deduce de un esquema.
   `role="menu"`, que ya tenía: ahí dentro hay un comando de verdad («Cerrar sesión»). **Lo destapó
   el E2E**, que dejó de encontrar «Productos» por rol de enlace: una prueba ajena señalando un
   problema real, no un selector viejo.
+  **T4-10 retiró `NavDropdown`** —los destinos viven desplegados en la barra lateral—, así que hoy
+  la regla no tiene a quién aplicarse; se conserva escrita porque **la conclusión sigue viva**: si
+  alguna vez vuelve a haber un desplegable de navegación, no es un `menu`. Lo que sí quedó del
+  cierre de T2-16 es `useMenuDesplegable`, con un solo usuario (`UserMenu`) y el comportamiento de
+  teclado que costó la tarea.
 - **Al añadir una ruta hay que darle título** en `Stockly-F/src/shared/lib/titulos.ts`, o
   `titulos.test.ts` falla — a propósito: sin entrada, al llegar a esa sección se anunciaría «Página
   no encontrada», que es peor que el silencio. No se leen del `<h1>` porque, con las rutas en

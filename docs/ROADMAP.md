@@ -5,20 +5,33 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-11 — **104 / 110**
+> ## Estado al 2026-08-12 — **109 / 114**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
-> Tier 3 (15/15). Del **Tier 4** —que la auditoría dejó fuera del alcance inmediato— se abordaron
-> **T4-01**, **T4-02**, **T4-03**, **T4-11**, **T4-04** y **T4-05**: las dos primeras por ser la
-> causa raíz común de T0-03, T1-03 y T1-05 y su consecuencia directa; la tercera porque T2-35–T2-37
-> ya habían hecho el trabajo caro; la cuarta —que no viene de la auditoría— porque el cierre de
-> T4-03 dejó anotado que faltaba el conmutador manual; la quinta porque el contrato de T4-01 ya
-> permitía que los errores viajaran con código; la sexta porque el valor del sistema es un
-> histórico de inventario del que no había ninguna copia, y **T4-06** porque de nada sirve saber
-> restaurar si nadie se entera de que hay que hacerlo. Las 6 restantes siguen fuera de alcance.
+> Tier 3 (15/15). El **Tier 4** —que la auditoría dejó fuera del alcance inmediato— va por
+> **12/17**, y una de esas doce está **descartada, no hecha**: **T4-17**, el recorrido con lector
+> de pantalla, se cerró el 2026-08-12 por decisión de alcance. El listón de accesibilidad del
+> proyecto es **teclado más árbol de accesibilidad**; lo que eso no cubre está escrito en su ficha
+> y en [accesibilidad.md](accesibilidad.md), no dado por bueno. Las
+> dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su consecuencia directa;
+> **T4-03** porque T2-35–T2-37 ya habían hecho el trabajo caro; **T4-11** —que no viene de la
+> auditoría— porque el cierre de T4-03 dejó anotado que faltaba el conmutador manual; **T4-04**
+> porque el contrato de T4-01 ya permitía que los errores viajaran con código; **T4-05** porque el
+> valor del sistema es un histórico de inventario del que no había ninguna copia; **T4-06** porque
+> de nada sirve saber restaurar si nadie se entera de que hay que hacerlo; y **T4-10** la última,
+> porque era lo que decía su propia ficha: es un cambio de layout que toca T2-16, T2-18 y T3-04, y
+> ninguna de las tres debía rehacerse dos veces.
 >
-> Backend **414/414** tests y 91.83 % de sentencias; frontend **498/498** y 53.14 %; E2E 9 pasados
-> y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
+> **Las 5 abiertas son las tres que abrieron los propios cierres** —T4-14, T4-15 y T4-16— más
+> **T4-12** y **T4-13**.
+>
+> Backend **424/424** tests y 91.83 % de sentencias; frontend **520/520** y 1 omitido; E2E 9
+> pasados y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
+>
+> **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
+> 104/110 y el índice daba 13 tareas al Tier 4 mientras las casillas sumaban 107/114: al cerrar una
+> tarea hay que tocar **la casilla, la cabecera, el índice y Progreso**, y es el índice el que se
+> queda atrás cuando se abre una tarea nueva.
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
 > se comprobaron equivocadas al abordarlas (`T3-03`, `T3-05`, `T3-08`, `T3-09`); la corrección está
@@ -34,10 +47,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 1** | Alta prioridad — funcionalidades rotas, verificación local, autorización, accesibilidad grave | 26 | 23 / 3 / 0 |
 | **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
-| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 13 | 2 / 6 / 5 |
-| | **Total** | **110** | **80 / 25 / 5** |
+| **Tier 4** | Futuro / opcional — fuera del alcance inmediato | 17 | 2 / 10 / 5 |
+| | **Total** | **114** | **80 / 29 / 5** |
 
-*Diez tareas no vienen de la auditoría, y por eso el total pasa de 100 a 110: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, y `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05.*
+*Catorce tareas no vienen de la auditoría, y por eso el total pasa de 100 a 114: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05, y `T4-14`–`T4-17` el 2026-08-11, de lo que destaparon T4-07 (el árbol de producción que infla la CLI de Prisma), T4-08 (el histórico sin paginar y el `work_mem`) y T4-09 (el lector de pantalla que no se pudo ejecutar).*
+
+*Que **tres de las cinco abiertas las abrieran los propios cierres** no es un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. Ninguna de las tres se habría visto sin ejecutar la anterior. La cuarta de aquel grupo, `T4-17`, se descartó por decisión de alcance el 2026-08-12.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1495,15 +1510,16 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Core Web Vitals mejor que la línea base:** LCP **420 ms** en producción frente a 556 ms en desarrollo (2 ms de TTFB, el resto arranque de la SPA), CLS **0.02** igual, cero errores de consola.
   - **El 63 de SEO no es una regresión, es la decisión de T3-12.** Lighthouse penaliza que la página esté bloqueada para indexar, y un inventario privado debe estarlo. Lo mismo con «agentic browsing», que mide si hay `llms.txt`.
   - **Descartado tras comprobarlo:** el árbol anunciaba el campo «Cantidad» con mínimo 1 y **máximo 0**, que parecía un `max` mal puesto. En el DOM no hay atributo `max`: es como Chrome serializa su ausencia.
-  - **Salvedad, y es parte del criterio: no se ha ejecutado NVDA ni VoiceOver.** Esta máquina no tiene ninguno, y «ejecutarlo» sin escuchar la salida no demuestra nada. Lo comprobado es el árbol de accesibilidad —que es lo que un lector lee— y que los flujos se completan sin ratón; no es lo mismo, porque el árbol dice qué se anunciaría, no si el recorrido resulta comprensible al oído. → **T4-17**.
+  - **Salvedad, y es parte del criterio: no se ha ejecutado NVDA ni VoiceOver.** Esta máquina no tiene ninguno, y «ejecutarlo» sin escuchar la salida no demuestra nada. Lo comprobado es el árbol de accesibilidad —que es lo que un lector lee— y que los flujos se completan sin ratón; no es lo mismo, porque el árbol dice qué se anunciaría, no si el recorrido resulta comprensible al oído. Se anotó como **T4-17**, y el **2026-08-12 esa tarea se descartó por decisión de alcance**: la salvedad no se resolvió comprobándola, se resolvió acordando que el listón del proyecto es teclado más árbol de accesibilidad. **Sigue sin haberse escuchado.**
 
-- [ ] **[T4-10] Navegación lateral en pantallas anchas**
+- [x] **[T4-10] Navegación lateral en pantallas anchas** ✅ *(2026-08-12)*
   - **Área:** UI/UX
-  - **Ubicación:** `Stockly-F/src/App.tsx:184-236`, `Stockly-F/src/routes/index.tsx`
-  - **Qué hacer:** Con doce módulos, la barra superior con tres desplegables (Catálogo, Órdenes, Admin) obliga a dos interacciones para alcanzar la mayoría de destinos y no comunica bien la ubicación actual. La regla de navegación adaptativa recomienda barra lateral a partir de 1024 px, conservando la barra superior por debajo. **Se deja explícitamente fuera del alcance inmediato:** es un cambio de layout que toca T2-16 (ARIA de los desplegables), T2-18 (gestión de foco al cambiar de ruta), T3-04 (intercalado de enlaces) y los tests de `App`, y ninguna de esas tareas debería rehacerse dos veces. Reevaluar cuando el Tier 2 de accesibilidad esté cerrado.
+  - **Ubicación:** `Stockly-F/src/App.tsx`
+  - **Qué hacer:** Con doce módulos, la barra superior con tres desplegables (Catálogo, Órdenes, Admin) obliga a dos interacciones para alcanzar la mayoría de destinos y no comunica bien la ubicación actual. La regla de navegación adaptativa recomienda barra lateral a partir de 1024 px, conservando la barra superior por debajo. **Se dejó explícitamente fuera del alcance inmediato** hasta cerrar el Tier 2 de accesibilidad: es un cambio de layout que toca T2-16 (ARIA de los desplegables), T2-18 (gestión de foco al cambiar de ruta), T3-04 (intercalado de enlaces) y los tests de `App`, y ninguna de esas tareas debía rehacerse dos veces.
   - **Criterio de aceptación:** si se aborda, todas las secciones son alcanzables en un clic a ≥1024 px, la sección actual queda destacada y la navegación por teclado y lector de pantalla sigue cumpliendo lo verificado en T2-16 y T2-18.
   - **Esfuerzo:** medio
   - **Depende de:** T2-16, T2-18, T3-04
+  - **Resultado:** barra lateral de 240 px desde `lg`, con los doce destinos desplegados; la cabecera se queda con la marca y la sesión y pasa de `<nav>` a `<header>`. El panel de móvil no cambia de sitio pero sí de contenido: los dos envoltorios pintan ahora **la misma lista**, así que el orden dejó de estar duplicado. `NavDropdown` se retiró — sin barra horizontal no lo usaba nadie.
 
 - [x] **[T4-11] Selector de tema en Configuración: claro, oscuro o automático** ✅ *(2026-08-10)*
   - **Área:** UI/UX
@@ -1559,7 +1575,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Esfuerzo:** medio
   - **Depende de:** T4-08
 
-- [ ] **[T4-17] Recorrido real con lector de pantalla**
+- [x] **[T4-17] Recorrido real con lector de pantalla** — **descartada** *(2026-08-12)*
   - **Área:** Accesibilidad
   - **Ubicación:** aplicación desplegada
   - **Origen:** es la mitad del criterio de T4-09 que **no se pudo comprobar**, no un hallazgo nuevo.
@@ -1567,6 +1583,8 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** los dos flujos se completan con lector de pantalla y sin mirar la pantalla, y queda anotado lo que haya que corregir.
   - **Esfuerzo:** medio
   - **Depende de:** T4-09
+  - **Resolución (2026-08-12): se descarta por decisión de alcance.** El listón de accesibilidad de este proyecto pasa a ser **teclado más árbol de accesibilidad**, que es lo que sí se puede ejecutar y repetir en las máquinas donde se trabaja; el recorrido con lector queda fuera. No se cierra porque se haya hecho —**no se ha hecho**—, sino porque deja de estar en la lista de trabajo.
+  - **Lo que eso deja sin cubrir, y se asume a sabiendas:** que la secuencia se entienda **de oído**. El árbol dice qué se anunciaría, no cómo suena: un orden correcto en el DOM puede resultar incomprensible leído, una tabla puede recitar sus cabeceras en cada celda y un aviso de `react-hot-toast` puede no llegar a anunciarse nunca. **Nada de eso lo ve `verify`,** y ninguna de las guardias estáticas de T4-09 lo sustituye. Si algún día hay una máquina con NVDA, esto se reabre: el trabajo sigue teniendo sentido, lo que se decidió es no bloquear el proyecto esperándolo.
 
 - [ ] **[T4-16] El dashboard a escala: `work_mem` y la consulta de rotación**
   - **Área:** Rendimiento
@@ -1671,7 +1689,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | DS-06 Escala tipográfica implícita; `font-black` sin peso importado | Bajo | T2-41 ✅ |
 | DS-07 Radios y sombras sin convención | Bajo | T3-14 ✅ |
 | DS-08 Sistema de diseño sin documentar | Bajo | T3-15 ✅ |
-| DS-09 Navegación superior con doce módulos | Bajo | T4-10 — *Tier 4, fuera de alcance* |
+| DS-09 Navegación superior con doce módulos | Bajo | T4-10 ✅ |
 
 ---
 
@@ -1681,7 +1699,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
-| 2026-08-11 | **T4-09** Auditoría de navegador y de lector de pantalla — **completada, con una salvedad** | Lighthouse sobre la **pila del compose** (build de producción tras nginx): login **93 → 100**, productos **94 → 100**, movimientos **95 → 100**, dashboard 100. Buenas prácticas 100 en las cuatro. Core Web Vitals mejor que la línea base: **LCP 420 ms** frente a 556 ms, **CLS 0.02**, cero errores de consola. Los dos flujos recorridos **solo con teclado**, y el de movimiento **ejecutado**: stock de 10 a 15. `verify` ✅ frontend **522/522** | **El criterio no se cumplía: el login estaba en 93**, y es la primera pantalla del producto. **Tres fallos que no se ven mirando:** ocho desplegables sin nombre accesible en cuatro pantallas —lo visible es la opción elegida, que dice el *valor*, no de qué es el filtro—; las siete pantallas sin sesión **sin landmark `<main>`**, con el marco copiado en las siete; y enlaces distinguidos **solo por el color**, con el subrayado reservado al `hover`. **Un cuarto lo dio el árbol de accesibilidad, no Lighthouse:** el menú de usuario enseñaba «Admin Principal» y se anunciaba «Menú de usuario» (WCAG 2.5.3) — por voz se dice lo que se ve y no pasaba nada. **La trampa de foco se comprobó por sus dos bordes**, que es donde se rompe. **Descartado tras mirarlo:** el «máximo 0» del campo Cantidad es cómo Chrome serializa un `max` ausente. **El 63 de SEO no es regresión**, es el bloqueo de indexación que decidió T3-12. **Salvedad: no se ejecutó NVDA ni VoiceOver** —no hay ninguno en esta máquina— → **T4-17**. |
+| 2026-08-12 | **T4-17** Recorrido real con lector de pantalla — **descartada** | Ninguna: **no se ha ejecutado NVDA ni VoiceOver**, y esta fila no dice lo contrario. Lo que queda como listón verificado es lo de T4-09: los dos flujos completados **solo con teclado** y el árbol de accesibilidad leído pantalla por pantalla | **Decisión de alcance, no un cierre por trabajo hecho.** El listón de accesibilidad del proyecto pasa a ser **teclado + árbol de accesibilidad**, que es lo que se puede ejecutar y repetir en las máquinas donde se trabaja. **Lo que se asume a sabiendas:** el árbol dice *qué* se anunciaría, no si la secuencia se entiende **de oído** — una tabla puede recitar sus cabeceras en cada celda, un aviso de `react-hot-toast` puede no anunciarse nunca y un orden correcto en el DOM puede resultar incomprensible leído. **Nada de eso lo ve `verify`.** Se reabre si aparece una máquina con lector; lo que se decidió es no bloquear el proyecto esperándola. |
+| 2026-08-12 | **T4-10** Navegación lateral en pantallas anchas — **completada** | Medido sobre la **pila del compose**. **El punto de ruptura, por sus dos lados:** a 1024 px la barra lateral está visible y la hamburguesa no; a **1023 px es al revés**, sin solaparse ni un píxel. Los **doce destinos a un clic**, sin un solo `<button>` en el lateral. Lighthouse de accesibilidad **100** en dashboard y productos, buenas prácticas 100. **T2-18 intacta**, comprobada activando un enlace con Enter: el foco acaba en `#contenido`, la región viva anuncia «Marcas» y el título cambia. **T2-16 intacta:** Escape cierra el menú de usuario y devuelve el foco a su disparador. `verify` ✅ frontend **520/520** y 1 omitido, E2E ✅ 9 y 1 omitido en `chromium` y `Mobile Chrome` | **La tarea pedía una barra lateral y lo que hacía falta era quitar los desplegables.** Con ellos puestos, la mayoría de destinos costaban dos interacciones; desplegados en el lateral, `NavDropdown` se quedó sin usuarios y se retiró con su test. **Lo que no estaba en la ficha: había dos recorridos, no uno.** El móvil agrupaba por tipo —enlaces sueltos arriba, secciones debajo— y el escritorio los intercalaba, así que cada destino nuevo había que darlo de alta dos veces y nada avisaba si se olvidaba uno; ahora los dos envoltorios pintan la misma lista y **eso es lo que vigila el test**, no que cada uno coincida por separado con lo esperado. **Tres decisiones que no se ven y sostienen el resto:** la cabecera pasa a `<header>` porque de `lg` en adelante no lleva ningún destino y un *landmark* de navegación que no navega es ruido para un lector de pantalla; los dos `<nav>` comparten `aria-label` sin chocar porque el oculto es `display: none` y no entra en el árbol; y **`min-w-0` en el `<main>`** —sin él las tablas de `min-w-160` empujan el contenido fuera de la ventana, que es el mismo mecanismo del `w-full` que dejó los selects sin texto, visto del otro lado—. **Corregido al mirarlo en el navegador:** los destinos de un grupo no llevan icono y su texto arrancaba 26 px a la izquierda del de «Dashboard», así que la lista se leía como si los hijos fueran los de fuera. **La sección activa se marca dos veces**, `text-info` y `aria-current="page"`: el color solo no vale (WCAG 1.4.1). **De paso:** los contadores de este documento estaban desfasados —la cabecera decía 104/110 y el índice daba 13 tareas al Tier 4—; contadas las casillas, eran 107/114 antes de esta. |
+| 2026-08-11 | **T4-09** Auditoría de navegador y de lector de pantalla — **completada, con una salvedad** | Lighthouse sobre la **pila del compose** (build de producción tras nginx): login **93 → 100**, productos **94 → 100**, movimientos **95 → 100**, dashboard 100. Buenas prácticas 100 en las cuatro. Core Web Vitals mejor que la línea base: **LCP 420 ms** frente a 556 ms, **CLS 0.02**, cero errores de consola. Los dos flujos recorridos **solo con teclado**, y el de movimiento **ejecutado**: stock de 10 a 15. `verify` ✅ frontend **522/522** | **El criterio no se cumplía: el login estaba en 93**, y es la primera pantalla del producto. **Tres fallos que no se ven mirando:** ocho desplegables sin nombre accesible en cuatro pantallas —lo visible es la opción elegida, que dice el *valor*, no de qué es el filtro—; las siete pantallas sin sesión **sin landmark `<main>`**, con el marco copiado en las siete; y enlaces distinguidos **solo por el color**, con el subrayado reservado al `hover`. **Un cuarto lo dio el árbol de accesibilidad, no Lighthouse:** el menú de usuario enseñaba «Admin Principal» y se anunciaba «Menú de usuario» (WCAG 2.5.3) — por voz se dice lo que se ve y no pasaba nada. **La trampa de foco se comprobó por sus dos bordes**, que es donde se rompe. **Descartado tras mirarlo:** el «máximo 0» del campo Cantidad es cómo Chrome serializa un `max` ausente. **El 63 de SEO no es regresión**, es el bloqueo de indexación que decidió T3-12. **Salvedad: no se ejecutó NVDA ni VoiceOver** —no hay ninguno en esta máquina— → **T4-17**, *descartada por decisión de alcance el 2026-08-12: la salvedad no se comprobó, se asumió*. |
 | 2026-08-11 | **T4-08** Pruebas de carga sobre los flujos de inventario — **completada** | Conjunto de **100 000 productos y 1 100 000 movimientos** (467 MB) en una base aparte. **Antes/después de los índices sobre el mismo dato**, quitándolos y reponiéndolos: el histórico de un producto pasa de `Parallel Seq Scan` a `Bitmap Heap Scan` y de **62.7 ms a 0.2 ms** (×384); cuatro consultas mejoran entre ×143 y ×384. Carga sostenida de 10 usuarios × 60 s: **1495 peticiones, 18.55 req/s, 0 % de errores**, umbrales cumplidos. Informe en [rendimiento.md](rendimiento.md) | **T1-15 confirmada, y con una sorpresa:** dos consultas salen *peor* con índices, y no por el índice — el plan deja de ser paralelo y el `Sort` de encima se va a disco con `work_mem` de 4 MB. A 64 MB la rotación pasa de **480 ms a 121 ms**. **El hallazgo grande no estaba en la ficha:** `GET /products/:id/movements` **no pagina**; con un producto de 100 000 movimientos el rendimiento cae a **5.27 req/s**, se transfieren **1.6 GB** y el histórico de un producto *normal* pasa de 177 ms a **3.17 s**. La base tarda **15 ms**: el resto es serializar 19 MB de JSON en el bucle de eventos. → **T4-15** y **T4-16**. **Dos defectos del propio banco de pruebas, ambos creíbles y falsos:** categoría y estado activo derivados del mismo módulo dejaban **una categoría entera inactiva** —la consulta del catálogo devolvía cero filas y el índice parecía empeorarla—; y **un umbral de k6 sin muestras se da por cumplido**, así que una pasada que reventó en `setup` informó de cuatro `p(95)=0s` en verde. |
 | 2026-08-11 | **T4-07** Auditoría de dependencias y licencias — **completada** | **0 vulnerabilidades** en las 296 dependencias de producción del backend y las 118 del frontend, en todas las severidades, y **ni GPL, ni LGPL, ni AGPL, ni SSPL** en ninguno de los dos árboles. La puerta se demuestra **en rojo** con informes fabricados (18 tests entre los dos repos), porque con el árbol limpio ejecutarla no distingue una comprobación que funciona de una que no mira nada. `verify` ✅ backend **424/424**, frontend **518/518** | **La trampa:** `pnpm audit --json` con el registro caído **sigue imprimiendo un informe con las cinco severidades a cero** — la auditoría que nunca se hizo se lee igual que la limpia. Se distinguen por la clave `error` del JSON, no por el código de salida. **Sin red avisa y no falla** (`--estricto` invierte eso): sin CI, `verify` corre en portátiles, y una puerta que se pone roja sin conexión se acaba esquivando. La de **licencias sí es dura y no necesita red**: sale del lockfile y para el gate ante una licencia sin revisar. **Dos listas y no una compartida** —el navegador trae MPL-2.0 y OFL-1.1, el servidor EPL-2.0—, porque la unión dejaría pasar en un repositorio lo revisado solo para el otro. **Una obligación real sin cumplir:** los `.woff2` de Inter se copian a `dist/`, así que la aplicación distribuye la tipografía y la OFL exige que el aviso la acompañe → `public/AVISOS-DE-TERCEROS.txt`, generado leyendo la licencia de los 118 paquetes. **Confirmada la incoherencia que la ficha anticipaba** (`ISC` declarada, `LICENSE` MIT). **Hallazgo nuevo:** `prisma` en `dependencies` arrastra `@prisma/studio-core` y su árbol de gráficos — ahí está la única EPL-2.0 y la diferencia entre 296 paquetes y los ~100 necesarios → **T4-14**. |
 | 2026-08-11 | **T4-06** Monitorización y alertas — **completada** | **El criterio, ejecutado por HTTP contra la aplicación entera:** provocados 5xx reales hasta cruzar el umbral, sale el aviso por correo con las rutas y un `requestId`, y no sale por debajo del umbral ni durante el enfriamiento. Las reglas de Prometheus pasan `promtool test rules` ✅ —disparan con un 20 % de errores y **no** con tráfico sano—, y los dos archivos de configuración, `promtool check config` y `amtool check-config` ✅. `verify` ✅ **414/414**, cobertura 91.83 % | **Dos capas, y ninguna sobra:** la alerta en proceso avisa sin desplegar nada, pero no puede avisar de que el proceso ha muerto —un proceso muerto no manda correos—; eso es `up == 0` en Prometheus. **La prueba de las reglas destapó el número que justifica esa duplicidad:** de la primera 5xx a la alerta de Prometheus pasan **~8 min y medio**, y el `for: 2m` solo explica dos; el resto lo pone la ventana del `rate[5m]`. A ojo se habría dado por bueno «dos minutos». **Dos defectos propios encontrados midiendo:** `req.baseUrl + req.route.path` da `/:id` en Express 5 —restaura `baseUrl` al desapilar el router, y con un 5xx responde `errorHandler`, que vive fuera—, así que los doce módulos habrían caído en una sola serie; y ni Prometheus ni Alertmanager **expanden `${VARIABLES}`** en su configuración, cosa que se manifiesta como un objetivo caído con 401 y ninguna pista. **La cardinalidad se trata como lo que es**, un agujero de memoria explotable desde fuera: se etiqueta con la plantilla de ruta y lo no casado va a una etiqueta fija. `/metrics` responde **404** en producción sin token. El agregador de logs no necesitó código: T2-10 ya dejó JSON por línea con `requestId`. |
@@ -1803,11 +1823,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 ### Métricas
 
-| Métrica | Inicial (auditoría) | Actual (2026-08-11) | Objetivo |
+| Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **424/424** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **522/522** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **520/520** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano; bajan 2 al retirar `NavDropdown` con T4-10)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
@@ -1816,6 +1836,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
 | Esquemas del spec escritos a mano | 14 *(~180 líneas de objeto literal)* | **0** ✅ *(23 derivados; solo `ProductWrite.image` es manual, T4-02)* | que la documentación se derive de la validación |
 | Estados que se comunican solo por color | 3 conjuntos *(stock, orden, movimiento)* | **0** ✅ | 0 (WCAG 1.4.1) |
+| Interacciones para alcanzar una sección a ≥1024 px | 2 *(nueve de los doce módulos vivían dentro de un desplegable)* | **1** ✅ *(los doce a un clic; ni un botón en el lateral, T4-10)* | 1 |
+| Recorridos de navegación que mantener a la vez | 2 *(el de la barra y el del panel de móvil, con órdenes distintos)* | **1** ✅ *(un array, dos envoltorios; lo vigila un test, T4-10)* | 1 |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
 | E2E (Playwright) | 2 escenarios, arranque manual | **10 en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 9 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome` ✅ | escenarios que crucen la frontera |
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |

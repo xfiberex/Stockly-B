@@ -3,7 +3,8 @@
 Lighthouse y recorrido de teclado sobre la **aplicación desplegada** (T4-09). Los hallazgos de
 accesibilidad de la auditoría del 2026-08-04 eran estáticos: leían el código, no lo ejecutaban.
 
-**Fecha:** 2026-08-11. **Sobre qué:** la pila del compose —build de producción servido por
+**Fecha:** 2026-08-11, con una revisión el **2026-08-12** por el cambio de navegación de T4-10
+(§6). **Sobre qué:** la pila del compose —build de producción servido por
 nginx, un solo origen— en `http://localhost:8080`, no el servidor de desarrollo. **Con qué:**
 Lighthouse (escritorio) y CDP para el recorrido de teclado y el árbol de accesibilidad.
 
@@ -111,8 +112,18 @@ confirma cumplida sobre la aplicación en marcha.
 no tiene ninguno de los dos; tampoco sirve de nada «ejecutarlo» sin escuchar la salida. Lo que
 sí se ha hecho es comprobar lo que un lector de pantalla lee —el árbol de accesibilidad, que
 es su fuente— y que los dos flujos se completan sin ratón. **Son cosas distintas:** el árbol
-dice qué se anunciaría, no cómo suena ni si el recorrido resulta comprensible. Queda pendiente
-un recorrido real con lector, anotado como **T4-17**.
+dice qué se anunciaría, no cómo suena ni si el recorrido resulta comprensible. Se anotó como
+**T4-17**.
+
+> **Decisión del 2026-08-12: T4-17 se descarta.** El listón de accesibilidad de este proyecto
+> es **teclado más árbol de accesibilidad** — lo que se puede ejecutar y repetir en las
+> máquinas donde se trabaja. El recorrido con lector queda fuera del alcance.
+>
+> **Esto no convierte lo de arriba en comprobado.** Sigue sin cubrirse que la secuencia se
+> entienda **de oído**: una tabla puede recitar sus cabeceras en cada celda, un aviso de
+> `react-hot-toast` puede no llegar a anunciarse nunca y un orden correcto en el DOM puede
+> resultar incomprensible leído. **Ninguna guardia de `verify` mira eso**, y ninguna de las
+> tres que dejó T4-09 lo sustituye. Se reabre si aparece una máquina con lector.
 
 **El 63 de SEO no es un fallo.** Lighthouse penaliza que la página **esté bloqueada para
 indexar**, y eso es exactamente lo que se decidió en T3-12: un sistema de inventario privado
@@ -140,3 +151,36 @@ cuatro pantallas de la tabla, con sesión iniciada para las tres últimas.
 servidor de desarrollo no minifica, sirve otros módulos y da cifras que no son las que verá
 nadie. Y `vite preview` tampoco vale de sustituto: no aplica `server.proxy`, así que la SPA se
 quedaría sin API.
+
+---
+
+## 6. Revisión del 2026-08-12 — la barra lateral (T4-10)
+
+T4-10 cambió el armazón de navegación de todas las pantallas con sesión, así que hubo que
+volver a medir. **Nada de lo de arriba se movió:** Lighthouse sigue en **100** de
+accesibilidad y **100** de buenas prácticas en dashboard y productos, sobre la misma pila del
+compose.
+
+Lo específico de este cambio, comprobado sobre la aplicación en marcha:
+
+| Qué | Resultado |
+|---|---|
+| Los doce destinos a un clic a ≥1024 px | ✅ doce enlaces, **ningún botón** en la barra lateral |
+| El punto de ruptura, por sus dos lados | ✅ a **1024 px** lateral visible y hamburguesa oculta; a **1023 px** al revés |
+| Sección actual destacada | ✅ `text-info` **y** `aria-current="page"` — el color solo no vale (WCAG 1.4.1) |
+| Landmarks del árbol | ✅ `banner` → `navigation "Secciones"` → `main`, uno de cada |
+| T2-18: cambio de ruta con teclado | ✅ Enter en un enlace deja el foco en `#contenido`, la región viva dice «Marcas» y el título cambia |
+| T2-16: menú de usuario | ✅ Escape lo cierra y devuelve el foco a su disparador |
+| T2-11: saltar al contenido | ✅ sigue siendo el primer tabulable, y **ahora importa más**: por delante del contenido hay doce enlaces en vez de cinco controles |
+| Desbordamiento horizontal | ✅ ninguno; la tabla de `min-w-160` se desplaza dentro de su contenedor, como debe |
+
+**Los dos `<nav>` comparten `aria-label` y no chocan.** Por debajo de `lg` el lateral es
+`display: none` y por encima lo es el panel de móvil: lo que no se pinta no entra en el árbol
+de accesibilidad, así que en ningún ancho hay dos regiones de navegación con el mismo nombre.
+Comprobado en los dos, no deducido.
+
+**Lo que sigue sin comprobarse es lo mismo que en §4:** ningún lector de pantalla real ha
+recorrido esta barra lateral, y con la decisión del 2026-08-12 ninguno va a hacerlo. Doce
+enlaces por delante del contenido en cada pantalla es justo el tipo de cosa que se juzga
+escuchándola; lo que la sostiene aquí es el enlace de saltar al contenido, que **sí** está
+verificado (§6).
