@@ -4,9 +4,15 @@ import { hashPassword, comparePassword } from "@/shared/lib/hash";
 import { generateToken, hashToken } from "@/shared/lib/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/shared/lib/nodemailer";
 import { auditService } from "@/modules/audit-logs";
+import type { Idioma } from "@/shared/i18n/correos";
 
 export const authService = {
-    async register(email: string, password: string, name: string) {
+    /**
+     * `idioma` viene de `Accept-Language` (T4-12) y **no de la base**: es el único correo
+     * que se manda a alguien que todavía no tiene fila donde consultarlo. Se guarda en la
+     * que se crea aquí, así que a partir del segundo correo ya sale de ella.
+     */
+    async register(email: string, password: string, name: string, idioma: Idioma) {
         const existing = await prisma.user.findUnique({ where: { email } });
         if (existing) throw new HttpError(409, "El correo ya está registrado", "EMAIL_ALREADY_REGISTERED");
 
@@ -27,12 +33,13 @@ export const authService = {
                 email,
                 password: hashed,
                 role: "USER",
+                idioma,
                 verifyToken: hash,
                 verifyExpires: expires,
             },
         });
 
-        await sendVerificationEmail(email, name, raw);
+        await sendVerificationEmail(email, name, raw, idioma);
     },
 
     async verifyEmail(rawToken: string) {
@@ -61,7 +68,9 @@ export const authService = {
             data: { verifyToken: hash, verifyExpires: expires },
         });
 
-        await sendVerificationEmail(email, user.name ?? "Usuario", raw);
+        // Aquí el usuario ya existe, así que el idioma sale de su fila y no de la cabecera:
+        // quien reenvía la verificación puede estar haciéndolo desde otro navegador.
+        await sendVerificationEmail(email, user.name ?? "Usuario", raw, user.idioma);
     },
 
     async login(email: string, password: string) {
@@ -178,7 +187,7 @@ export const authService = {
             data: { resetToken: hash, resetExpires: expires },
         });
 
-        await sendPasswordResetEmail(email, user.name ?? "Usuario", raw);
+        await sendPasswordResetEmail(email, user.name ?? "Usuario", raw, user.idioma);
     },
 
     async resetPassword(rawToken: string, newPassword: string) {
@@ -213,11 +222,29 @@ export const authService = {
                 email: true,
                 name: true,
                 role: true,
+                // T4-12: el frontend lo compara con su idioma efectivo para saber si tiene
+                // que sincronizarlo. Sin devolverlo, la única forma de averiguar si hace
+                // falta el `PATCH` sería mandarlo siempre.
+                idioma: true,
                 isActive: true,
                 isVerified: true,
                 createdAt: true,
             },
         });
+    },
+
+    /**
+     * T4-12 — el idioma en el que se le escribe a este usuario.
+     *
+     * Va aparte de `updateProfile` y no dentro: cambiar el idioma **no es editar el perfil**.
+     * Ese endpoint pide nombre y correo, y tocar el correo invalida la verificación y manda
+     * un correo de confirmación; colar aquí la preferencia de idioma obligaría a reenviar
+     * los tres campos y arrastraría ese efecto. Esto es una preferencia, se manda sola y no
+     * tiene más consecuencia que la que dice su nombre.
+     */
+    async updateIdioma(userId: string, idioma: Idioma) {
+        await prisma.user.update({ where: { id: userId }, data: { idioma } });
+        return { idioma };
     },
 
     async updateProfile(userId: string, name: string, email: string) {
@@ -243,7 +270,7 @@ export const authService = {
                 },
             });
 
-            await sendVerificationEmail(email, name, raw);
+            await sendVerificationEmail(email, name, raw, user.idioma);
             return {
                 emailChanged: true,
                 message: "Correo actualizado. Revisa tu bandeja para confirmar tu nueva dirección.",

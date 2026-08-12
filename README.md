@@ -24,7 +24,7 @@ Este README documenta **la API**. La documentación que cubre los dos repositori
 | Runtime | Node.js 22 + TypeScript 6 |
 | Framework | Express 5 |
 | ORM | Prisma 7 |
-| Base de datos | PostgreSQL 16 |
+| Base de datos | PostgreSQL 17 |
 | Autenticación | JWT (access 15 min) + refresh token en cookie |
 | Subida de imágenes | Cloudinary + Multer |
 | Correo | Nodemailer (SMTP) |

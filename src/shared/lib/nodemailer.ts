@@ -8,6 +8,34 @@ import {
     emailParagraph,
     emailNote,
 } from "@/shared/lib/emailTemplates";
+import {
+    traducirCorreo,
+    type Idioma,
+    type ClaveDeCorreo,
+    type Valores,
+} from "@/shared/i18n/correos";
+
+/**
+ * T4-12 — **ningún texto de correo se escribe en este archivo.** Cada función recibe el
+ * `idioma` de su destinatario —`users.idioma`— y saca de ahí el asunto, el preencabezado, el
+ * título, el cuerpo, el rótulo del botón y las notas.
+ *
+ * El `idioma` es un parámetro obligatorio y no tiene valor por defecto **a propósito**: con
+ * uno, cualquier sitio que se olvide de pasarlo compila y manda el correo en español, que es
+ * exactamente el fallo de partida. Sin él, `tsc` señala cada llamada.
+ */
+
+/**
+ * El traductor de un correo, con la marca ya puesta.
+ *
+ * `{marca}` aparece en casi todas las frases —asuntos, preencabezados, pie— y siempre vale
+ * lo mismo; pasarlo en cada llamada es la clase de repetición que se olvida en una y deja un
+ * `{marca}` literal en el asunto de un correo real.
+ */
+function traductorDeCorreo(idioma: Idioma) {
+    return (clave: ClaveDeCorreo, valores?: Valores) =>
+        traducirCorreo(idioma, clave, { marca: BRAND.name, ...valores });
+}
 
 function escapeHtml(str: string): string {
     return str
@@ -43,48 +71,50 @@ function requireSmtp(): void {
     }
 }
 
-export async function sendVerificationEmail(to: string, name: string, token: string) {
+export async function sendVerificationEmail(to: string, name: string, token: string, idioma: Idioma) {
     requireSmtp();
     const url =`${env.frontendUrl}/auth/confirm-account?token=${token}`;
-    const safeName = escapeHtml(name);
+    const t = traductorDeCorreo(idioma);
 
     const bodyHtml =
-        emailParagraph(`Hola <strong>${safeName}</strong>,`) +
-        emailParagraph("Gracias por registrarte en Stockly. Confirma tu cuenta para empezar a gestionar tu inventario.") +
-        emailButton(url, "Verificar cuenta") +
-        emailNote("El enlace expira en 24 horas. Si no creaste esta cuenta, puedes ignorar este correo.");
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(name) })) +
+        emailParagraph(t("verificacion.cuerpo")) +
+        emailButton(url, t("verificacion.boton")) +
+        emailNote(t("verificacion.nota"));
 
     await transporter.sendMail({
         from: env.smtp.from,
         to,
-        subject: "Verifica tu cuenta — Stockly",
+        subject: t("verificacion.asunto"),
         html: renderEmail({
-            preheader: "Confirma tu cuenta de Stockly para empezar.",
-            heading: "Verifica tu cuenta",
+            preheader: t("verificacion.preencabezado"),
+            heading: t("verificacion.titulo"),
             bodyHtml,
+            idioma,
         }),
     });
 }
 
-export async function sendPasswordResetEmail(to: string, name: string, token: string) {
+export async function sendPasswordResetEmail(to: string, name: string, token: string, idioma: Idioma) {
     requireSmtp();
     const url =`${env.frontendUrl}/auth/reset-password?token=${token}`;
-    const safeName = escapeHtml(name);
+    const t = traductorDeCorreo(idioma);
 
     const bodyHtml =
-        emailParagraph(`Hola <strong>${safeName}</strong>,`) +
-        emailParagraph("Recibimos una solicitud para restablecer la contraseña de tu cuenta. Haz clic en el botón para elegir una nueva.") +
-        emailButton(url, "Restablecer contraseña") +
-        emailNote("El enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo y tu contraseña seguirá siendo la misma.");
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(name) })) +
+        emailParagraph(t("reset.cuerpo")) +
+        emailButton(url, t("reset.boton")) +
+        emailNote(t("reset.nota"));
 
     await transporter.sendMail({
         from: env.smtp.from,
         to,
-        subject: "Restablecer contraseña — Stockly",
+        subject: t("reset.asunto"),
         html: renderEmail({
-            preheader: "Restablece la contraseña de tu cuenta de Stockly.",
-            heading: "Restablecer contraseña",
+            preheader: t("reset.preencabezado"),
+            heading: t("reset.titulo"),
             bodyHtml,
+            idioma,
         }),
     });
 }
@@ -95,44 +125,49 @@ export async function sendLowStockAlertEmail(
     productName: string,
     currentStock: number,
     minStock: number,
+    idioma: Idioma,
 ) {
     requireSmtp();
-    const safeAdmin =escapeHtml(adminName);
     const safeProduct = escapeHtml(productName);
     const url = `${env.frontendUrl}/products`;
+    const t = traductorDeCorreo(idioma);
 
-    // Tabla de datos con estilos inline (email-safe).
+    // Tabla de datos con estilos inline (email-safe). Los rótulos de la columna izquierda
+    // también se traducen: son texto, no datos.
     const stockTable = `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:4px 0 8px;border:1px solid ${BRAND.border};border-radius:8px;">
         <tr>
-            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">Producto</td>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">${t("stock.filaProducto")}</td>
             <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${BRAND.text};border-bottom:1px solid ${BRAND.border};">${safeProduct}</td>
         </tr>
         <tr>
-            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">Stock actual</td>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};border-bottom:1px solid ${BRAND.border};">${t("stock.filaActual")}</td>
             <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#b91c1c;border-bottom:1px solid ${BRAND.border};">${currentStock}</td>
         </tr>
         <tr>
-            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};">Stock mínimo</td>
+            <td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};">${t("stock.filaMinimo")}</td>
             <td align="right" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${BRAND.text};">${minStock}</td>
         </tr>
     </table>`;
 
     const bodyHtml =
-        emailParagraph(`Hola <strong>${safeAdmin}</strong>,`) +
-        emailParagraph(`El producto <strong>${safeProduct}</strong> alcanzó un nivel de stock bajo y podría requerir reabastecimiento.`) +
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(adminName) })) +
+        emailParagraph(t("stock.cuerpo", { producto: safeProduct })) +
         stockTable +
-        emailButton(url, "Ver productos") +
-        emailNote("Puedes desactivar estas alertas en la sección <strong>Configuración</strong> de Stockly.");
+        emailButton(url, t("stock.boton")) +
+        emailNote(t("stock.nota"));
 
     await transporter.sendMail({
         from: env.smtp.from,
         to,
-        subject: `⚠️ Alerta de bajo stock: ${productName} — Stockly`,
+        // El asunto es texto plano: va el nombre sin escapar, porque `&amp;` en la bandeja
+        // de entrada se lee como lo que es, un error.
+        subject: t("stock.asunto", { producto: productName }),
         html: renderEmail({
-            preheader: `${safeProduct} está en ${currentStock} unidades (mínimo ${minStock}).`,
-            heading: "Alerta de bajo stock",
+            preheader: t("stock.preencabezado", { producto: safeProduct, actual: currentStock, minimo: minStock }),
+            heading: t("stock.titulo"),
             bodyHtml,
+            idioma,
         }),
     });
 }
@@ -154,9 +189,10 @@ export async function sendServerErrorAlertEmail(
         rutas: Array<{ ruta: string; total: number }>;
         requestId?: string;
     },
+    idioma: Idioma,
 ) {
     requireSmtp();
-    const safeAdmin = escapeHtml(adminName);
+    const t = traductorDeCorreo(idioma);
 
     const filas = resumen.rutas
         .slice(0, 5)
@@ -175,28 +211,23 @@ export async function sendServerErrorAlertEmail(
     </table>`;
 
     const bodyHtml =
-        emailParagraph(`Hola <strong>${safeAdmin}</strong>,`) +
-        emailParagraph(
-            `El servidor devolvió <strong>${resumen.total} errores 5xx</strong> en los últimos ` +
-                `${resumen.ventanaMinutos} minutos. Estas son las rutas afectadas:`,
-        ) +
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(adminName) })) +
+        emailParagraph(t("errores.cuerpo", { total: resumen.total, minutos: resumen.ventanaMinutos })) +
         tabla +
         (resumen.requestId
-            ? emailNote(
-                `Para investigar, busca en el registro por <strong>${escapeHtml(resumen.requestId)}</strong>: ` +
-                    "es el identificador de una de las peticiones que falló y recupera todas sus líneas.",
-            )
+            ? emailNote(t("errores.notaTraza", { requestId: escapeHtml(resumen.requestId) }))
             : "") +
-        emailNote("No se repetirá este aviso durante el periodo de enfriamiento, aunque los errores continúen.");
+        emailNote(t("errores.notaEnfriamiento"));
 
     await transporter.sendMail({
         from: env.smtp.from,
         to,
-        subject: `🚨 Pico de errores 5xx: ${resumen.total} en ${resumen.ventanaMinutos} min — Stockly`,
+        subject: t("errores.asunto", { total: resumen.total, minutos: resumen.ventanaMinutos }),
         html: renderEmail({
-            preheader: `${resumen.total} errores 5xx en ${resumen.ventanaMinutos} minutos.`,
-            heading: "Pico de errores del servidor",
+            preheader: t("errores.preencabezado", { total: resumen.total, minutos: resumen.ventanaMinutos }),
+            heading: t("errores.titulo"),
             bodyHtml,
+            idioma,
         }),
     });
 }

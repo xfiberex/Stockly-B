@@ -99,6 +99,28 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **La pila del compose pasa a PostgreSQL 17** (`T4-13`). Levantaba `postgres:16-alpine`
+  mientras el servidor de desarrollo del proyecto era 17.10, y `pg_restore` **solo va hacia
+  adelante**: cada copia de seguridad era un archivo que no se podía restaurar en la pila.
+  Subir acepta los volcados de 16 y los de 17; la regla que queda es **nunca por debajo del
+  servidor más nuevo** que se use en el proyecto.
+  - `pnpm db:restaurar` compara ahora la versión del volcado con la del servidor de destino
+    **antes del `dropdb`**, y aborta sin tocar nada. Antes el fallo llegaba a mitad de la
+    restauración, con la base ya borrada y un error —`unrecognized configuration parameter
+    "transaction_timeout"`— que no menciona la versión por ningún lado.
+  - **Cambiar la imagen invalida el volumen de datos.** El ciclo de volcado, volumen nuevo y
+    restauración está en [`docs/operaciones.md §9`](docs/operaciones.md).
+- **Los correos salen en el idioma de quien los recibe** (`T4-12`). Verificación de cuenta,
+  restablecimiento de contraseña, alerta de bajo stock y aviso de pico de 5xx —**cuatro, no
+  los tres** que decía la ficha: T4-06 añadió el último después de escribirla—. El texto sale
+  de un catálogo por idioma y ya no vive dentro del HTML; el inglés se declara como un
+  `Record` sobre las claves del español, así que **una frase sin traducir no compila**.
+  - Nueva columna `users.idioma` y `PATCH /auth/me/idioma`. El frontend la sincroniza con su
+    idioma efectivo **solo cuando dejan de coincidir**, y manda ese idioma en `Accept-Language`
+    para el registro, que es el único correo hacia alguien que todavía no tiene fila.
+  - **No sustituye a la preferencia del navegador:** la interfaz se sigue decidiendo por
+    dispositivo. Esta columna existe porque un correo se redacta sin nadie delante — la alerta
+    de bajo stock la dispara una venta ajena.
 - **La navegación en pantallas anchas pasa a una barra lateral** (`T4-10`). De 1024 px en
   adelante, los doce destinos están desplegados y **ninguna sección cuesta ya dos clics**:
   antes nueve de los doce módulos vivían dentro de uno de los tres desplegables de la barra

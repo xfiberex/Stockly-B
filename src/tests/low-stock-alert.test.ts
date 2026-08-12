@@ -69,6 +69,8 @@ describe("Flujo de alerta de bajo stock", () => {
             "Cable HDMI",
             4, // 6 - 2
             5,
+            // T4-12: el idioma del administrador que la recibe, leído de su fila.
+            "ES",
         );
     });
 

@@ -15,7 +15,17 @@ services:
 
   # ── Base de datos PostgreSQL ─────────────────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    # T4-13 — **17 y no 16, y la dirección importa.** `pg_restore` va hacia adelante: un
+    # volcado de 16 entra en un servidor 17, pero uno de 17 **no entra** en un 16, y falla
+    # el día de la recuperación. El servidor de desarrollo del proyecto es 17.10, así que
+    # dejar el compose en 16 convertía cada copia en un archivo que no se podía restaurar
+    # aquí. La regla que se sigue: **esta imagen nunca por debajo del servidor más nuevo
+    # que se use en el proyecto**, y `pnpm db:restaurar` lo comprueba antes de tocar nada.
+    #
+    # Subirla **invalida el volumen `postgres_data`**: PostgreSQL se niega a arrancar sobre
+    # un directorio de datos de otra versión mayor. El procedimiento —volcado, volumen
+    # nuevo, restauración— está en `docs/operaciones.md`.
+    image: postgres:17-alpine
     container_name: stockly_db
     restart: unless-stopped
     environment:

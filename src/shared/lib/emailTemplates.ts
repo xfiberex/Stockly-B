@@ -1,6 +1,11 @@
 // Plantillas de correo con layout basado en tablas, compatible con los
 // principales gestores (Gmail, Outlook, Apple Mail, Yahoo) y responsive.
 // La paleta coincide con la UI del frontend (blue-600 como color de marca).
+//
+// **Aquí no se escribe texto** (T4-12): el armazón pone la estructura y los estilos, y todo
+// lo que se lee sale del catálogo de `shared/i18n/correos.es.ts`.
+
+import { traducirCorreo, etiquetaDeIdioma, type Idioma } from "@/shared/i18n/correos";
 
 export const BRAND = {
     name: "Stockly",
@@ -32,11 +37,17 @@ interface EmailOptions {
     preheader: string; // texto de vista previa (oculto en el cuerpo)
     heading: string;
     bodyHtml: string; // contenido ya escapado / seguro
+    /**
+     * Idioma del destinatario (T4-12). Decide el `lang` del documento **y el pie**, que es
+     * la única frase que no viene del cuerpo: estaba escrita aquí en español y salía así
+     * aunque el resto del correo fuera inglés.
+     */
+    idioma: Idioma;
 }
 
-export function renderEmail({ preheader, heading, bodyHtml }: EmailOptions): string {
+export function renderEmail({ preheader, heading, bodyHtml, idioma }: EmailOptions): string {
     return `<!DOCTYPE html>
-<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="${etiquetaDeIdioma(idioma)}" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -68,8 +79,8 @@ export function renderEmail({ preheader, heading, bodyHtml }: EmailOptions): str
                     <tr>
                         <td align="center" style="padding:20px 12px;">
                             <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:${BRAND.muted};">
-                                Este es un correo automático de ${BRAND.name}, por favor no respondas a este mensaje.<br />
-                                © ${BRAND.year} ${BRAND.name} · Gestión de inventario
+                                ${traducirCorreo(idioma, "comun.pie", { marca: BRAND.name })}<br />
+                                © ${BRAND.year} ${BRAND.name} · ${traducirCorreo(idioma, "comun.pieLema")}
                             </p>
                         </td>
                     </tr>

@@ -5,7 +5,7 @@ que se clonan uno al lado del otro:**
 
 ```
 01-Stockly/
-├── Stockly-B/                    # API REST (Node 22 / Express 5 / Prisma 7 / PostgreSQL 16)
+├── Stockly-B/                    # API REST (Node 22 / Express 5 / Prisma 7 / PostgreSQL 17)
 │   ├── docker-compose.yml        # PostgreSQL + backend en contenedores
 │   └── docs/                     # Documentación viva de TODO el proyecto
 └── Stockly-F/                    # SPA (React 19 / TypeScript 6 / Vite 8 / TailwindCSS 4)
@@ -45,8 +45,8 @@ que se clonan uno al lado del otro:**
 
 ### 1. Base de datos
 
-Sirve cualquier PostgreSQL 16 con la base `Stockly` creada. Con Docker, **desde `Stockly-B/`**, que
-es donde vive el `docker-compose.yml`:
+Sirve cualquier PostgreSQL **17 o superior** con la base `Stockly` creada. Con Docker, **desde
+`Stockly-B/`**, que es donde vive el `docker-compose.yml`:
 
 ```bash
 cd Stockly-B
@@ -57,6 +57,11 @@ docker compose up db -d
 > mismo en todos; el valor bueno es el del `.env` local, que no viaja en git. Si algo falla al
 > conectar, eso es lo primero que hay que mirar. `POSTGRES_HOST_PORT` cambia el que publica el
 > contenedor.
+
+> **La versión sí se fija, y hacia arriba** (T4-13). `pg_restore` solo va hacia adelante: un volcado
+> de 17 no se restaura en un servidor 16. Si en algún equipo se instala un PostgreSQL **más nuevo**
+> que el del compose, hay que subir la imagen —no basta con editar el número: ver
+> [operaciones.md §9](operaciones.md)—, o las copias de ese equipo no se podrán restaurar aquí.
 
 ### 2. Backend
 

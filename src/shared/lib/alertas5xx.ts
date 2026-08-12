@@ -108,13 +108,15 @@ async function avisarPorCorreo(resumen: {
 }): Promise<void> {
     if (!env.smtp.configured) return;
 
+    // T4-12: cada administrador, en su idioma. Aquí importa más que en el resto — este aviso
+    // llega cuando el servidor está fallando, y es el peor momento para pararse a traducir.
     const admins = await prisma.user.findMany({
         where: { role: "ADMIN", isActive: true, isVerified: true },
-        select: { email: true, name: true },
+        select: { email: true, name: true, idioma: true },
     });
 
     await Promise.allSettled(
-        admins.map((admin) => sendServerErrorAlertEmail(admin.email, admin.name, resumen)),
+        admins.map((admin) => sendServerErrorAlertEmail(admin.email, admin.name, resumen, admin.idioma)),
     );
 }
 

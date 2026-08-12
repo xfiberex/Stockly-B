@@ -24,13 +24,13 @@ describe("Servicios opcionales sin configurar", () => {
         await conEntornoSin(CLAVES_SMTP, async () => {
             const { sendVerificationEmail } = await import("@/shared/lib/nodemailer");
 
-            await expect(sendVerificationEmail("a@example.com", "Ana", "tok")).rejects.toMatchObject({
+            await expect(sendVerificationEmail("a@example.com", "Ana", "tok", "ES")).rejects.toMatchObject({
                 statusCode: 503,
                 message: expect.stringContaining("SMTP_HOST"),
             });
             // No se compara con `instanceof HttpError`: `isolateModules` carga una copia
             // distinta del módulo y el constructor no es el mismo objeto.
-            await expect(sendVerificationEmail("a@example.com", "Ana", "tok")).rejects.toMatchObject({
+            await expect(sendVerificationEmail("a@example.com", "Ana", "tok", "ES")).rejects.toMatchObject({
                 name: "HttpError",
             });
         });

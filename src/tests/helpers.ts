@@ -28,6 +28,8 @@ interface CreateUserOptions {
     // T3-02: el enum de Prisma, no `string`. Así un rol mal escrito en un test falla al
     // compilar en vez de al ejecutar contra la base.
     role?: $Enums.Role;
+    // T4-12: mismo criterio que `role`. Por defecto lo pone la base (español).
+    idioma?: $Enums.Idioma;
 }
 
 export async function createUser(options: CreateUserOptions = {}) {
@@ -37,11 +39,12 @@ export async function createUser(options: CreateUserOptions = {}) {
         password = "Test1234!",
         isVerified = true,
         role = "USER",
+        idioma = "ES",
     } = options;
 
     const hashed = await hashPassword(password);
     return prisma.user.create({
-        data: { name, email, password: hashed, isVerified, role },
+        data: { name, email, password: hashed, isVerified, role, idioma },
     });
 }
 

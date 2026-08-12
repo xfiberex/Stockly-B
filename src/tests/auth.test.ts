@@ -43,6 +43,8 @@ describe("Auth API", () => {
                 "ana@example.com",
                 "Ana García",
                 expect.any(String),
+                // T4-12: el cuarto argumento es el idioma. Sin `Accept-Language`, español.
+                "ES",
             );
         });
 
@@ -317,6 +319,8 @@ describe("Auth API", () => {
                 user.email,
                 expect.any(String),
                 expect.any(String),
+                // T4-12: aquí el idioma sale de la fila del usuario, no de la petición.
+                "ES",
             );
         });
     });

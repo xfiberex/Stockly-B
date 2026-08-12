@@ -16,14 +16,18 @@ export async function checkLowStockAlert(
     const enabled = await settingsService.get("lowStockAlertEnabled");
     if (!enabled) return;
 
+    // T4-12: `idioma` en el `select`. Este correo no lo pide nadie —lo dispara una venta o
+    // un ajuste de stock ajeno—, así que **no hay ninguna petición de la que deducirlo**: el
+    // idioma tiene que salir de la fila de cada destinatario. Dos administradores con
+    // preferencias distintas reciben el mismo aviso en dos idiomas.
     const admins = await prisma.user.findMany({
         where: { role: "ADMIN", isActive: true, isVerified: true },
-        select: { email: true, name: true },
+        select: { email: true, name: true, idioma: true },
     });
 
     await Promise.allSettled(
         admins.map((admin) =>
-            sendLowStockAlertEmail(admin.email, admin.name, productName, newStock, minStock),
+            sendLowStockAlertEmail(admin.email, admin.name, productName, newStock, minStock, admin.idioma),
         ),
     );
 }

@@ -11,6 +11,7 @@ import {
     resetPasswordSchema,
     updateProfileSchema,
     updatePasswordSchema,
+    idiomaSchema,
 } from "@/modules/auth/auth.validator";
 
 const router = Router();
@@ -26,5 +27,8 @@ router.post("/forgot-password", authStrictLimiter, validate(emailSchema), authCo
 router.post("/reset-password", authStrictLimiter, validate(resetPasswordSchema), authController.resetPassword);
 router.put("/me", requireAuth, validate(updateProfileSchema), authController.updateProfile);
 router.patch("/me/password", requireAuth, validate(updatePasswordSchema), authController.updatePassword);
+// T4-12 — el idioma en el que se le escribe a este usuario. Aparte de `PUT /me`, que edita
+// el perfil y arrastra la reverificación del correo.
+router.patch("/me/idioma", requireAuth, validate(idiomaSchema), authController.updateIdioma);
 
 export default router;

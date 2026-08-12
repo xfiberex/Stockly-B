@@ -12,7 +12,15 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { conexion, herramientas, ejecutar, capturar } = require("./postgres");
+const {
+    conexion,
+    herramientas,
+    ejecutar,
+    capturar,
+    versionDelServidor,
+    versionDelVolcado,
+    evaluarCompatibilidad,
+} = require("./postgres");
 
 const TABLAS = ["products", "stock_movements", "sale_orders", "purchase_orders", "price_history", "users", "audit_logs"];
 
@@ -55,6 +63,40 @@ function main() {
         );
         process.exitCode = 1;
         return;
+    }
+
+    /*
+     * T4-13 — la versión, comprobada **antes** de destruir nada.
+     *
+     * `pg_restore` solo va hacia adelante: un volcado de 17 en un servidor 16 falla, y lo
+     * hacía a mitad de la restauración, con la base de destino ya borrada y recreada, y con
+     * un error que habla de sintaxis y no de versiones. El día que se ejecuta esto de verdad
+     * es el peor para averiguarlo.
+     *
+     * Esta comprobación va **encima del `dropdb`** a propósito: si sale mal, lo que había
+     * sigue estando. Y avisa en vez de fallar cuando no puede saberlo —un volcado sin la
+     * línea de cabecera, o un servidor que no responde a la consulta—, por lo mismo que la
+     * auditoría de dependencias: una puerta que se cierra sin motivo se acaba esquivando.
+     */
+    const compatibilidad = evaluarCompatibilidad(
+        versionDelVolcado(bin, archivo, entorno),
+        versionDelServidor(bin, entorno),
+    );
+
+    if (compatibilidad.estado === "fallo") {
+        console.log(
+            `✗ el volcado viene de PostgreSQL ${compatibilidad.delVolcado} y este servidor es ${compatibilidad.delServidor}.\n` +
+                `  pg_restore no va hacia atrás: la restauración fallaría a medias, con la base de\n` +
+                `  destino ya borrada. No se ha tocado nada.\n\n` +
+                `  Restaura en un servidor ${compatibilidad.delVolcado} o superior. La pila del compose levanta la\n` +
+                `  versión que fija docker-compose.yml (ver docs/operaciones.md).`,
+        );
+        process.exitCode = 1;
+        return;
+    }
+
+    if (compatibilidad.estado === "indeterminado") {
+        console.log(`  aviso: no se ha podido comparar la versión del volcado con la del servidor (${compatibilidad.motivo}).`);
     }
 
     console.log(`Restaurando ${path.basename(archivo)} en ${objetivo} (${host}:${puerto}) …`);

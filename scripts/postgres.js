@@ -114,6 +114,55 @@ function herramientas(entorno) {
     return candidatos[0].bin;
 }
 
+/**
+ * La versión mayor del servidor donde se tomó un volcado, leída de su cabecera (T4-13).
+ *
+ * `pg_restore -l` imprime, entre los comentarios de cabecera, `;     Dumped from database
+ * version: 17.10`. Es el único sitio donde consta: el archivo `custom` es binario y no se
+ * puede mirar de otra forma sin restaurarlo, que es justo lo que se quiere evitar. Leer la
+ * lista **no necesita servidor**, así que la comprobación se puede hacer antes de conectar.
+ *
+ * **Los dos puntos son opcionales en el patrón y no por gusto:** al escribir esto sin ellos
+ * el guardia no reventó — se degradó a «no se puede saber» y dejó pasar la restauración,
+ * que es exactamente el aspecto que tiene una comprobación que no comprueba nada. Salió
+ * ejecutándolo, no leyéndolo.
+ *
+ * Devuelve `null` si el archivo no se puede leer o no trae la línea — un volcado de una
+ * versión muy antigua, o un archivo que no es un volcado. En ese caso no se bloquea nada:
+ * «no se puede saber» no es «hay un problema», el mismo criterio que la auditoría de T4-07.
+ */
+function versionDelVolcado(bin, archivo, entorno) {
+    const r = capturar(bin, "pg_restore", ["-l", archivo], entorno);
+    if (r.status !== 0) return null;
+
+    return leerVersionDeCabecera(r.stdout);
+}
+
+/** La parte que se puede probar sin un volcado delante. Ver `versionDelVolcado`. */
+function leerVersionDeCabecera(salida) {
+    const m = /Dumped from database version:?\s+(\d+)/.exec(salida ?? "");
+    return m ? Number(m[1]) : null;
+}
+
+/**
+ * ¿Entra este volcado en este servidor? (T4-13)
+ *
+ * `pg_restore` va **hacia adelante y no hacia atrás**: de 16 a 17 sí, de 17 a 16 no. Se
+ * separa del guion para poder demostrarlo en rojo sin dos servidores de versiones distintas
+ * delante — que es justo lo que no se tiene el día que esto importa.
+ */
+function evaluarCompatibilidad(delVolcado, delServidor) {
+    if (delVolcado === null || delServidor === null) {
+        return { estado: "indeterminado", motivo: "no se ha podido leer alguna de las dos versiones" };
+    }
+
+    if (delVolcado > delServidor) {
+        return { estado: "fallo", delVolcado, delServidor };
+    }
+
+    return { estado: "correcto", delVolcado, delServidor };
+}
+
 /** Ejecuta una herramienta de PostgreSQL heredando la salida. Devuelve el código. */
 function ejecutar(bin, herramienta, argumentos, entorno) {
     const r = spawnSync(path.join(bin, herramienta), argumentos, {
@@ -133,4 +182,13 @@ function capturar(bin, herramienta, argumentos, entorno) {
     });
 }
 
-module.exports = { conexion, herramientas, ejecutar, capturar };
+module.exports = {
+    conexion,
+    herramientas,
+    ejecutar,
+    capturar,
+    versionDelServidor,
+    versionDelVolcado,
+    leerVersionDeCabecera,
+    evaluarCompatibilidad,
+};

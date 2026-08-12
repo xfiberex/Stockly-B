@@ -5,6 +5,8 @@ import { signToken } from "@/shared/lib/jwt";
 import { env } from "@/config/env";
 import { HttpError } from "@/shared/lib/httpError";
 import { CSRF_COOKIE_NAME } from "@/shared/middlewares/csrf.middleware";
+import { idiomaDePeticion } from "@/shared/lib/idiomaDePeticion";
+import type { Idioma } from "@/shared/i18n/correos";
 
 /**
  * T2-28 — los atributos de las cookies dependen de **cómo se sirve**, no solo del
@@ -65,7 +67,9 @@ function issueSessionCookies(
 export const authController = {
     async register(req: Request, res: Response) {
         const { email, password, name } = req.body as { email: string; password: string; name: string };
-        await authService.register(email, password, name);
+        // T4-12: el idioma del correo de verificación sale de `Accept-Language`, porque
+        // todavía no hay fila de usuario de la que leerlo. Se guarda en la que se crea.
+        await authService.register(email, password, name, idiomaDePeticion(req));
         res.status(201).json({ message: "Revisa tu correo para confirmar tu cuenta" });
     },
 
@@ -131,6 +135,12 @@ export const authController = {
         const { name, email } = req.body as { name: string; email: string };
         const result = await authService.updateProfile(req.userId!, name, email);
         res.json(result);
+    },
+
+    async updateIdioma(req: Request, res: Response) {
+        const { idioma } = req.body as { idioma: Idioma };
+        const result = await authService.updateIdioma(req.userId!, idioma);
+        res.json({ data: result });
     },
 
     async updatePassword(req: Request, res: Response) {

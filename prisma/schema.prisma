@@ -42,6 +42,19 @@ enum Role {
   USER
 }
 
+// T4-12 — el idioma en el que se le escribe a este usuario.
+//
+// **No es la preferencia de la interfaz.** Esa vive en el `localStorage` del navegador y es
+// por dispositivo (ver `Stockly-F/src/shared/i18n/idioma.ts`): el mismo usuario puede tener
+// el portátil en inglés y el móvil en español, y las dos cosas son correctas. Un correo, en
+// cambio, se escribe **una vez y sin nadie delante** —la alerta de stock la dispara una venta,
+// no una pantalla—, así que hace falta un idioma guardado por usuario. Este es el último
+// efectivo que se le conoce, sincronizado desde el navegador.
+enum Idioma {
+  ES
+  EN
+}
+
 // Reflejan `AuditAction` y `AuditEntity` de `audit-logs.service.ts`, que ahora se
 // importan del cliente generado en vez de declararse dos veces. Añadir un valor aquí
 // es lo que lo hace existir para TypeScript, así que los dos lados no pueden separarse.
@@ -220,6 +233,9 @@ model User {
   email          String    @unique
   password       String
   role           Role      @default(USER)
+  // Por defecto español: es el idioma de referencia del catálogo, y una cuenta creada por
+  // seed o por migración no tiene ningún navegador detrás del que deducirlo (T4-12).
+  idioma         Idioma    @default(ES)
   isActive       Boolean   @default(true)
   isVerified     Boolean   @default(false)
   verifyToken    String?   @unique

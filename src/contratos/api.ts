@@ -32,6 +32,16 @@ import { z } from "zod";
 // Espejo de `prisma/schema.prisma`, vigilado por `contratos.test.ts`.
 
 export const rolSchema = z.enum(["ADMIN", "USER"]);
+
+/**
+ * T4-12 — el idioma en el que el servidor le escribe a un usuario.
+ *
+ * **En mayúsculas porque es un enum de la base**, no la etiqueta de idioma del navegador:
+ * el frontend maneja `"es"` / `"en"` en su `localStorage` y convierte al mandarlo. Mezclar
+ * las dos formas es la vía por la que un `"es"` acaba llegando a `users.idioma` y Prisma
+ * rechaza el `update` en producción.
+ */
+export const idiomaSchema = z.enum(["ES", "EN"]);
 export const estadoOrdenCompraSchema = z.enum(["PENDING", "RECEIVED", "CANCELLED"]);
 export const estadoOrdenVentaSchema = z.enum(["PENDING", "SHIPPED", "CANCELLED"]);
 export const tipoMovimientoSchema = z.enum(["IN", "OUT", "ADJUSTMENT", "IMPORT"]);
@@ -383,8 +393,18 @@ export const usuarioSchema = z.object({
     updatedAt: fechaSchema,
 });
 
-/** `GET /auth/me` no devuelve `updatedAt`: su `select` es más corto que `USER_SELECT`. */
-export const perfilSchema = usuarioSchema.omit({ updatedAt: true });
+/**
+ * `GET /auth/me` no devuelve `updatedAt`: su `select` es más corto que `USER_SELECT`.
+ *
+ * Y **sí devuelve `idioma`**, que `USER_SELECT` no trae (T4-12): es una preferencia de quien
+ * mira, no un dato de la ficha de un usuario ajeno, así que no pinta nada en el listado de
+ * administración. El frontend lo compara con su idioma efectivo para saber si tiene que
+ * sincronizarlo con `PATCH /auth/me/idioma`.
+ */
+export const perfilSchema = usuarioSchema.omit({ updatedAt: true }).extend({ idioma: idiomaSchema });
+
+/** Respuesta de `PATCH /auth/me/idioma`. */
+export const idiomaGuardadoSchema = z.object({ idioma: idiomaSchema });
 
 // ─────────────────────── Ajustes ───────────────────────
 
@@ -497,6 +517,7 @@ export const resumenReporteSchema = z.object({
 // cambia con él y `tsc` señala cada uso que dejó de encajar.
 
 export type Rol = z.infer<typeof rolSchema>;
+export type IdiomaDeCorreo = z.infer<typeof idiomaSchema>;
 export type EstadoOrdenCompra = z.infer<typeof estadoOrdenCompraSchema>;
 export type EstadoOrdenVenta = z.infer<typeof estadoOrdenVentaSchema>;
 export type TipoMovimiento = z.infer<typeof tipoMovimientoSchema>;
@@ -528,6 +549,7 @@ export type OrdenCompra = z.infer<typeof ordenCompraSchema>;
 
 export type Usuario = z.infer<typeof usuarioSchema>;
 export type Perfil = z.infer<typeof perfilSchema>;
+export type IdiomaGuardado = z.infer<typeof idiomaGuardadoSchema>;
 export type Ajuste = z.infer<typeof ajusteSchema>;
 export type AjusteGuardado = z.infer<typeof ajusteGuardadoSchema>;
 export type RegistroAuditoria = z.infer<typeof registroAuditoriaSchema>;

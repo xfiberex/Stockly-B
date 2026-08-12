@@ -34,6 +34,17 @@ export const resetPasswordSchema = z.object({
     password: passwordField(),
 });
 
+/**
+ * T4-12 — el idioma en el que se le escribe a este usuario.
+ *
+ * El enum se escribe aquí y **no se importa de Prisma**: los validadores son el borde de
+ * entrada y no deben depender del cliente generado. Que no se separe del `schema.prisma` lo
+ * vigila `contratos.test.ts`, igual que el resto de enums del contrato.
+ */
+export const idiomaSchema = z.object({
+    idioma: z.enum(["ES", "EN"], { message: "El idioma no es válido" }),
+});
+
 export const updateProfileSchema = z.object({
     name: z.string().trim().min(1, "El nombre es obligatorio").max(80, "El nombre no puede superar 80 caracteres"),
     email: emailField,
@@ -47,4 +58,5 @@ export const updatePasswordSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type IdiomaInput = z.infer<typeof idiomaSchema>;
 export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;

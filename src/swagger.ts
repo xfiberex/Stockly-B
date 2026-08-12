@@ -81,6 +81,14 @@ export const spec = {
                 responses: { "200": { description: "Contraseña actualizada" }, "403": { description: "Contraseña actual incorrecta" } },
             },
         },
+        "/auth/me/idioma": {
+            patch: {
+                tags: ["Auth"], summary: "Cambiar el idioma en el que se le escribe a este usuario",
+                description: "T4-12. Decide el idioma de los correos —verificación, restablecimiento y alertas—, no el de la interfaz: esa preferencia vive en el navegador. Los valores son los del enum de la base, en mayúsculas.",
+                requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["idioma"], properties: { idioma: { type: "string", enum: ["ES", "EN"] } } } } } },
+                responses: { "200": { description: "Idioma actualizado", content: { "application/json": { schema: { type: "object", properties: { data: { type: "object", properties: { idioma: { type: "string", enum: ["ES", "EN"] } } } } } } } }, "401": { description: "No autenticado" }, "422": { description: "Idioma no válido" } },
+            },
+        },
         "/auth/forgot-password": {
             post: {
                 tags: ["Auth"], summary: "Solicitar reset de contraseña",

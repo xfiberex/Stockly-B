@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **424/424** | **520/520** *(+1 omitido)* |
+| Tests | **455/455** | **526/526** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 12/17** · Total **109/114** *(una de ellas, T4-17, **descartada** y no hecha)*. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 14/17** · Total **111/114** *(una de ellas, T4-17, **descartada** y no hecha)*. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -77,8 +77,8 @@ y faltaba el trabajo de verdad, extraer los textos de las 25 pantallas restantes
 **T4-12**, los correos, que siguen saliendo solo en español. Ese mismo día se cerró **T4-05**: ya
 hay copia de seguridad (`pnpm db:backup`) y una restauración **ejecutada y medida**, no solo
 descrita — el procedimiento entero está en [operaciones.md](operaciones.md). También dejó anotada
-**T4-13**: el servidor de desarrollo de este equipo es PostgreSQL **17.10** y el compose levanta
-**`postgres:16-alpine`**, y un volcado de 17 no se restaura en un 16.
+**T4-13**, ya cerrada: el compose levantaba `postgres:16-alpine` mientras el servidor de desarrollo
+era **17.10**, y un volcado de 17 no se restaura en un 16.
 
 Y detrás de esa, **T4-06**, porque de nada sirve saber restaurar si nadie se entera de que hay que
 hacerlo: el sistema ya no está mudo. Hay `/metrics`, una alerta por pico de 5xx que **no depende de
@@ -116,8 +116,27 @@ lateral** con los doce destinos desplegados, así que ninguna sección cuesta ya
 cabecera —que se queda con la marca y la sesión— pasa de `<nav>` a `<header>`. `NavDropdown` se
 retiró: sin barra horizontal no lo usaba nadie. El hallazgo que no estaba en la ficha es que había
 **dos recorridos de navegación**, uno para móvil y otro para escritorio, con órdenes distintos; hoy
-son un array y dos envoltorios, y un test lo vigila. Las cinco restantes siguen fuera de alcance,
-listadas para que no hacerlas sea una decisión consciente.
+son un array y dos envoltorios, y un test lo vigila.
+
+Y **T4-12**, que cierra lo que T4-04 dejó a medias: los correos ya no salen siempre en español. Hay
+una columna `users.idioma` y un catálogo por idioma con el mismo mecanismo que el frontend —el
+inglés es un `Record` sobre las claves del español, así que **una frase sin traducir no compila**—.
+Lo que no era obvio es **de dónde sale el idioma en cada envío**: el registro lo saca de
+`Accept-Language`, porque es el único correo hacia alguien que aún no tiene fila; los demás, de la
+columna. Las alertas de stock y de 5xx **no tienen ninguna petición detrás** de la que deducirlo.
+Los correos además eran **cuatro y no los tres de la ficha**: T4-06 añadió el de pico de errores
+después de escribirla.
+
+Y **T4-13**: el compose pasa a **`postgres:17-alpine`**. La elección tiene dirección — `pg_restore`
+solo va hacia adelante, así que subir acepta los volcados de 16 y los de 17, mientras que quedarse
+en 16 rechazaba los de todos los equipos. **La regla que queda:** la imagen nunca por debajo del
+servidor más nuevo que se use en cualquier máquina del proyecto. Alinear los números no bastaba,
+porque la próxima vez que se separen nadie lo notaría hasta el día de la recuperación: `pnpm
+db:restaurar` compara ahora la versión del volcado con la del destino **antes de borrar la base**.
+Subir la imagen **invalida el volumen de datos**; el ciclo está en [operaciones.md §9](operaciones.md).
+
+**Las tres restantes** —T4-14, T4-15 y T4-16— siguen fuera de alcance, listadas para que no hacerlas
+sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un

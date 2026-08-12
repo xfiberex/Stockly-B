@@ -5,11 +5,11 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-12 — **109 / 114**
+> ## Estado al 2026-08-12 — **111 / 114**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). El **Tier 4** —que la auditoría dejó fuera del alcance inmediato— va por
-> **12/17**, y una de esas doce está **descartada, no hecha**: **T4-17**, el recorrido con lector
+> **14/17**, y una de esas catorce está **descartada, no hecha**: **T4-17**, el recorrido con lector
 > de pantalla, se cerró el 2026-08-12 por decisión de alcance. El listón de accesibilidad del
 > proyecto es **teclado más árbol de accesibilidad**; lo que eso no cubre está escrito en su ficha
 > y en [accesibilidad.md](accesibilidad.md), no dado por bueno. Las
@@ -22,10 +22,9 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > porque era lo que decía su propia ficha: es un cambio de layout que toca T2-16, T2-18 y T3-04, y
 > ninguna de las tres debía rehacerse dos veces.
 >
-> **Las 5 abiertas son las tres que abrieron los propios cierres** —T4-14, T4-15 y T4-16— más
-> **T4-12** y **T4-13**.
+> **Las 3 abiertas son justo las tres que abrieron los propios cierres**: T4-14, T4-15 y T4-16.
 >
-> Backend **424/424** tests y 91.83 % de sentencias; frontend **520/520** y 1 omitido; E2E 9
+> Backend **455/455** tests y 91.83 % de sentencias; frontend **526/526** y 1 omitido; E2E 9
 > pasados y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
@@ -52,7 +51,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 *Catorce tareas no vienen de la auditoría, y por eso el total pasa de 100 a 114: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05, y `T4-14`–`T4-17` el 2026-08-11, de lo que destaparon T4-07 (el árbol de producción que infla la CLI de Prisma), T4-08 (el histórico sin paginar y el `work_mem`) y T4-09 (el lector de pantalla que no se pudo ejecutar).*
 
-*Que **tres de las cinco abiertas las abrieran los propios cierres** no es un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. Ninguna de las tres se habría visto sin ejecutar la anterior. La cuarta de aquel grupo, `T4-17`, se descartó por decisión de alcance el 2026-08-12.*
+*Que **las tres abiertas las abrieran los propios cierres** no es un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. Ninguna se habría visto sin ejecutar la anterior. La cuarta de aquel grupo, `T4-17`, se descartó por decisión de alcance el 2026-08-12.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1539,23 +1538,28 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Nueve mutaciones, nueve guardias caídas:** un color sin `light-dark()`, un bloque de tema por media query, la regla de «oscuro» borrada, una sombra con un solo color, un `ring-offset` sin token, la clave del script en línea cambiada, ese script convertido en módulo, y las dos mitades de `elegirTema` —aplicar y avisar— por separado.
   - **Salvedad:** el E2E no cubre el selector. Sus radios son `sr-only`, así que habría que pulsar la etiqueta, y lo que aporta sobre los tests de unidad —que el atributo sobreviva a una recarga real— ya se comprobó a mano en el navegador.
 
-- [ ] **[T4-12] Los correos siguen saliendo solo en español**
+- [x] **[T4-12] Los correos siguen saliendo solo en español** ✅ *(2026-08-12)*
   - **Área:** UI/UX
-  - **Ubicación:** `Stockly-B/src/shared/templates/`, `schema.prisma`, registro y perfil
+  - **Ubicación:** `Stockly-B/src/shared/i18n/`, `Stockly-B/src/shared/lib/nodemailer.ts`, `schema.prisma`, registro y perfil
   - **Origen:** no viene de la auditoría. Sale del cierre de T4-04, que dejó traducida toda la interfaz y **no los correos**.
   - **Qué hacer:** la preferencia de idioma es de **dispositivo** y vive en el `localStorage` del navegador, así que el servidor no la conoce: verificación de cuenta, recuperación de contraseña y aviso de bajo stock salen siempre en español. Llevarla al servidor pide una columna `idioma` por usuario, enviarla en el registro y al cambiarla, y duplicar las plantillas —que hoy son HTML con el texto dentro—.
   - **Criterio de aceptación:** un usuario con la interfaz en inglés recibe en inglés los tres correos que la aplicación envía.
   - **Esfuerzo:** medio
   - **Depende de:** T4-04
+  - **Resultado:** columna `users.idioma` (enum `Idioma`, por defecto `ES`) y catálogo `correos.es.ts` / `correos.en.ts` con el mismo mecanismo que el frontend — el inglés es un `Record` sobre las claves del español, así que **una frase sin traducir no compila**. Las plantillas no se duplicaron: el armazón HTML es uno y el texto entra por clave.
+  - **Los correos son cuatro, no tres.** T4-06 añadió el aviso de pico de 5xx después de escribirse esta ficha; dejarlo fuera habría cumplido la letra del criterio y no su intención.
+  - **El idioma no sale del mismo sitio en los cuatro, y ahí estaba el diseño:** en el **registro** sale de `Accept-Language` —es el único correo hacia alguien que aún no tiene fila—; en los demás, de la columna. Que el de recuperar contraseña use la columna es lo que hace que llegue bien a quien lo pide desde el ordenador de otro, y las alertas **no tienen ninguna petición detrás** de la que deducirlo: las dispara una venta ajena o el propio servidor cayéndose.
 
-- [ ] **[T4-13] La versión de PostgreSQL no coincide entre el desarrollo y el compose**
+- [x] **[T4-13] La versión de PostgreSQL no coincide entre el desarrollo y el compose** ✅ *(2026-08-12)*
   - **Área:** DevOps
-  - **Ubicación:** `docker-compose.yml`, `docs/README-proyecto.md`, `docs/operaciones.md`
+  - **Ubicación:** `docker-compose.yml`, `scripts/postgres.js`, `scripts/restaurar.js`, `docs/README-proyecto.md`, `docs/operaciones.md`
   - **Origen:** no viene de la auditoría. La destapó el ensayo de restauración de T4-05.
   - **Qué hacer:** el servidor de desarrollo de este equipo es **PostgreSQL 17.10** y el compose levanta **`postgres:16-alpine`** (el README dice «PostgreSQL 16»). Un volcado tomado de un servidor 17 **no se restaura** en uno 16: es un fallo duro, y aparece el día de la recuperación, que es cuando peor viene. Decidir una versión y alinear las tres cosas. No se hizo dentro de T4-05 porque cambiar la imagen invalida el directorio de datos del volumen existente: exige `pg_upgrade` o un ciclo de volcado y restauración, con su propio ensayo.
   - **Criterio de aceptación:** un volcado tomado en cualquier equipo del proyecto se restaura en la pila del compose sin error de versión.
   - **Esfuerzo:** bajo
   - **Depende de:** T4-05
+  - **Resultado:** el compose pasa a **`postgres:17-alpine`**, y la elección tiene dirección: `pg_restore` solo va **hacia adelante**, así que subir acepta los volcados de 16 **y** los de 17, mientras que quedarse en 16 rechazaba los de todos los equipos del proyecto. La regla queda escrita: la imagen **nunca por debajo del servidor más nuevo** que se use en cualquier equipo.
+  - **Y no basta con alinear los números, porque la próxima vez que se separen nadie lo va a notar:** `pnpm db:restaurar` lee ahora la versión de la cabecera del volcado y la compara con la del destino **antes del `dropdb`**. Sin eso, el fallo llegaba con la base de destino ya borrada.
 
 - [ ] **[T4-14] El CLI de Prisma infla el árbol de producción**
   - **Área:** DevOps / Seguridad
@@ -1699,6 +1703,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-12 | **T4-13** La versión de PostgreSQL no coincide entre el desarrollo y el compose — **completada** | **El criterio, ejecutado.** Volcado real del servidor de desarrollo 17.10 (81.1 KB, 102 objetos) → volumen borrado → pila levantada sobre `postgres:17-alpine` (**17.10 confirmado con `select version()`**) → restaurado en **0.2 s** con las siete tablas y las 13 migraciones completas. Después: seed, `/health` 200, `/ready` 200 y login hasta el dashboard. **El guardia nuevo, demostrado en rojo** contra un `postgres:16-alpine` desechable: aborta con exit 1 y **sin haber creado la base de destino** —comprobado listando `pg_database`— | **La dirección de la incompatibilidad es lo que decide la versión:** `pg_restore` solo va hacia adelante, así que subir a 17 acepta los volcados de 16 **y** los de 17; quedarse en 16 rechazaba los de todos los equipos. **Alinear los números no era suficiente**, porque la próxima vez que se separen nadie lo notaría hasta el día de la recuperación: `pnpm db:restaurar` compara ahora la versión del volcado con la del servidor **antes del `dropdb`**. **Medido cómo se manifestaba** saltándose el guardia a propósito: `unrecognized configuration parameter "transaction_timeout"` —un parámetro que aparece en 17— **sin una sola mención a la versión**, y con la base de destino ya borrada. **Un defecto propio, encontrado ejecutándolo:** el patrón de la cabecera no llevaba los dos puntos y el guardia no reventó — se degradó a «no se puede saber» y dejó pasar la restauración, que es el aspecto exacto de una comprobación que no comprueba nada. **Subir la imagen invalida el volumen** y el contenedor entra en bucle de reinicio; el ciclo completo está en [operaciones.md §9](operaciones.md). |
+| 2026-08-12 | **T4-12** Los correos siguen saliendo solo en español — **completada** | **El criterio, de punta a punta y en el navegador**, sobre la pila del compose: interfaz en inglés → `accept-language: en` en la petición de registro (leído en la pestaña de red, no supuesto) → `users.idioma = EN` en la base. Al iniciar sesión con la interfaz en inglés, **un solo** `PATCH /auth/me/idioma` y la columna pasa a `EN`; al volver a español, regresa. **23 tests nuevos** inspeccionan el correo que se habría enviado —asunto, `lang` y cuerpo—, sin mockear las plantillas. `verify` ✅ backend **447/447** | **Los correos eran cuatro, no los tres de la ficha:** T4-06 añadió el aviso de pico de 5xx después de escribirla, y es el que peor momento tiene para llegar sin traducir. **El diseño está en de dónde sale el idioma, que no es el mismo sitio en todos:** el registro lo saca de `Accept-Language` porque es el único correo hacia alguien sin fila; el resto, de la columna. Las alertas **no tienen petición detrás** —las dispara una venta ajena o el servidor cayéndose—, así que sin columna no había nada que consultar. **La cabecera la pone el frontend a mano y no vale la del navegador:** dice el idioma del sistema operativo, no aquel con el que se está usando Stockly. Comprobado en Chrome que no la descarta — era el único tramo que todos los tests simulan. **Tres cosas que se vieron escribiéndolo:** el **pie** estaba incrustado en la plantilla y salía en español dentro de un correo inglés; los **rótulos de la tabla** de la alerta de stock también eran texto y también estaban dentro; y un `replace` encadenado por hueco deja que un producto llamado `{minimo}` se convierta en el stock mínimo — se interpola en un solo recorrido, con test. **`idioma` es un parámetro obligatorio y sin valor por defecto a propósito:** con uno, un envío que se olvide de pasarlo compila y sale en español, que es el fallo de partida. |
 | 2026-08-12 | **T4-17** Recorrido real con lector de pantalla — **descartada** | Ninguna: **no se ha ejecutado NVDA ni VoiceOver**, y esta fila no dice lo contrario. Lo que queda como listón verificado es lo de T4-09: los dos flujos completados **solo con teclado** y el árbol de accesibilidad leído pantalla por pantalla | **Decisión de alcance, no un cierre por trabajo hecho.** El listón de accesibilidad del proyecto pasa a ser **teclado + árbol de accesibilidad**, que es lo que se puede ejecutar y repetir en las máquinas donde se trabaja. **Lo que se asume a sabiendas:** el árbol dice *qué* se anunciaría, no si la secuencia se entiende **de oído** — una tabla puede recitar sus cabeceras en cada celda, un aviso de `react-hot-toast` puede no anunciarse nunca y un orden correcto en el DOM puede resultar incomprensible leído. **Nada de eso lo ve `verify`.** Se reabre si aparece una máquina con lector; lo que se decidió es no bloquear el proyecto esperándola. |
 | 2026-08-12 | **T4-10** Navegación lateral en pantallas anchas — **completada** | Medido sobre la **pila del compose**. **El punto de ruptura, por sus dos lados:** a 1024 px la barra lateral está visible y la hamburguesa no; a **1023 px es al revés**, sin solaparse ni un píxel. Los **doce destinos a un clic**, sin un solo `<button>` en el lateral. Lighthouse de accesibilidad **100** en dashboard y productos, buenas prácticas 100. **T2-18 intacta**, comprobada activando un enlace con Enter: el foco acaba en `#contenido`, la región viva anuncia «Marcas» y el título cambia. **T2-16 intacta:** Escape cierra el menú de usuario y devuelve el foco a su disparador. `verify` ✅ frontend **520/520** y 1 omitido, E2E ✅ 9 y 1 omitido en `chromium` y `Mobile Chrome` | **La tarea pedía una barra lateral y lo que hacía falta era quitar los desplegables.** Con ellos puestos, la mayoría de destinos costaban dos interacciones; desplegados en el lateral, `NavDropdown` se quedó sin usuarios y se retiró con su test. **Lo que no estaba en la ficha: había dos recorridos, no uno.** El móvil agrupaba por tipo —enlaces sueltos arriba, secciones debajo— y el escritorio los intercalaba, así que cada destino nuevo había que darlo de alta dos veces y nada avisaba si se olvidaba uno; ahora los dos envoltorios pintan la misma lista y **eso es lo que vigila el test**, no que cada uno coincida por separado con lo esperado. **Tres decisiones que no se ven y sostienen el resto:** la cabecera pasa a `<header>` porque de `lg` en adelante no lleva ningún destino y un *landmark* de navegación que no navega es ruido para un lector de pantalla; los dos `<nav>` comparten `aria-label` sin chocar porque el oculto es `display: none` y no entra en el árbol; y **`min-w-0` en el `<main>`** —sin él las tablas de `min-w-160` empujan el contenido fuera de la ventana, que es el mismo mecanismo del `w-full` que dejó los selects sin texto, visto del otro lado—. **Corregido al mirarlo en el navegador:** los destinos de un grupo no llevan icono y su texto arrancaba 26 px a la izquierda del de «Dashboard», así que la lista se leía como si los hijos fueran los de fuera. **La sección activa se marca dos veces**, `text-info` y `aria-current="page"`: el color solo no vale (WCAG 1.4.1). **De paso:** los contadores de este documento estaban desfasados —la cabecera decía 104/110 y el índice daba 13 tareas al Tier 4—; contadas las casillas, eran 107/114 antes de esta. |
 | 2026-08-11 | **T4-09** Auditoría de navegador y de lector de pantalla — **completada, con una salvedad** | Lighthouse sobre la **pila del compose** (build de producción tras nginx): login **93 → 100**, productos **94 → 100**, movimientos **95 → 100**, dashboard 100. Buenas prácticas 100 en las cuatro. Core Web Vitals mejor que la línea base: **LCP 420 ms** frente a 556 ms, **CLS 0.02**, cero errores de consola. Los dos flujos recorridos **solo con teclado**, y el de movimiento **ejecutado**: stock de 10 a 15. `verify` ✅ frontend **522/522** | **El criterio no se cumplía: el login estaba en 93**, y es la primera pantalla del producto. **Tres fallos que no se ven mirando:** ocho desplegables sin nombre accesible en cuatro pantallas —lo visible es la opción elegida, que dice el *valor*, no de qué es el filtro—; las siete pantallas sin sesión **sin landmark `<main>`**, con el marco copiado en las siete; y enlaces distinguidos **solo por el color**, con el subrayado reservado al `hover`. **Un cuarto lo dio el árbol de accesibilidad, no Lighthouse:** el menú de usuario enseñaba «Admin Principal» y se anunciaba «Menú de usuario» (WCAG 2.5.3) — por voz se dice lo que se ve y no pasaba nada. **La trampa de foco se comprobó por sus dos bordes**, que es donde se rompe. **Descartado tras mirarlo:** el «máximo 0» del campo Cantidad es cómo Chrome serializa un `max` ausente. **El 63 de SEO no es regresión**, es el bloqueo de indexación que decidió T3-12. **Salvedad: no se ejecutó NVDA ni VoiceOver** —no hay ninguno en esta máquina— → **T4-17**, *descartada por decisión de alcance el 2026-08-12: la salvedad no se comprobó, se asumió*. |
@@ -1825,11 +1831,12 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **424/424** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **455/455** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **520/520** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano; bajan 2 al retirar `NavDropdown` con T4-10)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **526/526** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
+| Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
 | Errores de la API con código estable | 0 *(solo `message`, siempre en español)* | **42 códigos** ✅ *(el cliente compone la frase en su idioma, T4-04)* | que ningún mensaje de error dependa del idioma del servidor |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
@@ -1846,7 +1853,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Métricas expuestas por el servicio | 0 | **3 propias + las del proceso** ✅ *(peticiones, duración, 5xx, bucle de eventos, montón, GC)* | que un incidente se pueda reconstruir |
 | Reglas de alerta probadas | 0 *(no había reglas)* | **5 escritas, 2 con prueba unitaria** ✅ *(`promtool test rules`)* | que ninguna regla llegue sin ejecutarse antes |
 | Copias de seguridad de la base | 0 *(ni procedimiento ni archivo)* | **`pnpm db:backup`, retención de 14 días y mínimo 3 copias** ✅ *(T4-05)* | una copia diaria automática |
-| Restauraciones probadas | 0 *(nunca se había intentado)* | **1** ✅ *(2026-08-11: 31 MB restaurados en 0.3 s, `/ready` 200 contra la copia)* | una al mes, con su fila en el registro |
+| Restauraciones probadas | 0 *(nunca se había intentado)* | **2** ✅ *(la del 2026-08-11 y la del 2026-08-12 **en la pila del compose**, T4-13)* | una al mes, con su fila en el registro |
+| PostgreSQL del compose frente al de desarrollo | 16 contra **17.10** *(un volcado de 17 no entraba)* | **17 en los dos** ✅ *(y `db:restaurar` lo comprueba antes de borrar nada, T4-13)* | que la imagen nunca quede por debajo |
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | Índices no-únicos en el esquema | 0 | **19** ✅ *(T2-43 los del orden por `createdAt`; T2-09 los GIN de trigramas)* | cubrir FK, ordenaciones y búsqueda |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |

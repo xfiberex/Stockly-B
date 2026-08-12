@@ -132,6 +132,7 @@ una restauración con éxito**. Esta es. Se repite el primer lunes de cada mes y
 | Fecha | Origen | Resultado |
 |---|---|---|
 | 2026-08-11 | `Stockly` en PostgreSQL 17.10 (`localhost:5433`), 31 MB | ✅ Ver detalle abajo |
+| 2026-08-12 | `Stockly` en PostgreSQL 17.10 (`localhost:5433`), 81.1 KB de volcado | ✅ **restaurado en la pila del compose** (T4-13) |
 
 **Detalle del ensayo del 2026-08-11.** Base de 31 MB → volcado de **76.7 KB** con 101 objetos en
 **0.2 s**; restauración en una base nueva en **0.3 s**. Casi todo el tamaño de la base son índices,
@@ -311,8 +312,64 @@ sobre el que alertar sin depender de Prometheus es `alerta: "pico_5xx"`.
 
 ---
 
-> ⚠️ **Discrepancia de versión abierta.** El servidor de desarrollo de este equipo es **PostgreSQL
-> 17.10** y el `docker-compose.yml` levanta **`postgres:16-alpine`**. Un volcado tomado de 17 **no
-> se restaura** en un servidor 16: es un fallo duro, y aparece el día de la recuperación. No se
-> arregla desde esta tarea porque cambiar la imagen del compose invalida el directorio de datos del
-> volumen existente y exige `pg_upgrade` o un ciclo de volcado y restauración. → **T4-13**.
+---
+
+## 9. La versión de PostgreSQL (T4-13)
+
+**El compose levanta `postgres:17-alpine`.** Hasta el 2026-08-12 levantaba `16-alpine` mientras el
+servidor de desarrollo del proyecto era **17.10**, y esa diferencia convertía cada copia de
+seguridad en un archivo que no se podía restaurar en la pila.
+
+**La regla, y su dirección:** `pg_restore` solo va **hacia adelante**. Un volcado de 16 entra en un
+servidor 17; uno de 17 **no entra** en un 16. De ahí la regla que sigue el proyecto:
+
+> La imagen del `docker-compose.yml` **nunca por debajo del servidor más nuevo** que se use en
+> cualquier equipo del proyecto. Subirla es barato; descubrir que no se puede restaurar, no.
+
+**Cómo se manifestaba, medido** —volcado de 17.10 restaurado a mano en un `postgres:16-alpine`
+desechable—:
+
+```
+pg_restore: error: could not execute query: ERROR:  unrecognized configuration parameter "transaction_timeout"
+La orden era: SET transaction_timeout = 0;
+```
+
+`transaction_timeout` es un parámetro que aparece en PostgreSQL 17. **El error no menciona la
+versión por ningún lado**, y llega con la base de destino ya borrada y recreada: el día de la
+recuperación, eso son horas de depurar lo que no es.
+
+**Por eso `pnpm db:restaurar` lo comprueba antes de tocar nada.** Lee la versión de la cabecera del
+volcado (`pg_restore -l`, que no necesita servidor), la compara con la del destino y **aborta sin
+haber borrado la base**:
+
+```
+✗ el volcado viene de PostgreSQL 17 y este servidor es 16.
+  pg_restore no va hacia atrás: la restauración fallaría a medias, con la base de
+  destino ya borrada. No se ha tocado nada.
+```
+
+Si no puede saberlo —un volcado sin esa línea, un servidor que no responde— **avisa y deja pasar**,
+el mismo criterio que la auditoría de dependencias: «no se puede saber» no es «hay un problema».
+
+### Subir la versión de la imagen
+
+Cambiar el número de `image:` **no basta y no es inocuo**: PostgreSQL se niega a arrancar sobre un
+directorio de datos de otra versión mayor, y el contenedor entra en bucle de reinicio con
+`database files are incompatible with server`. El ciclo completo, con la pila en marcha:
+
+```bash
+cd Stockly-B
+pnpm db:backup                    # ① la copia va del servidor de desarrollo, no del contenedor
+docker compose down -v            # ② -v borra el volumen: es lo que exige el cambio de versión
+# editar `image:` en docker-compose.yml
+docker compose up -d              # ③ inicializa un directorio de datos nuevo
+pnpm db:restaurar backups/<archivo>.dump --a Stockly --forzar
+```
+
+**El `-v` del paso ② borra los datos**, así que el ① no es opcional. En una máquina de producción
+la alternativa es `pg_upgrade` con los dos binarios instalados; para este proyecto, donde la pila
+del compose se recrea a diario, el ciclo de volcado y restauración es más corto y se comprueba solo.
+
+**Ejecutado el 2026-08-12** en este equipo: volcado de 17.10 (81.1 KB, 102 objetos) restaurado en la
+pila ya sobre `postgres:17-alpine` en **0.2 s**, con las siete tablas y las 13 migraciones
+completas; después, seed, `/health` 200, `/ready` 200 y login hasta el dashboard.
