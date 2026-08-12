@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **455/455** | **526/526** *(+1 omitido)* |
+| Tests | **460/460** | **526/526** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 14/17** · Total **111/114** *(una de ellas, T4-17, **descartada** y no hecha)*. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 15/17** · Total **112/114** *(una de ellas, T4-17, **descartada** y no hecha)*. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -90,8 +90,9 @@ Ese mismo día se cerró **T4-07**, el análisis de composición que la auditor�
 vulnerabilidad **alta** en producción o una licencia sin revisar. El resultado de hoy es limpio —0
 vulnerabilidades sobre 296 + 118 paquetes, sin copyleft fuerte—, así que lo que vale es la puerta,
 no la foto; el informe y lo que **no** cubre están en [dependencias.md](dependencias.md). Dejó
-anotada **T4-14**: `prisma` vive en `dependencies` a propósito —el contenedor migra al arrancar—
-pero arrastra `@prisma/studio-core` y unos 200 paquetes que el servidor no necesita.
+anotada **T4-14**, ya cerrada — y con la causa **al revés de como la contaba**: `prisma` no
+arrastraba nada por estar en `dependencies`, lo arrastra **`@prisma/client`, que lo declara como
+peer opcional**. Bajarlo a `devDependencies` no cambia ni un paquete.
 
 Y **T4-08**, que es la primera vez que este proyecto mide algo bajo carga: 100 000 productos y
 1 100 000 movimientos en una base aparte, los índices de T1-15 comprobados quitándolos y
@@ -135,8 +136,16 @@ porque la próxima vez que se separen nadie lo notaría hasta el día de la recu
 db:restaurar` compara ahora la versión del volcado con la del destino **antes de borrar la base**.
 Subir la imagen **invalida el volumen de datos**; el ciclo está en [operaciones.md §9](operaciones.md).
 
-**Las tres restantes** —T4-14, T4-15 y T4-16— siguen fuera de alcance, listadas para que no hacerlas
-sea una decisión consciente.
+Y **T4-14**, que dejó la imagen del backend en **426 MB desde 1.81 GB** y su árbol en **183
+paquetes desde 313**. Tres cambios, y hacían falta los tres: las migraciones salen del `CMD` a un
+servicio `migrate` que corre antes y termina —de paso, con varias réplicas cada una lanzaba
+`migrate deploy` a la vez—; el árbol se poda **por alcanzabilidad** y no por lista; y el runner
+**copia** ese árbol en vez de instalarlo y podarlo, porque borrar en una capa posterior no quita
+nada de la imagen. Dentro viajaban una interfaz gráfica de 42 MB, TypeScript y un PostgreSQL para
+navegador.
+
+**Las dos restantes** —T4-15 y T4-16— siguen fuera de alcance, listadas para que no hacerlas sea
+una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -306,9 +315,10 @@ POSTGRES_HOST_PORT=5442 docker compose up -d
 DATABASE_URL="postgresql://postgres:postgres@localhost:5442/Stockly" pnpm exec prisma db seed
 ```
 
-**La pila del compose no se siembra sola.** El contenedor aplica migraciones al arrancar
-(`prisma migrate deploy` en el `CMD`) pero no ejecuta el seed, así que la base queda con el
-esquema y sin usuarios: el login responde **401** y parece un fallo de credenciales.
+**La pila del compose no se siembra sola.** Desde T4-14 las migraciones las aplica el
+servicio `migrate` —un contenedor que corre, termina y bloquea el arranque del backend si
+falla—, pero **nadie ejecuta el seed**: la base queda con el esquema y sin usuarios, el login
+responde **401** y parece un fallo de credenciales.
 
 **CSRF** (double-submit): para un PATCH/POST manual contra el servidor hay que leer la
 cookie `csrfToken` y reenviarla en la cabecera `x-csrf-token`. En `NODE_ENV=test` se

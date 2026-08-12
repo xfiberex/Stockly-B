@@ -44,6 +44,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Migraciones ──────────────────────────────────────────────────────────────
+  #
+  # T4-14 — un contenedor de inicialización: aplica las migraciones pendientes y **termina**.
+  # El backend no arranca hasta que este sale con código 0 (`service_completed_successfully`).
+  #
+  # Estaba dentro del `CMD` del backend, y eso obligaba a llevar el CLI de Prisma en la
+  # imagen de producción —con su interfaz gráfica de 42 MB detrás—. De paso arregla algo que
+  # no era de tamaño: con más de una réplica, **cada una lanzaba `migrate deploy` a la vez**
+  # contra la misma base.
+  #
+  # Usa la etapa `migrator`, que **es el `builder`**: comparte todas sus capas con la
+  # compilación que ya se hace, así que no descarga ni construye nada aparte.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    container_name: stockly_migrate
+    # Un contenedor que debe terminar. `restart: unless-stopped` lo reviviría en bucle.
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-Stockly}
+    depends_on:
+      db:
+        condition: service_healthy
+
   # ── Backend Express ──────────────────────────────────────────────────────────
   backend:
     build:
@@ -70,6 +96,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # T4-14: y a que las migraciones hayan terminado bien. Si `migrate` sale con error, el
+      # backend **no arranca**, en vez de servir contra un esquema a medias.
+      migrate:
+        condition: service_completed_successfully
     # T2-25: se sondea `/ready`, no `/health`. El segundo responde 200 mientras el
     # proceso viva, así que como healthcheck diría «sano» con la base caída.
     # Se usa `node` y no `curl` ni `wget` porque la imagen es `node:alpine` y no
@@ -83,8 +113,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      # Margen para `prisma migrate deploy`, que corre antes de que el servidor escuche.
-      start_period: 40s
+      # Margen de arranque. Ya no incluye las migraciones —las aplica el servicio `migrate`
+      # antes de que este contenedor exista (T4-14)—, así que sobra bastante.
+      start_period: 20s
 
   # ── Frontend (SPA servida por nginx) ─────────────────────────────────────────
   # T2-28. El contexto apunta al repositorio hermano: los dos se clonan uno al lado del

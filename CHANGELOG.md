@@ -99,6 +99,18 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **La imagen de producción del backend baja de 1.81 GB a 426 MB** y su árbol de 313 a **183
+  paquetes** (`T4-14`). Dentro viajaban una interfaz gráfica de 42 MB (`@prisma/studio-core`,
+  con React y `elkjs` — **la única EPL-2.0** del proyecto), TypeScript, `effect` y un
+  PostgreSQL para navegador (`@electric-sql/pglite`). Nada de eso lo ejecuta un servidor.
+  - **Las migraciones salen del `CMD`** a un servicio `migrate` que corre antes y termina; el
+    backend no arranca hasta que sale con 0. Con varias réplicas, el arreglo anterior lanzaba
+    `migrate deploy` desde todas a la vez contra la misma base.
+  - El árbol se poda con [`scripts/podar-produccion.js`](scripts/podar-produccion.js), que
+    **corta los peers opcionales y barre lo inalcanzable** en vez de enumerar paquetes.
+  - **La causa no era la que se había anotado:** `prisma` no viajaba por estar en
+    `dependencies` —`@prisma/client` lo declara como *peer opcional*—, así que bajarlo a
+    `devDependencies` no cambia ni un paquete. Medido en [`docs/dependencias.md`](docs/dependencias.md).
 - **La pila del compose pasa a PostgreSQL 17** (`T4-13`). Levantaba `postgres:16-alpine`
   mientras el servidor de desarrollo del proyecto era 17.10, y `pg_restore` **solo va hacia
   adelante**: cada copia de seguridad era un archivo que no se podía restaurar en la pila.

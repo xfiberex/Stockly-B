@@ -103,7 +103,10 @@ inventarlo.
 
 ---
 
-## 4. Hallazgo: el CLI de Prisma vive en las dependencias de producción
+## 4. Hallazgo: el CLI de Prisma viaja en la imagen de producción
+
+> **Resuelto en T4-14 (2026-08-12), y con la causa distinta de la que se escribió aquí.** Lo
+> que sigue es el hallazgo original; la corrección va debajo.
 
 `prisma` está en `dependencies`, no en `devDependencies`, y **está puesto ahí a propósito**:
 el contenedor arranca con `prisma migrate deploy && node dist/server.js`, así que el CLI
@@ -115,10 +118,42 @@ interfaz gráfica, y con ella su árbol de gráficos y diagramas: `elkjs`, `@vis
 diferencia entre 296 paquetes de producción y los ~100 que necesita el servidor para
 funcionar.
 
-No lo toco aquí porque cambia el despliegue, no una dependencia. Queda propuesto como
-**T4-14**: aplicar las migraciones desde un job o un contenedor de inicialización, y bajar
-`prisma` a `devDependencies`. Reduciría la superficie de la imagen de producción en unos
-200 paquetes.
+### La corrección (T4-14)
+
+**No era por estar en `dependencies`.** `@prisma/client` declara `prisma` —y `typescript`—
+como **peers opcionales**, y pnpm los instala solos. Bajar `prisma` a `devDependencies` deja
+el árbol **exactamente igual**, y está medido: `pnpm install --prod` en un contenedor limpio
+da **313 paquetes con los dos manifiestos**. El remedio que proponía la ficha, por sí solo,
+no habría cambiado nada — y encima habría roto el `CMD`, porque el CLI deja de enlazarse.
+
+Lo que sí viajaba, medido dentro de la imagen:
+
+| Paquete | Tamaño | Qué es |
+|---|---:|---|
+| `@prisma/studio-core` | 42 MB | una interfaz gráfica, con React y sus diagramas (`elkjs` ← **la única EPL-2.0**) |
+| `effect` | 34 MB | vía `@prisma/config` |
+| `typescript` | 24 MB | peer de tipos; el servidor ejecuta JavaScript compilado |
+| `@electric-sql/pglite` | 23 MB | un PostgreSQL para el navegador, vía `@prisma/dev` |
+| `@prisma/dev` | 18 MB | se llama «dev» |
+
+**Cómo se quitó:** las migraciones salen del `CMD` a un servicio `migrate` que corre antes y
+termina, y el árbol se poda con
+[`scripts/podar-produccion.js`](../scripts/podar-produccion.js), que **corta los dos peers y
+barre lo que deja de ser alcanzable** desde los enlaces de la raíz. Resultado: **1.81 GB → 426
+MB** y **313 → 183 paquetes**.
+
+> **Por qué una regla y no una lista.** La primera versión enumeraba paquetes: recortaba
+> tamaño pero dejaba **292 de 313 entradas**, porque las transitivas del CLI no estaban en la
+> lista. Y una lista escrita a mano envejece con la siguiente versión de Prisma sin que nadie
+> se entere.
+
+### Lo que esto **no** cambia: la cifra de la puerta
+
+`pnpm auditoria` sigue diciendo **296 paquetes de producción**, y no es un descuido. Mide el
+grafo **declarado** —lo que `pnpm licenses list --prod` resuelve, peers incluidos—, que es un
+**superconjunto** de lo que acaba en la imagen. Para una puerta de vulnerabilidades y
+licencias eso es lo correcto: audita de más, nunca de menos. Los 183 de la imagen son otra
+medida, y se toma en el `build`.
 
 ---
 

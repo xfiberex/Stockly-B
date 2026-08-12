@@ -114,8 +114,9 @@ docker compose up -d --build
 ```
 
 Levanta PostgreSQL, el backend y el frontend tras nginx —que sirve la SPA y hace de proxy de `/api`,
-así que hay un solo origen— en `http://localhost:8080`. La pila **no se siembra sola**: aplica las
-migraciones al arrancar pero no ejecuta el seed, de modo que el login responde 401 hasta que se
+así que hay un solo origen— en `http://localhost:8080`. La pila **no se siembra sola**: un servicio
+`migrate` aplica las migraciones y termina —el backend no arranca hasta que sale bien (T4-14)—,
+pero nadie ejecuta el seed, de modo que el login responde 401 hasta que se
 lance a mano y parece un fallo de credenciales.
 
 La documentación interactiva de la API (Swagger) está en `/api/v1/docs` y **no se monta con

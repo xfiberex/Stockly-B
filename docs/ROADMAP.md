@@ -5,11 +5,11 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-12 — **111 / 114**
+> ## Estado al 2026-08-12 — **112 / 114**
 >
 > **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
 > Tier 3 (15/15). El **Tier 4** —que la auditoría dejó fuera del alcance inmediato— va por
-> **14/17**, y una de esas catorce está **descartada, no hecha**: **T4-17**, el recorrido con lector
+> **15/17**, y una de esas quince está **descartada, no hecha**: **T4-17**, el recorrido con lector
 > de pantalla, se cerró el 2026-08-12 por decisión de alcance. El listón de accesibilidad del
 > proyecto es **teclado más árbol de accesibilidad**; lo que eso no cubre está escrito en su ficha
 > y en [accesibilidad.md](accesibilidad.md), no dado por bueno. Las
@@ -22,9 +22,9 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > porque era lo que decía su propia ficha: es un cambio de layout que toca T2-16, T2-18 y T3-04, y
 > ninguna de las tres debía rehacerse dos veces.
 >
-> **Las 3 abiertas son justo las tres que abrieron los propios cierres**: T4-14, T4-15 y T4-16.
+> **Las 2 abiertas son las que abrió la prueba de carga**: T4-15 y T4-16.
 >
-> Backend **455/455** tests y 91.83 % de sentencias; frontend **526/526** y 1 omitido; E2E 9
+> Backend **460/460** tests y 91.83 % de sentencias; frontend **526/526** y 1 omitido; E2E 9
 > pasados y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
@@ -51,7 +51,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 *Catorce tareas no vienen de la auditoría, y por eso el total pasa de 100 a 114: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05, y `T4-14`–`T4-17` el 2026-08-11, de lo que destaparon T4-07 (el árbol de producción que infla la CLI de Prisma), T4-08 (el histórico sin paginar y el `work_mem`) y T4-09 (el lector de pantalla que no se pudo ejecutar).*
 
-*Que **las tres abiertas las abrieran los propios cierres** no es un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. Ninguna se habría visto sin ejecutar la anterior. La cuarta de aquel grupo, `T4-17`, se descartó por decisión de alcance el 2026-08-12.*
+*Que **las dos abiertas las abriera un cierre anterior** no es un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. Ninguna de las dos se habría visto sin ejecutar la prueba de carga de T4-08. De aquel grupo, `T4-17` se descartó por decisión de alcance y `T4-14` se cerró, ambas el 2026-08-12.*
 
 **Ruta crítica sugerida:** `T0-01 → T0-02 → T0-03/04 → T0-05 → T1-01/T1-02 (verificación local)` ✅ *completada el 2026-08-07* y, en paralelo desde el primer día, todos los quick wins sin dependencias de Tier 1.
 
@@ -1561,14 +1561,16 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Resultado:** el compose pasa a **`postgres:17-alpine`**, y la elección tiene dirección: `pg_restore` solo va **hacia adelante**, así que subir acepta los volcados de 16 **y** los de 17, mientras que quedarse en 16 rechazaba los de todos los equipos del proyecto. La regla queda escrita: la imagen **nunca por debajo del servidor más nuevo** que se use en cualquier equipo.
   - **Y no basta con alinear los números, porque la próxima vez que se separen nadie lo va a notar:** `pnpm db:restaurar` lee ahora la versión de la cabecera del volcado y la compara con la del destino **antes del `dropdb`**. Sin eso, el fallo llegaba con la base de destino ya borrada.
 
-- [ ] **[T4-14] El CLI de Prisma infla el árbol de producción**
+- [x] **[T4-14] El CLI de Prisma infla el árbol de producción** ✅ *(2026-08-12)*
   - **Área:** DevOps / Seguridad
-  - **Ubicación:** `package.json`, `Dockerfile`, `docker-compose.yml`
+  - **Ubicación:** `package.json`, `Dockerfile`, `docker-compose.yml`, `scripts/podar-produccion.js`
   - **Origen:** no viene de la auditoría. Lo destapó el análisis de composición de T4-07.
   - **Qué hacer:** `prisma` está en `dependencies` y no en `devDependencies` **a propósito y documentado**: el contenedor arranca con `prisma migrate deploy && node dist/server.js`, así que el CLI tiene que estar en la imagen. El precio no era evidente: arrastra `@prisma/studio-core` —una interfaz gráfica— y con ella su árbol de gráficos y diagramas (`elkjs`, `@visx/vendor`, `robust-predicates`, `pako`). Ahí está **la única EPL-2.0 del proyecto** y buena parte de la diferencia entre los 296 paquetes de producción y los ~100 que el servidor necesita para responder. Aplicar las migraciones desde un job o un contenedor de inicialización —que sí puede llevar el CLI— y bajar `prisma` a `devDependencies`.
   - **Criterio de aceptación:** el árbol de producción del backend baja de 200 paquetes, las migraciones se siguen aplicando al desplegar y `pnpm verify` pasa entero.
   - **Esfuerzo:** medio
   - **Depende de:** T4-07
+  - **La causa que daba la ficha era la equivocada, y se comprobó midiendo.** `prisma` no arrastra el CLI por estar en `dependencies`: **`@prisma/client` lo declara como *peer opcional*** y pnpm lo instala solo. Bajarlo a `devDependencies` —el remedio que proponía— deja el árbol **exactamente igual**: 313 paquetes antes y después, medido instalando `--prod` en un contenedor limpio con los dos manifiestos.
+  - **Resultado:** imagen de **1.81 GB → 426 MB** y **313 → 183 paquetes**. Tres cambios, y hacían falta los tres: las migraciones salen del `CMD` a un servicio `migrate` que termina; el árbol se poda por **alcanzabilidad** desde los enlaces de la raíz (`scripts/podar-produccion.js`); y el runner **copia** ese árbol en vez de instalarlo y podarlo, porque borrar en una capa posterior no quita nada de la imagen.
 
 - [ ] **[T4-15] `GET /products/:id/movements` devuelve el histórico entero**
   - **Área:** Rendimiento
@@ -1703,6 +1705,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-12 | **T4-14** El CLI de Prisma infla el árbol de producción — **completada** | **Imagen del backend: 1.81 GB → 426 MB. Árbol: 313 → 183 paquetes** (el criterio pedía bajar de 200). Arranque desde cero con el volumen borrado: `migrate` aplica **las 13 migraciones** y sale con 0, el backend arranca después y queda `healthy`. Ejercitada la imagen podada de punta a punta: `/ready` 200, login 200, productos 200, reportes 200, **CSV de 15 182 bytes**, **PDF de 6 593 bytes con cabecera `%PDF`** y un registro que **envía el correo** (201). `verify` ✅ **460/460** | **La causa de la ficha era la equivocada.** No es que `prisma` esté en `dependencies`: **`@prisma/client` lo declara como peer opcional** y pnpm lo instala solo. Bajarlo a `devDependencies` deja el árbol **igual** —313 antes y 313 después, medido con `pnpm install --prod` en un contenedor limpio con cada manifiesto—. Lo que sí arrastra, medido dentro de la imagen: `@prisma/studio-core` 42 MB *(y con él React y `elkjs`, **la única EPL-2.0**)*, `effect` 34 MB, `typescript` 24 MB, `@electric-sql/pglite` 23 MB —un PostgreSQL para el navegador— y `@prisma/dev` 18 MB. **Dos defectos propios, los dos encontrados midiendo:** podar en un `RUN` posterior al `install` ahorró **0 MB**, porque la capa de abajo sigue viajando —hubo que mover la poda a la etapa que se copia—; y podar **por lista** recortó tamaño pero dejó **292 de 313 entradas**, porque las transitivas del CLI no estaban en la lista. Se sustituyó por una **regla**: cortar los dos peers y barrer lo inalcanzable desde los enlaces de la raíz. **De propina, algo que no era de tamaño:** con las migraciones dentro del `CMD`, cada réplica del backend lanzaba `migrate deploy` a la vez contra la misma base. **Y el `chown -R /app` del runner duplicaba los 300 MB de `node_modules` en una capa nueva**; los `COPY --chown` ya lo dejaban resuelto. |
 | 2026-08-12 | **T4-13** La versión de PostgreSQL no coincide entre el desarrollo y el compose — **completada** | **El criterio, ejecutado.** Volcado real del servidor de desarrollo 17.10 (81.1 KB, 102 objetos) → volumen borrado → pila levantada sobre `postgres:17-alpine` (**17.10 confirmado con `select version()`**) → restaurado en **0.2 s** con las siete tablas y las 13 migraciones completas. Después: seed, `/health` 200, `/ready` 200 y login hasta el dashboard. **El guardia nuevo, demostrado en rojo** contra un `postgres:16-alpine` desechable: aborta con exit 1 y **sin haber creado la base de destino** —comprobado listando `pg_database`— | **La dirección de la incompatibilidad es lo que decide la versión:** `pg_restore` solo va hacia adelante, así que subir a 17 acepta los volcados de 16 **y** los de 17; quedarse en 16 rechazaba los de todos los equipos. **Alinear los números no era suficiente**, porque la próxima vez que se separen nadie lo notaría hasta el día de la recuperación: `pnpm db:restaurar` compara ahora la versión del volcado con la del servidor **antes del `dropdb`**. **Medido cómo se manifestaba** saltándose el guardia a propósito: `unrecognized configuration parameter "transaction_timeout"` —un parámetro que aparece en 17— **sin una sola mención a la versión**, y con la base de destino ya borrada. **Un defecto propio, encontrado ejecutándolo:** el patrón de la cabecera no llevaba los dos puntos y el guardia no reventó — se degradó a «no se puede saber» y dejó pasar la restauración, que es el aspecto exacto de una comprobación que no comprueba nada. **Subir la imagen invalida el volumen** y el contenedor entra en bucle de reinicio; el ciclo completo está en [operaciones.md §9](operaciones.md). |
 | 2026-08-12 | **T4-12** Los correos siguen saliendo solo en español — **completada** | **El criterio, de punta a punta y en el navegador**, sobre la pila del compose: interfaz en inglés → `accept-language: en` en la petición de registro (leído en la pestaña de red, no supuesto) → `users.idioma = EN` en la base. Al iniciar sesión con la interfaz en inglés, **un solo** `PATCH /auth/me/idioma` y la columna pasa a `EN`; al volver a español, regresa. **23 tests nuevos** inspeccionan el correo que se habría enviado —asunto, `lang` y cuerpo—, sin mockear las plantillas. `verify` ✅ backend **447/447** | **Los correos eran cuatro, no los tres de la ficha:** T4-06 añadió el aviso de pico de 5xx después de escribirla, y es el que peor momento tiene para llegar sin traducir. **El diseño está en de dónde sale el idioma, que no es el mismo sitio en todos:** el registro lo saca de `Accept-Language` porque es el único correo hacia alguien sin fila; el resto, de la columna. Las alertas **no tienen petición detrás** —las dispara una venta ajena o el servidor cayéndose—, así que sin columna no había nada que consultar. **La cabecera la pone el frontend a mano y no vale la del navegador:** dice el idioma del sistema operativo, no aquel con el que se está usando Stockly. Comprobado en Chrome que no la descarta — era el único tramo que todos los tests simulan. **Tres cosas que se vieron escribiéndolo:** el **pie** estaba incrustado en la plantilla y salía en español dentro de un correo inglés; los **rótulos de la tabla** de la alerta de stock también eran texto y también estaban dentro; y un `replace` encadenado por hueco deja que un producto llamado `{minimo}` se convierta en el stock mínimo — se interpola en un solo recorrido, con test. **`idioma` es un parámetro obligatorio y sin valor por defecto a propósito:** con uno, un envío que se olvide de pasarlo compila y sale en español, que es el fallo de partida. |
 | 2026-08-12 | **T4-17** Recorrido real con lector de pantalla — **descartada** | Ninguna: **no se ha ejecutado NVDA ni VoiceOver**, y esta fila no dice lo contrario. Lo que queda como listón verificado es lo de T4-09: los dos flujos completados **solo con teclado** y el árbol de accesibilidad leído pantalla por pantalla | **Decisión de alcance, no un cierre por trabajo hecho.** El listón de accesibilidad del proyecto pasa a ser **teclado + árbol de accesibilidad**, que es lo que se puede ejecutar y repetir en las máquinas donde se trabaja. **Lo que se asume a sabiendas:** el árbol dice *qué* se anunciaría, no si la secuencia se entiende **de oído** — una tabla puede recitar sus cabeceras en cada celda, un aviso de `react-hot-toast` puede no anunciarse nunca y un orden correcto en el DOM puede resultar incomprensible leído. **Nada de eso lo ve `verify`.** Se reabre si aparece una máquina con lector; lo que se decidió es no bloquear el proyecto esperándola. |
@@ -1831,7 +1834,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **455/455** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **460/460** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
 | Tests frontend | 181/181 ✅ | **526/526** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
@@ -1872,6 +1875,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | `docker compose up --build` | ❌ no alcanzable | ✅ **health 200** | ✅ health 200 |
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
 | Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
+| Imagen de producción del backend | 1.81 GB *(sin medir hasta T4-14)* | **426 MB** ✅ *(−76 %)* | que no lleve lo que no ejecuta |
+| Paquetes en la imagen del backend | 313 *(con una interfaz gráfica y un PostgreSQL para navegador dentro)* | **183** ✅ *(poda por alcanzabilidad, T4-14)* | < 200 — **alcanzado** |
 | Análisis de composición de dependencias | *nunca ejecutado (zona no cubierta de la auditoría)* | **en cada `verify`** ✅ *(0 vulnerabilidades sobre 296 + 118 paquetes de producción, T4-07)* | que una vulnerabilidad alta no pase la puerta |
 | Licencias copyleft fuerte en producción | *sin comprobar* | **0** ✅ *(ni GPL, ni LGPL, ni AGPL, ni SSPL; lista permitida con guardia)* | 0 |
 | Licencia declarada frente al archivo `LICENSE` | ❌ `ISC` declarada, archivo MIT | ✅ **MIT en ambos** *(los dos repos, con autor)* | que coincidan |
