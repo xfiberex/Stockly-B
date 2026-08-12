@@ -4,15 +4,61 @@ import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/u
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
+import { filtroDeEnum } from "@/shared/lib/enums";
+import { $Enums } from "@/generated/prisma/client";
 import type {
     CreateProductDto,
     UpdateProductDto,
     ProductQuery,
+    MovementsQuery,
     ImportProductDto,
     StockMovementType,
     CreateManualMovementDto,
     BulkStockDto,
 } from "@/modules/products/product.types";
+
+/**
+ * T4-15 — el `where` del histórico de un producto, compartido por el listado y su recuento.
+ *
+ * **`dateTo` incluye el día entero.** Quien escribe «hasta el 12 de agosto» quiere los
+ * movimientos del 12, y `lte: 2026-08-12T00:00:00` no devuelve ni uno: los excluye todos
+ * salvo los de medianoche exacta. Se toma el instante siguiente al final del día y se
+ * compara con `lt`, que además evita el milisegundo de `23:59:59.999`.
+ *
+ * Una fecha ilegible **se rechaza, no se ignora**: mismo criterio que `filtroDeEnum`. Un
+ * filtro que no se aplica devuelve de más y nadie se entera.
+ */
+function whereDeMovimientos(productId: string, query: MovementsQuery) {
+    const type = filtroDeEnum($Enums.StockMovementType, query.type, "type");
+    const desde = fechaDeFiltro(query.dateFrom, "dateFrom");
+    const hasta = fechaDeFiltro(query.dateTo, "dateTo");
+
+    if (hasta) hasta.setUTCDate(hasta.getUTCDate() + 1);
+
+    return {
+        productId,
+        ...(type && { type }),
+        ...((desde || hasta) && {
+            createdAt: { ...(desde && { gte: desde }), ...(hasta && { lt: hasta }) },
+        }),
+    };
+}
+
+/** `YYYY-MM-DD` (lo que manda un `input[type=date]`) o un 400 que dice cuál falla. */
+function fechaDeFiltro(valor: string | undefined, campo: string): Date | undefined {
+    if (!valor) return undefined;
+
+    const fecha = new Date(`${valor}T00:00:00.000Z`);
+    if (Number.isNaN(fecha.getTime())) {
+        throw new HttpError(
+            400,
+            `El filtro «${campo}» no es una fecha válida: «${valor}». Formato esperado: AAAA-MM-DD.`,
+            "INVALID_FILTER_VALUE",
+            { campo, valor, validos: "AAAA-MM-DD" },
+        );
+    }
+    return fecha;
+}
 
 const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true } },
@@ -392,36 +438,97 @@ export const productService = {
         return { created, errors };
     },
 
-    async getMovements(productId: string) {
+    /**
+     * T4-15 — el histórico de un producto, paginado y filtrado **en la base**.
+     *
+     * Antes era un `findMany` sin `take`. Con la media del proyecto —once movimientos por
+     * producto— no se notaba; con el producto caliente de la prueba de carga (100 000)
+     * **diez usuarios concurrentes hundían la API entera**, y no por la consulta: la base
+     * tarda 15 ms. Lo caro es hidratar 100 000 objetos y serializar ~19 MB de JSON **en el
+     * bucle de eventos**, que es de un solo hilo — por eso se llevaba por delante a las
+     * peticiones de los demás, que no tenían nada que ver con este producto.
+     *
+     * **Los filtros bajan aquí con la paginación, y no es opcional.** Filtrar en el
+     * navegador sobre una página filtra solo lo que se ha traído: el resultado dependería
+     * de en qué página estás, en silencio y pareciendo correcto.
+     *
+     * Orden **descendente**: la primera página es lo último que pasó, que es lo que se
+     * quiere ver al abrir un histórico. El desempate por `id` lo hace correcto por
+     * construcción — `createdAt` no es único: una importación crea cientos de filas en el
+     * mismo instante, y sin orden total una fila puede salir en dos páginas o en ninguna.
+     */
+    async getMovements(productId: string, query: MovementsQuery = {}) {
         const product = await prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
-        const movements = await prisma.stockMovement.findMany({
-            where: { productId },
-            orderBy: { createdAt: "asc" },
-        });
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 50 });
+        const where = whereDeMovimientos(productId, query);
 
-        return { product, movements };
+        const [movements, total] = await prisma.$transaction([
+            prisma.stockMovement.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            }),
+            prisma.stockMovement.count({ where }),
+        ]);
+
+        return { product, movements, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     },
 
-    async exportMovements(productId: string) {
-        const product = await prisma.product.findUnique({ where: { id: productId } });
+    /**
+     * Filas que tendrá la exportación, para decidir el tope antes de escribir nada.
+     *
+     * **La ficha de T4-15 daba esta exportación por resuelta —«escribe por lotes desde
+     * T2-05»— y no lo estaba.** Lo que T2-05 convirtió en lotes fue la exportación del
+     * catálogo; esta cargaba los 100 000 movimientos de golpe y `buildCsv` concatenaba el
+     * archivo entero en una sola cadena. Paginar el listado y dejar aquí el mismo defecto
+     * habría movido el problema al botón de al lado.
+     */
+    async contarMovimientosParaExportar(productId: string, query: MovementsQuery = {}) {
+        const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+        return prisma.stockMovement.count({ where: whereDeMovimientos(productId, query) });
+    },
+
+    /**
+     * El histórico en lotes, **por cursor y no por `skip`**: `OFFSET` obliga a Postgres a
+     * leer y descartar todas las filas anteriores en cada página, así que el último lote de
+     * una exportación grande cuesta lo que el histórico entero. Mismo patrón que
+     * `exportarPorLotes` del catálogo.
+     */
+    async *exportarMovimientosPorLotes(productId: string, query: MovementsQuery = {}) {
+        const product = await prisma.product.findUnique({
+            where: { id: productId },
+            select: { name: true, sku: true },
+        });
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
-        const movements = await prisma.stockMovement.findMany({
-            where: { productId },
-            orderBy: { createdAt: "asc" },
-        });
+        const where = whereDeMovimientos(productId, query);
+        let cursor: string | undefined;
 
-        return movements.map((m) => ({
-            productName: product.name,
-            sku: product.sku ?? "",
-            type: m.type,
-            delta: m.delta,
-            stockAfter: m.stockAfter,
-            note: m.note ?? "",
-            createdAt: m.createdAt.toISOString(),
-        }));
+        for (;;) {
+            const pagina = await prisma.stockMovement.findMany({
+                where,
+                take: TAM_LOTE_EXPORTACION,
+                ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            });
+
+            if (pagina.length === 0) return;
+            yield pagina.map((m) => ({
+                productName: product.name,
+                sku: product.sku ?? "",
+                type: m.type,
+                delta: m.delta,
+                stockAfter: m.stockAfter,
+                note: m.note ?? "",
+                createdAt: m.createdAt.toISOString(),
+            }));
+            if (pagina.length < TAM_LOTE_EXPORTACION) return;
+            cursor = pagina[pagina.length - 1]!.id;
+        }
     },
 
     async createManualMovement(productId: string, dto: CreateManualMovementDto) {

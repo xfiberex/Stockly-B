@@ -165,6 +165,25 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Corregido
 
+- **El histórico de un producto ya no se devuelve entero** (`T4-15`).
+  `GET /products/:id/movements` acepta `page`, `limit` y los filtros de tipo y fecha, y los
+  aplica **en la base**. Con el producto caliente de la prueba de carga —100 000 movimientos—
+  pasa de **3.17 s y 19 MB a 57 ms y 0.01 MB**, y la carga sostenida sube de 18.55 a 90.82
+  req/s con 0 % de errores. La exportación del histórico, que se daba por resuelta y no lo
+  estaba, pasa al escritor por lotes y **acepta los mismos filtros**: sin ellos, un producto
+  con más movimientos que el tope de exportación no había forma de exportarlo. En la pantalla,
+  el gráfico dice que dibuja la página, el recuento sale del total del servidor y el botón de
+  exportar dejó de construir el CSV en el navegador —con paginación habría exportado la página
+  creyendo exportarlo todo—.
+- **El dashboard baja de 1.91 s a 337 ms en el p(95)** (`T4-16`), y ninguna de sus siete
+  consultas ordena ya en disco. **`work_mem` no se ha tocado**: subirlo a 64 MB daba ×3.3 y
+  reescribir la consulta de rotación da ×20 con el valor de fábrica —de 401.6 ms a 20.0—, sin
+  comprometer memoria, que se reserva por conexión y por nodo de ordenación. El `LEFT JOIN`
+  agregaba los 95 051 productos activos para quedarse con veinte; ahora se parte de los
+  movimientos. Se arregló además una segunda consulta que la ficha no nombraba —«movimientos
+  por mes», que ordenaba 360 725 filas para devolver 24—. Las dos devuelven exactamente lo
+  mismo que antes, comprobado fila a fila. Efecto secundario: los productos **sin salidas en
+  30 días** ya no rellenan la tabla de rotación con ceros.
 - **Los modales también se miden a 412 px.** El repaso de móvil llegó a las pantallas y no
   a lo que se abre encima. En el detalle de producto, las dos acciones eran `flex-1` en una
   fila y `flex-1` **no reparte a partes iguales** —el mínimo de un elemento flexible es su

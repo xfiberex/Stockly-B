@@ -218,8 +218,11 @@ describe("Contrato de la API (T4-01)", () => {
                 .set("Cookie", cookieAdmin);
 
             expect(res.status).toBe(200);
-            conforme(contrato.productoSchema, res.body.data.product, "movements.product");
-            conforme(contrato.movimientoStockSchema.array(), res.body.data.movements, "movements.movements");
+            // T4-15: se comprueba la respuesta **entera**, no sus dos mitades por separado.
+            // Antes se validaban `product` y `movements` sueltos, así que el `meta` nuevo
+            // podría faltar y el test seguiría en verde — que es como se documenta una
+            // respuesta que ya no existe.
+            conforme(contrato.movimientosDeProductoSchema, res.body.data, "movements");
         });
 
         it("GET /products/:id/price-history", async () => {

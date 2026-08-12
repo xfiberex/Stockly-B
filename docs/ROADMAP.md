@@ -5,14 +5,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-12 — **112 / 114**
+> ## Estado al 2026-08-12 — **114 / 114**
 >
-> **Los cuatro tiers de trabajo están cerrados:** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48) y
-> Tier 3 (15/15). El **Tier 4** —que la auditoría dejó fuera del alcance inmediato— va por
-> **15/17**, y una de esas quince está **descartada, no hecha**: **T4-17**, el recorrido con lector
-> de pantalla, se cerró el 2026-08-12 por decisión de alcance. El listón de accesibilidad del
-> proyecto es **teclado más árbol de accesibilidad**; lo que eso no cubre está escrito en su ficha
-> y en [accesibilidad.md](accesibilidad.md), no dado por bueno. Las
+> **No queda ninguna tarea abierta.** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48), Tier 3 (15/15)
+> y **Tier 4 (17/17)**, el que la auditoría había dejado fuera del alcance inmediato.
+>
+> **Cerradas no quiere decir todas hechas.** Una de las 114 está **descartada**: **T4-17**, el
+> recorrido con lector de pantalla, se cerró por decisión de alcance y **no se ejecutó**. El listón
+> de accesibilidad del proyecto es **teclado más árbol de accesibilidad**; lo que eso no cubre está
+> escrito en su ficha y en [accesibilidad.md](accesibilidad.md), no dado por bueno. Cualquier otra
+> lectura de este 114/114 es más generosa de lo que los hechos permiten.
+>
+> Las
 > dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su consecuencia directa;
 > **T4-03** porque T2-35–T2-37 ya habían hecho el trabajo caro; **T4-11** —que no viene de la
 > auditoría— porque el cierre de T4-03 dejó anotado que faltaba el conmutador manual; **T4-04**
@@ -22,9 +26,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > porque era lo que decía su propia ficha: es un cambio de layout que toca T2-16, T2-18 y T3-04, y
 > ninguna de las tres debía rehacerse dos veces.
 >
-> **Las 2 abiertas son las que abrió la prueba de carga**: T4-15 y T4-16.
+> **Las dos últimas las abrió la prueba de carga**, y las dos se cerraron midiendo: T4-15 y T4-16
+> dejan la carga sostenida en **90.82 req/s frente a los 18.55 de línea base**, con 0 % de errores
+> y el dashboard en **337 ms de p(95)** donde estaba en 1.91 s. Detalle en
+> [rendimiento.md](rendimiento.md).
 >
-> Backend **460/460** tests y 91.83 % de sentencias; frontend **526/526** y 1 omitido; E2E 9
+> Backend **481/481** tests y 91.83 % de sentencias; frontend **535/535** y 1 omitido; E2E 9
 > pasados y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
@@ -1572,7 +1579,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **La causa que daba la ficha era la equivocada, y se comprobó midiendo.** `prisma` no arrastra el CLI por estar en `dependencies`: **`@prisma/client` lo declara como *peer opcional*** y pnpm lo instala solo. Bajarlo a `devDependencies` —el remedio que proponía— deja el árbol **exactamente igual**: 313 paquetes antes y después, medido instalando `--prod` en un contenedor limpio con los dos manifiestos.
   - **Resultado:** imagen de **1.81 GB → 426 MB** y **313 → 183 paquetes**. Tres cambios, y hacían falta los tres: las migraciones salen del `CMD` a un servicio `migrate` que termina; el árbol se poda por **alcanzabilidad** desde los enlaces de la raíz (`scripts/podar-produccion.js`); y el runner **copia** ese árbol en vez de instalarlo y podarlo, porque borrar en una capa posterior no quita nada de la imagen.
 
-- [ ] **[T4-15] `GET /products/:id/movements` devuelve el histórico entero**
+- [x] **[T4-15] `GET /products/:id/movements` devuelve el histórico entero** — **completada** *(2026-08-12)*
   - **Área:** Rendimiento
   - **Ubicación:** `src/modules/products/product.service.ts` (`getMovements`), `Stockly-F/src/modules/products/components/StockMovementsPage.tsx`
   - **Origen:** no viene de la auditoría. Lo midió la prueba de carga de T4-08.
@@ -1580,6 +1587,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** con el conjunto de carga y el producto caliente, `pnpm carga:ejecutar` cumple sus umbrales y el rendimiento se mantiene en el orden de la línea base (~18 req/s); la pantalla de movimientos sigue funcionando con su paginación.
   - **Esfuerzo:** medio
   - **Depende de:** T4-08
+  - **Cumplido con margen:** `pnpm carga:ejecutar` en verde y **90.82 req/s** frente a los 18.55 de línea base, con 0 % de errores. El histórico del producto caliente pasa de **3.17 s y 19 MB a 57 ms y 0.01 MB**, medido contra el conjunto de carga.
+  - **La ficha se equivocaba en la última frase.** Decía que `…/movements/export` «no tiene el problema: escribe por lotes desde T2-05», y no era así: lo que T2-05 convirtió en lotes fue la exportación del **catálogo**. Esta cargaba los 100 000 movimientos de golpe y `buildCsv` concatenaba el archivo entero en una cadena — el comentario del controlador incluso lo justificaba («va acotado a un producto, así que no necesita streaming»), que es exactamente la suposición que rompe un producto caliente: el histórico de uno solo puede pesar más que el catálogo entero. Pasa al mismo escritor por lotes.
+  - **Y eso destapó un tercer defecto, este mío:** con la exportación por lotes entra en juego el tope de `MAX_FILAS_EXPORTACION`, y el producto caliente tiene **100 019 movimientos contra un máximo de 100 000**. Devolvía 413 con el mensaje «filtra antes de exportar» y **ese endpoint no aceptaba filtros**: un consejo imposible de seguir. Ahora acepta los mismos que el listado, y el mismo producto se exporta por tramos (medido: 3.13 MB en 1.0 s con `type=IN`).
+  - **Los filtros bajan al servidor con la paginación, y no es opcional:** la pantalla filtraba en memoria, lo cual solo funcionaba porque recibía el histórico entero. Filtrar una página filtra lo traído, y el resultado dependería de en qué página estabas — sin error, sin aviso.
+  - **Tres cosas de la pantalla que había que decidir, no arrastrar:** el gráfico dibuja *la página* y ahora lo dice —rotularlo «Evolución del stock» enseñando 50 de 100 000 sería mentir—; el recuento sale de `meta.total` y no de la longitud del array; y el botón de exportar dejó de construir el CSV en el navegador, que con paginación habría exportado la página creyendo exportarlo todo. Esa es la peor forma de perder datos: el archivo se abre, tiene filas y parece correcto.
+  - **Guardias:** `movimientos-paginados.test.ts` (14) y `StockMovementsPage.test.tsx` (8). La central es «sin parámetros **no** devuelve el histórico entero»: un test que pidiera `?limit=5` y recibiera 5 pasaría igual con el defecto puesto. Falsificadas quitando el `take` y el ajuste de `dateTo` — 3 en rojo, incluido el clásico de que «hasta el día 20» excluya el día 20.
 
 - [x] **[T4-17] Recorrido real con lector de pantalla** — **descartada** *(2026-08-12)*
   - **Área:** Accesibilidad
@@ -1592,7 +1605,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Resolución (2026-08-12): se descarta por decisión de alcance.** El listón de accesibilidad de este proyecto pasa a ser **teclado más árbol de accesibilidad**, que es lo que sí se puede ejecutar y repetir en las máquinas donde se trabaja; el recorrido con lector queda fuera. No se cierra porque se haya hecho —**no se ha hecho**—, sino porque deja de estar en la lista de trabajo.
   - **Lo que eso deja sin cubrir, y se asume a sabiendas:** que la secuencia se entienda **de oído**. El árbol dice qué se anunciaría, no cómo suena: un orden correcto en el DOM puede resultar incomprensible leído, una tabla puede recitar sus cabeceras en cada celda y un aviso de `react-hot-toast` puede no llegar a anunciarse nunca. **Nada de eso lo ve `verify`,** y ninguna de las guardias estáticas de T4-09 lo sustituye. Si algún día hay una máquina con NVDA, esto se reabre: el trabajo sigue teniendo sentido, lo que se decidió es no bloquear el proyecto esperándolo.
 
-- [ ] **[T4-16] El dashboard a escala: `work_mem` y la consulta de rotación**
+- [x] **[T4-16] El dashboard a escala: `work_mem` y la consulta de rotación** — **completada** *(2026-08-12)*
   - **Área:** Rendimiento
   - **Ubicación:** `src/modules/reports/reports.service.ts`, configuración de PostgreSQL (`docker-compose.yml`)
   - **Origen:** no viene de la auditoría. Lo midió T4-08.
@@ -1600,6 +1613,13 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** `GET /reports` baja del segundo en el p(95) con el conjunto de carga, y ninguna de sus consultas ordena en disco.
   - **Esfuerzo:** medio
   - **Depende de:** T4-08
+  - **Cumplido:** dashboard **p(95) de 337 ms** (pedía < 1 s) y **ninguna de las siete consultas ordena en disco**, comprobadas una a una con `EXPLAIN ANALYZE` sobre 100 000 productos.
+  - **`work_mem` no se toca, y esa es la decisión de la tarea.** La ficha proponía subirlo y el número era cierto: la rotación baja de 401.6 ms a 121.1 con 64 MB. Pero **reescribir la consulta la deja en 20.0 ms con el valor de fábrica** — seis veces mejor que el ajuste, y sin comprometer memoria. `work_mem` se reserva **por conexión y por nodo de ordenación**: subirlo a 64 MB para arreglar una consulta multiplica por todo lo demás lo que el servidor puede llegar a pedir. Se arregla la causa, no el síntoma; la configuración queda como está a propósito.
+  - **Por qué la reescritura es tan grande:** el `LEFT JOIN` partía de `products`, así que agrupaba los **95 051 productos activos** —85 000 de ellos sin una sola salida en el mes— para quedarse con veinte. Partiendo de los movimientos son 31 501 filas y 9 967 grupos. Las dos formas devuelven **los mismos veinte productos con los mismos totales**, comprobado fila a fila.
+  - **La ficha nombraba una consulta y eran dos.** «Movimientos por mes» también se iba a disco —`external merge` de 7 800 kB, 275.6 ms— y por un motivo distinto: agrupa por una **expresión** (`TO_CHAR(createdAt,'YYYY-MM')`), de la que PostgreSQL no tiene estadísticas, así que estima muchos grupos, descarta el `HashAggregate` y **ordena las 360 725 filas de la ventana para devolver 24**. Recorriéndola mes a mes con un `LATERAL`, cada mes agrupa solo por `type` —columna real, cuatro valores— y se queda en **74.8 ms**, en memoria. El criterio decía «ninguna de sus consultas», así que mirar solo la de rotación habría dejado seis sin comprobar.
+  - **Dos detalles que no son cosmética.** El desempate por `id`: **seis productos empatan** en el valor de corte del conjunto de carga, y sin orden total cuáles entran en el top 20 cambia entre recargas de la misma pantalla. Y el margen de 500 del camino rápido **no se da por bueno**: si devuelve menos de 20 filas, se repite con la variante exacta. Un margen medido (17 inactivos entre los 500 primeros) sigue siendo un margen, no una garantía.
+  - **Lo que la reescritura cambia y hay que saber:** los productos **sin salidas en 30 días ya no aparecen**. Antes el `LEFT JOIN` los traía con `totalOut = 0` y rellenaban la tabla con filas de las que no se decide nada —velocidad 0, días hasta agotarse `null`—.
+  - **Guardias:** `dashboard-consultas.test.ts` (7). Uno existe por un descubrimiento propio: con pocos productos, `getSummary` **siempre** cae en la vuelta atrás exacta, así que el camino rápido —el que corre en producción— no lo tocaba ningún test hasta añadir el caso de 25 productos rotando. Falsificado quitando el filtro de activos del camino rápido: 1 en rojo.
 
 ---
 
@@ -1705,6 +1725,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-12 | **T4-16** El dashboard a escala: `work_mem` y la consulta de rotación — **completada** | **El criterio, por sus dos mitades.** `pnpm carga:ejecutar` sobre 100 000 productos: dashboard **p(95) 337 ms** (pedía < 1 s), y **ninguna de las siete consultas ordena en disco**, comprobadas una a una con `EXPLAIN ANALYZE`. La rotación pasa de **401.6 ms a 20.0 ms**, y devuelve **los mismos veinte productos con los mismos totales**, comparados fila a fila. `verify` ✅ **481/481** | **`work_mem` no se toca, y esa es la decisión.** El número de la ficha era cierto —64 MB bajan la rotación a 121 ms— pero **reescribir la consulta la deja en 20 con el valor de fábrica**: seis veces mejor que el ajuste y sin comprometer memoria, porque `work_mem` se reserva **por conexión y por nodo de ordenación**. Se arregla la causa, no el síntoma. **El `LEFT JOIN` agregaba los 95 051 productos activos —85 000 sin una sola salida en el mes— para quedarse con veinte**; partiendo de los movimientos son 31 501 filas y 9 967 grupos. **La ficha nombraba una consulta y eran dos:** «movimientos por mes» también se iba a disco (7 800 kB, 275.6 ms) por un motivo distinto —agrupa por una **expresión**, de la que PostgreSQL no tiene estadísticas, así que estima muchos grupos, descarta el `HashAggregate` y **ordena 360 725 filas para devolver 24**—; recorrida mes a mes con un `LATERAL` baja a **74.8 ms**, en memoria. El criterio decía «ninguna de sus consultas», así que mirar solo la de rotación habría dejado seis sin comprobar. **Dos detalles que no son cosmética:** el desempate por `id` —**seis productos empatan** en el corte, y sin orden total el top 20 se baraja entre recargas— y que el margen de 500 del camino rápido **no se da por bueno**: si devuelve menos de 20 filas se repite con la variante exacta. **Lo que cambia y hay que saber:** los productos sin salidas en 30 días ya no rellenan la tabla con ceros. **Un descubrimiento propio:** con pocos productos `getSummary` **siempre** cae en la vuelta atrás exacta, así que el camino rápido —el que corre en producción— no lo tocaba ningún test hasta añadir el caso de 25 rotadores. |
+| 2026-08-12 | **T4-15** `GET /products/:id/movements` devuelve el histórico entero — **completada** | **El criterio, con margen.** `pnpm carga:ejecutar` en verde y **90.82 req/s** frente a los 18.55 de línea base, 0 % de errores sobre 7 293 peticiones. El histórico del producto caliente pasa de **3.17 s y 19 MB a 57 ms y 0.01 MB**. **22 tests nuevos** entre los dos repositorios; `verify` ✅ backend **481/481** y frontend **535/535** | **La ficha se equivocaba en su última frase:** decía que la exportación «escribe por lotes desde T2-05» y lo que T2-05 convirtió en lotes fue la del **catálogo**. Esta cargaba los 100 000 movimientos de golpe, y el comentario del controlador incluso lo justificaba —«va acotado a un producto, así que no necesita streaming»—, que es justo la suposición que rompe un producto caliente: **el histórico de uno solo puede pesar más que el catálogo entero**. **Eso destapó un defecto mío:** con la exportación por lotes entra el tope de filas, y el caliente tiene **100 019 contra un máximo de 100 000**; devolvía 413 diciendo «filtra antes de exportar» y **ese endpoint no aceptaba filtros**. Ahora acepta los mismos que el listado (medido: 3.13 MB en 1.0 s con `type=IN`). **Los filtros bajan al servidor con la paginación y no es opcional:** filtrar en el navegador filtra lo traído, y el resultado dependería de en qué página estabas, sin error y sin aviso. **Tres decisiones de pantalla:** el gráfico dibuja *la página* y ahora lo dice —rotularlo «Evolución del stock» enseñando 50 de 100 000 sería mentir—; el recuento sale de `meta.total`; y el botón de exportar dejó de construir el CSV en el navegador, que con paginación habría exportado la página creyendo exportarlo todo —la peor forma de perder datos: el archivo se abre, tiene filas y parece correcto—. **La guardia central es «sin parámetros no devuelve el histórico entero»:** un test que pidiera `?limit=5` y recibiera 5 pasaría igual con el defecto puesto. **De paso:** la base de carga estaba dos migraciones por detrás y el login devolvía 500. |
 | 2026-08-12 | **T4-14** El CLI de Prisma infla el árbol de producción — **completada** | **Imagen del backend: 1.81 GB → 426 MB. Árbol: 313 → 183 paquetes** (el criterio pedía bajar de 200). Arranque desde cero con el volumen borrado: `migrate` aplica **las 13 migraciones** y sale con 0, el backend arranca después y queda `healthy`. Ejercitada la imagen podada de punta a punta: `/ready` 200, login 200, productos 200, reportes 200, **CSV de 15 182 bytes**, **PDF de 6 593 bytes con cabecera `%PDF`** y un registro que **envía el correo** (201). `verify` ✅ **460/460** | **La causa de la ficha era la equivocada.** No es que `prisma` esté en `dependencies`: **`@prisma/client` lo declara como peer opcional** y pnpm lo instala solo. Bajarlo a `devDependencies` deja el árbol **igual** —313 antes y 313 después, medido con `pnpm install --prod` en un contenedor limpio con cada manifiesto—. Lo que sí arrastra, medido dentro de la imagen: `@prisma/studio-core` 42 MB *(y con él React y `elkjs`, **la única EPL-2.0**)*, `effect` 34 MB, `typescript` 24 MB, `@electric-sql/pglite` 23 MB —un PostgreSQL para el navegador— y `@prisma/dev` 18 MB. **Dos defectos propios, los dos encontrados midiendo:** podar en un `RUN` posterior al `install` ahorró **0 MB**, porque la capa de abajo sigue viajando —hubo que mover la poda a la etapa que se copia—; y podar **por lista** recortó tamaño pero dejó **292 de 313 entradas**, porque las transitivas del CLI no estaban en la lista. Se sustituyó por una **regla**: cortar los dos peers y barrer lo inalcanzable desde los enlaces de la raíz. **De propina, algo que no era de tamaño:** con las migraciones dentro del `CMD`, cada réplica del backend lanzaba `migrate deploy` a la vez contra la misma base. **Y el `chown -R /app` del runner duplicaba los 300 MB de `node_modules` en una capa nueva**; los `COPY --chown` ya lo dejaban resuelto. |
 | 2026-08-12 | **T4-13** La versión de PostgreSQL no coincide entre el desarrollo y el compose — **completada** | **El criterio, ejecutado.** Volcado real del servidor de desarrollo 17.10 (81.1 KB, 102 objetos) → volumen borrado → pila levantada sobre `postgres:17-alpine` (**17.10 confirmado con `select version()`**) → restaurado en **0.2 s** con las siete tablas y las 13 migraciones completas. Después: seed, `/health` 200, `/ready` 200 y login hasta el dashboard. **El guardia nuevo, demostrado en rojo** contra un `postgres:16-alpine` desechable: aborta con exit 1 y **sin haber creado la base de destino** —comprobado listando `pg_database`— | **La dirección de la incompatibilidad es lo que decide la versión:** `pg_restore` solo va hacia adelante, así que subir a 17 acepta los volcados de 16 **y** los de 17; quedarse en 16 rechazaba los de todos los equipos. **Alinear los números no era suficiente**, porque la próxima vez que se separen nadie lo notaría hasta el día de la recuperación: `pnpm db:restaurar` compara ahora la versión del volcado con la del servidor **antes del `dropdb`**. **Medido cómo se manifestaba** saltándose el guardia a propósito: `unrecognized configuration parameter "transaction_timeout"` —un parámetro que aparece en 17— **sin una sola mención a la versión**, y con la base de destino ya borrada. **Un defecto propio, encontrado ejecutándolo:** el patrón de la cabecera no llevaba los dos puntos y el guardia no reventó — se degradó a «no se puede saber» y dejó pasar la restauración, que es el aspecto exacto de una comprobación que no comprueba nada. **Subir la imagen invalida el volumen** y el contenedor entra en bucle de reinicio; el ciclo completo está en [operaciones.md §9](operaciones.md). |
 | 2026-08-12 | **T4-12** Los correos siguen saliendo solo en español — **completada** | **El criterio, de punta a punta y en el navegador**, sobre la pila del compose: interfaz en inglés → `accept-language: en` en la petición de registro (leído en la pestaña de red, no supuesto) → `users.idioma = EN` en la base. Al iniciar sesión con la interfaz en inglés, **un solo** `PATCH /auth/me/idioma` y la columna pasa a `EN`; al volver a español, regresa. **23 tests nuevos** inspeccionan el correo que se habría enviado —asunto, `lang` y cuerpo—, sin mockear las plantillas. `verify` ✅ backend **447/447** | **Los correos eran cuatro, no los tres de la ficha:** T4-06 añadió el aviso de pico de 5xx después de escribirla, y es el que peor momento tiene para llegar sin traducir. **El diseño está en de dónde sale el idioma, que no es el mismo sitio en todos:** el registro lo saca de `Accept-Language` porque es el único correo hacia alguien sin fila; el resto, de la columna. Las alertas **no tienen petición detrás** —las dispara una venta ajena o el servidor cayéndose—, así que sin columna no había nada que consultar. **La cabecera la pone el frontend a mano y no vale la del navegador:** dice el idioma del sistema operativo, no aquel con el que se está usando Stockly. Comprobado en Chrome que no la descarta — era el único tramo que todos los tests simulan. **Tres cosas que se vieron escribiéndolo:** el **pie** estaba incrustado en la plantilla y salía en español dentro de un correo inglés; los **rótulos de la tabla** de la alerta de stock también eran texto y también estaban dentro; y un `replace` encadenado por hueco deja que un producto llamado `{minimo}` se convierta en el stock mínimo — se interpola en un solo recorrido, con test. **`idioma` es un parámetro obligatorio y sin valor por defecto a propósito:** con uno, un envío que se olvide de pasarlo compila y sale en español, que es el fallo de partida. |
@@ -1819,14 +1841,21 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **10** | 17 | 59 % |
-| **Total** | **107** | **114** | **94 %** |
+| **Tier 4** | **17** | **17** | **100 %** ✅ |
+| **Total** | **114** | **114** | **100 %** ✅ |
 
-*El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que el 94 % de arriba es sobre 113, no sobre las 100 originales.*
+*El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que ese 100 % es sobre 114, no sobre las 100 originales. **Y una de las 114 está descartada, no hecha** (T4-17).*
 
-*Estas cifras estuvieron desviadas: la tabla decía 102/109 mientras las casillas del documento sumaban 104/110, porque los cierres de T4-05 y T4-06 y el alta de T4-13 no llegaron aquí. **Se cuentan las casillas** —8+26+48+15+10 hechas y 7 pendientes— y esta tabla y la de [CONTEXTO §3](CONTEXTO.md) dicen lo mismo. Al cerrar una tarea hay que tocar los dos sitios.*
+***Esta tabla se ha quedado atrás dos veces, y las dos por lo mismo:** se cierra una tarea, se marca la casilla y se actualiza la cabecera, y el resumen —que está 1 800 líneas más abajo— no se toca. La primera vez decía 102/109 con las casillas en 104/110 (cierres de T4-05 y T4-06, alta de T4-13); la segunda, 107/114 con las casillas en **112/114**, porque no llegaron aquí los cinco cierres del 2026-08-11 y 12 —T4-12, T4-13, T4-14, T4-10 y T4-17—. **Se cuentan las casillas, no se recuerdan**, y contarlas es un comando:*
 
-***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, **T4-05**, la copia de seguridad, **T4-06**, monitorización y alertas, **T4-07**, el análisis de composición de dependencias, y **T4-08**, las pruebas de carga. Las 7 restantes siguen fuera de alcance, y cinco de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04; **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05; **T4-14**, el CLI de Prisma en el árbol de producción, que destapó T4-07; y **T4-15** y **T4-16**, el histórico sin paginar y el coste del dashboard a escala, que midió T4-08.*
+```bash
+grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 114
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 0
+```
+
+*Al cerrar una tarea hay que tocar **la casilla, la cabecera, el índice, esta tabla y la de [CONTEXTO §3](CONTEXTO.md)**. Si los cinco números no coinciden, manda el `grep`.*
+
+***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, **T4-05**, la copia de seguridad, **T4-06**, monitorización y alertas, **T4-07**, el análisis de composición de dependencias, y **T4-08**, las pruebas de carga. El 2026-08-12 se cerraron **T4-10**, la navegación lateral; **T4-12**, los correos, que anotó el cierre de T4-04; **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05; y **T4-14**, el CLI de Prisma en el árbol de producción, que destapó T4-07 — más **T4-17**, que **no se hizo: se descartó** por decisión de alcance. **Las 2 restantes las midió T4-08 y ninguna viene de la auditoría:** **T4-15**, el histórico sin paginar, y **T4-16**, el coste del dashboard a escala.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1834,9 +1863,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **460/460** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **481/481** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **526/526** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **535/535** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
@@ -1862,9 +1891,11 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Índices no-únicos en el esquema | 0 | **19** ✅ *(T2-43 los del orden por `createdAt`; T2-09 los GIN de trigramas)* | cubrir FK, ordenaciones y búsqueda |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
 | Histórico de un producto (1 100 000 movimientos) | `Parallel Seq Scan`, 62.7 ms *(midiendo sin los índices, T4-08)* | **`Bitmap Heap Scan`, 0.2 ms** ✅ *(×384)* | `Index Scan` |
-| Carga sostenida, 10 usuarios × 60 s | *nunca medida* | **18.55 req/s, 0 % de errores** ✅ *(100 000 productos, T4-08)* | que exista la medida y no se degrade |
-| Dashboard bajo carga, p(95) | *nunca medido* | 1.91 s ⚠️ *(la pantalla más cara; T4-16)* | < 1 s |
-| Endpoints de listado sin paginar | *sin comprobar* | **1** ⚠️ *(`/products/:id/movements`: 5.27 req/s y 1.6 GB con un producto grande; T4-15)* | 0 |
+| Carga sostenida, 10 usuarios × 60 s | *nunca medida* | **90.82 req/s, 0 % de errores** ✅ *(era 18.55 en T4-08; ×4.9 tras T4-15 y T4-16)* | que exista la medida y no se degrade |
+| Dashboard bajo carga, p(95) | *nunca medido* | **337 ms** ✅ *(era 1.91 s; T4-16)* | < 1 s |
+| Endpoints de listado sin paginar | *sin comprobar* | **0** ✅ *(T4-15: el histórico de un producto pasa de 3.17 s y 19 MB a **57 ms y 0.01 MB**)* | 0 |
+| Consultas del dashboard que ordenan en disco | *sin comprobar* | **0** ✅ *(eran 2, con `external merge` de 8 072 y 7 800 kB; T4-16)* | 0 |
+| `work_mem` | 4 MB *(de fábrica)* | **4 MB** ✅ *(sin tocar: la reescritura da ×20 donde el ajuste daba ×3.3)* | no subirlo para tapar una consulta |
 | CSS de la aplicación (build) | 78.40 kB · gzip 13.55 | **68.40 kB · gzip 12.14** ✅ | bajar con la escala y los subconjuntos |
 | Archivos de fuente emitidos | 56 *(7 subconjuntos × 4 pesos × 2 formatos)* | **8** ✅ | solo el subconjunto latino |
 | `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |

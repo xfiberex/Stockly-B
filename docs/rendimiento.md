@@ -4,7 +4,7 @@ Pruebas de carga y medición de consultas sobre un conjunto de datos representat
 La auditoría del 2026-08-04 **no midió nada**: sus hallazgos de base de datos salían de leer
 el esquema. Esto es lo que pasa al ejecutarlos.
 
-**Fecha:** 2026-08-11. **Máquina:** Windows 11, PostgreSQL 17.10 local (puerto 5433), backend
+**Fechas:** 2026-08-11 (§1–§4, T4-08) y **2026-08-12** (§5–§6, T4-15 y T4-16). **Máquina:** Windows 11, PostgreSQL 17.10 local (puerto 5433), backend
 compilado (`dist/`) contra esa base. Los números absolutos son de este equipo; lo que viaja
 entre máquinas son las proporciones y los planes.
 
@@ -96,6 +96,11 @@ sesión, con los mismos índices:
 La rotación pasa de perder por ×0.63 a ganar por ×2.5. **No sobra ningún índice**; falta
 memoria de trabajo. → **T4-16**.
 
+> **Esta conclusión resultó ser la mitad de la historia, y la mitad equivocada.** Al abordar
+> T4-16 se midió la alternativa que aquí no se probó —reescribir la consulta— y deja la
+> rotación en **20.0 ms con `work_mem` de fábrica**: seis veces mejor que subirlo a 64 MB. No
+> faltaba memoria de trabajo, sobraba trabajo. Ver [§5](#5-t4-16--el-dashboard-a-escala).
+
 ---
 
 ## 3. Carga sostenida — la línea base
@@ -171,15 +176,116 @@ un `JOIN` podría elegir mal: asume reparto uniforme, y un inventario real no lo
 
 → **T4-15**.
 
-### Lo que sí estaba resuelto
+### Lo que se dio por resuelto y no lo estaba
 
-`GET /products/:id/movements/export` **no** tiene este problema: las exportaciones se
-escriben por lotes desde T2-05. El listado se quedó fuera de aquella tarea porque entonces
-nadie tenía diez mil movimientos en un producto.
+Aquí decía que `GET /products/:id/movements/export` **no** tenía el problema, porque «las
+exportaciones se escriben por lotes desde T2-05». **Es falso, y se comprobó al abordar
+T4-15.** Lo que T2-05 convirtió en lotes fue la exportación del **catálogo**; la del
+histórico de un producto seguía haciendo un `findMany` sin `take` y construyendo el archivo
+entero en una cadena. El comentario del controlador lo justificaba —«va acotado a un
+producto, así que no necesita streaming»— y esa es exactamente la suposición que rompe un
+producto caliente: **el histórico de uno solo puede pesar más que el catálogo entero.**
+
+Se deja escrito el error en lugar de corregirlo en silencio: una frase que dice «esto ya
+está bien» es lo que hace que nadie vuelva a mirarlo.
 
 ---
 
-## 5. Hallazgo menor: el buscador del catálogo ignora el SKU
+## 5. T4-16 — el dashboard a escala
+
+Medido el 2026-08-12 sobre el mismo conjunto, con `EXPLAIN (ANALYZE, BUFFERS)`, mejor de
+cinco pasadas. **`work_mem` sigue en 4 MB**, el valor de fábrica, en todas las filas salvo
+donde se indica.
+
+### La consulta de rotación
+
+| Variante | Tiempo | Ordenación |
+|---|---:|---|
+| Original (`LEFT JOIN` desde `products`) | 401.6 ms | `external merge`, **8 072 kB en disco** |
+| Original + `work_mem` 64 MB | 121.1 ms | en memoria |
+| **Reescrita, `work_mem` de fábrica** | **20.0 ms** | `top-N heapsort`, 83 kB |
+
+**Por eso `work_mem` no se sube.** El ajuste daba ×3.3 y la reescritura da ×20 sin tocar la
+configuración — y `work_mem` se reserva **por conexión y por nodo de ordenación**, así que
+subirlo a 64 MB para tapar una consulta multiplica por todo lo demás lo que el servidor
+puede llegar a pedir. Se arregla la causa.
+
+Lo que cambia es de dónde se parte: el `LEFT JOIN` agregaba los **95 051 productos activos**
+—85 000 de ellos sin una sola salida en el mes— para quedarse con veinte. Partiendo de los
+movimientos son **31 501 filas y 9 967 grupos**. Las dos formas devuelven los mismos veinte
+productos con los mismos totales, comparados fila a fila.
+
+Una variante intermedia, para que conste: filtrar `isActive` **dentro** del agregado es
+exacto por construcción pero devuelve el `Seq Scan` sobre el catálogo y cuesta **56 ms**. Se
+prefirió el margen de 500 con vuelta atrás exacta si devuelve menos de 20 filas — medido, 17
+de los 500 primeros por rotación están inactivos.
+
+### La consulta que la ficha no nombraba
+
+| Variante | Tiempo | Ordenación |
+|---|---:|---|
+| `GROUP BY TO_CHAR("createdAt",'YYYY-MM'), type` | 275.6 ms | `external merge`, **7 800 kB en disco** |
+| Mes a mes con `LATERAL`, agrupando solo por `type` | **74.8 ms** | `quicksort`, 26 kB |
+
+El motivo es distinto y vale la pena entenderlo: agrupar por una **expresión** deja a
+PostgreSQL sin estadísticas de cuántos grupos saldrán. Estima muchos, descarta el
+`HashAggregate` y elige `GroupAggregate`, que **ordena las 360 725 filas de la ventana para
+devolver 24**. Recorriendo mes a mes, cada mes agrupa por `type` —columna real, cuatro
+valores— y vuelve el `HashAggregate`.
+
+**Las dos formas dan las mismas cifras**, comprobado cubo a cubo **con el instante de corte
+fijado**. Sin fijarlo parecen distintas: la ventana rueda desde `NOW()` y el primer cubo
+—que es parcial— pierde filas entre una consulta y la siguiente. Esa rareza del gráfico se
+conserva a propósito; cambiarla es una decisión de producto.
+
+### Las siete consultas del dashboard, después
+
+```
+count total                  7.1 ms  sin ordenación
+count activos                9.0 ms  sin ordenación
+valor de inventario         33.2 ms  sin ordenación
+stock por categoría         41.2 ms  quicksort  Memory: 25kB
+top 10 por valor            36.1 ms  top-N heapsort  Memory: 27kB
+movimientos por mes         74.9 ms  quicksort  Memory: 26kB
+stock bajo                  28.8 ms  top-N heapsort  Memory: 29kB
+rotación                    20.1 ms  top-N heapsort  Memory: 83kB
+```
+
+**Ninguna ordena en disco**, que es la mitad del criterio de aceptación. Se miran las siete
+y no solo la de rotación porque el criterio decía «ninguna de sus consultas» — y ahí estaba
+la segunda.
+
+---
+
+## 6. Carga sostenida, después de T4-15 y T4-16
+
+Misma prueba, misma máquina, **con** el producto caliente:
+
+| | Línea base (T4-08) | Tras T4-15 | Tras T4-16 |
+|---|---:|---:|---:|
+| Rendimiento | 18.55 req/s | 29.34 | **90.82 req/s** |
+| Peticiones completadas | 1495 | 2358 | **7293** |
+| Datos transferidos | 14 MB *(sin el caliente)* · 1.6 GB *(con él)* | 22 MB | 69 MB |
+| Dashboard p(95) | 1.91 s | 1.38 s | **337 ms** |
+| Histórico p(95) | 177 ms *(sin el caliente)* | 317 ms | **254 ms** |
+| Histórico grande p(95) | 5.26 s | 325 ms | **179 ms** |
+| Catálogo p(95) | — | 275 ms | **128 ms** |
+| Escritura p(95) | 789 ms | 558 ms | **280 ms** |
+| Errores | 0 % | 0 % | **0 %** |
+
+**La columna del medio es la que enseña algo.** Con T4-15 sola, los dos históricos cruzaban
+su umbral de 300 ms por poco —317 y 325— pese a haber casi duplicado el rendimiento. No era
+suyo: el dashboard seguía costando 1.04 s de media en las mismas diez VUs y saturaba el
+bucle de eventos, así que la cola de todo lo demás era suya. Arreglado el dashboard, los dos
+históricos bajan sin que se tocara ni una línea de su código.
+
+`ruta_historico_grande` **tiene ahora umbral y antes no**, y eso también es un resultado:
+mientras el endpoint no paginaba, ponerle un límite habría sido fingir que su número era
+aceptable.
+
+---
+
+## 7. Hallazgo menor: el buscador del catálogo ignora el SKU
 
 `where.name.contains` y nada más (`product.service.ts`). Buscar `SKU-CALIENTE` no devuelve el
 producto cuyo SKU es exactamente ese — se descubrió porque la prueba de carga no encontraba
@@ -188,7 +294,7 @@ no es rendimiento, y cambiar lo que busca una pantalla es una decisión de produ
 
 ---
 
-## 6. Repetir las mediciones
+## 8. Repetir las mediciones
 
 ```bash
 pnpm carga:sembrar                    # ~2 min 30 s; recrea Stockly_carga desde cero

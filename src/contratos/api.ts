@@ -301,6 +301,24 @@ export const historialPrecioSchema = z.object({
 });
 
 /**
+ * `GET /products/:id/movements` (T4-15).
+ *
+ * **No usa `paginadoSchema`** aunque lleve `meta`: además de la página devuelve el
+ * producto, y llamar `data` a los movimientos dentro de un `data` que ya envuelve todo
+ * confundiría los dos niveles. Lo que sí comparte es el `meta`, que es lo que permite
+ * reutilizar el control de paginación de la interfaz.
+ *
+ * Los movimientos llegan **del más reciente al más antiguo**: la primera página es lo
+ * último que pasó, que es lo que se abre a mirar. Quien pinte una serie temporal con
+ * ellos tiene que invertirlos.
+ */
+export const movimientosDeProductoSchema = z.object({
+    product: productoSchema,
+    movements: z.array(movimientoStockSchema),
+    meta: metaPaginacionSchema,
+});
+
+/**
  * `filaDeExportacion` de `product.service.ts`, que es lo que devuelve `/products/export`.
  * Las once columnas y su orden están fijados por un test en cada repositorio (T3-05).
  */
@@ -538,6 +556,7 @@ export type Etiqueta = z.infer<typeof etiquetaSchema>;
 
 export type Producto = z.infer<typeof productoSchema>;
 export type MovimientoStock = z.infer<typeof movimientoStockSchema>;
+export type MovimientosDeProducto = z.infer<typeof movimientosDeProductoSchema>;
 export type HistorialPrecio = z.infer<typeof historialPrecioSchema>;
 export type ProductoExportado = z.infer<typeof productoExportadoSchema>;
 export type ResultadoImportacion = z.infer<typeof resultadoImportacionSchema>;

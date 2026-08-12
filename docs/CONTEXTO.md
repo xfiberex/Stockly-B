@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **460/460** | **526/526** *(+1 omitido)* |
+| Tests | **481/481** | **535/535** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 15/17** · Total **112/114** *(una de ellas, T4-17, **descartada** y no hecha)*. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 17/17** ✅ · Total **114/114** *(una de ellas, T4-17, **descartada** y no hecha: el 114/114 no significa «todo comprobado»)*. **No queda ninguna tarea abierta.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -144,8 +144,24 @@ servicio `migrate` que corre antes y termina —de paso, con varias réplicas ca
 nada de la imagen. Dentro viajaban una interfaz gráfica de 42 MB, TypeScript y un PostgreSQL para
 navegador.
 
-**Las dos restantes** —T4-15 y T4-16— siguen fuera de alcance, listadas para que no hacerlas sea
-una decisión consciente.
+Y las dos últimas, **T4-15** y **T4-16**, las que abrió la prueba de carga. Juntas dejan la carga
+sostenida en **90.82 req/s frente a los 18.55 de línea base**, con 0 % de errores y el dashboard en
+**337 ms de p(95)** donde estaba en 1.91 s.
+
+**T4-15** pagina el histórico de un producto —de **3.17 s y 19 MB a 57 ms y 0.01 MB**— y baja los
+filtros al servidor, que no es opcional: filtrar en el navegador una página filtra lo traído, y el
+resultado dependería de en qué página estabas. La ficha decía que la exportación ya estaba
+resuelta y **no lo estaba**; al arreglarla apareció que el tope de filas rechazaba el producto
+caliente con un «filtra antes de exportar» imposible de seguir, porque ese endpoint no aceptaba
+filtros. Ahora los acepta.
+
+**T4-16** es la que más se aleja de su ficha. Pedía subir `work_mem` y **no se ha tocado**: el
+ajuste daba ×3.3 y reescribir la consulta da ×20 con el valor de fábrica —de 401.6 ms a 20.0—, sin
+comprometer memoria, porque `work_mem` se reserva por conexión y por nodo de ordenación. Nombraba
+además una consulta y eran dos: «movimientos por mes» también se iba a disco, y por otro motivo
+—agrupa por una expresión, así que PostgreSQL no tiene estadísticas, descarta el `HashAggregate` y
+**ordena 360 725 filas para devolver 24**—. Las dos reescrituras devuelven exactamente lo mismo,
+comprobado fila a fila. Todo en [rendimiento.md](rendimiento.md) §5 y §6.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -510,10 +526,21 @@ incluida la extensión `pg_trgm` de T2-09.
 
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
-**Por dónde seguir:** no queda trabajo asignado. Los cuatro tiers están cerrados y lo único abierto
-es el **Tier 4** (7 tareas), que la auditoría dejó fuera del alcance inmediato a propósito. La más
-cercana es **T4-12** —los correos siguen saliendo solo en español—, que no viene de la auditoría
-sino de lo que dejó anotado el cierre de T4-04.
+**Por dónde seguir: el ROADMAP está en 114/114 y no queda nada asignado.** Eso no quiere decir que
+no quede nada que hacer; quiere decir que **lo siguiente hay que decidirlo, no consultarlo**. Tres
+cosas quedan escritas y sin dueño, y ninguna es una tarea pendiente disfrazada:
+
+- **T4-17 se descartó, no se hizo.** El recorrido con lector de pantalla sigue sin ejecutarse. Si
+  aparece una máquina con NVDA o VoiceOver, es lo primero que vuelve a la lista.
+- **El primer cubo del gráfico de movimientos por mes es parcial**, porque la ventana rueda desde
+  hoy. Se conservó al reescribir la consulta en T4-16: cambiarlo es una decisión de producto.
+- **El buscador del catálogo ignora el SKU** (§7 de [rendimiento.md](rendimiento.md)). Lo mismo:
+  cambiar lo que busca una pantalla no es una tarea de rendimiento.
+
+Y una advertencia de método, que es lo que este tramo ha ido repitiendo: **cinco de las últimas
+seis fichas describían mal su propio problema** —T4-14 la causa, T4-15 el alcance, T4-16 el remedio
+y una consulta de dos—. Las fichas cuentan lo que se vio en la auditoría del 2026-08-04, no lo que
+resultó ser. Medir antes de arreglar, y medir otra vez después.
 
 ### Los textos de la interfaz
 

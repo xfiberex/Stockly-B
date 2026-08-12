@@ -63,6 +63,12 @@ export const options = {
         ruta_catalogo: ["p(95)<500"],
         ruta_dashboard: ["p(95)<2000"],
         ruta_escritura: ["p(95)<1000"],
+        // T4-15 — **este umbral no existía y esa era la señal.** Mientras el histórico se
+        // devolvía entero, ponerle un límite al producto caliente habría sido fingir que su
+        // número era aceptable, así que se medía sin umbral. Paginado, cuesta lo mismo que
+        // cualquier otro histórico y se le exige lo mismo: si un producto de 100 000
+        // movimientos vuelve a salir de esta franja, es que algo dejó de paginar.
+        ruta_historico_grande: ["p(95)<300"],
     },
 };
 
@@ -120,14 +126,15 @@ export default function ({ sesion, ids, idCaliente }) {
     const id = ids[Math.floor(Math.random() * ids.length)];
 
     // `SIN_CALIENTE=1` deja fuera el histórico grande. No es un interruptor de comodidad: es
-    // lo que permite comparar. Ese endpoint solo degrada al resto —satura el bucle de
-    // eventos serializando 19 MB de JSON— y sin poder apagarlo no hay forma de saber cuánto
-    // de la latencia del dashboard es suya y cuánto es del dashboard.
+    // lo que permite comparar. Hasta T4-15 ese endpoint degradaba a todos los demás —saturaba
+    // el bucle de eventos serializando 19 MB de JSON— y sin poder apagarlo no había forma de
+    // saber cuánto de la latencia del dashboard era suya y cuánto del dashboard. Sigue aquí
+    // porque esa comparación es justo la que demuestra que ya no lo hace.
     if (idCaliente && !__ENV.SIN_CALIENTE) {
         group("histórico del producto caliente", () => {
-            // Sin umbral asociado a propósito: esto **no** es un objetivo que cumplir, es la
-            // medida de un endpoint que no pagina. Ponerle un límite sería fingir que el
-            // número es aceptable.
+            // **Sin parámetros a propósito.** Pedirlo con `?limit=20` mediría que k6 sabe
+            // paginar, no que el endpoint pagina: lo que se comprueba aquí es qué hace el
+            // servidor cuando nadie le dice nada, que es como lo llamaba la pantalla.
             const r = http.get(`${BASE}/products/${idCaliente}/movements`, { headers: cabeceras(sesion) });
             caliente.add(r.timings.duration);
             check(r, { "histórico grande 200": (x) => x.status === 200 });

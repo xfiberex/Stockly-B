@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
 import { auditService } from "@/modules/audit-logs";
-import { buildCsv } from "@/shared/lib/csv";
-import { enviarExportacion, BOM } from "@/shared/lib/exportacion";
-import type { CreateProductDto, UpdateProductDto, ProductQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
+import { enviarExportacion } from "@/shared/lib/exportacion";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, MovementsQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
 export const productController = {
     async getProducts(
@@ -101,12 +100,14 @@ export const productController = {
     },
 
     async getProductMovements(
-        req: Request<{ id: string }>,
+        req: Request<{ id: string }, unknown, unknown, MovementsQuery>,
         res: Response,
         next: NextFunction,
     ): Promise<void> {
         try {
-            const result = await productService.getMovements(req.params.id);
+            // T4-15: la query trae página y filtros. Sin ella el listado devolvía el
+            // histórico entero, y con un producto de 100 000 movimientos eso tumbaba la API.
+            const result = await productService.getMovements(req.params.id, req.query);
             res.json({ success: true, message: "Movimientos obtenidos exitosamente", data: result });
         } catch (error) {
             next(error);
@@ -114,26 +115,27 @@ export const productController = {
     },
 
     async exportProductMovements(
-        req: Request<{ id: string }>,
+        req: Request<{ id: string }, unknown, unknown, MovementsQuery & { format?: string }>,
         res: Response,
         next: NextFunction,
     ): Promise<void> {
         try {
-            const rows = await productService.exportMovements(req.params.id);
-            const format = (req.query.format as string | undefined) ?? "json";
-
-            if (format === "csv") {
-                // T2-34: mismo trato que la exportación grande — `charset` explícito y la
-                // marca de orden de bytes, sin la cual Excel rompe los acentos. Este listado
-                // va acotado a un producto, así que no necesita streaming.
-                const csv = buildCsv(rows);
-                res.setHeader("Content-Type", "text/csv; charset=utf-8");
-                res.setHeader("Content-Disposition", `attachment; filename=movements-${req.params.id}.csv`);
-                res.send(csv === "" ? "" : BOM + csv);
-                return;
-            }
-
-            res.json({ success: true, message: "Movimientos exportados exitosamente", data: rows });
+            // T4-15 — **acepta los mismos filtros que el listado.** El tope de exportación
+            // rechaza con 413 y el mensaje dice «filtra antes de exportar»; sin filtros aquí,
+            // ese consejo era imposible de seguir y un producto con más movimientos que el
+            // tope no había forma de exportarlo. Medido con el producto caliente de la prueba
+            // de carga: 100 019 movimientos contra un tope de 100 000.
+            // T4-15 — pasa al mismo escritor por lotes que el catálogo (T2-05). El comentario
+            // que había aquí decía que «va acotado a un producto, así que no necesita
+            // streaming», y esa es justo la suposición que rompe un producto caliente: el
+            // histórico de uno solo puede ser mayor que el catálogo entero.
+            await enviarExportacion(res, {
+                formato: req.query.format,
+                nombreArchivo: `movements-${req.params.id}`,
+                mensaje: "Movimientos exportados exitosamente",
+                total: await productService.contarMovimientosParaExportar(req.params.id, req.query),
+                lotes: productService.exportarMovimientosPorLotes(req.params.id, req.query),
+            });
         } catch (error) {
             next(error);
         }

@@ -36,6 +36,18 @@ export interface ProductQuery {
     tagId?: string;
 }
 
+/**
+ * T4-15 — los filtros del histórico de un producto. Van por query string porque el
+ * listado se pagina en la base: filtrarlos en el navegador filtraría solo la página traída.
+ */
+export interface MovementsQuery {
+    page?: string;
+    limit?: string;
+    type?: string;
+    dateFrom?: string;
+    dateTo?: string;
+}
+
 export interface ImportProductDto {
     name: string;
     description?: string;

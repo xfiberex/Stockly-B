@@ -48,6 +48,7 @@ const RESPUESTAS = {
     Product: contrato.productoSchema,
     ProductExport: contrato.productoExportadoSchema,
     StockMovement: contrato.movimientoStockSchema,
+    MovimientosDeProducto: contrato.movimientosDeProductoSchema,
     PriceHistory: contrato.historialPrecioSchema,
     Category: contrato.categoriaSchema,
     Supplier: contrato.proveedorSchema,

@@ -181,13 +181,23 @@ export const spec = {
         "/products/{id}/movements": {
             ...postDeMovimientoManual,
             get: {
-                tags: ["Stock Movements"], summary: "Historial de movimientos de stock de un producto",
-                parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+                tags: ["Stock Movements"], summary: "Historial de movimientos de stock de un producto — paginado",
+                // T4-15: página y filtros. Los filtros son de servidor porque el listado ya
+                // no viene entero; aplicarlos en el cliente filtraría solo la página traída.
+                parameters: [
+                    { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+                    { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+                    { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } },
+                    { name: "type", in: "query", schema: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT", "IMPORT"] } },
+                    { name: "dateFrom", in: "query", schema: { type: "string", format: "date" } },
+                    { name: "dateTo", in: "query", description: "Inclusivo: incluye el día entero", schema: { type: "string", format: "date" } },
+                ],
                 responses: {
                     "200": {
-                        description: "Producto + lista de movimientos",
-                        content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "object", properties: { product: { $ref: "#/components/schemas/Product" }, movements: { type: "array", items: { $ref: "#/components/schemas/StockMovement" } } } } } } } },
+                        description: "Producto + página de movimientos, del más reciente al más antiguo",
+                        content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/MovimientosDeProducto" } } } } },
                     },
+                    "400": { description: "Filtro con un valor inválido" },
                     "404": { description: "Producto no encontrado" },
                 },
             },
