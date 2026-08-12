@@ -99,6 +99,27 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **El seed vuelve a describir el esquema entero, y su histórico cuadra.** Se había quedado en
+  las tablas de las primeras fases: sembraba usuarios, catálogos, productos, movimientos,
+  precios y órdenes de compra, y **no sabía nada** de etiquetas, órdenes de venta, auditoría,
+  ajustes ni del idioma por usuario. Además, cada bloque inventaba su parte del histórico por
+  separado: la apertura decía un saldo, las ventas otro y las órdenes recibidas no dejaban
+  rastro, así que **la suma de los movimientos de un producto no daba su stock**. Ahora hay un
+  único libro mayor que respeta la regla del código de producción —recibir una compra es
+  entrada, enviar una venta es salida— y **cierra exactamente** en el stock del catálogo, con
+  el saldo comprobado movimiento a movimiento. Verificado sobre la base sembrada: 48 productos,
+  142 movimientos, **0 descuadres y 0 saldos negativos**.
+  - **`cleanAll` estaba incompleto** y no daba error: las claves foráneas nuevas son `SetNull`
+    o `Cascade`, así que volver a sembrar dejaba órdenes de venta huérfanas, etiquetas
+    duplicándose y un ajuste conmutado a mano sobreviviendo al «borrón y cuenta nueva».
+  - **Los SKU inexistentes dejan de descartarse en silencio.** Un `.filter()` vaciaba órdenes
+    enteras al renombrar un producto, y la pantalla parecía rota sin serlo. Ahora falla el seed.
+  - Los datos son **reproducibles**: generador propio con semilla fija en vez de `Math.random()`.
+  - Las credenciales no cambian.
+- **`pnpm check` también comprueba `prisma/seed.ts`** (`tsconfig.seed.json`). El `tsconfig.json`
+  principal solo mira `src/**/*`, así que **al seed no lo comprobaba nadie**: la verificación
+  pasaba en verde con los enums declarados como `string` y tablas enteras sin sembrar, y el
+  fallo aparecía meses después al ejecutarlo. Es la razón de que se quedara atrás.
 - **La imagen de producción del backend baja de 1.81 GB a 426 MB** y su árbol de 313 a **183
   paquetes** (`T4-14`). Dentro viajaban una interfaz gráfica de 42 MB (`@prisma/studio-core`,
   con React y `elkjs` — **la única EPL-2.0** del proyecto), TypeScript, `effect` y un

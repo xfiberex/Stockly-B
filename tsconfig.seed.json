@@ -1,0 +1,18 @@
+{
+    // El `tsconfig.json` principal solo mira `src/**/*`, así que `prisma/seed.ts` **no lo
+    // comprobaba nadie**: `pnpm check` pasaba en verde con el seed roto, y el fallo salía
+    // meses después, al sembrar. Es exactamente cómo se quedó atrás — sin órdenes de venta,
+    // sin etiquetas y con los enums declarados como `string`.
+    //
+    // Va aparte y no dentro del principal porque aquel tiene `rootDir: "src"` y emite a
+    // `dist/`: meter `prisma/` ahí cambiaría la forma de la compilación de producción. Este
+    // solo comprueba tipos, nunca emite.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "rootDir": "."
+    },
+    // Solo `prisma/`: lo que el seed use de `src/` entra por sus propios imports, y el
+    // resto ya lo comprueba el `tsc` principal.
+    "include": ["prisma/**/*.ts"]
+}
