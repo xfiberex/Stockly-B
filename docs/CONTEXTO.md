@@ -56,7 +56,7 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **414/414** | **498/498** *(+1 omitido)* |
+| Tests | **424/424** | **518/518** *(+1 omitido)* |
 | Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
@@ -66,7 +66,7 @@ de datos, el backend y el frontend—. En este equipo (2026-08-11): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 7/13** · Total **104/110**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
+**Tier 4: 9/16** · Total **106/113**. **Los cuatro tiers de trabajo están cerrados.** Del Tier 4,
 que la auditoría dejó fuera del alcance inmediato a propósito, se abordaron **T4-01**, **T4-02** y
 **T4-03** el 2026-08-10: las dos primeras por ser la causa raíz común de T0-03, T1-03 y T1-05 y su
 consecuencia directa, la tercera porque T2-35–T2-37 ya habían hecho el trabajo caro. **T4-11** —el
@@ -83,8 +83,25 @@ descrita — el procedimiento entero está en [operaciones.md](operaciones.md). 
 Y detrás de esa, **T4-06**, porque de nada sirve saber restaurar si nadie se entera de que hay que
 hacerlo: el sistema ya no está mudo. Hay `/metrics`, una alerta por pico de 5xx que **no depende de
 nada externo** y reglas de Prometheus **probadas con `promtool`**, no solo escritas (§8 de
-[operaciones.md](operaciones.md)). Las seis restantes siguen fuera de alcance, listadas para que no
-hacerlas sea una decisión consciente.
+[operaciones.md](operaciones.md)).
+
+Ese mismo día se cerró **T4-07**, el análisis de composición que la auditoría no llegó a hacer:
+`pnpm verify` termina ahora en `pnpm auditoria` en los dos repositorios y para el gate ante una
+vulnerabilidad **alta** en producción o una licencia sin revisar. El resultado de hoy es limpio —0
+vulnerabilidades sobre 296 + 118 paquetes, sin copyleft fuerte—, así que lo que vale es la puerta,
+no la foto; el informe y lo que **no** cubre están en [dependencias.md](dependencias.md). Dejó
+anotada **T4-14**: `prisma` vive en `dependencies` a propósito —el contenedor migra al arrancar—
+pero arrastra `@prisma/studio-core` y unos 200 paquetes que el servidor no necesita.
+
+Y **T4-08**, que es la primera vez que este proyecto mide algo bajo carga: 100 000 productos y
+1 100 000 movimientos en una base aparte, los índices de T1-15 comprobados quitándolos y
+reponiéndolos sobre el mismo dato —el histórico de un producto, de **62.7 ms a 0.2 ms**— y una
+prueba de k6 con diez usuarios sostenidos. Destapó lo que el análisis de esquema no podía ver:
+**`GET /products/:id/movements` no pagina**, y con un producto de 100 000 movimientos hunde la
+API entera a 5.27 req/s (→ **T4-15**); y el dashboard tarda 1.91 s en el p(95), en parte porque
+`work_mem` está en 4 MB y sus ordenaciones se van a disco (→ **T4-16**). Todo en
+[rendimiento.md](rendimiento.md). Las siete restantes siguen fuera de alcance, listadas para
+que no hacerlas sea una decisión consciente.
 
 La aplicación pasó de tener el guardado de configuración roto, las etiquetas de producto inertes,
 una ventana de 15 minutos de acceso para cuentas desactivadas, cinco listados que reventaban con un
@@ -112,8 +129,10 @@ de arreglar, y medir otra vez después.
 
 | Documento | Para qué |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 110 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [ROADMAP.md](ROADMAP.md) | Las 113 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
 | [operaciones.md](operaciones.md) | Copia de seguridad, restauración, reversión y **alertas**. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
+| [dependencias.md](dependencias.md) | Vulnerabilidades y licencias del árbol de producción de los dos repos, y cómo funciona la puerta de `pnpm auditoria` — incluida **la lista de lo que no cubre** |
+| [rendimiento.md](rendimiento.md) | Lo que pasa con 100 000 productos: índices medidos antes y después, latencias bajo carga y los dos cuellos que salieron |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
 | [adr/](adr/) | **Siete decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
@@ -130,6 +149,15 @@ archivos rastreados, para buscar en el código está el alias `git buscar` — v
 ## 4. Trampas del entorno, ya pagadas
 
 *Cada una costó un fallo antes de entenderse. No hace falta redescubrirlas.*
+
+**`pnpm audit --json` sin registro puede informar de cero vulnerabilidades (2026-08-11).**
+No falla de forma visible: imprime un informe con las cinco severidades a cero, así que
+**la auditoría que nunca se hizo se lee exactamente igual que la que salió limpia**. Y el
+código de salida no sirve para distinguirlas, porque varía según cómo falle —con el registro
+inalcanzable por variable de entorno salió 255 y con `--registry` salió 1—. Lo que sí
+distingue los dos casos es la clave `error` del JSON, que es lo que mira
+[`scripts/auditoria.js`](../scripts/auditoria.js). Si alguna vez se reescribe esa
+comprobación, no leer `metadata` sin comprobar antes `error`.
 
 **Un servidor huérfano en el 3000 rompe el E2E siguiente, y la culpa es del rate limiter (2026-08-10).**
 Si una pasada de `pnpm test:e2e:full` se interrumpe, el backend puede quedarse escuchando.

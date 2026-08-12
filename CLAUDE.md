@@ -15,8 +15,10 @@ Está en [`docs/`](docs/), y cubre **los dos repositorios**:
 | Archivo | Qué es |
 |---|---|
 | [docs/CONTEXTO.md](docs/CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado actual, decisiones vivas, trampas del entorno ya pagadas y por dónde seguir |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 110 tareas con dependencias, progreso y métricas. La fuente de verdad del trabajo pendiente |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 113 tareas con dependencias, progreso y métricas. La fuente de verdad del trabajo pendiente |
 | [docs/operaciones.md](docs/operaciones.md) | Copia de seguridad, restauración y reversión. Léelo **antes** de tocar una migración desplegada |
+| [docs/dependencias.md](docs/dependencias.md) | Vulnerabilidades y licencias de las dependencias de producción, y cómo funciona la puerta de `pnpm auditoria`. Léelo **antes** de añadir una dependencia |
+| [docs/rendimiento.md](docs/rendimiento.md) | Mediciones con 100 000 productos: índices antes/después, latencias bajo carga y los cuellos conocidos. Léelo **antes** de tocar una consulta de listado |
 | [docs/INFORME-AUDITORIA.md](docs/INFORME-AUDITORIA.md) | Los hallazgos que justifican cada tarea. **Congelado a propósito:** está escrito en presente y describe el 2026-08-04, no el estado actual |
 | [docs/README-proyecto.md](docs/README-proyecto.md) | Arranque desde cero de los dos repositorios |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura no obvias: por qué algo está hecho así antes de simplificarlo |
@@ -36,7 +38,11 @@ Este proyecto **no usa CI**. No hay GitHub Actions ni pipeline de ningún provee
 pnpm verify
 ```
 
-Encadena `prisma generate → prisma migrate deploy → check → test:coverage → build → smoke`.
+Encadena `prisma generate → prisma migrate deploy → check → test:coverage → build → smoke → auditoria`.
+
+El paso `auditoria` ([scripts/auditoria.js](scripts/auditoria.js), T4-07) rompe la compilación ante una vulnerabilidad **alta o crítica** en dependencias de producción o ante una licencia fuera de la lista permitida. **Sin red avisa y deja pasar** —«no se puede saber» no es «hay un problema»—; `pnpm auditoria --estricto` convierte ese aviso en fallo, que es la forma de usarlo antes de publicar. La comprobación de licencias no necesita red y no tiene excusa: sale del lockfile.
+
+**La prueba de carga (`load/`, T4-08) no está en `verify` y no debe estarlo:** tarda minutos, necesita Docker y sus números dependen de la máquina. Se lanza a mano con `pnpm carga:sembrar` → `pnpm carga:consultas` / `pnpm carga:ejecutar`, siempre contra `Stockly_carga`, una base aparte que los guiones recrean.
 
 El paso `smoke` ([scripts/smoke.js](scripts/smoke.js)) arranca `dist/server.js` de verdad y consulta `/api/v1/health`. No es redundante con `build`: `tsc` no reescribe los alias `@/`, así que un build que compila puede seguir sin arrancar — es exactamente el fallo que costó la tarea T0-01. Usa `SMOKE_PORT` (3100 por defecto) para no chocar con el `dev`.
 

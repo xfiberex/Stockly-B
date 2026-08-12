@@ -25,6 +25,12 @@ observabilidad/alertmanager.yml
 backups/
 *.dump
 
+# Salida de la prueba de carga (T4-08): se regenera con `pnpm carga:consultas` y
+# `pnpm carga:ejecutar`. Los planes ocupan cientos de líneas y cambian en cada máquina;
+# lo que sí se versiona son las conclusiones, en `docs/rendimiento.md`.
+load/planes.txt
+load/resultado.json
+
 # Test coverage
 coverage/
 

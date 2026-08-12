@@ -19,6 +19,30 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Banco de pruebas de carga** (`T4-08`), en `load/`. `pnpm carga:sembrar` construye una base
+  aparte con 100 000 productos y 1 100 000 movimientos —incluido **un producto caliente con
+  100 000 él solo**, porque la media de once por producto no se parece a ningún inventario
+  real—; `pnpm carga:consultas` mide las consultas del hallazgo P-01 **quitando y reponiendo
+  los índices sobre el mismo dato**; y `pnpm carga:ejecutar` lanza k6 en Docker contra el
+  backend compilado. Ninguno toca la base de la aplicación: abortan si el nombre coincide.
+  Las mediciones y lo que destaparon, en [`docs/rendimiento.md`](docs/rendimiento.md).
+
+- **Análisis de composición de dependencias en la verificación local** (`T4-07`).
+  `pnpm verify` termina ahora en `pnpm auditoria`, en los dos repositorios: una
+  vulnerabilidad **alta o crítica** en dependencias de producción rompe la compilación, y
+  una licencia que no esté en la lista permitida también. El resultado de hoy es limpio —0
+  vulnerabilidades sobre 296 paquetes en el backend y 118 en el frontend, y **ni GPL, ni
+  LGPL, ni AGPL, ni SSPL** en ninguno de los dos árboles—, así que la puerta se demuestra en
+  rojo con informes fabricados, no ejecutándola. Sin conexión avisa en vez de fallar, y
+  `--estricto` invierte esa decisión para antes de publicar. El informe completo, con lo que
+  **no** cubre, está en [`docs/dependencias.md`](docs/dependencias.md).
+
+- **Aviso de terceros distribuido con la aplicación** (`T4-07`).
+  `Stockly-F/public/AVISOS-DE-TERCEROS.txt` recoge la licencia de los 118 paquetes de
+  producción y se sirve junto a la aplicación. No es formalismo: los `.woff2` de Inter se
+  copian a `dist/`, así que la aplicación **distribuye** la tipografía y la OFL-1.1 exige que
+  el aviso la acompañe. Se regenera con `pnpm auditoria --informe`.
+
 - **Monitorización y alertas** (`T4-06`). `GET /api/v1/metrics` expone métricas en formato
   Prometheus —peticiones, duración, 5xx y las del proceso—, protegido por `METRICS_TOKEN` y
   **cerrado en producción si no se configura**. Además, el backend detecta por su cuenta un
@@ -121,6 +145,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   calendario—: ahora el adorno nativo se apaga, el icono lo pinta la aplicación, hay una
   pista de formato traducida cuando el campo está vacío y **toda la caja abre el
   calendario**, no solo el icono de la esquina.
+- **La licencia declarada no era la del proyecto** (`T4-07`). `Stockly-B/package.json` decía
+  `ISC` mientras su archivo `LICENSE` es MIT. Los dos repositorios declaran ahora `MIT` y su
+  autor, que es lo que dicen los dos archivos `LICENSE`.
 - **Un desplegable ya no se queda en su relleno.** El de la columna de acciones de Usuarios
   medía 50 px, de los que 48 eran el `pl-3` + `pr-9` del chevron: se veía el indicador y ni
   una letra del rol. `w-full` es un porcentaje y no aporta anchura intrínseca, así que

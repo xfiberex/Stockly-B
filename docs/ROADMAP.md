@@ -1445,21 +1445,40 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **El agregador de logs no necesitó código.** Desde T2-10 la salida ya es JSON por línea con nivel, `requestId` y credenciales censuradas: basta apuntar el recolector a la salida estándar. El campo `alerta: "pico_5xx"` permite alertar desde ahí sin Prometheus, que es la tercera vía por si las otras dos fallan.
   - **`prom-client` sí se gana el sitio**, al revés que `i18next` (ADR 0007) o `zod-to-openapi` (T4-02). No por los contadores —eso es un `Map`— sino por `collectDefaultMetrics`: el retraso del bucle de eventos es la métrica que distingue «la API va lenta» de «la base va lenta», y no se escribe a mano.
 
-- [ ] **[T4-07] Auditoría de dependencias y licencias**
+- [x] **[T4-07] Auditoría de dependencias y licencias** ✅ *(2026-08-11)*
   - **Área:** Seguridad
-  - **Ubicación:** ambos repos
+  - **Ubicación:** `scripts/auditoria.js` y `src/tests/auditoria.test.ts` **en los dos repos**, [`docs/dependencias.md`](dependencias.md), `Stockly-F/public/AVISOS-DE-TERCEROS.txt`
   - **Qué hacer:** No se ejecutó análisis de composición en esta auditoría (zona no cubierta del informe). Ejecutar `pnpm audit --prod` e incorporarlo al guion de verificación local (T1-01 / T1-02), y generar un informe de licencias. Verificar de paso la coherencia entre la licencia `ISC` declarada en `Stockly-B/package.json:21` y el archivo `LICENSE` del repositorio.
   - **Criterio de aceptación:** el guion de verificación local falla ante vulnerabilidades de severidad alta o superior en dependencias de producción; la licencia declarada coincide con el archivo.
   - **Esfuerzo:** medio
   - **Depende de:** T1-01, T1-02
+  - **El resultado limpio es el menos interesante:** 0 vulnerabilidades en las 296 dependencias de producción del backend y las 118 del frontend, en todas las severidades, y **ni GPL, ni LGPL, ni AGPL, ni SSPL** en ninguno de los dos árboles.
+  - **Una puerta que sale verde no demuestra nada.** Con el árbol limpio, ejecutar el guion da el mismo resultado tanto si comprueba como si no. Por eso la decisión vive en dos funciones puras y `auditoria.test.ts` les da una vulnerabilidad alta de mentira y una GPL: es la única forma de enseñar la puerta **en rojo**, que es lo que pide el criterio de aceptación.
+  - **La trampa que costó encontrar:** `pnpm audit --json` **con el registro caído sigue imprimiendo un informe con las cinco severidades a cero**. La auditoría que nunca se hizo se lee exactamente igual que la que salió limpia, así que leer `metadata` sin más da un verde falso. Lo que separa los dos casos es la clave `error` del JSON, no el código de salida, que varía según cómo falle.
+  - **Sin red avisa, no falla** —y con `--estricto`, falla—. «No se puede saber» no es «hay un problema», y este proyecto no tiene CI: `verify` se ejecuta en portátiles. Una puerta que se pone roja sin conexión se acabaría esquivando, que es peor que no tenerla. La comprobación de **licencias sí es dura y no necesita red** (sale del lockfile): es la que de verdad vigila el día a día, porque para el gate ante una dependencia nueva con una licencia sin revisar.
+  - **El corte está en «alta» a propósito.** Una puerta que salta con cualquier aviso de severidad baja se acaba desactivando, y entonces no protege de nada.
+  - **Dos listas de licencias y no una compartida.** El navegador trae MPL-2.0 y OFL-1.1; el servidor trae EPL-2.0. Una lista común sería la unión de ambas y dejaría pasar en un repositorio lo que solo se revisó para el otro.
+  - **Una obligación de licencia que no se estaba cumpliendo:** los `.woff2` de Inter se copian a `dist/`, así que la aplicación **distribuye** la tipografía, y la OFL-1.1 exige que el aviso la acompañe —lo mismo, en menor grado, que pide la MIT para el paquete de JavaScript—. Resuelto con `pnpm auditoria --informe`, que genera `public/AVISOS-DE-TERCEROS.txt` leyendo la licencia de los 118 paquetes; `public/` se copia tal cual a `dist/`, así que el aviso queda servido junto a la aplicación. Generado y no escrito a mano por lo de siempre: una lista de 118 entradas copiada a mano caduca en la siguiente instalación.
+  - **La incoherencia que la ficha anticipaba, confirmada:** `package.json` declaraba `ISC` y el archivo `LICENSE` es MIT. Los dos repositorios declaran ahora MIT y su autor.
+  - **Hallazgo nuevo:** `prisma` está en `dependencies` **a propósito** —el contenedor arranca con `prisma migrate deploy`—, pero arrastra `@prisma/studio-core` y con él un árbol de gráficos (`elkjs`, `@visx/vendor`, `robust-predicates`). Ahí está la única EPL-2.0 del proyecto y buena parte de la diferencia entre 296 paquetes de producción y los ~100 que el servidor necesita para funcionar. → **T4-14**.
+  - **Lo que esta herramienta no mira**, y conviene no confundir con «revisado»: la imagen base `node:22-alpine`, PostgreSQL y los binarios del entorno. `pnpm audit` consulta el registro de npm y nada más.
 
-- [ ] **[T4-08] Pruebas de carga sobre los flujos de inventario**
+- [x] **[T4-08] Pruebas de carga sobre los flujos de inventario** ✅ *(2026-08-11)*
   - **Área:** Rendimiento
-  - **Ubicación:** nuevo directorio `load/`
+  - **Ubicación:** `load/` (`sembrar.js`, `consultas.js`, `movimientos.js`, `ejecutar.js`), [`docs/rendimiento.md`](rendimiento.md)
   - **Qué hacer:** No se midió el rendimiento en esta auditoría; los hallazgos de base de datos derivan del análisis de esquema. Con un conjunto de datos representativo (10–100k productos, 1M movimientos), ejecutar `EXPLAIN ANALYZE` sobre las consultas listadas en el hallazgo P-01 y una prueba de carga con k6 sobre los endpoints de movimientos de stock, para validar T1-15 y T2-08 con datos reales.
   - **Criterio de aceptación:** existen mediciones antes/después de los índices y un informe de latencias bajo carga sostenida.
   - **Esfuerzo:** alto
   - **Depende de:** T1-15, T2-02
+  - **El «antes» hubo que reconstruirlo.** Los índices existen desde el 2026-08-07 y la base de desarrollo tiene 48 productos, donde cualquier plan es instantáneo: no hay antes que medir. `consultas.js` **quita los 19 índices no únicos sobre la base de carga, mide, los repone y vuelve a medir** — mismo dato, misma máquina, misma sesión. Se restauran en un `finally`, porque dejar una base sin índices tras un fallo sería el peor final posible.
+  - **T1-15 validada donde importaba:** el histórico de un producto pasa de `Parallel Seq Scan` a `Bitmap Heap Scan` y de **62.7 ms a 0.2 ms** (×384). Cuatro consultas mejoran entre ×143 y ×384, y son justamente las que crecen sin parar con el uso.
+  - **Dos consultas salen *peor* con índices, y la culpa no es del índice.** Sin ellos PostgreSQL no tiene más remedio que un plan paralelo; con ellos elige `Index Scan` en serie y el `Sort` de encima deja de ser tres ordenaciones paralelas para ser una grande que **no cabe en `work_mem` y se va a disco** (`external merge`, 5.6 y 8 MB). Con `work_mem` a 64 MB, la rotación pasa de 480 ms a **121 ms** — de perder por ×0.63 a ganar por ×2.5. No sobra ningún índice; falta memoria de trabajo. → **T4-16**.
+  - **El hallazgo grande no estaba en la ficha:** `GET /products/:id/movements` **no pagina**. Con un producto de 100 000 movimientos, diez usuarios concurrentes hunden la API entera: el rendimiento cae de **18.55 a 5.27 req/s**, se transfieren **1.6 GB** en lugar de 14 MB y el histórico de un producto *normal* pasa de 177 ms a **3.17 s** sin que haya cambiado nada suyo. **La base tarda 15 ms** en esa consulta: el 99.5 % del tiempo es hidratar 100 000 objetos y serializar 19 MB de JSON en el bucle de eventos. → **T4-15**.
+  - **El reparto uniforme escondía justo eso.** Un millón de movimientos entre cien mil productos son once por producto, y ningún inventario real se parece a esa media. El sembrador crea además **un producto caliente**; sin él, la prueba habría salido en verde y el problema seguiría ahí.
+  - **Dos defectos del propio banco de pruebas, y los dos daban resultados creíbles y falsos.** El generador sacaba la categoría de `i % 20` y el estado activo de `(i % 20) <> 0`: correlacionados, así que **una categoría entera salía inactiva** y la consulta del catálogo devolvía cero filas, con lo que el índice parecía empeorarla. Y **un umbral de k6 sin muestras se da por cumplido**: la primera pasada reventó en `setup` y el informe enseñó cuatro `p(95)=0s` **en verde**. Ahora hay umbrales sobre `checks` y sobre el número de peticiones.
+  - **Un 2 % de escrituras fallidas que no era un fallo:** los movimientos iban a productos al azar y el 5 % del catálogo está inactivo, así que la API respondía 400 con toda la razón. La prueba pide ahora solo productos activos.
+  - **La prueba de carga no entra en `pnpm verify`, y es deliberado:** tarda minutos, necesita Docker y sus números dependen de la máquina. Un umbral que falla porque el portátil está compilando otra cosa enseña a ignorar la puerta.
+  - **k6 va en Docker** porque no está instalado en el equipo y no hace falta que lo esté. El conjunto de datos vive en **`Stockly_carga`**, una base aparte, y los guiones abortan si el nombre coincide con el de `DATABASE_URL`.
 
 - [ ] **[T4-09] Auditoría de navegador y de lector de pantalla**
   - **Área:** Accesibilidad / Rendimiento
@@ -1512,6 +1531,33 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** un volcado tomado en cualquier equipo del proyecto se restaura en la pila del compose sin error de versión.
   - **Esfuerzo:** bajo
   - **Depende de:** T4-05
+
+- [ ] **[T4-14] El CLI de Prisma infla el árbol de producción**
+  - **Área:** DevOps / Seguridad
+  - **Ubicación:** `package.json`, `Dockerfile`, `docker-compose.yml`
+  - **Origen:** no viene de la auditoría. Lo destapó el análisis de composición de T4-07.
+  - **Qué hacer:** `prisma` está en `dependencies` y no en `devDependencies` **a propósito y documentado**: el contenedor arranca con `prisma migrate deploy && node dist/server.js`, así que el CLI tiene que estar en la imagen. El precio no era evidente: arrastra `@prisma/studio-core` —una interfaz gráfica— y con ella su árbol de gráficos y diagramas (`elkjs`, `@visx/vendor`, `robust-predicates`, `pako`). Ahí está **la única EPL-2.0 del proyecto** y buena parte de la diferencia entre los 296 paquetes de producción y los ~100 que el servidor necesita para responder. Aplicar las migraciones desde un job o un contenedor de inicialización —que sí puede llevar el CLI— y bajar `prisma` a `devDependencies`.
+  - **Criterio de aceptación:** el árbol de producción del backend baja de 200 paquetes, las migraciones se siguen aplicando al desplegar y `pnpm verify` pasa entero.
+  - **Esfuerzo:** medio
+  - **Depende de:** T4-07
+
+- [ ] **[T4-15] `GET /products/:id/movements` devuelve el histórico entero**
+  - **Área:** Rendimiento
+  - **Ubicación:** `src/modules/products/product.service.ts` (`getMovements`), `Stockly-F/src/modules/products/components/StockMovementsPage.tsx`
+  - **Origen:** no viene de la auditoría. Lo midió la prueba de carga de T4-08.
+  - **Qué hacer:** el `findMany` no lleva `take`, así que devuelve **todos** los movimientos del producto. Con la media del proyecto —once por producto— no se nota; con un producto de 100 000 movimientos, **diez usuarios concurrentes hunden la API entera**: el rendimiento cae de 18.55 a 5.27 req/s, se transfieren 1.6 GB en lugar de 14 MB y el histórico de un producto *normal* pasa de 177 ms a 3.17 s. **La consulta tarda 15 ms en la base**: el resto es hidratar 100 000 objetos y serializar ~19 MB de JSON **en el bucle de eventos**, que es lo que arrastra a las peticiones ajenas. Paginar con el mismo patrón que el resto de listados (`parsePagination` + `meta`), y adaptar la pantalla, que hoy recibe el array completo. `…/movements/export` **no** tiene el problema: escribe por lotes desde T2-05.
+  - **Criterio de aceptación:** con el conjunto de carga y el producto caliente, `pnpm carga:ejecutar` cumple sus umbrales y el rendimiento se mantiene en el orden de la línea base (~18 req/s); la pantalla de movimientos sigue funcionando con su paginación.
+  - **Esfuerzo:** medio
+  - **Depende de:** T4-08
+
+- [ ] **[T4-16] El dashboard a escala: `work_mem` y la consulta de rotación**
+  - **Área:** Rendimiento
+  - **Ubicación:** `src/modules/reports/reports.service.ts`, configuración de PostgreSQL (`docker-compose.yml`)
+  - **Origen:** no viene de la auditoría. Lo midió T4-08.
+  - **Qué hacer:** con 100 000 productos el dashboard tarda **1.43 s de media y 1.91 s en el p(95)**, y es la primera pantalla tras el login. T2-02 ya bajó sus agregados a SQL, así que lo que queda es la consulta de rotación, que **agrega sobre los 95 000 productos activos antes de quedarse con veinte**. Y hay una segunda mitad, más barata de arreglar: `work_mem` está en el valor de fábrica de **4 MB**, con lo que sus ordenaciones se van a disco (`external merge`, 8 MB). Subirlo a 64 MB en la misma sesión baja la rotación de **480 ms a 121 ms**, sin tocar una línea de SQL. Decidir el valor —por sesión, por rol o en la configuración del servidor— y revisar si la rotación puede acotarse antes de agregar.
+  - **Criterio de aceptación:** `GET /reports` baja del segundo en el p(95) con el conjunto de carga, y ninguna de sus consultas ordena en disco.
+  - **Esfuerzo:** medio
+  - **Depende de:** T4-08
 
 ---
 
@@ -1589,8 +1635,8 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | V-05 Frontend sin despliegue | Medio | T2-28 |
 | V-06 Sin backup ni monitorización | Bajo | T4-05 ✅, T4-06 ✅ |
 | SEO — sin `robots.txt` | Bajo | T3-12 |
-| Zonas no cubiertas — SCA y licencias | — | T4-07 |
-| Zonas no cubiertas — pruebas de carga | — | T4-08 |
+| Zonas no cubiertas — SCA y licencias | — | T4-07 ✅ |
+| Zonas no cubiertas — pruebas de carga | — | T4-08 ✅ |
 | Zonas no cubiertas — auditoría de navegador | — | T4-09 |
 
 ### Consultoría de diseño (2026-08-05)
@@ -1617,6 +1663,8 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-08-11 | **T4-08** Pruebas de carga sobre los flujos de inventario — **completada** | Conjunto de **100 000 productos y 1 100 000 movimientos** (467 MB) en una base aparte. **Antes/después de los índices sobre el mismo dato**, quitándolos y reponiéndolos: el histórico de un producto pasa de `Parallel Seq Scan` a `Bitmap Heap Scan` y de **62.7 ms a 0.2 ms** (×384); cuatro consultas mejoran entre ×143 y ×384. Carga sostenida de 10 usuarios × 60 s: **1495 peticiones, 18.55 req/s, 0 % de errores**, umbrales cumplidos. Informe en [rendimiento.md](rendimiento.md) | **T1-15 confirmada, y con una sorpresa:** dos consultas salen *peor* con índices, y no por el índice — el plan deja de ser paralelo y el `Sort` de encima se va a disco con `work_mem` de 4 MB. A 64 MB la rotación pasa de **480 ms a 121 ms**. **El hallazgo grande no estaba en la ficha:** `GET /products/:id/movements` **no pagina**; con un producto de 100 000 movimientos el rendimiento cae a **5.27 req/s**, se transfieren **1.6 GB** y el histórico de un producto *normal* pasa de 177 ms a **3.17 s**. La base tarda **15 ms**: el resto es serializar 19 MB de JSON en el bucle de eventos. → **T4-15** y **T4-16**. **Dos defectos del propio banco de pruebas, ambos creíbles y falsos:** categoría y estado activo derivados del mismo módulo dejaban **una categoría entera inactiva** —la consulta del catálogo devolvía cero filas y el índice parecía empeorarla—; y **un umbral de k6 sin muestras se da por cumplido**, así que una pasada que reventó en `setup` informó de cuatro `p(95)=0s` en verde. |
+| 2026-08-11 | **T4-07** Auditoría de dependencias y licencias — **completada** | **0 vulnerabilidades** en las 296 dependencias de producción del backend y las 118 del frontend, en todas las severidades, y **ni GPL, ni LGPL, ni AGPL, ni SSPL** en ninguno de los dos árboles. La puerta se demuestra **en rojo** con informes fabricados (18 tests entre los dos repos), porque con el árbol limpio ejecutarla no distingue una comprobación que funciona de una que no mira nada. `verify` ✅ backend **424/424**, frontend **518/518** | **La trampa:** `pnpm audit --json` con el registro caído **sigue imprimiendo un informe con las cinco severidades a cero** — la auditoría que nunca se hizo se lee igual que la limpia. Se distinguen por la clave `error` del JSON, no por el código de salida. **Sin red avisa y no falla** (`--estricto` invierte eso): sin CI, `verify` corre en portátiles, y una puerta que se pone roja sin conexión se acaba esquivando. La de **licencias sí es dura y no necesita red**: sale del lockfile y para el gate ante una licencia sin revisar. **Dos listas y no una compartida** —el navegador trae MPL-2.0 y OFL-1.1, el servidor EPL-2.0—, porque la unión dejaría pasar en un repositorio lo revisado solo para el otro. **Una obligación real sin cumplir:** los `.woff2` de Inter se copian a `dist/`, así que la aplicación distribuye la tipografía y la OFL exige que el aviso la acompañe → `public/AVISOS-DE-TERCEROS.txt`, generado leyendo la licencia de los 118 paquetes. **Confirmada la incoherencia que la ficha anticipaba** (`ISC` declarada, `LICENSE` MIT). **Hallazgo nuevo:** `prisma` en `dependencies` arrastra `@prisma/studio-core` y su árbol de gráficos — ahí está la única EPL-2.0 y la diferencia entre 296 paquetes y los ~100 necesarios → **T4-14**. |
 | 2026-08-11 | **T4-06** Monitorización y alertas — **completada** | **El criterio, ejecutado por HTTP contra la aplicación entera:** provocados 5xx reales hasta cruzar el umbral, sale el aviso por correo con las rutas y un `requestId`, y no sale por debajo del umbral ni durante el enfriamiento. Las reglas de Prometheus pasan `promtool test rules` ✅ —disparan con un 20 % de errores y **no** con tráfico sano—, y los dos archivos de configuración, `promtool check config` y `amtool check-config` ✅. `verify` ✅ **414/414**, cobertura 91.83 % | **Dos capas, y ninguna sobra:** la alerta en proceso avisa sin desplegar nada, pero no puede avisar de que el proceso ha muerto —un proceso muerto no manda correos—; eso es `up == 0` en Prometheus. **La prueba de las reglas destapó el número que justifica esa duplicidad:** de la primera 5xx a la alerta de Prometheus pasan **~8 min y medio**, y el `for: 2m` solo explica dos; el resto lo pone la ventana del `rate[5m]`. A ojo se habría dado por bueno «dos minutos». **Dos defectos propios encontrados midiendo:** `req.baseUrl + req.route.path` da `/:id` en Express 5 —restaura `baseUrl` al desapilar el router, y con un 5xx responde `errorHandler`, que vive fuera—, así que los doce módulos habrían caído en una sola serie; y ni Prometheus ni Alertmanager **expanden `${VARIABLES}`** en su configuración, cosa que se manifiesta como un objetivo caído con 401 y ninguna pista. **La cardinalidad se trata como lo que es**, un agujero de memoria explotable desde fuera: se etiqueta con la plantilla de ruta y lo no casado va a una etiqueta fija. `/metrics` responde **404** en producción sin token. El agregador de logs no necesitó código: T2-10 ya dejó JSON por línea con `requestId`. |
 | 2026-08-11 | **T4-05** Backup, restauración y reversión — **completada** | **Restauración ejecutada, no descrita** ([registro](operaciones.md#5-ensayo-de-restauración--registro)): 31 MB → volcado de 76.7 KB en 0.2 s, restaurado en 0.3 s. Siete tablas de negocio, 12 migraciones y un `md5` de las 52 filas de inventario **idénticos**; `pg_dump --schema-only` comparado línea a línea sin diferencias reales; `prisma migrate status` «up to date»; y la aplicación arrancada contra la copia responde **200** en `/api/v1/ready`, que sondea la base | **Dos guiones, porque un procedimiento que se copia y pega a mano no se ejecuta**: `pnpm db:backup` y `pnpm db:restaurar`, en Node y no en `.sh` —el proyecto se trabaja desde Windows y la copia debe programarse igual en el Programador de tareas que en `cron`—. **El ensayo por defecto no es el comando del desastre:** restaura en `Stockly_restauracion` y apuntar a la base real exige `--forzar`. **Cuatro trampas silenciosas encontradas montándolo:** el `DATABASE_URL` del `.env` **no le vale a `pg_dump`** (la `@` sin codificar hace que libpq busque un socket `@localhost`, con un error que no la menciona); **`pg_restore` sale con código 0 aunque falle** salvo `--exit-on-error`; un cliente más nuevo que el servidor vuelca sin protestar y rompe al restaurar; `dropdb` se cuelga con un Prisma Studio abierto. **La retención lleva guardia contra sí misma** —mínimo 3 copias y podar solo tras verificar el volcado—, porque una poda por antigüedad a secas borra la última copia buena el día en que es lo único que queda. **Destapó que el servidor de desarrollo es 17.10 y el compose levanta `postgres:16-alpine`**: un volcado de 17 no entra en un 16 → **T4-13**. |
 | 2026-08-10 | **T4-11** Selector de tema en Configuración — **completada** | Sobre el build de producción, con CPU a 1/20 y red «Slow 3G»: con preferencia «claro» y sistema en oscuro, el **primer `requestAnimationFrame`** ya pinta `rgb(248, 250, 252)` **con React sin montar**. Falsificado quitando el script del `dist/index.html`: el mismo frame pasa a `rgb(11, 18, 32)`. `verify` ✅ **471/471**, E2E ✅ | **El conmutador obligó a rehacer la capa de tokens, a mejor:** una media query no se anula desde la aplicación, y duplicar la paleta bajo `[data-tema]` dejaba cada color en tres sitios. Cada token pasa a `light-dark(claro, oscuro)`, el bloque de 40 líneas de T4-03 **desaparece** y el conmutador entero son tres reglas de `color-scheme`. **Deja obsoleto el apaño de las sombras** de T4-03: con el par dentro del token, el literal que Tailwind incrusta ya lleva los dos valores. **Defecto encontrado midiendo:** `ring-offset-2` rellena el hueco con `#fff` de fábrica, así que el anillo de foco dibujaba un halo blanco en oscuro —`rgb(255,255,255)` medido, `rgb(21,29,44)` tras el arreglo—. La preferencia va en `localStorage` y no en `/settings`, que es global a todos los usuarios. Nueve mutaciones, nueve guardias caídas. |
@@ -1723,12 +1771,14 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 1** | **26** | **26** | **100 %** ✅ |
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
-| Tier 4 | **5** | 12 | 42 % |
-| **Total** | **102** | **109** | **94 %** |
+| Tier 4 | **9** | 16 | 56 % |
+| **Total** | **106** | **113** | **94 %** |
 
-*El denominador creció cuatro veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y una el 2026-08-11 (T4-12)—, así que el 94 % de arriba es sobre 109, no sobre las 100 originales.*
+*El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que el 94 % de arriba es sobre 113, no sobre las 100 originales.*
 
-***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, **T4-05**, la copia de seguridad, y **T4-06**, monitorización y alertas. Las 6 restantes siguen fuera de alcance, y dos de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04, y **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05.*
+*Estas cifras estuvieron desviadas: la tabla decía 102/109 mientras las casillas del documento sumaban 104/110, porque los cierres de T4-05 y T4-06 y el alta de T4-13 no llegaron aquí. **Se cuentan las casillas** —8+26+48+15+9 hechas y 7 pendientes— y esta tabla y la de [CONTEXTO §3](CONTEXTO.md) dicen lo mismo. Al cerrar una tarea hay que tocar los dos sitios.*
+
+***Los cuatro tiers de trabajo están cerrados.** Del Tier 4 —que la auditoría dejó fuera del alcance inmediato a propósito— se abordaron **T4-01**, **T4-02** y **T4-03** el 2026-08-10, ese mismo día se añadió y cerró **T4-11**, y el 2026-08-11 se cerraron **T4-04**, la internacionalización, **T4-05**, la copia de seguridad, **T4-06**, monitorización y alertas, **T4-07**, el análisis de composición de dependencias, y **T4-08**, las pruebas de carga. Las 7 restantes siguen fuera de alcance, y cinco de ellas no vienen de la auditoría sino de los cierres anteriores: **T4-12**, los correos, que anotó el de T4-04; **T4-13**, la discrepancia de versión de PostgreSQL que destapó el ensayo de restauración de T4-05; **T4-14**, el CLI de Prisma en el árbol de producción, que destapó T4-07; y **T4-15** y **T4-16**, el histórico sin paginar y el coste del dashboard a escala, que midió T4-08.*
 
 *T3-07 (limpiar artefactos antes de compilar) se resolvió como efecto colateral de T0-01.*
 
@@ -1736,9 +1786,9 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-11) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **414/414** ✅ | mantener en verde |
+| Tests backend | 198/198 ✅ | **424/424** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **498/498** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **518/518** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
@@ -1759,6 +1809,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | Consultas extra a BD por mutación (email del actor) | 1 | **0** ✅ | 0 |
 | Índices no-únicos en el esquema | 0 | **19** ✅ *(T2-43 los del orden por `createdAt`; T2-09 los GIN de trigramas)* | cubrir FK, ordenaciones y búsqueda |
 | Histórico de un producto (40 000 movimientos) | `Seq Scan`, 5.709 ms | **`Bitmap Index Scan`, 0.747 ms** ✅ | `Index Scan` |
+| Histórico de un producto (1 100 000 movimientos) | `Parallel Seq Scan`, 62.7 ms *(midiendo sin los índices, T4-08)* | **`Bitmap Heap Scan`, 0.2 ms** ✅ *(×384)* | `Index Scan` |
+| Carga sostenida, 10 usuarios × 60 s | *nunca medida* | **18.55 req/s, 0 % de errores** ✅ *(100 000 productos, T4-08)* | que exista la medida y no se degrade |
+| Dashboard bajo carga, p(95) | *nunca medido* | 1.91 s ⚠️ *(la pantalla más cara; T4-16)* | < 1 s |
+| Endpoints de listado sin paginar | *sin comprobar* | **1** ⚠️ *(`/products/:id/movements`: 5.27 req/s y 1.6 GB con un producto grande; T4-15)* | 0 |
 | CSS de la aplicación (build) | 78.40 kB · gzip 13.55 | **68.40 kB · gzip 12.14** ✅ | bajar con la escala y los subconjuntos |
 | Archivos de fuente emitidos | 56 *(7 subconjuntos × 4 pesos × 2 formatos)* | **8** ✅ | solo el subconjunto latino |
 | `pnpm lint` (frontend) | ❌ 26 errores, 4 avisos | ✅ **0 errores, 0 avisos** | ✅ 0 errores |
@@ -1769,6 +1823,10 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | `docker compose up --build` | ❌ no alcanzable | ✅ **health 200** | ✅ health 200 |
 | Chunk `vendor` (sin comprimir) | 549.93 kB | 549.93 kB | < 250 kB |
 | Guiones `verify` locales | 0 | **2 en verde** ✅ *(backend y frontend, exit 0)* | 2 en verde |
+| Análisis de composición de dependencias | *nunca ejecutado (zona no cubierta de la auditoría)* | **en cada `verify`** ✅ *(0 vulnerabilidades sobre 296 + 118 paquetes de producción, T4-07)* | que una vulnerabilidad alta no pase la puerta |
+| Licencias copyleft fuerte en producción | *sin comprobar* | **0** ✅ *(ni GPL, ni LGPL, ni AGPL, ni SSPL; lista permitida con guardia)* | 0 |
+| Licencia declarada frente al archivo `LICENSE` | ❌ `ISC` declarada, archivo MIT | ✅ **MIT en ambos** *(los dos repos, con autor)* | que coincidan |
+| Avisos de terceros distribuidos con la aplicación | 0 *(se sirven los `.woff2` de Inter sin su licencia OFL)* | **118 paquetes** ✅ *(`public/AVISOS-DE-TERCEROS.txt`, generado)* | que el aviso viaje con lo que se distribuye |
 | Tokens semánticos en `@theme` | 1 (`--font-sans`) | **30** ✅ *(17 colores de interfaz, 9 de gráfico, 2 sombras, easing y tipografía)* | capa completa (T2-35) |
 | Utilidades de color crudas en `src/**/*.tsx` | 561 (41 de 57 archivos) | **0** ✅ *(con test que lo vigila)* | 0 fuera de excepciones |
 | Variantes de `Badge` sin significado | 4 de 7 | **0 de 5** ✅ | 0 |
