@@ -17,7 +17,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > histórico de inventario del que no había ninguna copia, y **T4-06** porque de nada sirve saber
 > restaurar si nadie se entera de que hay que hacerlo. Las 6 restantes siguen fuera de alcance.
 >
-> Backend **414/414** tests y 91.83 % de sentencias; frontend **494/494** y 53.14 %; E2E 9 pasados
+> Backend **414/414** tests y 91.83 % de sentencias; frontend **498/498** y 53.14 %; E2E 9 pasados
 > y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
 >
 > **Las fichas describen el problema tal como se vio en la auditoría, no como resultó ser.** Cuatro
@@ -1738,7 +1738,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 |---|---|---|---|
 | Tests backend | 198/198 ✅ | **414/414** ✅ | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **494/494** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **498/498** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |

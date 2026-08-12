@@ -96,6 +96,41 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Corregido
 
+- **Repaso de la interfaz en móvil, medido a 412 px** (Galaxy S20 Ultra). El valor del
+  inventario se salía de su tarjeta en Reportes; los filtros de Productos cabían dos por
+  fila pero ninguno dejaba leer la opción elegida; en las órdenes de compra y venta las
+  acciones de icono se comían la fila y el nombre del proveedor caía en seis líneas —y el
+  importe, oculto en móvil, ahora se ve—; y el panel de «Exportar» se dibujaba con la
+  primera letra fuera de la pantalla. El armazón de las pantallas pasa a tres constantes
+  compartidas con su guardia en `desbordes.test.ts`, que de paso destapó otras tres
+  pantallas con el relleno de escritorio fijado.
+- **Las tablas vuelven a desplazarse a lo ancho.** Seis de las doce estaban dentro de una
+  tarjeta con `overflow-hidden` —puesto para recortar las esquinas redondeadas— que anula
+  el desplazamiento: a las columnas de la derecha no había forma de llegar desde un
+  teléfono. Ahora todas comparten contenedor y ancho mínimo, y la barra va oculta
+  (`sin-barra`) sin perder el desplazamiento con el dedo, la rueda o el teclado.
+- **Auditoría y Usuarios dejan de esconder columnas en móvil.** «Detalles», «Fecha» y
+  «Registrado» salían solo a partir de `md`; ahora que la tabla se desplaza, ocultarlas era
+  perder información sin ganar nada.
+- **Con el menú de navegación abierto, la página ya no se desplaza por detrás.** El panel
+  tiene altura máxima y desplazamiento propio (`dvh`, no `vh`), corta el encadenamiento con
+  `overscroll-contain` y bloquea el elemento raíz mientras está abierto —en `<html>`, que
+  es el que desplaza; hacerlo en `<body>` no cambiaba nada—.
+- **Los campos de fecha se ven igual en todos los navegadores** (`CampoDeFecha`). En Android
+  salían vacíos y con el indicador descolocado —un chevron de desplegable en vez de un
+  calendario—: ahora el adorno nativo se apaga, el icono lo pinta la aplicación, hay una
+  pista de formato traducida cuando el campo está vacío y **toda la caja abre el
+  calendario**, no solo el icono de la esquina.
+- **Un desplegable ya no se queda en su relleno.** El de la columna de acciones de Usuarios
+  medía 50 px, de los que 48 eran el `pl-3` + `pr-9` del chevron: se veía el indicador y ni
+  una letra del rol. `w-full` es un porcentaje y no aporta anchura intrínseca, así que
+  dentro de una fila flexible el campo no reclama sitio; el ancho mínimo va en `Select` y no
+  en la página, porque el fallo es de cualquier `Select` que caiga en un `flex`. De paso,
+  ese desplegable pasa a nombrar la fila (`Cambiar el rol de Laura Sánchez`): sin etiqueta,
+  un lector de pantalla anunciaba tres controles llamados «Admin».
+- **Los filtros de movimientos de un producto** dejan de comprimirse: las etiquetas
+  «Desde»/«Hasta» pasan encima del campo y cada control ocupa su fila en móvil, donde un
+  `input[type=date]` de 120 px no llegaba a mostrar el año.
 - El guardado de configuración: un ajuste booleano se leía como cadena y el interruptor se
   pintaba apagado con la opción activa (`T1-05`, `T1-06`).
 - Las etiquetas de producto se descartaban en silencio al guardar (`T1-03`).
