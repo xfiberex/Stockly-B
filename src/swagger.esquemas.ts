@@ -46,6 +46,7 @@ const RESPUESTAS = {
     TagRef: contrato.etiquetaRefSchema,
     Tag: contrato.etiquetaSchema,
     Product: contrato.productoSchema,
+    ProductWithAvailability: contrato.productoConDisponibleSchema,
     ProductExport: contrato.productoExportadoSchema,
     StockMovement: contrato.movimientoStockSchema,
     MovimientosDeProducto: contrato.movimientosDeProductoSchema,

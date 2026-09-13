@@ -119,7 +119,11 @@ export const spec = {
                     { name: "tagId", in: "query", schema: { type: "string", format: "uuid" } },
                     { name: "isActive", in: "query", schema: { type: "boolean" } },
                 ],
-                responses: { "200": { description: "Lista paginada de productos" }, "401": { description: "No autenticado" } },
+                responses: {
+                    // T5-03 — cada producto trae su comprometido en ventas pendientes y su disponible.
+                    "200": { description: "Lista paginada de productos, con comprometido y disponible", content: { "application/json": { schema: { type: "object", properties: { data: { type: "object", properties: { data: { type: "array", items: { $ref: "#/components/schemas/ProductWithAvailability" } }, meta: { $ref: "#/components/schemas/PaginationMeta" } } } } } } } },
+                    "401": { description: "No autenticado" },
+                },
             },
             post: {
                 tags: ["Products"], summary: "Crear producto (ADMIN)",
@@ -157,7 +161,7 @@ export const spec = {
             get: {
                 tags: ["Products"], summary: "Obtener producto por ID",
                 parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
-                responses: { "200": { description: "Producto encontrado" }, "404": { description: "No encontrado" } },
+                responses: { "200": { description: "Producto encontrado, con comprometido y disponible (T5-03)", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/ProductWithAvailability" } } } } } }, "404": { description: "No encontrado" } },
             },
             put: {
                 tags: ["Products"], summary: "Actualizar producto (ADMIN)",

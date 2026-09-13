@@ -198,14 +198,14 @@ describe("Contrato de la API (T4-01)", () => {
             const res = await request(app).get("/api/v1/products").set("Cookie", cookieAdmin);
 
             expect(res.status).toBe(200);
-            conforme(contrato.paginadoSchema(contrato.productoSchema), res.body.data, "GET /products");
+            conforme(contrato.paginadoSchema(contrato.productoConDisponibleSchema), res.body.data, "GET /products");
         });
 
         it("GET /products/:id — el precio llega como cadena, no como número", async () => {
             const res = await request(app).get(`/api/v1/products/${productoId}`).set("Cookie", cookieAdmin);
 
             expect(res.status).toBe(200);
-            conforme(contrato.productoSchema, res.body.data, "GET /products/:id");
+            conforme(contrato.productoConDisponibleSchema, res.body.data, "GET /products/:id");
 
             // Es el hallazgo que motivó `importeSchema`. Si algún día Prisma o el
             // serializador cambian y esto empieza a llegar como número, quiero enterarme

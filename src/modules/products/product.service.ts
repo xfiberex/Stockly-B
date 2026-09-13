@@ -3,6 +3,7 @@ import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { mismoCoste } from "@/shared/lib/costeMedio";
+import { conDisponible } from "@/shared/lib/stockComprometido";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
@@ -162,7 +163,9 @@ export const productService = {
         ]);
 
         return {
-            data: products,
+            // T5-03 — con comprometido y disponible: es la lista de la que elige el formulario
+            // de venta. Una sola consulta agrupada para la página entera, no una por producto.
+            data: await conDisponible(products),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     },
@@ -170,7 +173,8 @@ export const productService = {
     async getById(id: string) {
         const product = await prisma.product.findUnique({ where: { id }, include: PRODUCT_INCLUDE });
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
-        return product;
+        const [conCifras] = await conDisponible([product]);
+        return conCifras!;
     },
 
     async create(dto: CreateProductDto, file?: Express.Multer.File) {

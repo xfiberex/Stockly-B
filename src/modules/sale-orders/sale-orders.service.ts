@@ -5,6 +5,8 @@ import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
+import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
+import { Prisma } from "@/generated/prisma/client";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 const ORDER_INCLUDE = {
@@ -43,23 +45,68 @@ export const saleOrderService = {
         return order;
     },
 
+    /**
+     * T5-03 — una venta no puede pedir más de lo **disponible**: stock menos lo comprometido
+     * en ventas pendientes. Antes solo se comprobaba al enviar, así que se aceptaban dos
+     * ventas por las mismas unidades y la segunda fallaba cuando ya se le había prometido al
+     * cliente. La decisión de la ficha fue **bloquear**, no avisar: la interfaz lo dice
+     * mientras se escribe la cantidad y aquí se rechaza con 409.
+     *
+     * El mismo producto en varias líneas **suma**: dos líneas de 3 sobre 5 disponibles son 6.
+     */
     async create(dto: CreateSaleOrderDto) {
-        return prisma.saleOrder.create({
-            data: {
-                customerName: dto.customerName,
-                customerEmail: dto.customerEmail,
-                customerPhone: dto.customerPhone,
-                notes: dto.notes,
-                items: {
-                    create: dto.items.map((item) => ({
-                        productId: item.productId ?? null,
-                        productName: item.productName,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                    })),
+        const pedido = new Map<string, number>();
+        for (const item of dto.items) {
+            if (item.productId) pedido.set(item.productId, (pedido.get(item.productId) ?? 0) + item.quantity);
+        }
+        const ids = [...pedido.keys()].sort();
+
+        return prisma.$transaction(async (tx) => {
+            if (ids.length > 0) {
+                // Se bloquean las filas de los productos **antes** de contar lo comprometido.
+                // Sin el bloqueo, dos ventas simultáneas de las mismas unidades leerían el
+                // mismo disponible y pasarían las dos — que es el defecto que viene a cerrar
+                // la tarea, solo que en una ventana más estrecha. Ordenadas por id, para que
+                // dos ventas con productos en distinto orden no se esperen mutuamente.
+                await tx.$queryRaw`SELECT id FROM products WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+
+                const productos = await tx.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, stock: true } });
+                const comprometido = await comprometidoPorProducto(ids, tx);
+
+                for (const id of ids) {
+                    const producto = productos.find((p) => p.id === id);
+                    if (!producto) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+
+                    const disponible = producto.stock - (comprometido.get(id) ?? 0);
+                    const requerido = pedido.get(id)!;
+                    if (requerido > disponible) {
+                        throw new HttpError(
+                            409,
+                            `No hay suficiente disponible de "${producto.name}". Disponible: ${Math.max(disponible, 0)}, requerido: ${requerido}`,
+                            "INSUFFICIENT_AVAILABLE_STOCK",
+                            { producto: producto.name, disponible: Math.max(disponible, 0), requerido },
+                        );
+                    }
+                }
+            }
+
+            return tx.saleOrder.create({
+                data: {
+                    customerName: dto.customerName,
+                    customerEmail: dto.customerEmail,
+                    customerPhone: dto.customerPhone,
+                    notes: dto.notes,
+                    items: {
+                        create: dto.items.map((item) => ({
+                            productId: item.productId ?? null,
+                            productName: item.productName,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                        })),
+                    },
                 },
-            },
-            include: ORDER_INCLUDE,
+                include: ORDER_INCLUDE,
+            });
         });
     },
 

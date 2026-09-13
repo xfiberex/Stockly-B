@@ -19,6 +19,20 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Recepción parcial de órdenes de compra** (`T5-04`). Una orden ya no pasa de pendiente a
+  recibida de golpe: **cada entrega registra lo que llega de cada línea**, suma ese stock con su
+  movimiento y su coste medio, y deja la orden **«Recibida a medias»** hasta que se completan
+  todas. El diálogo de recepción propone lo que falta y no deja pasarse; la API lo rechaza con
+  **400** si llega igualmente (`POST /purchase-orders/:id/receipts`). **Cancelar retira lo que
+  entró, no lo pedido.** Las órdenes ya recibidas se migran como recibidas del todo.
+
+- **Stock comprometido y disponible** (`T5-03`). Lo pedido en ventas pendientes cuenta ya como
+  comprometido, y **una venta nueva no puede pedir más de lo disponible** (stock menos
+  comprometido): el formulario lo dice mientras se escribe y no deja guardar, y la API responde
+  **409** si llega igualmente. El mismo producto en varias líneas suma. El catálogo enseña el
+  disponible bajo el stock cuando hay algo comprometido, el detalle del producto lo desglosa, y la
+  rotación del informe cuenta los días restantes sobre el disponible.
+
 - **Valor del inventario a coste y margen realizado** (`T5-02`). El dashboard y el informe dan
   ahora tres cifras con su nombre —**valor a coste**, **valor a precio de venta** y **margen
   potencial**— y avisan de cuántos productos con stock no tienen coste y quedan fuera. El
@@ -124,6 +138,10 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **Una orden de compra con mercancía recibida ya no vuelve a pendiente, ni se elimina si va a
+  medias** (`T5-04`). Volver a pendiente se aceptaba y dejaba ese stock sin orden que lo
+  explicara, y recibible otra vez; ahora responde 400.
+
 - **El seed vuelve a describir el esquema entero, y su histórico cuadra.** Se había quedado en
   las tablas de las primeras fases: sembraba usuarios, catálogos, productos, movimientos,
   precios y órdenes de compra, y **no sabía nada** de etiquetas, órdenes de venta, auditoría,
@@ -210,6 +228,13 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   traerse el catálogo entero (`T2-02`).
 
 ### Corregido
+
+- **Dos recepciones simultáneas de la misma compra podían sumar el stock dos veces** (`T5-04`).
+  El estado se comprobaba fuera de la transacción; ahora la orden se bloquea antes de leerlo.
+
+- **La lista de productos se quedaba vieja tras operar con órdenes** (`T5-03`). Crear, enviar o
+  cancelar una venta y recibir o cancelar una compra no refrescaban la caché de productos, así que
+  el stock en pantalla no cambiaba hasta recargar.
 
 - **Ocho claves muertas fuera del catálogo de idiomas**, y una guardia para que no vuelvan a
   acumularse. El compilador ya comprobaba que español e inglés declaren lo mismo, pero **no

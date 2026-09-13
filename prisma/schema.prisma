@@ -12,8 +12,11 @@ datasource db {
   provider = "postgresql"
 }
 
+// T5-04 — `PARTIALLY_RECEIVED`: ha entrado algo, pero no todo lo pedido. Se llega a él solo por
+// `POST /purchase-orders/:id/receipts`; `RECEIVED` significa ya que **todas** las líneas están completas.
 enum PurchaseOrderStatus {
   PENDING
+  PARTIALLY_RECEIVED
   RECEIVED
   CANCELLED
 }
@@ -234,6 +237,10 @@ model PurchaseOrderItem {
   product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   productName     String
   quantity        Int
+  // T5-04 — lo que ha entrado de esta línea, entre todas sus recepciones. Nunca pasa de
+  // `quantity`. Es lo que retira una cancelación (T0-04): retirar `quantity` de una orden
+  // recibida a medias sacaría del inventario unidades que nunca entraron.
+  receivedQuantity Int          @default(0)
   unitPrice       Decimal       @db.Decimal(10, 2)
   createdAt       DateTime      @default(now())
 

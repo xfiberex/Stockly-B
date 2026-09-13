@@ -42,7 +42,7 @@ export const rolSchema = z.enum(["ADMIN", "USER"]);
  * rechaza el `update` en producción.
  */
 export const idiomaSchema = z.enum(["ES", "EN"]);
-export const estadoOrdenCompraSchema = z.enum(["PENDING", "RECEIVED", "CANCELLED"]);
+export const estadoOrdenCompraSchema = z.enum(["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"]);
 export const estadoOrdenVentaSchema = z.enum(["PENDING", "SHIPPED", "CANCELLED"]);
 export const tipoMovimientoSchema = z.enum(["IN", "OUT", "ADJUSTMENT", "IMPORT"]);
 /** T5-01 — de dónde sale un cambio de coste: una recepción de compra o una edición a mano. */
@@ -129,12 +129,15 @@ export const CODIGOS_DE_ERROR = [
     "CANNOT_DELETE_RECEIVED_ORDER",
     "CANNOT_DELETE_SHIPPED_ORDER",
     "CANNOT_MODIFY_CANCELLED_ORDER",
+    "CANNOT_REOPEN_RECEIVED_ORDER",
     "INACTIVE_PRODUCT_MOVEMENT",
     "INSUFFICIENT_STOCK",
     "INVALID_FILTER_VALUE",
     "INVALID_OR_EXPIRED_TOKEN",
     "ORDER_ALREADY_SHIPPED",
+    "ORDER_NOT_RECEIVABLE",
     "PRODUCT_ALREADY_ACTIVE",
+    "RECEIPT_EXCEEDS_PENDING",
     "STOCK_CANNOT_BE_NEGATIVE",
     // 401 / 403 — quién eres y qué se te permite
     "ACCOUNT_DISABLED",
@@ -147,6 +150,7 @@ export const CODIGOS_DE_ERROR = [
     "BRAND_NOT_FOUND",
     "CATEGORY_NOT_FOUND",
     "PRODUCT_NOT_FOUND",
+    "PURCHASE_ORDER_ITEM_NOT_FOUND",
     "PURCHASE_ORDER_NOT_FOUND",
     "ROUTE_NOT_FOUND",
     "SALE_ORDER_NOT_FOUND",
@@ -160,6 +164,8 @@ export const CODIGOS_DE_ERROR = [
     "EMAIL_IN_USE",
     "SUPPLIER_EMAIL_EXISTS",
     "TAG_NAME_EXISTS",
+    // 409 — el estado del inventario no admite la petición
+    "INSUFFICIENT_AVAILABLE_STOCK",
     // 413 / 422 — el cuerpo o el archivo
     "EXPORT_TOO_LARGE",
     "INVALID_IMAGE_FILE",
@@ -290,6 +296,17 @@ export const productoSchema = z.object({
     updatedAt: fechaSchema,
 });
 
+/**
+ * T5-03 — `GET /products` y `GET /products/:id` traen además lo comprometido en ventas
+ * pendientes y el disponible (`stock − comprometido`). El resto de respuestas con producto
+ * —crear, editar, restaurar, el histórico— **no**: calcularlo en cada una costaría una consulta
+ * más donde nadie lo pinta. **El disponible puede ser negativo** con datos anteriores a T5-03.
+ */
+export const productoConDisponibleSchema = productoSchema.extend({
+    committedStock: z.number(),
+    availableStock: z.number(),
+});
+
 export const movimientoStockSchema = z.object({
     id: z.string(),
     productId: z.string(),
@@ -414,6 +431,8 @@ export const itemOrdenCompraSchema = z.object({
     product: productoDeItemSchema,
     productName: z.string(),
     quantity: z.number(),
+    /** T5-04 — lo que ha entrado de la línea entre todas sus recepciones; nunca más que `quantity`. */
+    receivedQuantity: z.number(),
     unitPrice: importeSchema,
     createdAt: fechaSchema,
 });
@@ -554,6 +573,8 @@ export const metricaStockSchema = z.object({
     sku: z.string().nullable(),
     totalOutLast30Days: z.number(),
     currentStock: z.number(),
+    /** T5-03 — stock menos lo comprometido; `daysToStockout` se cuenta sobre este. */
+    availableStock: z.number(),
     minStock: z.number(),
     dailyVelocity: z.number(),
     daysToStockout: z.number().nullable(),
@@ -631,6 +652,7 @@ export type Etiqueta = z.infer<typeof etiquetaSchema>;
 
 export type Producto = z.infer<typeof productoSchema>;
 export type MovimientoStock = z.infer<typeof movimientoStockSchema>;
+export type ProductoConDisponible = z.infer<typeof productoConDisponibleSchema>;
 export type MovimientosDeProducto = z.infer<typeof movimientosDeProductoSchema>;
 export type HistorialPrecio = z.infer<typeof historialPrecioSchema>;
 export type HistorialCoste = z.infer<typeof historialCosteSchema>;

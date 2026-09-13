@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **517/517** | **564/564** *(+1 omitido)* |
-| Cobertura (sentencias) | 93.8 % *(suelo 85 %)* | 70.49 % *(suelo 45 %)* |
+| Tests | **547/547** | **582/582** *(+1 omitido)* |
+| Cobertura (sentencias) | 94.23 % *(suelo 85 %)* | 72.27 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -65,8 +65,21 @@ de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
+**Ojo antes de lanzar el E2E: resiembra la base de desarrollo.** `e2e/global-setup.ts` ejecuta
+`pnpm db:seed` contra la `DATABASE_URL` de `Stockly-B/.env`, que es la base con la que se trabaja,
+y el seed **la vacía** antes de sembrar. Además `reuseExistingServer` reutiliza los servidores que
+estén levantados. Con el proyecto en uso y datos que se quieran conservar, se hace copia antes
+(`pnpm db:backup`). El usuario autorizó resembrar cuando haga falta (2026-09-13).
+
+**Y con los servidores levantados a mano, el E2E cae por 429.** `reuseExistingServer` reutiliza el
+backend tal como se arrancó, con el límite por defecto (100 peticiones cada 15 min); el
+`RATE_LIMIT_MAX` de `playwright.config.ts` solo se aplica si lo arranca Playwright. Si están en uso
+y no se pueden parar, se levanta otro par: backend con `PORT=3100 FRONTEND_URL=http://localhost:5174
+RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el proxy a `localhost:3100`
+(el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
+
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 2/15** *(abierto el 2026-09-13; T5-01 y T5-02 cerradas)* · Total **116/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 4/15** *(abierto el 2026-09-13; T5-01 a T5-04 cerradas)* · Total **118/129**.
 
 **Ojo: el `verify` del backend está en rojo en su último paso desde el 2026-09-13**, y no por el
 código: `pnpm auditoria` encuentra **10 avisos altos** nuevos en `multer`, `nodemailer` y

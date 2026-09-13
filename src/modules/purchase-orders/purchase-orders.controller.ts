@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { purchaseOrderService } from "./purchase-orders.service";
 import { auditService } from "@/modules/audit-logs";
 import { enviarExportacion } from "@/shared/lib/exportacion";
-import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
+import type { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 export const purchaseOrderController = {
     async getAllOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -57,6 +57,25 @@ export const purchaseOrderController = {
                 action, "PurchaseOrder", req.params.id,
             );
             res.json({ success: true, message: "Orden de compra actualizada", data: order });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    /** T5-04 — una entrega parcial o la última. Se audita como recepción, con lo recibido. */
+    async receiveOrder(
+        req: Request<{ id: string }, {}, ReceivePurchaseOrderDto>,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> {
+        try {
+            const order = await purchaseOrderService.receive(req.params.id, req.body);
+            await auditService.log(
+                { userId: req.userId, userEmail: req.userEmail },
+                "ORDER_RECEIVE", "PurchaseOrder", req.params.id,
+                { status: order.status, items: req.body.items },
+            );
+            res.status(201).json({ success: true, message: "Recepción registrada", data: order });
         } catch (error) {
             next(error);
         }

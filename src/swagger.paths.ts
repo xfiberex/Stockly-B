@@ -249,7 +249,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/purchase-orders": {
         get: {
             tags: ["Purchase Orders"], summary: "Listar órdenes de compra",
-            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "RECEIVED", "CANCELLED"] } }],
+            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] } }],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/PurchaseOrder"), "Listado paginado"), "401": ERROR("No autenticado") },
         },
         post: {
@@ -265,6 +265,24 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
     },
     "/purchase-orders/export": exportacion("Purchase Orders", "las órdenes de compra"),
+    "/purchase-orders/{id}/receipts": {
+        post: {
+            tags: ["Purchase Orders"], summary: "Registrar una recepción, parcial o completa (T5-04)",
+            description: "Suma a cada línea indicada la cantidad recibida, con su stock, su movimiento `IN` y el coste medio calculado sobre lo recibido. La orden queda `RECEIVED` si todas sus líneas se completan y `PARTIALLY_RECEIVED` si no. Las líneas que no se envían no reciben nada.",
+            parameters: [PARAM_ID],
+            requestBody: { required: true, content: { "application/json": { schema: {
+                type: "object", required: ["items"],
+                properties: {
+                    items: { type: "array", minItems: 1, items: { type: "object", required: ["itemId", "quantity"], properties: { itemId: { type: "string", format: "uuid" }, quantity: { type: "integer", minimum: 1 } } } },
+                },
+            } } } },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/PurchaseOrder" }, "Recepción registrada"),
+                "400": ERROR("Más de lo pendiente (`RECEIPT_EXCEEDS_PENDING`) u orden recibida o cancelada (`ORDER_NOT_RECEIVABLE`)"),
+                "404": ERROR("La orden o la línea no existen"), "422": ERROR("Datos inválidos"),
+            },
+        },
+    },
     "/purchase-orders/{id}": {
         get: {
             tags: ["Purchase Orders"], summary: "Obtener una orden", parameters: [PARAM_ID],
@@ -272,16 +290,16 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
         patch: {
             tags: ["Purchase Orders"], summary: "Actualizar o cambiar de estado",
-            description: "Pasar a `RECEIVED` **suma stock** de cada ítem ligado a un producto; cancelar una ya recibida lo resta, y falla con 400 si esas unidades ya se consumieron (T0-04).",
+            description: "Pasar a `RECEIVED` **suma lo que falte** de cada línea ligada a un producto; cancelar una recibida, entera o a medias, retira lo que entró (`receivedQuantity`) y falla con 400 si esas unidades ya se consumieron (T0-04). `PARTIALLY_RECEIVED` no se escribe: se llega a él con `POST /purchase-orders/{id}/receipts`. Una orden con mercancía recibida no vuelve a `PENDING`.",
             parameters: [PARAM_ID],
             requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["PENDING", "RECEIVED", "CANCELLED"] }, supplierId: { type: "string", format: "uuid" }, notes: { type: "string" } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/PurchaseOrder" }, "Actualizada"),
-                "400": ERROR("Transición inválida o stock ya consumido"), "404": ERROR("No encontrada"),
+                "400": ERROR("Transición inválida, vuelta a pendiente de una orden con mercancía o stock ya consumido"), "404": ERROR("No encontrada"),
             },
         },
         delete: {
-            tags: ["Purchase Orders"], summary: "Eliminar (no permitido si ya se recibió)", parameters: [PARAM_ID],
+            tags: ["Purchase Orders"], summary: "Eliminar (no permitido si ya se recibió algo)", parameters: [PARAM_ID],
             responses: { "200": JSON_OK(undefined, "Eliminada"), "400": ERROR("No se puede eliminar una orden recibida"), "404": ERROR("No encontrada") },
         },
     },
@@ -303,7 +321,13 @@ export const rutasAdicionales: Record<string, Ruta> = {
                     items: { type: "array", minItems: 1, items: { type: "object", properties: { productId: { type: "string", format: "uuid" }, productName: { type: "string" }, quantity: { type: "integer" }, unitPrice: { type: "number" } } } },
                 },
             } } } },
-            responses: { "201": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Creada"), "422": ERROR("Datos inválidos") },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Creada"),
+                "404": ERROR("Un productId no existe"),
+                // T5-03 — la venta pide más de lo disponible (stock menos ventas pendientes).
+                "409": ERROR("INSUFFICIENT_AVAILABLE_STOCK: la cantidad supera lo disponible de un producto"),
+                "422": ERROR("Datos inválidos"),
+            },
         },
     },
     "/sale-orders/export": exportacion("Sale Orders", "las órdenes de venta"),

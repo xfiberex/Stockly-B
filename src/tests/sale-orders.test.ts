@@ -152,13 +152,17 @@ describe("Sale Orders API", () => {
         });
 
         it("400 si el stock es insuficiente y no altera el stock", async () => {
-            const product = await createProduct("Mouse", 2);
+            const product = await createProduct("Mouse", 5);
 
             const created = await request(app)
                 .post(BASE)
                 .set("Cookie", adminCookie)
                 .send({ items: [{ productId: product.id, productName: "Mouse", quantity: 5, unitPrice: 10 }] });
             const orderId = created.body.data.id;
+            // T5-03: ya no se puede **crear** una venta mayor que lo disponible, así que el
+            // stock baja después, como lo haría un ajuste manual o una merma. El envío sigue
+            // siendo la última comprobación, y esto es lo que la vigila.
+            await prisma.product.update({ where: { id: product.id }, data: { stock: 2 } });
 
             const shipped = await request(app)
                 .patch(`${BASE}/${orderId}`)
@@ -175,7 +179,7 @@ describe("Sale Orders API", () => {
 
         it("ATOMICIDAD: si un ítem falla, ningún otro ítem se descuenta y la orden sigue PENDING", async () => {
             const ok = await createProduct("Suficiente", 100);
-            const short = await createProduct("Escaso", 1);
+            const short = await createProduct("Escaso", 5);
 
             const created = await request(app)
                 .post(BASE)
@@ -187,6 +191,8 @@ describe("Sale Orders API", () => {
                     ],
                 });
             const orderId = created.body.data.id;
+            // T5-03: la venta se crea con stock suficiente y el escaso baja después (ver arriba).
+            await prisma.product.update({ where: { id: short.id }, data: { stock: 1 } });
 
             const shipped = await request(app)
                 .patch(`${BASE}/${orderId}`)

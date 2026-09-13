@@ -208,6 +208,11 @@ interface LineaDePedido {
     qty: number;
     /** Coste al proveedor. En las ventas no se declara: sale del precio del catálogo. */
     unitPrice?: number;
+    /**
+     * T5-04 — lo que ha llegado de la línea en una compra `PARTIALLY_RECEIVED`. En una
+     * `RECEIVED` es siempre `qty` y no se declara; en el resto, 0.
+     */
+    recibida?: number;
 }
 
 interface OrdenDeCompra {
@@ -271,12 +276,13 @@ const ordenesDeCompra: OrdenDeCompra[] = [
     },
     {
         proveedor: "MegaSupply Corp",
-        status: "PENDING",
-        notes: "Reposición urgente gaming y audio — en espera de confirmación",
+        // T5-04 — una a medias, para que la pantalla tenga un caso que enseñar.
+        status: "PARTIALLY_RECEIVED",
+        notes: "Reposición urgente gaming y audio — llegó la primera entrega",
         dias: 10,
         items: [
-            { sku: "GAM-COR-M65RGB", qty: 15, unitPrice: 1750 },
-            { sku: "GAM-COR-VIR-SE", qty: 8, unitPrice: 4800 },
+            { sku: "GAM-COR-M65RGB", qty: 15, unitPrice: 1750, recibida: 15 },
+            { sku: "GAM-COR-VIR-SE", qty: 8, unitPrice: 4800, recibida: 5 },
             { sku: "AUD-SNY-XM5", qty: 10, unitPrice: 7900 },
             { sku: "AUD-COR-HS80", qty: 12, unitPrice: 2750 },
             { sku: "AUD-COR-WAVE3", qty: 6, unitPrice: 3200 },
@@ -522,6 +528,13 @@ function anotarMovimientosSueltos(libro: LibroMayor, productos: Product[]): void
 
 // ─── Órdenes ──────────────────────────────────────────────────────────────────
 
+/** T5-04 — cuánto entró de una línea de compra: todo si está recibida, lo declarado si va a medias. */
+function unidadesRecibidas(orden: OrdenDeCompra, linea: LineaDePedido): number {
+    if (orden.status === "RECEIVED") return linea.qty;
+    if (orden.status === "PARTIALLY_RECEIVED") return linea.recibida ?? 0;
+    return 0;
+}
+
 async function sembrarOrdenesDeCompra(
     porSku: Map<string, Product>,
     proveedores: Map<string, string>,
@@ -533,11 +546,12 @@ async function sembrarOrdenesDeCompra(
         const fecha = hace(orden.dias);
         const lineas = orden.items.map((i) => {
             const producto = exigirProducto(porSku, i.sku);
-            if (orden.status === "RECEIVED") {
+            const recibida = unidadesRecibidas(orden, i);
+            if (recibida > 0) {
                 libro.anotar({
                     productId: producto.id,
                     type: "IN",
-                    delta: i.qty,
+                    delta: recibida,
                     note: `Recepción de orden de compra — ${orden.proveedor}`,
                     createdAt: fecha,
                 });
@@ -546,6 +560,7 @@ async function sembrarOrdenesDeCompra(
                 productId: producto.id,
                 productName: producto.name,
                 quantity: i.qty,
+                receivedQuantity: recibida,
                 unitPrice: i.unitPrice ?? Number(producto.price),
             };
         });
@@ -583,12 +598,14 @@ async function sembrarCostes(porSku: Map<string, Product>): Promise<Map<string, 
     const acumulado = new Map<string, { unidades: number; valor: number }>();
 
     for (const orden of ordenesDeCompra) {
-        if (orden.status !== "RECEIVED") continue;
         for (const linea of orden.items) {
+            // T5-04 — solo lo que entró: una línea a medias promedia sus unidades recibidas.
+            const recibida = unidadesRecibidas(orden, linea);
+            if (recibida === 0) continue;
             const producto = exigirProducto(porSku, linea.sku);
             const coste = linea.unitPrice ?? Number(producto.price);
             const previo = acumulado.get(producto.id) ?? { unidades: 0, valor: 0 };
-            acumulado.set(producto.id, { unidades: previo.unidades + linea.qty, valor: previo.valor + linea.qty * coste });
+            acumulado.set(producto.id, { unidades: previo.unidades + recibida, valor: previo.valor + recibida * coste });
         }
     }
 

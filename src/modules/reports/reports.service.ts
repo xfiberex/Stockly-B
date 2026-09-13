@@ -1,5 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
+import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 
 // Forma del resumen que consumen tanto el JSON como el generador de PDF.
 export type ReportSummary = Awaited<ReturnType<typeof reportsService.getSummary>>;
@@ -319,11 +320,18 @@ export const reportsService = {
         const productsWithoutCost = Number(totalesDeInventario[0]?.productsWithoutCost ?? 0);
         const lowStockCount = Number(totalesDeInventario[0]?.lowStockCount ?? 0);
 
+        // T5-03 — los días hasta quedarse sin nada se cuentan sobre el **disponible**, no sobre
+        // el stock: lo comprometido en ventas pendientes ya tiene dueño, y contarlo como
+        // cobertura retrasaba el aviso de reponer justo en los productos que más se venden.
+        // Son veinte filas: una consulta agrupada, no veinte.
+        const comprometido = await comprometidoPorProducto(rotacion.map((m) => m.productId));
+
         // Calcular métricas de rotación y proyección
         const rotationMetrics = rotacion.map((m) => {
             const totalOut = Number(m.totalOut);
             const dailyVelocity = totalOut / 30;
-            const daysToStockout = dailyVelocity > 0 ? Math.floor(m.currentStock / dailyVelocity) : null;
+            const availableStock = Number(m.currentStock) - (comprometido.get(m.productId) ?? 0);
+            const daysToStockout = dailyVelocity > 0 ? Math.max(0, Math.floor(availableStock / dailyVelocity)) : null;
             const reorderSoon = daysToStockout !== null && daysToStockout <= 14;
 
             return {
@@ -331,6 +339,7 @@ export const reportsService = {
                 productName: m.productName,
                 sku: m.sku,
                 currentStock: Number(m.currentStock),
+                availableStock,
                 minStock: Number(m.minStock),
                 totalOutLast30Days: totalOut,
                 dailyVelocity: Math.round(dailyVelocity * 100) / 100,

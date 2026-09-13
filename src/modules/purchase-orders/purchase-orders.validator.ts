@@ -18,3 +18,20 @@ export const updatePurchaseOrderSchema = z.object({
     notes: z.string().trim().max(1000).optional(),
     status: z.enum(["PENDING", "RECEIVED", "CANCELLED"]).optional(),
 });
+
+/**
+ * T5-04 — `POST /purchase-orders/:id/receipts`. `status` en `PATCH` sigue sin admitir
+ * `PARTIALLY_RECEIVED`: a ese estado se llega recibiendo, no escribiéndolo.
+ */
+export const receivePurchaseOrderSchema = z.object({
+    items: z
+        .array(
+            z.object({
+                itemId: z.string().uuid(),
+                quantity: z.number().int().positive("La cantidad recibida debe ser mayor a 0"),
+            }),
+        )
+        .min(1, "Se requiere al menos una línea")
+        // Dos entradas para la misma línea sumarían en silencio y esquivarían el tope por línea.
+        .refine((items) => new Set(items.map((i) => i.itemId)).size === items.length, "Cada línea solo puede aparecer una vez"),
+});

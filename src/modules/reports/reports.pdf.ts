@@ -416,7 +416,8 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
                     { text: m.productName, sub: m.sku ?? undefined, color: INK },
                     { text: int(m.totalOutLast30Days), align: "right", color: MUTED },
                     { text: `${m.dailyVelocity.toFixed(2)}/día`, align: "right", color: MUTED },
-                    { text: int(m.currentStock), align: "right", color: INK },
+                    // T5-03 — el disponible, que es sobre lo que se cuentan los días restantes.
+                    { text: int(m.availableStock), align: "right", color: INK },
                     { text: dias, align: "right", color: urgent ? CRIT : BODY, bold: m.daysToStockout !== null && m.daysToStockout <= 14 },
                 ],
             };
@@ -427,7 +428,7 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
                 { header: "Producto", width: 190 },
                 { header: "Salidas 30d", width: 80, align: "right" },
                 { header: "Vel./día", width: 75, align: "right" },
-                { header: "Stock", width: 65, align: "right" },
+                { header: "Disponible", width: 65, align: "right" },
                 { header: "Días rest.", width: 105, align: "right" },
             ],
             rows,
