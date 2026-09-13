@@ -579,7 +579,7 @@ async function sembrarOrdenesDeCompra(
  * que las pantallas tienen que saber enseñar («desconocido», no cero). Tampoco se siembra
  * `cost_history`: esas filas describen recepciones concretas, y aquí no se ha recibido nada.
  */
-async function sembrarCostes(porSku: Map<string, Product>): Promise<number> {
+async function sembrarCostes(porSku: Map<string, Product>): Promise<Map<string, string>> {
     const acumulado = new Map<string, { unidades: number; valor: number }>();
 
     for (const orden of ordenesDeCompra) {
@@ -592,15 +592,24 @@ async function sembrarCostes(porSku: Map<string, Product>): Promise<number> {
         }
     }
 
+    const costes = new Map<string, string>();
     for (const [id, { unidades, valor }] of acumulado) {
-        await prisma.product.update({ where: { id }, data: { costPrice: (valor / unidades).toFixed(4) } });
+        const coste = (valor / unidades).toFixed(4);
+        costes.set(id, coste);
+        await prisma.product.update({ where: { id }, data: { costPrice: coste } });
     }
 
     console.log(`  - ${acumulado.size} productos con coste medio (el resto, sin coste conocido)`);
-    return acumulado.size;
+    // Se devuelve por id: los `Product` de `porSku` se leyeron antes de fijar el coste y lo
+    // tienen a null, y las ventas enviadas lo necesitan para congelarlo (T5-02).
+    return costes;
 }
 
-async function sembrarOrdenesDeVenta(porSku: Map<string, Product>, libro: LibroMayor): Promise<number> {
+async function sembrarOrdenesDeVenta(
+    porSku: Map<string, Product>,
+    costes: Map<string, string>,
+    libro: LibroMayor,
+): Promise<number> {
     let items = 0;
 
     for (const orden of ordenesDeVenta) {
@@ -623,6 +632,10 @@ async function sembrarOrdenesDeVenta(porSku: Map<string, Product>, libro: LibroM
                 // El precio de venta es el del catálogo: repetirlo aquí a mano solo crea
                 // una segunda copia que se separa de `data/products.ts` a la primera.
                 unitPrice: Number(producto.price),
+                // T5-02 — como en el envío real: el coste se congela solo en lo enviado.
+                // Es el coste de hoy y no el de la fecha de la orden, que el seed no conoce;
+                // para datos de demostración basta con que el margen salga de algo real.
+                unitCost: orden.status === "SHIPPED" ? (costes.get(producto.id) ?? null) : null,
             };
         });
 
@@ -634,6 +647,7 @@ async function sembrarOrdenesDeVenta(porSku: Map<string, Product>, libro: LibroM
                 customerPhone: orden.customerPhone,
                 notes: orden.notes,
                 createdAt: fecha,
+                shippedAt: orden.status === "SHIPPED" ? fecha : null,
                 items: { create: lineas },
             },
         });
@@ -769,8 +783,9 @@ async function main(): Promise<void> {
     // Las órdenes van antes que los movimientos: son las que los generan.
     const libro = new LibroMayor();
     await sembrarOrdenesDeCompra(porSku, proveedores, libro);
-    const conCoste = await sembrarCostes(porSku);
-    await sembrarOrdenesDeVenta(porSku, libro);
+    const costes = await sembrarCostes(porSku);
+    const conCoste = costes.size;
+    await sembrarOrdenesDeVenta(porSku, costes, libro);
     anotarMovimientosSueltos(libro, productos);
 
     const movimientos = libro.cerrar(productos);

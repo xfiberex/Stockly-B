@@ -19,6 +19,15 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Valor del inventario a coste y margen realizado** (`T5-02`). El dashboard y el informe dan
+  ahora tres cifras con su nombre —**valor a coste**, **valor a precio de venta** y **margen
+  potencial**— y avisan de cuántos productos con stock no tienen coste y quedan fuera. El
+  informe gana la sección **«Margen realizado — últimos 30 días»**, por categoría y con el top
+  10 de productos por margen, también en el PDF. Cada venta **congela al enviarse** el coste del
+  producto (`unitCost`) y guarda **cuándo se envió** (`shippedAt`, rellenado en las ya enviadas
+  con su última modificación), así que su margen no cambia aunque después cambie el coste. Lo
+  vendido sin coste conocido no se suma como coste cero: se informa aparte.
+
 - **Coste medio ponderado de los productos** (`T5-01`). Cada recepción de una orden de compra
   recalcula el coste del producto —`(stock × coste + cantidad × precio de compra) / (stock +
   cantidad)`— en la misma transacción que el stock, y deja una fila en el nuevo historial de

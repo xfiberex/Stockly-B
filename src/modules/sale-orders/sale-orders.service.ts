@@ -154,6 +154,13 @@ export const saleOrderService = {
                 }
 
                 const refreshed = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
+
+                // T5-02 — el coste se congela en el ítem **al enviar**, que es cuando la
+                // mercancía sale. Se lee de `refreshed` y no del `include` de arriba: esa
+                // lectura es anterior al `updateMany` que bloquea la fila, y entre las dos una
+                // recepción podría haber cambiado el coste medio.
+                await tx.saleOrderItem.update({ where: { id: item.id }, data: { unitCost: refreshed.costPrice } });
+
                 await tx.stockMovement.create({
                     data: {
                         productId: item.productId,
@@ -175,7 +182,7 @@ export const saleOrderService = {
 
             return tx.saleOrder.update({
                 where: { id },
-                data: { ...customerData, status: "SHIPPED" },
+                data: { ...customerData, status: "SHIPPED", shippedAt: new Date() },
                 include: ORDER_INCLUDE,
             });
         });

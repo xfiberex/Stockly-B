@@ -22,6 +22,8 @@ const money = (n: number) =>
     `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const moneyShort = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
 const int = (n: number) => n.toLocaleString("es-MX");
+/** T5-02 — sin ventas no hay porcentaje: se dice «—», no «0.0%». */
+const pct = (n: number | null) => (n === null ? "—" : `${n.toFixed(1)}%`);
 
 // Trunca a una sola línea que quepa en `maxWidth`. En pdfkit 0.18 `lineBreak:false`
 // no evita el ajuste de línea, así que recortamos a mano (usa la métrica de la
@@ -212,11 +214,30 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
             { label: "Total productos", value: int(summary.totals.totalProducts) },
             { label: "Productos activos", value: int(summary.totals.activeProducts) },
             { label: "Bajo stock", value: int(summary.totals.lowStockCount) },
-            { label: "Valor inventario", value: moneyShort(summary.totals.inventoryValue) },
+            // T5-02 — «a precio de venta», con su nombre: sin él se leía como lo invertido.
+            { label: "Valor a precio de venta", value: moneyShort(summary.totals.inventoryValue) },
         ],
         y,
     );
-    y += 20;
+    y += 10;
+    y = drawKpis(
+        doc,
+        [
+            { label: "Valor a coste", value: moneyShort(summary.totals.inventoryCostValue) },
+            { label: "Margen potencial", value: moneyShort(summary.totals.potentialMargin) },
+            { label: `Margen ${summary.margin.days} días`, value: moneyShort(summary.margin.margin) },
+            { label: "% margen realizado", value: pct(summary.margin.marginPercent) },
+        ],
+        y,
+    );
+    if (summary.totals.productsWithoutCost > 0) {
+        doc.font("Helvetica").fontSize(8).fillColor(MUTED).text(
+            `${int(summary.totals.productsWithoutCost)} productos con stock no tienen coste: no suman ni al valor a coste ni al margen potencial.`,
+            MARGIN, y, { width: CONTENT_W, lineBreak: false },
+        );
+        y += 12;
+    }
+    y += 10;
 
     // Stock por categoría
     if (summary.stockByCategory.length > 0) {
@@ -285,6 +306,66 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
             y,
             22,
         );
+        y += 22;
+    }
+
+    // T5-02 — margen realizado de las ventas enviadas en la ventana
+    const margen = summary.margin;
+    if (margen.byCategory.length > 0 || margen.revenueWithoutCost > 0) {
+        y = ensureSpace(doc, y, 110);
+        const sinCoste = margen.revenueWithoutCost > 0
+            ? `Fuera del cálculo, por no tener coste al enviarse: ${money(margen.revenueWithoutCost)} en ventas`
+            : "Solo ventas enviadas con coste conocido al enviarse";
+        y = sectionHeading(doc, `Margen realizado — últimos ${margen.days} días`, y, sinCoste);
+
+        const filaDeMargen = (nombre: Cell, m: { revenue: number; cost: number; margin: number; marginPercent: number | null }, total = false): Row => ({
+            topRule: total,
+            cells: [
+                nombre,
+                { text: money(m.revenue), align: "right", color: total ? INK : MUTED, bold: total },
+                { text: money(m.cost), align: "right", color: total ? INK : MUTED, bold: total },
+                { text: money(m.margin), align: "right", color: m.margin < 0 ? CRIT : INK, bold: true },
+                { text: pct(m.marginPercent), align: "right", color: m.margin < 0 ? CRIT : MUTED, bold: total },
+            ],
+        });
+
+        if (margen.byCategory.length > 0) {
+            const rows: Row[] = margen.byCategory.map((c) => filaDeMargen({ text: c.name ?? "Sin categoría", color: c.name ? INK : MUTED }, c));
+            rows.push(filaDeMargen({ text: "Total", bold: true, color: INK }, margen, true));
+            y = drawTable(
+                doc,
+                [
+                    { header: "Categoría", width: 175 },
+                    { header: "Ventas", width: 95, align: "right" },
+                    { header: "Coste", width: 95, align: "right" },
+                    { header: "Margen", width: 95, align: "right" },
+                    { header: "%", width: 55, align: "right" },
+                ],
+                rows,
+                y,
+                22,
+            );
+            y += 16;
+        }
+
+        if (margen.topProducts.length > 0) {
+            y = ensureSpace(doc, y, 90);
+            y = sectionHeading(doc, "Top 10 productos por margen", y);
+            const rows: Row[] = margen.topProducts.map((p) => filaDeMargen({ text: p.name, sub: `${int(p.units)} uds.`, color: INK }, p));
+            y = drawTable(
+                doc,
+                [
+                    { header: "Producto", width: 175 },
+                    { header: "Ventas", width: 95, align: "right" },
+                    { header: "Coste", width: 95, align: "right" },
+                    { header: "Margen", width: 95, align: "right" },
+                    { header: "%", width: 55, align: "right" },
+                ],
+                rows,
+                y,
+                30,
+            );
+        }
         y += 22;
     }
 

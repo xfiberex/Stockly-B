@@ -507,7 +507,14 @@ export const totalesReporteSchema = z.object({
     totalProducts: z.number(),
     activeProducts: z.number(),
     inactiveProducts: z.number(),
+    /** A precio de **venta**: incluye un beneficio que todavía no existe. */
     inventoryValue: z.number(),
+    /** T5-02 — a coste medio, sumando solo los productos que tienen coste. */
+    inventoryCostValue: z.number(),
+    /** Precio de venta menos coste, **sobre los productos con coste**; no sobre todos. */
+    potentialMargin: z.number(),
+    /** Activos con stock y sin coste: quedan fuera de las dos cifras anteriores. */
+    productsWithoutCost: z.number(),
     lowStockCount: z.number(),
 });
 
@@ -553,6 +560,40 @@ export const metricaStockSchema = z.object({
     reorderSoon: z.boolean(),
 });
 
+/**
+ * T5-02 — lo común a cada fila del margen realizado. `marginPercent` es sobre ventas, con un
+ * decimal, y `null` cuando no hay ventas: un 0 % diría que se vendió sin ganar nada.
+ */
+const camposDeMargen = {
+    revenue: z.number(),
+    cost: z.number(),
+    margin: z.number(),
+    marginPercent: z.number().nullable(),
+};
+
+/** `name` es `null` para lo vendido sin categoría: la etiqueta la pone la interfaz, en su idioma. */
+export const margenPorCategoriaSchema = z.object({ name: z.string().nullable(), ...camposDeMargen });
+
+export const margenPorProductoSchema = z.object({
+    /** `null` si el producto se borró después; el nombre es el congelado en la venta. */
+    productId: z.string().nullable(),
+    name: z.string(),
+    units: z.number(),
+    ...camposDeMargen,
+});
+
+/**
+ * Margen de las ventas **enviadas** en los últimos `days` días. Solo cuentan los ítems con
+ * coste congelado al enviar; lo vendido sin él va en `revenueWithoutCost` y no entra.
+ */
+export const margenRealizadoSchema = z.object({
+    days: z.number(),
+    ...camposDeMargen,
+    revenueWithoutCost: z.number(),
+    byCategory: z.array(margenPorCategoriaSchema),
+    topProducts: z.array(margenPorProductoSchema),
+});
+
 export const resumenReporteSchema = z.object({
     totals: totalesReporteSchema,
     stockByCategory: z.array(stockPorCategoriaSchema),
@@ -560,6 +601,7 @@ export const resumenReporteSchema = z.object({
     movementsByMonth: z.array(movimientoPorMesSchema),
     lowStockProducts: z.array(productoBajoStockSchema),
     stockMetrics: z.array(metricaStockSchema),
+    margin: margenRealizadoSchema,
 });
 
 // ─────────────────────── Tipos inferidos ───────────────────────
@@ -615,6 +657,9 @@ export type MovimientoPorMes = z.infer<typeof movimientoPorMesSchema>;
 export type ProductoBajoStock = z.infer<typeof productoBajoStockSchema>;
 export type MetricaStock = z.infer<typeof metricaStockSchema>;
 export type ResumenReporte = z.infer<typeof resumenReporteSchema>;
+export type MargenRealizado = z.infer<typeof margenRealizadoSchema>;
+export type MargenPorCategoria = z.infer<typeof margenPorCategoriaSchema>;
+export type MargenPorProducto = z.infer<typeof margenPorProductoSchema>;
 
 /** Un listado paginado ya envuelto: `{ data: T[], meta }`. */
 export interface Paginado<T> {

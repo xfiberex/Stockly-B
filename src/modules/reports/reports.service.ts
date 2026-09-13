@@ -65,8 +65,99 @@ const rotacionExacta = Prisma.sql`
     LIMIT 20
 `;
 
+/**
+ * T5-02 — la ventana del margen realizado. La misma que la rotación, para que las dos tablas
+ * del informe hablen del mismo mes; los rangos de fechas a elección son T5-09.
+ */
+export const DIAS_DE_MARGEN = 30;
+
+/**
+ * Ventas enviadas dentro de la ventana, que es de lo único que sale un margen realizado. Van
+ * separados el origen y el filtro porque el desglose por categoría necesita meter sus
+ * `JOIN` entre los dos.
+ */
+const ITEMS_VENDIDOS = Prisma.sql`
+    FROM sale_orders so
+    JOIN sale_order_items soi ON soi."saleOrderId" = so.id
+`;
+const EN_LA_VENTANA = Prisma.sql`
+    so.status = 'SHIPPED'
+    AND so."shippedAt" >= NOW() - make_interval(days => ${DIAS_DE_MARGEN})
+`;
+
+type FilaDeMargen = { revenue: number; cost: number };
+
+/** Margen y porcentaje sobre ventas; sin ventas no hay porcentaje, no un 0 %. */
+function conMargen<T extends FilaDeMargen>(fila: T) {
+    const revenue = Number(fila.revenue);
+    const cost = Number(fila.cost);
+    const margin = revenue - cost;
+    return { ...fila, revenue, cost, margin, marginPercent: revenue > 0 ? Math.round((margin / revenue) * 1000) / 10 : null };
+}
+
+/**
+ * T5-02 — margen realizado de las ventas enviadas en la ventana. Tres consultas en paralelo;
+ * comparten el filtro y ninguna depende de otra.
+ *
+ * Solo cuentan los ítems con `unitCost`. Los que no lo tienen —producto sin coste, ítem
+ * escrito a mano o venta anterior a T5-02— no se suman como coste cero, que daría un margen
+ * del 100 %: se informa de cuánto se vendió así, para que se sepa qué parte de las ventas
+ * queda fuera del cálculo.
+ */
+function consultarMargen() {
+    return Promise.all([
+        prisma.$queryRaw<Array<FilaDeMargen & { revenueWithoutCost: number }>>`
+            SELECT
+                COALESCE(SUM(soi.quantity * soi."unitPrice") FILTER (WHERE soi."unitCost" IS NOT NULL), 0)::float8 AS revenue,
+                COALESCE(SUM(soi.quantity * soi."unitCost"), 0)::float8 AS cost,
+                COALESCE(SUM(soi.quantity * soi."unitPrice") FILTER (WHERE soi."unitCost" IS NULL), 0)::float8 AS "revenueWithoutCost"
+            ${ITEMS_VENDIDOS}
+            WHERE ${EN_LA_VENTANA}
+        `,
+        // Por la categoría **actual** del producto: el ítem no la congela. Un producto
+        // borrado o sin categoría sale con `name` a NULL, y **no** con el «Sin categoría»
+        // que pone el desglose de stock: ese literal llega en español a una interfaz en
+        // inglés. La etiqueta la pone quien pinta, en su idioma.
+        prisma.$queryRaw<Array<FilaDeMargen & { name: string | null }>>`
+            SELECT
+                c.name AS name,
+                SUM(soi.quantity * soi."unitPrice")::float8 AS revenue,
+                SUM(soi.quantity * soi."unitCost")::float8 AS cost
+            ${ITEMS_VENDIDOS}
+            LEFT JOIN products p ON p.id = soi."productId"
+            LEFT JOIN categories c ON c.id = p."categoryId"
+            WHERE ${EN_LA_VENTANA} AND soi."unitCost" IS NOT NULL
+            GROUP BY 1
+            ORDER BY SUM(soi.quantity * (soi."unitPrice" - soi."unitCost")) DESC, 1 NULLS LAST
+        `,
+        // Top 10 por margen en importe, no en porcentaje: un 90 % sobre una venta de $5
+        // no es lo que se quiere ver arriba. El nombre es el congelado en el ítem, así
+        // que un producto borrado sigue saliendo con el suyo.
+        prisma.$queryRaw<Array<FilaDeMargen & { productId: string | null; name: string; units: bigint }>>`
+            SELECT
+                soi."productId",
+                MAX(soi."productName") AS name,
+                SUM(soi.quantity)::bigint AS units,
+                SUM(soi.quantity * soi."unitPrice")::float8 AS revenue,
+                SUM(soi.quantity * soi."unitCost")::float8 AS cost
+            ${ITEMS_VENDIDOS}
+            WHERE ${EN_LA_VENTANA} AND soi."unitCost" IS NOT NULL
+            GROUP BY soi."productId"
+            ORDER BY SUM(soi.quantity * (soi."unitPrice" - soi."unitCost")) DESC, soi."productId"
+            LIMIT 10
+        `,
+    ]);
+}
+
 export const reportsService = {
     async getSummary() {
+        // T5-02 — el margen arranca a la vez que el resto y se recoge más abajo: esperarlo
+        // después sumaría sus ~190 ms a la primera pantalla tras el login (medido sobre el
+        // conjunto de carga). El `catch` vacío no lo silencia —el `await` de abajo sigue
+        // fallando—; solo evita un rechazo sin manejar si antes falla el otro bloque.
+        const margenEnCurso = consultarMargen();
+        margenEnCurso.catch(() => undefined);
+
         const [
             totalProducts,
             activeProducts,
@@ -90,9 +181,24 @@ export const reportsService = {
             // `COUNT(*) FILTER (WHERE …)` recorre la tabla una sola vez para las dos
             // cosas, y `SUM` sobre `numeric` suma en decimal exacto en vez de acumular
             // errores de coma flotante producto a producto.
-            prisma.$queryRaw<Array<{ inventoryValue: number; lowStockCount: bigint }>>`
+            //
+            // T5-02 — y el valor **a coste**, en la misma pasada. El valor a precio de venta
+            // incluye un beneficio que todavía no existe; el de coste es lo que hay invertido.
+            // Los productos sin coste no suman cero: se cuentan aparte, y el margen potencial
+            // se calcula solo sobre los que tienen coste —restar el coste de unos al precio
+            // de todos daría un margen inflado por los que no se saben—.
+            prisma.$queryRaw<Array<{
+                inventoryValue: number;
+                inventoryCostValue: number;
+                costedSaleValue: number;
+                productsWithoutCost: bigint;
+                lowStockCount: bigint;
+            }>>`
                 SELECT
                     COALESCE(SUM(price * stock), 0)::float8 AS "inventoryValue",
+                    COALESCE(SUM("costPrice" * stock) FILTER (WHERE "costPrice" IS NOT NULL), 0)::float8 AS "inventoryCostValue",
+                    COALESCE(SUM(price * stock) FILTER (WHERE "costPrice" IS NOT NULL), 0)::float8 AS "costedSaleValue",
+                    COUNT(*) FILTER (WHERE "costPrice" IS NULL AND stock > 0) AS "productsWithoutCost",
                     COUNT(*) FILTER (WHERE stock <= "minStock") AS "lowStockCount"
                 FROM products
                 WHERE "isActive" = true
@@ -195,6 +301,8 @@ export const reportsService = {
             prisma.$queryRaw<FilaDeRotacion[]>(rotacionRapida),
         ]);
 
+        const [margenTotal, margenPorCategoria, margenPorProducto] = await margenEnCurso;
+
         // Si el margen no bastó, se repite sin él. Es el caso raro —haría falta que casi
         // todos los primeros por rotación estuvieran inactivos— y cuesta 56 ms; lo que no
         // puede pasar es que el dashboard enseñe catorce filas donde hay veinte.
@@ -206,6 +314,9 @@ export const reportsService = {
         // Un `GROUP BY` sin filas no devuelve ninguna, así que la fila de totales sí
         // existe siempre (es un agregado sin agrupación) pero conviene no darla por hecha.
         const inventoryValue = Number(totalesDeInventario[0]?.inventoryValue ?? 0);
+        const inventoryCostValue = Number(totalesDeInventario[0]?.inventoryCostValue ?? 0);
+        const costedSaleValue = Number(totalesDeInventario[0]?.costedSaleValue ?? 0);
+        const productsWithoutCost = Number(totalesDeInventario[0]?.productsWithoutCost ?? 0);
         const lowStockCount = Number(totalesDeInventario[0]?.lowStockCount ?? 0);
 
         // Calcular métricas de rotación y proyección
@@ -234,6 +345,9 @@ export const reportsService = {
                 activeProducts,
                 inactiveProducts: totalProducts - activeProducts,
                 inventoryValue,
+                inventoryCostValue,
+                potentialMargin: costedSaleValue - inventoryCostValue,
+                productsWithoutCost,
                 lowStockCount,
             },
             stockByCategory: porCategoria.map((c) => ({
@@ -263,6 +377,18 @@ export const reportsService = {
                 category: p.categoryName ?? null,
             })),
             stockMetrics: rotationMetrics,
+            margin: {
+                days: DIAS_DE_MARGEN,
+                ...conMargen({
+                    revenue: margenTotal[0]?.revenue ?? 0,
+                    cost: margenTotal[0]?.cost ?? 0,
+                }),
+                revenueWithoutCost: Number(margenTotal[0]?.revenueWithoutCost ?? 0),
+                byCategory: margenPorCategoria.map((c) => conMargen({ name: c.name, revenue: c.revenue, cost: c.cost })),
+                topProducts: margenPorProducto.map((p) =>
+                    conMargen({ productId: p.productId, name: p.name, units: Number(p.units), revenue: p.revenue, cost: p.cost }),
+                ),
+            },
         };
     },
 };

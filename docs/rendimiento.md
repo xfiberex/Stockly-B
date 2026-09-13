@@ -292,6 +292,41 @@ producto cuyo SKU es exactamente ese — se descubrió porque la prueba de carga
 su producto. El buscador de usuarios sí mira dos campos (nombre y correo). No se toca aquí:
 no es rendimiento, y cambiar lo que busca una pantalla es una decisión de producto.
 
+## 7 bis. T5-02 — el valor a coste y el margen, sobre el conjunto de carga
+
+El criterio de T5-02 pedía que las consultas nuevas no ordenaran en disco con este conjunto,
+y **el conjunto no tenía ventas**: `load/sembrar.js` genera productos, movimientos y
+auditoría, pero ni una orden de venta. Para medir se sembraron a mano en `Stockly_carga`,
+con un guion que no se ha versionado —ver la salvedad del final—:
+
+- **coste** en el 90 % de los productos, entre el 50 y el 80 % de su precio;
+- **330 000 órdenes** repartidas en un año —300 000 enviadas, 20 000 pendientes, 10 000
+  canceladas— con **660 000 ítems**, el 85 % de lo enviado con coste congelado. Quedan
+  **24 580 envíos en la ventana de 30 días** y **99 860 productos distintos** vendidos.
+
+| Consulta | Mejor de 5 | Plan | ¿A disco? |
+|---|---:|---|---|
+| Totales de inventario (con valor a coste) | **47.9 ms** | `Parallel Seq Scan` + agregado parcial, una pasada | no |
+| Margen total de la ventana | **74.3 ms** | `Bitmap Index Scan` sobre `sale_orders_status_shippedAt_idx` + `Parallel Hash Join` | no |
+| Margen por categoría | **149.6 ms** | `HashAggregate` de 20 grupos, `quicksort` en 29 kB | no |
+| Top 10 productos por margen | **187.3 ms** | agrupa 30 863 productos; `top-N heapsort` en 27 kB, `quicksort` de 2 MB por worker | no |
+
+**Un error propio de la siembra, que se vio en el plan y no en el resultado:** la primera
+pasada devolvía **una sola fila** en el top y en el desglose por categoría. El `random()`
+estaba dentro de la condición del `JOIN` que asignaba producto a cada ítem, y el
+planificador lo evaluó una vez: las 660 000 líneas apuntaban al mismo producto, y las
+consultas salían rapidísimas por agrupar un solo grupo. Sorteando el producto en una
+subconsulta materializada antes del `JOIN`, los números son los de la tabla.
+
+**Las tres consultas de margen corren en paralelo con el resto del resumen**, no después. La
+primera versión las esperaba al final, y eso sumaba sus ~190 ms a la primera pantalla tras el
+login; ahora arrancan a la vez que las demás. **No se ha repetido `pnpm carga:ejecutar`**, así
+que el p(95) de 337 ms del §6 no está medido de nuevo con estas consultas.
+
+**Salvedad:** mientras `load/sembrar.js` no genere ventas, rehacer `Stockly_carga` las borra y
+estas cuatro filas no se pueden repetir con el guion versionado. Traerlo al generador es trabajo
+pendiente, anotado en la ficha de T5-02.
+
 ---
 
 ## 8. Repetir las mediciones

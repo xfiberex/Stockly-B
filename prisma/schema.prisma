@@ -332,11 +332,17 @@ model SaleOrder {
   customerEmail String?
   customerPhone String?
   notes         String?
+  // T5-02 — cuándo salió la mercancía. `updatedAt` no sirve para esto: cambia con cualquier
+  // edición de la orden, y el margen de un periodo se cuenta por la fecha de envío. Se
+  // conserva si después se cancela: el estado ya dice que no cuenta.
+  shippedAt     DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   items         SaleOrderItem[]
 
   @@index([status, createdAt])
+  // El informe de margen filtra por estado y por fecha de envío, en ese orden.
+  @@index([status, shippedAt])
   @@map("sale_orders")
 }
 
@@ -349,6 +355,11 @@ model SaleOrderItem {
   productName String
   quantity    Int
   unitPrice   Decimal   @db.Decimal(10, 2)
+  // T5-02 — el coste medio del producto **en el momento del envío**, congelado igual que
+  // `productName` congela el nombre. Calcular el margen de una venta pasada con el coste
+  // actual da un número, y está mal. `null` si el producto no tenía coste, si el ítem no
+  // está ligado a uno o si la venta se envió antes de que existiera este campo.
+  unitCost    Decimal?  @db.Decimal(12, 4)
   createdAt   DateTime  @default(now())
 
   @@index([saleOrderId])
