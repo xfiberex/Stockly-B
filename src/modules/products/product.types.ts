@@ -3,6 +3,7 @@ export interface CreateProductDto {
     description?: string;
     sku?: string;
     price: number;
+    costPrice?: number;
     stock?: number;
     minStock?: number;
     categoryId?: string;
@@ -16,6 +17,8 @@ export interface UpdateProductDto {
     description?: string;
     sku?: string;
     price?: number;
+    /** `null` quita el coste: vuelve a ser desconocido (T5-01). */
+    costPrice?: number | null;
     stock?: number;
     minStock?: number;
     categoryId?: string;
@@ -46,6 +49,12 @@ export interface MovementsQuery {
     type?: string;
     dateFrom?: string;
     dateTo?: string;
+}
+
+/** T5-01 — el histórico de costes se pagina igual que el de movimientos. */
+export interface CostHistoryQuery {
+    page?: string;
+    limit?: string;
 }
 
 export interface ImportProductDto {

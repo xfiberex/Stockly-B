@@ -79,6 +79,7 @@ describe("Esquemas derivados del spec (T4-02)", () => {
                 description: "Descripción",
                 sku: "SKU-1",
                 price: 10,
+                costPrice: 6.5,
                 stock: 1,
                 minStock: 0,
                 categoryId: "11111111-1111-4111-8111-111111111111",

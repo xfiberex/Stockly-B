@@ -22,6 +22,7 @@ productRouter.get("/:id", productController.getProductById);
 productRouter.get("/:id/movements", productController.getProductMovements);
 productRouter.get("/:id/movements/export", productController.exportProductMovements);
 productRouter.get("/:id/price-history", productController.getPriceHistory);
+productRouter.get("/:id/cost-history", productController.getCostHistory);
 
 // Escritura — solo ADMIN
 productRouter.post("/import", requireRole("ADMIN"), validate(importProductsSchema), productController.importProducts);

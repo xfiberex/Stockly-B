@@ -233,6 +233,18 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
     },
 
+    "/products/{id}/cost-history": {
+        get: {
+            tags: ["Products"], summary: "Historial de cambios de coste medio (T5-01)",
+            description: "Del más reciente al más antiguo. Cada recepción de compra que cambia el coste medio deja una fila, igual que cada edición manual.",
+            parameters: [PARAM_ID, ...PARAMS_PAGINA],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/CostHistoryPage" }, "Página del historial"),
+                "404": ERROR("Producto no encontrado"),
+            },
+        },
+    },
+
     // ── Órdenes de compra ────────────────────────────────────────────────────
     "/purchase-orders": {
         get: {

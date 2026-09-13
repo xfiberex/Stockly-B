@@ -9,6 +9,7 @@ export async function cleanDb() {
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.priceHistory.deleteMany();
+    await prisma.costHistory.deleteMany();
     await prisma.stockMovement.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tag.deleteMany();

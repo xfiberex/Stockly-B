@@ -45,6 +45,8 @@ export const idiomaSchema = z.enum(["ES", "EN"]);
 export const estadoOrdenCompraSchema = z.enum(["PENDING", "RECEIVED", "CANCELLED"]);
 export const estadoOrdenVentaSchema = z.enum(["PENDING", "SHIPPED", "CANCELLED"]);
 export const tipoMovimientoSchema = z.enum(["IN", "OUT", "ADJUSTMENT", "IMPORT"]);
+/** T5-01 — de dónde sale un cambio de coste: una recepción de compra o una edición a mano. */
+export const origenCosteSchema = z.enum(["PURCHASE_RECEIPT", "MANUAL"]);
 
 export const accionAuditoriaSchema = z.enum([
     "CREATE", "UPDATE", "DELETE", "RESTORE", "STOCK_MOVEMENT", "BULK_STOCK",
@@ -266,6 +268,12 @@ export const productoSchema = z.object({
     description: z.string().nullable(),
     sku: z.string().nullable(),
     price: importeSchema,
+    /**
+     * T5-01 — coste medio ponderado, con cuatro decimales. **`null` es desconocido, no
+     * cero**: un producto que nunca se ha comprado no vale nada a coste, simplemente no se
+     * sabe. Quien sume valores a coste tiene que decidir qué hace con él, no tratarlo como 0.
+     */
+    costPrice: importeSchema.nullable(),
     stock: z.number(),
     minStock: z.number(),
     imageUrl: z.string().nullable(),
@@ -298,6 +306,30 @@ export const historialPrecioSchema = z.object({
     oldPrice: importeSchema,
     newPrice: importeSchema,
     createdAt: fechaSchema,
+});
+
+/**
+ * T5-01 — un cambio del coste medio. `oldCost` es `null` en la primera recepción de un
+ * producto sin coste; `newCost` lo es cuando un ADMIN borra el coste a mano.
+ * `purchaseOrderId` solo lo llevan los que salen de una recepción.
+ */
+export const historialCosteSchema = z.object({
+    id: z.string(),
+    productId: z.string(),
+    oldCost: importeSchema.nullable(),
+    newCost: importeSchema.nullable(),
+    source: origenCosteSchema,
+    purchaseOrderId: z.string().nullable(),
+    createdAt: fechaSchema,
+});
+
+/**
+ * `GET /products/:id/cost-history` (T5-01): paginado y del más reciente al más antiguo.
+ * Sin el producto, a diferencia de los movimientos: la pantalla que lo pide ya lo tiene.
+ */
+export const historialCosteDeProductoSchema = z.object({
+    history: z.array(historialCosteSchema),
+    meta: metaPaginacionSchema,
 });
 
 /**
@@ -539,6 +571,7 @@ export type IdiomaDeCorreo = z.infer<typeof idiomaSchema>;
 export type EstadoOrdenCompra = z.infer<typeof estadoOrdenCompraSchema>;
 export type EstadoOrdenVenta = z.infer<typeof estadoOrdenVentaSchema>;
 export type TipoMovimiento = z.infer<typeof tipoMovimientoSchema>;
+export type OrigenCoste = z.infer<typeof origenCosteSchema>;
 export type AccionAuditoria = z.infer<typeof accionAuditoriaSchema>;
 export type EntidadAuditoria = z.infer<typeof entidadAuditoriaSchema>;
 
@@ -558,6 +591,8 @@ export type Producto = z.infer<typeof productoSchema>;
 export type MovimientoStock = z.infer<typeof movimientoStockSchema>;
 export type MovimientosDeProducto = z.infer<typeof movimientosDeProductoSchema>;
 export type HistorialPrecio = z.infer<typeof historialPrecioSchema>;
+export type HistorialCoste = z.infer<typeof historialCosteSchema>;
+export type HistorialCosteDeProducto = z.infer<typeof historialCosteDeProductoSchema>;
 export type ProductoExportado = z.infer<typeof productoExportadoSchema>;
 export type ResultadoImportacion = z.infer<typeof resultadoImportacionSchema>;
 

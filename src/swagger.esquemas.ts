@@ -50,6 +50,8 @@ const RESPUESTAS = {
     StockMovement: contrato.movimientoStockSchema,
     MovimientosDeProducto: contrato.movimientosDeProductoSchema,
     PriceHistory: contrato.historialPrecioSchema,
+    CostHistory: contrato.historialCosteSchema,
+    CostHistoryPage: contrato.historialCosteDeProductoSchema,
     Category: contrato.categoriaSchema,
     Supplier: contrato.proveedorSchema,
     SaleOrder: contrato.ordenVentaSchema,

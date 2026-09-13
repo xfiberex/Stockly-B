@@ -57,6 +57,7 @@ async function limpiar(): Promise<void> {
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.priceHistory.deleteMany();
+    await prisma.costHistory.deleteMany();
     await prisma.stockMovement.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.product.deleteMany();
@@ -565,6 +566,40 @@ async function sembrarOrdenesDeCompra(
     return items;
 }
 
+/**
+ * T5-01 — el coste medio de cada producto, **a partir de sus compras recibidas**.
+ *
+ * Se promedian las líneas recibidas ponderadas por cantidad, que es exactamente lo que
+ * habría calculado la recepción real si cada producto hubiera partido de stock cero. No lo
+ * reproduce paso a paso —el catálogo del seed nace con su stock final y el libro mayor
+ * reparte las entradas hacia atrás—, y para datos de demostración no hace falta: lo que
+ * importa es que el coste salga de las compras y no de un número inventado.
+ *
+ * Los productos **sin ninguna compra recibida se quedan sin coste**, a propósito: es el caso
+ * que las pantallas tienen que saber enseñar («desconocido», no cero). Tampoco se siembra
+ * `cost_history`: esas filas describen recepciones concretas, y aquí no se ha recibido nada.
+ */
+async function sembrarCostes(porSku: Map<string, Product>): Promise<number> {
+    const acumulado = new Map<string, { unidades: number; valor: number }>();
+
+    for (const orden of ordenesDeCompra) {
+        if (orden.status !== "RECEIVED") continue;
+        for (const linea of orden.items) {
+            const producto = exigirProducto(porSku, linea.sku);
+            const coste = linea.unitPrice ?? Number(producto.price);
+            const previo = acumulado.get(producto.id) ?? { unidades: 0, valor: 0 };
+            acumulado.set(producto.id, { unidades: previo.unidades + linea.qty, valor: previo.valor + linea.qty * coste });
+        }
+    }
+
+    for (const [id, { unidades, valor }] of acumulado) {
+        await prisma.product.update({ where: { id }, data: { costPrice: (valor / unidades).toFixed(4) } });
+    }
+
+    console.log(`  - ${acumulado.size} productos con coste medio (el resto, sin coste conocido)`);
+    return acumulado.size;
+}
+
 async function sembrarOrdenesDeVenta(porSku: Map<string, Product>, libro: LibroMayor): Promise<number> {
     let items = 0;
 
@@ -734,6 +769,7 @@ async function main(): Promise<void> {
     // Las órdenes van antes que los movimientos: son las que los generan.
     const libro = new LibroMayor();
     await sembrarOrdenesDeCompra(porSku, proveedores, libro);
+    const conCoste = await sembrarCostes(porSku);
     await sembrarOrdenesDeVenta(porSku, libro);
     anotarMovimientosSueltos(libro, productos);
 
@@ -761,6 +797,7 @@ async function main(): Promise<void> {
     Etiquetas           ${etiquetas.size}
     Productos           ${productos.length}  (${bajos.length} bajo minimo, 2 descontinuados)
     Ordenes de compra   ${ordenesDeCompra.length}
+    Con coste medio     ${conCoste}  (el resto, sin coste conocido)
     Ordenes de venta    ${ordenesDeVenta.length}
     Movimientos         ${movimientos.length}
 

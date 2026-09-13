@@ -46,6 +46,7 @@ describe("Contrato de la API (T4-01)", () => {
             ["PurchaseOrderStatus", contrato.estadoOrdenCompraSchema.options, $Enums.PurchaseOrderStatus],
             ["SaleOrderStatus", contrato.estadoOrdenVentaSchema.options, $Enums.SaleOrderStatus],
             ["StockMovementType", contrato.tipoMovimientoSchema.options, $Enums.StockMovementType],
+            ["CostSource", contrato.origenCosteSchema.options, $Enums.CostSource],
             ["AuditAction", contrato.accionAuditoriaSchema.options, $Enums.AuditAction],
             ["AuditEntity", contrato.entidadAuditoriaSchema.options, $Enums.AuditEntity],
         ];
@@ -232,6 +233,22 @@ describe("Contrato de la API (T4-01)", () => {
 
             expect(res.status).toBe(200);
             conforme(contrato.historialPrecioSchema.array(), res.body.data.history, "price-history.history");
+        });
+
+        it("GET /products/:id/cost-history — paginado, con una fila de recepción", async () => {
+            // Una fila real, no una lista vacía: con `[]` la forma de cada elemento no se
+            // comprueba y el test pasaría con cualquier esquema.
+            await prisma.costHistory.create({
+                data: { productId: productoId, oldCost: null, newCost: "12.5", source: "MANUAL" },
+            });
+
+            const res = await request(app)
+                .get(`/api/v1/products/${productoId}/cost-history`)
+                .set("Cookie", cookieAdmin);
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.history.length).toBeGreaterThan(0);
+            conforme(contrato.historialCosteDeProductoSchema, res.body.data, "cost-history");
         });
 
         it("GET /products/export — la fila de exportación", async () => {

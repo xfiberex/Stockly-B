@@ -5,9 +5,16 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-08-12 — **114 / 114**
+> ## Estado al 2026-09-13 — **115 / 129**
 >
-> **No queda ninguna tarea abierta.** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48), Tier 3 (15/15)
+> **Se abre el [Tier 5](#tier-5--funcionalidad-de-negocio), con 15 tareas, y se cierra la primera: T5-01**, coste
+> medio ponderado, con la cancelación de compras recibidas llevada a la interfaz. No
+> corrige nada de la auditoría: es funcionalidad de negocio nueva —costes y margen, stock
+> comprometido, recepción parcial, reposición, clientes, conteos, informes por periodo, avisos y un
+> rol de almacén—, más dos tareas condicionadas a que el negocio las pida. Lo que sigue en este
+> bloque describe el cierre del 2026-08-12 y sigue siendo cierto para los Tiers 0 a 4.
+>
+> **Tiers 0 a 4: no queda ninguna tarea abierta.** Tier 0 (8/8), Tier 1 (26/26), Tier 2 (48/48), Tier 3 (15/15)
 > y **Tier 4 (17/17)**, el que la auditoría había dejado fuera del alcance inmediato.
 >
 > **Cerradas no quiere decir todas hechas.** Una de las 114 está **descartada**: **T4-17**, el
@@ -47,9 +54,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 | **Tier 2** | Mejoras sustanciales — rendimiento, accesibilidad, sistema de diseño, cobertura, infra, documentación | 48 | 35 / 13 / 0 |
 | **Tier 3** | Pulido y mantenimiento | 15 | 15 / 0 / 0 |
 | **Tier 4** | Futuro / opcional — lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 | 2 / 10 / 5 |
-| | **Total** | **114** | **80 / 29 / 5** |
+| **Tier 5** | Funcionalidad de negocio — costes y margen, stock comprometido, compras, clientes, almacén, informes, avisos y roles | 15 | 1 / 10 / 4 |
+| | **Total** | **129** | **81 / 39 / 9** |
 
 *Catorce tareas no vienen de la auditoría, y por eso el total pasa de 100 a 114: `T2-42`–`T2-45` se añadieron el 2026-08-08 (tres del cierre del Tier 1 y una encontrada al verificar T2-42), `T2-46`–`T2-48` el 2026-08-09, de un repaso de la aplicación en marcha, `T4-11` el 2026-08-10, de una limitación que el propio cierre de T4-03 dejó anotada, `T4-12` el 2026-08-11, de otra que dejó anotada el de T4-04, `T4-13` ese mismo día, de una discrepancia que destapó el ensayo de restauración de T4-05, y `T4-14`–`T4-17` el 2026-08-11, de lo que destaparon T4-07 (el árbol de producción que infla la CLI de Prisma), T4-08 (el histórico sin paginar y el `work_mem`) y T4-09 (el lector de pantalla que no se pudo ejecutar).*
+
+*Las quince del **Tier 5** (`T5-01`–`T5-15`, 2026-09-13) tampoco vienen de la auditoría, y de otra manera: no las abrió ningún cierre, sino un repaso del dominio con el trabajo anterior terminado. Son funcionalidad nueva, no remediación, y por eso **no tienen hallazgo** en la tabla de trazabilidad.*
 
 *Que **catorce tareas las abriera un cierre anterior** no fue un desbordamiento del alcance: es lo que pasa cuando una tarea se cierra midiendo en vez de mirando. `T4-15` y `T4-16` —las dos últimas en cerrarse— no se habrían visto sin ejecutar la prueba de carga de T4-08, y la mitad del valor de aquella tarea está justamente ahí.*
 
@@ -1616,7 +1626,195 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ---
 
+## Tier 5 — Funcionalidad de negocio
+
+*Abierto el 2026-09-13. **No viene de la auditoría ni de un cierre anterior**: sale de un repaso del dominio con los cuatro tiers de trabajo cerrados. La infraestructura, la accesibilidad y el rendimiento están medidos; lo que queda son **huecos del negocio de inventario**, y dos de ellos —T5-01 y T5-03— hacen que hoy la aplicación enseñe cifras engañosas sin que nada falle.*
+
+*Las fichas se escribieron leyendo el código el 2026-09-13, no ejecutándolo. Vale la advertencia de siempre: **medir antes de arreglar**. Donde una ficha dice «Decisión previa», la tarea no empieza hasta que esa decisión esté tomada y anotada en la propia ficha, porque es de producto y no técnica.*
+
+**Reglas comunes a todo el tier** — no se repiten en cada ficha, pero cada una las cumple para cerrarse:
+
+- **Migración solo hacia adelante** ([operaciones.md §6](operaciones.md)): columnas nuevas anulables o con valor por defecto, para que los datos que ya existen sigan siendo válidos sin inventar valores.
+- **Contrato regenerado** (T4-01) y **spec derivado** (T4-02): una respuesta nueva se declara en `src/contratos/api.ts`, no a mano en el frontend.
+- **Textos en español e inglés** (T4-04) —`literales.test.ts` no deja pasar otra cosa— y **errores con código estable**, nunca solo con `message`.
+- **Auditoría:** una acción que cambia stock, costes o permisos añade su valor a `AuditAction` y deja rastro.
+- **Estado con icono, no solo con color** (T2-38), en las dos paletas (T4-03).
+- **Todo lo que mueve stock ocurre en una transacción** y con decremento condicional, como T0-03 y T0-04. Un flujo nuevo que toca inventario lleva **escenario E2E**.
+- `pnpm verify` en verde en los dos repositorios, con los tests nuevos **falsificados**: se rompe a propósito lo que protegen y se comprueba que caen.
+
+### Costes y margen
+
+- [x] **[T5-01] Coste del producto y coste medio ponderado** ✅ *(2026-09-13)*
+  - **Área:** Negocio
+  - **Ubicación:** `prisma/schema.prisma` (`Product`), `src/modules/purchase-orders/purchase-orders.service.ts` (rama de recepción), `src/modules/products/`, `Stockly-F/src/modules/products/`
+  - **Qué hacer:** `Product` solo tiene `price`, el precio de **venta**. Lo que costó cada unidad sí se guarda —`PurchaseOrderItem.unitPrice`— pero nada lo lee después de crear la orden. Añadir `costPrice Decimal? @db.Decimal(10, 2)` y recalcularlo **dentro de la transacción de recepción** como coste medio ponderado: `(stock × coste actual + cantidad × unitPrice) / (stock + cantidad)`. Editable a mano por ADMIN para el inventario inicial, con su propio histórico (el mismo patrón que `PriceHistory`).
+  - **Decisión previa:** qué pasa con el coste al **cancelar una orden ya recibida** (T0-04). Deshacer una media ponderada solo es exacto si no ha habido otra recepción entre medias. Opciones: recalcular desde el histórico de recepciones, o dejar el coste como está y anotarlo. La segunda es más simple y hay que escribirla, no suponerla.
+  - **Casos que el test debe cubrir:** producto sin coste previo (la primera recepción fija el coste, no promedia con cero); stock a cero o negativo antes de recibir (el peso del coste anterior es cero); ítems sin `productId` (no tocan nada, como hoy no tocan el stock).
+  - **Criterio de aceptación:** recibir 10 unidades a 5 sobre 10 que costaron 3 deja el coste en **4.00**, en la misma transacción que el stock; un producto que nunca se ha comprado tiene coste **desconocido** (`null`), no cero.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+  - **Decisión tomada (2026-09-13): al cancelar una orden recibida, el coste medio no se toca.** Se retira el stock (T0-04) y el coste se queda como lo dejó la recepción; lo corrige la siguiente recepción o un ADMIN a mano. Anotado también en el código, en la rama de cancelación, y dicho en el propio diálogo de confirmación.
+  - **La premisa de la decisión estaba incompleta, y lo vio el usuario en el navegador:** la ficha hablaba de cancelar una orden recibida como algo que ocurre, y **la interfaz no lo permitía** —solo ofrecía cancelar las pendientes—. El backend sí, desde T0-04: el camino existía por API y no desde la aplicación, la misma carencia que T2-42 cerró en ventas. **Se decidió llevarlo a la interfaz dentro de esta tarea:** botón en las órdenes recibidas con diálogo que dice cuántas unidades salen y de qué productos, que el coste no cambia y que se rechaza entera si esas unidades ya se vendieron. Si el backend la rechaza, el diálogo se queda abierto.
+  - **Verificado localmente (2026-09-13):** `verify` backend con **504/504** tests (21 nuevos en `costes.test.ts`) y cobertura de sentencias **93.61 %**; `check`, `build` y `smoke` en verde, **y el paso `auditoria` en rojo por causas ajenas a la tarea** (ver la última nota). `verify` frontend en verde, con los números en [Progreso](#progreso).
+  - **El criterio, en la aplicación levantada y por la interfaz:** producto creado desde el formulario con coste 3 y stock 10 → orden de compra de 10 a 5 (el precio unitario **ya venía propuesto en 3**, desde el coste) → recibida → **stock 20, coste `"4"`** y una fila `PURCHASE_RECEIPT` ligada a la orden → cancelada desde el diálogo nuevo → **stock 10, coste 4 intacto** y la misma única fila de histórico. La pestaña «Historial de costes» la enseña con su origen.
+  - **Cuatro decimales, no dos.** La ficha pedía `Decimal(10, 2)`, como `price`, y eso habría sido un error: la media se recalcula en cada recepción y redondear cada vez a céntimos **acumula el error compra tras compra** (3 unidades a 1.00 + 1 a 1.01 = 1.0025, que a dos decimales se queda en 1.00 para siempre). Columna `Decimal(12, 4)`, cálculo en `Decimal` y un solo redondeo al final. La interfaz sigue mostrando dos decimales.
+  - **Concurrencia:** el coste se lee de la fila que devuelve el `update` del stock, que ya la tiene **bloqueada hasta el final de la transacción**. Dos recepciones simultáneas del mismo producto no pueden promediar sobre el mismo coste de partida: la segunda espera.
+  - **La guarda de stock a cero no cambia el resultado; la de stock negativo sí.** Al falsificar se vio que quitar `stockAntes <= 0` no tumba el test de stock cero —con cero unidades la fórmula da lo mismo— y sí el de stock negativo, donde sin la guarda sale una media absurda (−170). Se deja la guarda por el caso negativo y el test de cero documenta el comportamiento.
+  - **Falsificados:** quitar la guarda de stock negativo o la comprobación de «el coste no cambió» tumba **2** tests del backend; proponer el precio de venta en vez del coste, esconder el botón de las recibidas o no mandar la cadena vacía al vaciar el campo tumba **9** del frontend.
+  - **Detalle que solo se vio en el navegador:** el diálogo decía «La orden **Orden** #37620E3E». Se copió la frase de ventas, donde el número se escribe «Venta #…» y no se nota; en compras el número ya empieza por «Orden». Corregido, y el test lo comprueba.
+  - **Lo que cambia además y hay que saber:** al elegir un producto en una orden de compra, el precio unitario se propone desde el **coste** si se conoce. Antes se proponía siempre el **precio de venta**, y con esta tarea eso ya no es inofensivo: lo que se deje ahí es lo que la recepción promediará. **Sin coste conocido se sigue proponiendo el de venta**, y la primera recepción fijaría ese valor si nadie lo corrige.
+  - **El seed da coste** a los 18 productos con compras recibidas —media ponderada de sus líneas— y deja **sin coste a los 30 restantes**, a propósito, porque es el caso que las pantallas tienen que saber enseñar. Ejecutado contra `Stockly_test`, no contra la base de desarrollo.
+  - **Fuera de alcance, anotado:** ni la importación ni la exportación CSV del catálogo llevan coste (sus columnas están fijadas por un test en cada repositorio, T3-05); los movimientos manuales de entrada no tocan el coste, porque no dicen a cuánto entró la mercancía; y **el coste lo ve cualquier usuario autenticado**, también `USER`, igual que el precio. Si debe ocultarse es una decisión de roles, y el sitio natural es la matriz de T5-13.
+  - **Trampa del entorno:** `migrate deploy` contra `Stockly_test` no da el P3005 que describe CONTEXTO, sino que se niega por una migración **marcada como fallida el 2026-08-12** (`20260807215703_add_missing_indexes`): esa base sí tiene `_prisma_migrations`, a medias. La vía buena sigue siendo `prisma db push`, que funcionó sin pedir consentimiento.
+  - **`pnpm auditoria` en rojo, y no por esta tarea** —no se añadió ninguna dependencia—: **10 avisos altos** publicados después del último `verify` en verde, en `multer` (<2.3.0), `nodemailer` (<9.1.0) y transitivas de Prisma (`deepmerge-ts`, `mysql2`, `fast-uri`). Además, `package.json` y `pnpm-lock.yaml` del backend ya estaban modificados antes de empezar (pnpm 11.21.0 → 12.4.1) y no se han tocado. Merece tarea propia.
+
+- [ ] **[T5-02] Valor del inventario a coste y margen en los informes**
+  - **Área:** Negocio / Informes
+  - **Ubicación:** `src/modules/reports/reports.service.ts`, `src/modules/reports/reports.pdf.ts`, `prisma/schema.prisma` (`SaleOrderItem`), `Stockly-F/src/modules/dashboard/`, `Stockly-F/src/modules/reports/`
+  - **Qué hacer:** el valor de inventario del dashboard es `SUM(price * stock)`, y el top 10 ordena por `price * stock`: **valora el almacén a precio de venta**, así que la cifra incluye un beneficio que todavía no existe. Mostrar las dos cifras con su nombre —«a coste» y «a precio de venta»— y el margen potencial entre ellas. Para el margen **realizado** hace falta congelar el coste en el momento de la venta: añadir `unitCost` a `SaleOrderItem` y rellenarlo en la transacción de envío, igual que `productName` congela el nombre. Informe de margen por producto y por categoría, también en el PDF.
+  - **Qué no hacer:** calcular el margen de una venta pasada con el coste **actual** del producto. Da un número, y está mal.
+  - **Criterio de aceptación:** con productos sin coste, el dashboard dice cuántos quedan fuera del valor a coste en vez de contarlos como cero; una venta enviada conserva su margen aunque después cambie el coste del producto. Las consultas nuevas pasan por `EXPLAIN ANALYZE` con el conjunto de carga de T4-08 sin ordenar en disco (el listón de T4-16).
+  - **Esfuerzo:** medio
+  - **Depende de:** T5-01
+
+### Ventas y compras
+
+- [ ] **[T5-03] Stock comprometido y stock disponible**
+  - **Área:** Negocio
+  - **Ubicación:** `src/modules/sale-orders/sale-orders.service.ts`, `src/modules/products/product.service.ts`, `Stockly-F/src/modules/sale-orders/`, `Stockly-F/src/modules/products/`
+  - **Qué hacer:** crear una venta **no mira el stock**: `create` guarda los ítems sin más, y la comprobación solo ocurre al enviar (`stock: { gte: item.quantity }` en la transacción de envío). Con 5 unidades se pueden aceptar dos ventas de 5, y el problema aparece al enviar la segunda, cuando ya se le ha prometido al cliente. Calcular `comprometido = SUM(quantity)` de las ventas `PENDING` por producto y `disponible = stock − comprometido`; mostrarlo en el catálogo, en el detalle y en el formulario de venta mientras se escribe la cantidad.
+  - **Decisión previa:** si una venta que supera lo disponible se **avisa** (se crea igual, con un aviso visible en la orden) o se **bloquea** (409 con código estable). Avisar es más flexible —se puede vender lo que va a llegar—; bloquear es más seguro. Puede ser un ajuste de `AppSetting`, pero entonces los dos caminos llevan test.
+  - **Nota:** la métrica «días hasta desabastecimiento» de la rotación usa `stock`. Con esta tarea debería usar `disponible`, o decir por qué no.
+  - **Criterio de aceptación:** con 5 en stock y una venta pendiente de 5, el catálogo muestra **0 disponibles** y crear otra venta de 1 avisa o se rechaza según la decisión tomada. Enviar o cancelar la primera libera el comprometido sin intervención.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+- [ ] **[T5-04] Recepción parcial de órdenes de compra**
+  - **Área:** Negocio
+  - **Ubicación:** `prisma/schema.prisma` (`PurchaseOrderStatus`, `PurchaseOrderItem`), `src/modules/purchase-orders/`, `Stockly-F/src/modules/purchase-orders/`
+  - **Qué hacer:** una orden pasa de `PENDING` a `RECEIVED` de una vez y suma **todas** las cantidades. Un proveedor que entrega 60 de 100 obliga a elegir entre marcar recibido lo que no ha llegado o dejar fuera del inventario lo que sí. Añadir `receivedQuantity Int @default(0)` por línea, el estado `PARTIALLY_RECEIVED` y una acción de recepción que acepte cantidades por línea (`POST /purchase-orders/:id/receipts`). Cada recepción genera sus movimientos `IN` y, con T5-01 hecha, actualiza el coste con lo recibido.
+  - **Atención con T0-04:** cancelar una orden recibida retira **lo que entró**, que a partir de aquí es `receivedQuantity`, no `quantity`. Es exactamente el tipo de cambio que reintroduce el defecto que arregló, y los seis tests de T0-05 tienen que seguir en verde sin tocarlos.
+  - **Criterio de aceptación:** recibir 60 de 100 suma 60 y deja la orden en parcial; recibir los 40 restantes la cierra en `RECEIVED`; no se puede recibir más de lo pedido (400 con código); cancelar una parcial retira 60, no 100. Las órdenes que ya están en `RECEIVED` quedan con `receivedQuantity = quantity` tras la migración.
+  - **Esfuerzo:** alto
+  - **Depende de:** —
+
+- [ ] **[T5-05] Plazo de entrega del proveedor y sugerencias de reposición**
+  - **Área:** Negocio
+  - **Ubicación:** `prisma/schema.prisma` (`Supplier`), `src/modules/purchase-orders/`, `src/modules/reports/reports.service.ts` (rotación), `Stockly-F/src/modules/purchase-orders/`
+  - **Qué hacer:** la aplicación ya **sabe** qué hay que pedir y no lo dice: tiene `minStock`, el proveedor de cada producto y la velocidad de salida de los últimos 30 días, y lo único que hace con eso es marcar `reorderSoon` a 14 días fijos. Añadir `leadTimeDays Int?` a `Supplier` y un endpoint de sugerencias que proponga, por producto: `velocidad diaria × plazo + minStock − disponible − pendiente de recibir`, redondeado hacia arriba y nunca negativo. En la pantalla de compras, «Generar órdenes sugeridas» crea **borradores `PENDING` agrupados por proveedor**, que se revisan antes de enviarse. Nada se pide solo.
+  - **Casos a decidir y escribir:** productos sin proveedor (se listan aparte, no se descartan en silencio); proveedor sin plazo (se usa uno por defecto de `AppSetting`, y la sugerencia lo dice); el precio del borrador (el último `unitPrice` pagado a ese proveedor, o el coste de T5-01).
+  - **Criterio de aceptación:** un producto con velocidad 2/día, plazo 7, mínimo 10, 5 disponibles y 0 pedidos sugiere **19**; con 19 ya pedidos en una orden abierta sugiere **0**. Los borradores generados se pueden editar y cancelar como cualquier orden.
+  - **Esfuerzo:** medio
+  - **Depende de:** T5-03 (sin «disponible» la sugerencia ignora lo ya vendido); T5-04 recomendable (con ella, «pendiente de recibir» es exacto también en las parciales)
+
+- [ ] **[T5-06] Clientes como entidad**
+  - **Área:** Negocio
+  - **Ubicación:** `prisma/schema.prisma` (`SaleOrder`, modelo nuevo `Customer`), `src/modules/customers/` (nuevo), `Stockly-F/src/modules/customers/` (nuevo), `Stockly-F/src/modules/sale-orders/`
+  - **Qué hacer:** `SaleOrder` guarda `customerName`, `customerEmail` y `customerPhone` como texto suelto en cada orden: no hay forma de ver qué ha comprado un cliente, ni de corregir su teléfono una vez. Modelo `Customer` con CRUD, `SaleOrder.customerId` opcional, autocompletar al crear la venta y ficha de cliente con su historial y su importe total. **Los tres campos de la orden se conservan** como instantánea, igual que `productName` en los ítems: una orden pasada debe seguir diciendo a quién se envió.
+  - **Migración de lo que ya existe:** agrupar las órdenes por `customerEmail` normalizado (minúsculas, sin espacios). Las que no tienen correo **no se agrupan por nombre**: dos «Juan Pérez» no son la misma persona. Se quedan sin cliente y la migración cuenta cuántas.
+  - **Criterio de aceptación:** la ficha de un cliente lista sus órdenes y suma solo las enviadas; editar el cliente no reescribe las órdenes pasadas; la migración informa de cuántas órdenes quedaron vinculadas y cuántas no.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+### Almacén
+
+- [ ] **[T5-07] Conteo físico de inventario**
+  - **Área:** Negocio
+  - **Ubicación:** `prisma/schema.prisma` (modelos nuevos `InventoryCount`, `InventoryCountLine`), `src/modules/inventory-counts/` (nuevo), `Stockly-F/src/modules/inventory-counts/` (nuevo)
+  - **Qué hacer:** hoy la única forma de cuadrar el sistema con la estantería es un movimiento manual producto a producto, sin rastro de que fue un recuento. Una sesión de conteo (`OPEN → CLOSED` o `CANCELLED`) filtrable por categoría, donde se captura la cantidad contada de cada producto; al cerrarla, cada diferencia genera un movimiento `ADJUSTMENT` con la nota del conteo, en **una sola transacción**. Informe de la sesión: diferencias en unidades y, con T5-01, en valor a coste.
+  - **Decisión previa:** contra qué stock se compara si hay ventas o recepciones **durante** el conteo. Comparar con el stock al cerrar convierte cada venta del día en «merma»; comparar con el del momento de contar cada línea es lo correcto en la mayoría de almacenes. Sea cual sea, se guarda el esperado en la línea, no se recalcula.
+  - **Criterio de aceptación:** contar 8 donde el sistema espera 10 genera un `ADJUSTMENT` de −2 al cerrar, y ninguno antes; una sesión cancelada no mueve nada; la auditoría registra el cierre con el número de ajustes.
+  - **Esfuerzo:** alto
+  - **Depende de:** —
+
+- [ ] **[T5-08] Código de barras: búsqueda, escaneo y etiquetas**
+  - **Área:** Negocio / UI
+  - **Ubicación:** `prisma/schema.prisma` (`Product`), `src/modules/products/`, `Stockly-F/src/modules/products/`
+  - **Qué hacer:** campo `barcode String? @unique` (EAN-13, UPC o interno), búsqueda **exacta** por código, escaneo con la cámara del móvil para abrir el producto o registrar un movimiento, y etiquetas imprimibles en PDF reutilizando pdfkit.
+  - **Antes de elegir librería:** `BarcodeDetector` es nativa en Chrome de Android pero **no existe en Firefox ni en Safari de escritorio**, así que casi seguro hace falta una alternativa. La que se elija pasa por `pnpm auditoria` (T4-07) y por su licencia antes de instalarse, y se carga bajo demanda para no inflar el primer arranque.
+  - **Enlaza con una decisión abierta:** el buscador del catálogo ignora el SKU ([CONTEXTO §6](CONTEXTO.md), [rendimiento.md §7](rendimiento.md)). Una búsqueda exacta por código es un índice `UNIQUE` normal y no tiene el coste del `ILIKE`; puede cubrir SKU y código de barras a la vez sin tocar el buscador de texto.
+  - **Criterio de aceptación:** escanear un código existente abre su producto en el móvil (`Mobile Chrome`, también en E2E con una imagen de prueba); uno desconocido ofrece darlo de alta con el código ya puesto; la etiqueta impresa se vuelve a leer con el mismo escáner.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+### Informes y avisos
+
+- [ ] **[T5-09] Informes de ventas y compras por periodo**
+  - **Área:** Informes
+  - **Ubicación:** `src/modules/reports/`, `Stockly-F/src/modules/reports/`
+  - **Qué hacer:** los informes actuales son una foto del momento más la rotación de 30 días fijos; no hay manera de responder «cuánto vendimos en marzo». Filtro `from`/`to` con atajos (este mes, mes anterior, trimestre, año), unidades e importe de ventas enviadas y compras recibidas por periodo, por producto y por categoría, con exportación a CSV y PDF.
+  - **Decisión que absorbe:** el primer cubo del gráfico de movimientos por mes es parcial porque la ventana rueda desde hoy, y quedó anotado como decisión de producto en [CONTEXTO §6](CONTEXTO.md). Con rangos de fechas reales, esa decisión se toma aquí.
+  - **Zona horaria:** «marzo» empieza a medianoche **de quien pregunta**, no del servidor. Decidirla (la del navegador, o una de `AppSetting`) y probar el borde del mes.
+  - **Criterio de aceptación:** la suma de los meses de un trimestre coincide con el trimestre; una venta enviada el último día del mes a las 23:30 hora local cae en ese mes; las consultas pasan por `EXPLAIN ANALYZE` con el conjunto de carga sin ordenar en disco.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+- [ ] **[T5-10] Clasificación ABC de productos**
+  - **Área:** Informes
+  - **Ubicación:** `src/modules/reports/`, `Stockly-F/src/modules/reports/`, `Stockly-F/src/modules/products/`
+  - **Qué hacer:** ordenar los productos por lo que facturan en un periodo y clasificarlos: **A** hasta el 80 % acumulado, **B** hasta el 95 %, **C** el resto. Distintivo en el catálogo y filtro por clase, para saber qué productos merecen conteos más frecuentes y márgenes de seguridad mayores.
+  - **Criterio de aceptación:** con un conjunto de prueba de facturación conocida, las clases coinciden con un cálculo hecho a mano, incluido el producto que cae justo en el 80 %; los productos sin ventas en el periodo son **C**, no desaparecen.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T5-09
+
+- [ ] **[T5-11] Resumen periódico por correo**
+  - **Área:** Notificaciones
+  - **Ubicación:** `scripts/` (nuevo comando), `src/shared/lib/emailTemplates.ts`, `src/shared/lib/nodemailer.ts`, `src/modules/settings/`
+  - **Qué hacer:** un correo semanal a los ADMIN con los productos en stock bajo, las ventas pendientes de enviar, lo más vendido de la semana y, si T5-05 está hecha, las órdenes de compra que superan el plazo de entrega de su proveedor. Activable en Configuración, como `lowStockAlertEnabled`, y en el idioma de cada destinatario (T4-12).
+  - **Cómo programarlo:** el backend **no tiene planificador** —ni `node-cron` ni cola—, y meter uno en el proceso manda el correo una vez por réplica en cuanto haya más de una. Lo coherente con el proyecto es lo que ya hace `pnpm db:backup`: un comando (`pnpm resumen:enviar`) que se programa desde fuera, documentado en [operaciones.md](operaciones.md) junto al de la copia.
+  - **Criterio de aceptación:** ejecutar el comando dos veces el mismo día no envía dos correos (se registra la última ejecución); con el ajuste desactivado no envía nada y sale con 0; cada ADMIN lo recibe en su idioma.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+- [ ] **[T5-12] Notificaciones dentro de la aplicación**
+  - **Área:** Notificaciones / UI
+  - **Ubicación:** `prisma/schema.prisma` (modelo nuevo `Notification`), `src/shared/lib/stockAlerts.ts`, `src/modules/notifications/` (nuevo), `Stockly-F/src/shared/components/` (cabecera)
+  - **Qué hacer:** la alerta de stock bajo **solo sale por correo**, y solo si está activada: quien tiene la aplicación abierta no se entera. Notificación por usuario, campana en la cabecera con contador de no leídas y marcar como leídas. Primeras fuentes: stock bajo (desde `dispararAlertaStock`), venta que no se puede enviar por falta de stock y, con T5-05, órdenes atrasadas. Consulta periódica al volver a la pestaña antes que SSE o WebSocket: menos piezas, y suficiente para avisos que no son de segundos.
+  - **Accesibilidad:** el contador se anuncia con una región `aria-live` educada, no con cada consulta; el panel se abre y se cierra con teclado (el listón de T4-09).
+  - **Criterio de aceptación:** reducir un producto por debajo del mínimo crea una notificación para cada ADMIN activo aunque el correo esté desactivado; marcarla leída la quita del contador en todas las pestañas en la siguiente consulta; las leídas de más de 90 días se purgan.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+### Acceso
+
+- [ ] **[T5-13] Rol de almacén**
+  - **Área:** Autorización
+  - **Ubicación:** `prisma/schema.prisma` (`Role`), `src/shared/middlewares/auth.middleware.ts`, rutas de `products`, `purchase-orders`, `sale-orders` y (con T5-07) `inventory-counts`, `Stockly-F/src/modules/users/`, transversal en el frontend
+  - **Qué hacer:** solo existen `ADMIN` y `USER`, y todo lo que escribe exige `ADMIN`: la persona que recibe mercancía o cuenta el almacén necesita **los mismos permisos que quien cambia precios y desactiva usuarios**. Añadir un rol `WAREHOUSE` que pueda registrar movimientos, recibir compras, enviar ventas y contar, pero no editar precios ni costes, ni borrar, ni tocar usuarios o configuración.
+  - **Primero, la matriz:** escribir en la ficha, antes de tocar código, la tabla rol × ruta. Son unas 30 rutas de escritura fuera de `auth` y es fácil dejarse una. Un test la recorre entera contra la tabla, de modo que añadir una ruta sin decidir su rol **falla**.
+  - **Atención:** `requireRole(...roles: string[])` acepta cadenas. Con un tercer rol conviene tiparlo con `$Enums.Role`, que es justo la clase de error que T3-02 cerró en la base.
+  - **Criterio de aceptación:** un usuario `WAREHOUSE` recibe una orden de compra y recibe **403** al cambiar un precio, tanto por API como porque la interfaz no le ofrece el botón; la matriz y el test coinciden ruta a ruta.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+### Condicionadas: solo si el negocio lo pide
+
+*Son las dos de más valor **si** hacen falta y las más caras con diferencia: cambian dónde vive el stock, así que tocan casi todos los módulos, las pruebas de carga y los informes. Se listan para que la decisión de no hacerlas sea consciente, como se hizo con el Tier 4. **Ninguna empieza sin un caso de uso real escrito en su ficha.***
+
+- [ ] **[T5-14] Varios almacenes**
+  - **Área:** Negocio / Arquitectura
+  - **Ubicación:** transversal, los dos repositorios
+  - **Qué hacer:** `Product.stock` es un único número. Con varios almacenes pasa a una tabla `StockLevel(productId, warehouseId, stock)`, cada movimiento lleva su almacén y aparece un movimiento nuevo, la **transferencia**, que es una salida y una entrada en la misma transacción. Compras, ventas, conteos, alertas de mínimo (¿por almacén o globales?) y todos los informes cambian.
+  - **Decisión previa:** si `Product.stock` se mantiene como suma desnormalizada (lecturas rápidas, riesgo de que diverja) o desaparece (una fuente de verdad, consultas más caras). Medirlo con el conjunto de 100 000 productos de T4-08 antes de decidir, no después, y dejarlo en un ADR.
+  - **Criterio de aceptación:** una transferencia de 10 unidades no cambia el stock total y deja dos movimientos enlazados; la migración pone todo el stock actual en un almacén por defecto y el total no cambia; la prueba de carga de T4-08 no empeora más de lo que el ADR haya aceptado.
+  - **Esfuerzo:** alto
+  - **Depende de:** T5-03, T5-04, T5-07 (hacerlas antes: con varios almacenes, cada una cuesta el doble)
+
+- [ ] **[T5-15] Lotes y fechas de caducidad**
+  - **Área:** Negocio
+  - **Ubicación:** transversal, los dos repositorios
+  - **Qué hacer:** solo tiene sentido con producto perecedero o con trazabilidad obligatoria (alimentación, farmacia, cosmética). Lote con fecha de caducidad al recibir, salida **FEFO** (primero lo que caduca antes) al enviar, aviso de lotes próximos a caducar y ajuste de caducados como merma.
+  - **Criterio de aceptación:** enviar una venta consume primero el lote que caduca antes; un lote caducado no se asigna a una venta; el informe de caducidades lista lo que vence en los próximos N días con su valor a coste.
+  - **Esfuerzo:** alto
+  - **Depende de:** decidir junto a T5-14: si los dos se van a hacer, el nivel de stock es `(producto, almacén, lote)` y conviene diseñarlo una sola vez.
+
+**Ruta sugerida del Tier 5:** `T5-01 → T5-02` y `T5-03 → T5-04 → T5-05` primero, porque corrigen cifras que hoy se leen mal y la segunda cadena aprovecha la rotación que ya existe. Después, sin orden entre ellas: `T5-06`, `T5-07`, `T5-08`, `T5-09 → T5-10`, `T5-11`, `T5-12`, `T5-13`. `T5-14` y `T5-15`, solo con un caso de uso real.
+
+---
+
 ## Trazabilidad hallazgo → tarea
+
+*Cubre los Tiers 0 a 4. Las tareas del Tier 5 no corrigen ningún hallazgo: son funcionalidad nueva y su origen está en la introducción de [su tier](#tier-5--funcionalidad-de-negocio).*
 
 | Hallazgo | Severidad | Tareas |
 |---|---|---|
@@ -1718,6 +1916,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-09-13 | **T5-01** Coste del producto y coste medio ponderado — **completada** | **El criterio, por la interfaz de la aplicación levantada:** coste 3 × stock 10 + recepción de 10 a 5 → **coste 4**, stock 20 y una fila `PURCHASE_RECEIPT` con su orden; cancelada desde el diálogo nuevo → stock 10 y **coste 4 intacto**. `verify` backend: **504/504** (21 nuevos), sentencias **93.61 %**, `check`/`build`/`smoke` ✅ y **`auditoria` ❌ por 10 avisos altos ajenos a la tarea**. `verify` frontend ✅ **556/556 + 1 omitido**, sentencias **70.22 %** | **Decisión:** cancelar una recibida no toca el coste. **La premisa estaba incompleta:** la interfaz no permitía cancelar una orden recibida —el backend sí, desde T0-04—, lo vio el usuario en el navegador y se llevó a la interfaz con diálogo, como T2-42 en ventas. **`Decimal(12, 4)` y no `(10, 2)`**: redondear la media a céntimos en cada recepción acumula error. El coste se lee de la fila que el `update` del stock ya tiene bloqueada, así que dos recepciones simultáneas no promedian sobre el mismo punto de partida. **El precio de compra se propone desde el coste** —antes, desde el de venta—; sin coste conocido se sigue proponiendo el de venta. **Solo en el navegador:** «La orden Orden #…», corregido. Fuera: coste en importación/exportación CSV y ocultarlo a `USER` (T5-13). `Stockly_test` tiene una migración marcada como fallida desde el 2026-08-12; `db push` sigue siendo la vía. |
 | 2026-08-12 | **T4-16** El dashboard a escala: `work_mem` y la consulta de rotación — **completada** | **El criterio, por sus dos mitades.** `pnpm carga:ejecutar` sobre 100 000 productos: dashboard **p(95) 337 ms** (pedía < 1 s), y **ninguna de las siete consultas ordena en disco**, comprobadas una a una con `EXPLAIN ANALYZE`. La rotación pasa de **401.6 ms a 20.0 ms**, y devuelve **los mismos veinte productos con los mismos totales**, comparados fila a fila. `verify` ✅ **481/481** | **`work_mem` no se toca, y esa es la decisión.** El número de la ficha era cierto —64 MB bajan la rotación a 121 ms— pero **reescribir la consulta la deja en 20 con el valor de fábrica**: seis veces mejor que el ajuste y sin comprometer memoria, porque `work_mem` se reserva **por conexión y por nodo de ordenación**. Se arregla la causa, no el síntoma. **El `LEFT JOIN` agregaba los 95 051 productos activos —85 000 sin una sola salida en el mes— para quedarse con veinte**; partiendo de los movimientos son 31 501 filas y 9 967 grupos. **La ficha nombraba una consulta y eran dos:** «movimientos por mes» también se iba a disco (7 800 kB, 275.6 ms) por un motivo distinto —agrupa por una **expresión**, de la que PostgreSQL no tiene estadísticas, así que estima muchos grupos, descarta el `HashAggregate` y **ordena 360 725 filas para devolver 24**—; recorrida mes a mes con un `LATERAL` baja a **74.8 ms**, en memoria. El criterio decía «ninguna de sus consultas», así que mirar solo la de rotación habría dejado seis sin comprobar. **Dos detalles que no son cosmética:** el desempate por `id` —**seis productos empatan** en el corte, y sin orden total el top 20 se baraja entre recargas— y que el margen de 500 del camino rápido **no se da por bueno**: si devuelve menos de 20 filas se repite con la variante exacta. **Lo que cambia y hay que saber:** los productos sin salidas en 30 días ya no rellenan la tabla con ceros. **Un descubrimiento propio:** con pocos productos `getSummary` **siempre** cae en la vuelta atrás exacta, así que el camino rápido —el que corre en producción— no lo tocaba ningún test hasta añadir el caso de 25 rotadores. |
 | 2026-08-12 | **T4-15** `GET /products/:id/movements` devuelve el histórico entero — **completada** | **El criterio, con margen.** `pnpm carga:ejecutar` en verde y **90.82 req/s** frente a los 18.55 de línea base, 0 % de errores sobre 7 293 peticiones. El histórico del producto caliente pasa de **3.17 s y 19 MB a 57 ms y 0.01 MB**. **22 tests nuevos** entre los dos repositorios; `verify` ✅ backend **481/481** y frontend **535/535** | **La ficha se equivocaba en su última frase:** decía que la exportación «escribe por lotes desde T2-05» y lo que T2-05 convirtió en lotes fue la del **catálogo**. Esta cargaba los 100 000 movimientos de golpe, y el comentario del controlador incluso lo justificaba —«va acotado a un producto, así que no necesita streaming»—, que es justo la suposición que rompe un producto caliente: **el histórico de uno solo puede pesar más que el catálogo entero**. **Eso destapó un defecto mío:** con la exportación por lotes entra el tope de filas, y el caliente tiene **100 019 contra un máximo de 100 000**; devolvía 413 diciendo «filtra antes de exportar» y **ese endpoint no aceptaba filtros**. Ahora acepta los mismos que el listado (medido: 3.13 MB en 1.0 s con `type=IN`). **Los filtros bajan al servidor con la paginación y no es opcional:** filtrar en el navegador filtra lo traído, y el resultado dependería de en qué página estabas, sin error y sin aviso. **Tres decisiones de pantalla:** el gráfico dibuja *la página* y ahora lo dice —rotularlo «Evolución del stock» enseñando 50 de 100 000 sería mentir—; el recuento sale de `meta.total`; y el botón de exportar dejó de construir el CSV en el navegador, que con paginación habría exportado la página creyendo exportarlo todo —la peor forma de perder datos: el archivo se abre, tiene filas y parece correcto—. **La guardia central es «sin parámetros no devuelve el histórico entero»:** un test que pidiera `?limit=5` y recibiera 5 pasaría igual con el defecto puesto. **De paso:** la base de carga estaba dos migraciones por detrás y el login devolvía 500. |
 | 2026-08-12 | **T4-14** El CLI de Prisma infla el árbol de producción — **completada** | **Imagen del backend: 1.81 GB → 426 MB. Árbol: 313 → 183 paquetes** (el criterio pedía bajar de 200). Arranque desde cero con el volumen borrado: `migrate` aplica **las 13 migraciones** y sale con 0, el backend arranca después y queda `healthy`. Ejercitada la imagen podada de punta a punta: `/ready` 200, login 200, productos 200, reportes 200, **CSV de 15 182 bytes**, **PDF de 6 593 bytes con cabecera `%PDF`** y un registro que **envía el correo** (201). `verify` ✅ **460/460** | **La causa de la ficha era la equivocada.** No es que `prisma` esté en `dependencies`: **`@prisma/client` lo declara como peer opcional** y pnpm lo instala solo. Bajarlo a `devDependencies` deja el árbol **igual** —313 antes y 313 después, medido con `pnpm install --prod` en un contenedor limpio con cada manifiesto—. Lo que sí arrastra, medido dentro de la imagen: `@prisma/studio-core` 42 MB *(y con él React y `elkjs`, **la única EPL-2.0**)*, `effect` 34 MB, `typescript` 24 MB, `@electric-sql/pglite` 23 MB —un PostgreSQL para el navegador— y `@prisma/dev` 18 MB. **Dos defectos propios, los dos encontrados midiendo:** podar en un `RUN` posterior al `install` ahorró **0 MB**, porque la capa de abajo sigue viajando —hubo que mover la poda a la etapa que se copia—; y podar **por lista** recortó tamaño pero dejó **292 de 313 entradas**, porque las transitivas del CLI no estaban en la lista. Se sustituyó por una **regla**: cortar los dos peers y barrer lo inalcanzable desde los enlaces de la raíz. **De propina, algo que no era de tamaño:** con las migraciones dentro del `CMD`, cada réplica del backend lanzaba `migrate deploy` a la vez contra la misma base. **Y el `chown -R /app` del runner duplicaba los 300 MB de `node_modules` en una capa nueva**; los `COPY --chown` ya lo dejaban resuelto. |
@@ -1835,15 +2034,16 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
 | **Tier 4** | **17** | **17** | **100 %** ✅ |
-| **Total** | **114** | **114** | **100 %** ✅ |
+| **Tier 5** | 1 | 15 | 7 % |
+| **Total** | **115** | **129** | **89 %** |
 
 *El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que ese 100 % es sobre 114, no sobre las 100 originales. **Y una de las 114 está descartada, no hecha** (T4-17).*
 
 ***Esta tabla se ha quedado atrás dos veces, y las dos por lo mismo:** se cierra una tarea, se marca la casilla y se actualiza la cabecera, y el resumen —que está 1 800 líneas más abajo— no se toca. La primera vez decía 102/109 con las casillas en 104/110 (cierres de T4-05 y T4-06, alta de T4-13); la segunda, 107/114 con las casillas en **112/114**, porque no llegaron aquí los cinco cierres del 2026-08-11 y 12 —T4-12, T4-13, T4-14, T4-10 y T4-17—. **Se cuentan las casillas, no se recuerdan**, y contarlas es un comando:*
 
 ```bash
-grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 114
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 0
+grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 115
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 14 (el Tier 5, abierto el 2026-09-13)
 ```
 
 *Al cerrar una tarea hay que tocar **la casilla, la cabecera, el índice, esta tabla y la de [CONTEXTO §3](CONTEXTO.md)**. Si los cinco números no coinciden, manda el `grep`.*
@@ -1856,10 +2056,10 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 0
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **481/481** ✅ | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **91.83 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **536/536** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **53.14 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests backend | 198/198 ✅ | **504/504** ✅ *(2026-09-13, T5-01)* | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **93.61 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **556/556** ✅ *(+1 omitido: la frescura del contrato sin el repo hermano; 2026-09-13)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **70.22 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |

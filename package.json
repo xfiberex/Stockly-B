@@ -29,11 +29,11 @@
   "keywords": [],
   "author": "Ricky Angel Jiménez Bueno",
   "license": "MIT",
-  "packageManager": "pnpm@11.21.0",
+  "packageManager": "pnpm@12.4.1",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "11.21.0",
+      "version": "12.4.1",
       "onFail": "download"
     }
   },

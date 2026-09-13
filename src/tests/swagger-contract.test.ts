@@ -50,6 +50,7 @@ describe("Contrato entre Swagger y el validador de productos", () => {
         const ejemplo: Record<string, unknown> = {
             name: "Producto de ejemplo",
             price: 10,
+            costPrice: 6.5,
             stock: 1,
             minStock: 0,
             description: "Descripción",

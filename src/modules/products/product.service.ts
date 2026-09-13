@@ -2,6 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
+import { mismoCoste } from "@/shared/lib/costeMedio";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
@@ -11,6 +12,7 @@ import type {
     UpdateProductDto,
     ProductQuery,
     MovementsQuery,
+    CostHistoryQuery,
     ImportProductDto,
     StockMovementType,
     CreateManualMovementDto,
@@ -190,6 +192,7 @@ export const productService = {
                 description: dto.description,
                 sku: dto.sku || null,
                 price: dto.price !== undefined ? parseFloat(String(dto.price)) : 0,
+                costPrice: dto.costPrice ?? null,
                 stock,
                 minStock,
                 categoryId: dto.categoryId ?? null,
@@ -229,6 +232,10 @@ export const productService = {
         const existingPrice = parseFloat(String(existing.price));
         const priceChanged = newPrice !== undefined && newPrice !== existingPrice;
 
+        // T5-01 — el coste a mano deja rastro igual que el precio. Se compara a los decimales
+        // de la columna: reenviar el formulario sin tocar el campo no es un cambio de coste.
+        const costChanged = dto.costPrice !== undefined && !mismoCoste(existing.costPrice, dto.costPrice);
+
         const tagsUpdate = dto.tagIds !== undefined
             ? { tags: { set: dto.tagIds.map((tid) => ({ id: tid })) } }
             : {};
@@ -247,6 +254,7 @@ export const productService = {
                     ...(dto.description !== undefined && { description: dto.description }),
                     ...(dto.sku !== undefined && { sku: dto.sku || null }),
                     ...(newPrice !== undefined && { price: newPrice }),
+                    ...(costChanged && { costPrice: dto.costPrice }),
                     ...(hasStockChange && { stock: newStock }),
                     ...(dto.minStock !== undefined && { minStock: parseInt(String(dto.minStock), 10) }),
                     ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
@@ -262,6 +270,12 @@ export const productService = {
             if (priceChanged) {
                 await tx.priceHistory.create({
                     data: { productId: id, oldPrice: existingPrice, newPrice: newPrice! },
+                });
+            }
+
+            if (costChanged) {
+                await tx.costHistory.create({
+                    data: { productId: id, oldCost: existing.costPrice, newCost: dto.costPrice ?? null, source: "MANUAL" },
                 });
             }
 
@@ -625,6 +639,33 @@ export const productService = {
         );
 
         return results;
+    },
+
+    /**
+     * T5-01 — los cambios de coste de un producto, del más reciente al más antiguo.
+     *
+     * Paginado desde el principio, a diferencia del de precios: el precio lo cambia una
+     * persona de vez en cuando, pero el coste cambia **en cada recepción**, y un producto
+     * que se compra a diario acumula cientos de filas al año (la regla de T4-15).
+     */
+    async getCostHistory(productId: string, query: CostHistoryQuery = {}) {
+        const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+
+        const { page, limit, skip } = parsePagination(query, { defaultLimit: 20 });
+        const where = { productId };
+
+        const [history, total] = await prisma.$transaction([
+            prisma.costHistory.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            }),
+            prisma.costHistory.count({ where }),
+        ]);
+
+        return { history, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     },
 
     async getPriceHistory(productId: string) {

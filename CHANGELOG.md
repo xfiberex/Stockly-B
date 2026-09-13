@@ -19,6 +19,22 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Coste medio ponderado de los productos** (`T5-01`). Cada recepción de una orden de compra
+  recalcula el coste del producto —`(stock × coste + cantidad × precio de compra) / (stock +
+  cantidad)`— en la misma transacción que el stock, y deja una fila en el nuevo historial de
+  costes (`GET /products/:id/cost-history`, paginado). El coste también se puede fijar o quitar a
+  mano. **Un producto sin coste lo tiene desconocido (`null`), no cero**, y así lo dicen las
+  pantallas. Columna `Decimal(12, 4)`: a dos decimales la media acumularía error de redondeo.
+  El formulario de producto tiene el campo, el detalle lo enseña y la página de movimientos
+  gana la pestaña «Historial de costes». Al añadir un producto a una orden de compra, el precio
+  unitario se propone desde el coste en vez de desde el precio de venta.
+
+- **Cancelar desde la interfaz una orden de compra ya recibida** (`T5-01`). El backend lo
+  permitía desde T0-04, pero la pantalla solo ofrecía cancelar las pendientes. Ahora las
+  recibidas tienen la acción, con un diálogo que dice cuántas unidades salen y de qué productos,
+  que **el coste medio no cambia** y que la cancelación se rechaza entera si esas unidades ya se
+  vendieron.
+
 - **Banco de pruebas de carga** (`T4-08`), en `load/`. `pnpm carga:sembrar` construye una base
   aparte con 100 000 productos y 1 100 000 movimientos —incluido **un producto caliente con
   100 000 él solo**, porque la media de once por producto no se parece a ningún inventario

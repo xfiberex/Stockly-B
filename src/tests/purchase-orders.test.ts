@@ -22,6 +22,8 @@ describe("Purchase Orders API", () => {
     });
 
     afterEach(async () => {
+        // T5-01: recibir una orden deja histórico de coste, que referencia al producto.
+        await prisma.costHistory.deleteMany();
         await prisma.purchaseOrderItem.deleteMany();
         await prisma.purchaseOrder.deleteMany();
         await prisma.stockMovement.deleteMany();

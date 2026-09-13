@@ -56,8 +56,8 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **481/481** | **536/536** *(+1 omitido)* |
-| Cobertura (sentencias) | 91.83 % *(suelo 85 %)* | 53.14 % *(suelo 45 %)* |
+| Tests | **504/504** | **556/556** *(+1 omitido)* |
+| Cobertura (sentencias) | 93.61 % *(suelo 85 %)* | 70.22 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
@@ -66,7 +66,12 @@ de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · Total **114/114**.
+**Tier 4: 17/17** ✅ · **Tier 5: 1/15** *(abierto el 2026-09-13; T5-01 cerrada)* · Total **115/129**.
+
+**Ojo: el `verify` del backend está en rojo en su último paso desde el 2026-09-13**, y no por el
+código: `pnpm auditoria` encuentra **10 avisos altos** nuevos en `multer`, `nodemailer` y
+transitivas de Prisma. Todo lo anterior —tests, `build`, `smoke`— pasa. Hay que subir esas
+dependencias en una tarea propia; detalle en la ficha de T5-01.
 
 **Ese 114/114 no significa «todo comprobado».** Una de las tareas, **T4-17** —el recorrido con
 lector de pantalla—, está **descartada y no hecha**: se cerró por decisión de alcance porque no hay
@@ -114,7 +119,7 @@ Medir antes de arreglar, y medir otra vez después. La corrección de cada una e
 
 | Documento | Para qué |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 114 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
+| [ROADMAP.md](ROADMAP.md) | Las 129 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
 | [operaciones.md](operaciones.md) | Copia de seguridad, restauración, reversión y **alertas**. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
 | [dependencias.md](dependencias.md) | Vulnerabilidades y licencias del árbol de producción de los dos repos, y cómo funciona la puerta de `pnpm auditoria` — incluida **la lista de lo que no cubre** |
 | [rendimiento.md](rendimiento.md) | Lo que pasa con 100 000 productos: índices medidos antes y después, latencias bajo carga y los dos cuellos que salieron |
@@ -228,8 +233,10 @@ pasarle `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` con el texto literal de la
 Antes de investigar un fallo masivo de la suite, mirar si el mensaje habla del **esquema** y no
 de la lógica.
 
-**La base de tests `Stockly_test` no tiene tabla `_prisma_migrations`.** `migrate deploy`
-contra ella falla con **P3005** («the database schema is not empty»). Se sincroniza con
+**La base de tests `Stockly_test` no se migra con `migrate deploy`.** En un equipo falla con
+**P3005** («the database schema is not empty»); en el de 5433, desde el 2026-08-12, se niega por una
+migración **marcada como fallida** (`20260807215703_add_missing_indexes`) en una
+`_prisma_migrations` a medias. Las dos cosas llevan al mismo sitio. Se sincroniza con
 `prisma db push` apuntando `DATABASE_URL` a `Stockly_test` — y hay que hacerlo cada vez que
 se añade una migración, porque `pnpm verify` solo migra la base de desarrollo.
 
@@ -450,8 +457,14 @@ incluida la extensión `pg_trgm` de T2-09.
 
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
-**Por dónde seguir: el ROADMAP está en 114/114 y no queda nada asignado.** Eso no quiere decir que
-no quede nada que hacer; quiere decir que **lo siguiente hay que decidirlo, no consultarlo**. Tres
+**Por dónde seguir (2026-09-13): el [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio) está
+abierto**, con 15 tareas de funcionalidad de negocio y una ruta sugerida al final del tier. Lo que
+sigue se escribió al cerrar los Tiers 0 a 4, y las dos decisiones de producto que menciona tienen dónde
+tomarse: el cubo parcial en **T5-09**, y la búsqueda por SKU puede resolverla la búsqueda exacta de
+**T5-08** sin tocar el buscador de texto.
+
+**Al cierre del 2026-08-12 el ROADMAP estaba en 114/114 y no quedaba nada asignado.** Eso no quería
+decir que no quedara nada que hacer; quería decir que **lo siguiente hay que decidirlo, no consultarlo**. Tres
 cosas quedan escritas y sin dueño, y ninguna es una tarea pendiente disfrazada:
 
 - **T4-17 se descartó, no se hizo.** El recorrido con lector de pantalla sigue sin ejecutarse. Si

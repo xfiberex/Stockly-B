@@ -3,6 +3,7 @@ import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
+import { costeMedioTrasRecepcion, mismoCoste } from "@/shared/lib/costeMedio";
 import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 const ORDER_INCLUDE = {
@@ -93,6 +94,11 @@ export const purchaseOrderService = {
         // Cancelación de una orden recibida: se revierte el incremento de stock en una sola
         // transacción. El decremento es condicional (stock >= cantidad) para no dejar stock
         // negativo si esas unidades ya salieron por una venta; en ese caso se rechaza entera.
+        //
+        // T5-01 — **el coste medio no se toca al cancelar**, y es una decisión, no un olvido
+        // (anotada en la ficha). Deshacer una media ponderada solo es exacto si no hubo otra
+        // recepción ni un ajuste manual entre medias; dejarlo como está es siempre válido, y
+        // si la compra tenía un precio atípico lo corrige la siguiente recepción o un ADMIN.
         if (beingCancelled) {
             return prisma.$transaction(async (tx) => {
                 const items = await tx.purchaseOrderItem.findMany({
@@ -136,8 +142,8 @@ export const purchaseOrderService = {
             });
         }
 
-        // Recepción: el cambio de estado y el incremento atómico de stock de cada producto
-        // vinculado ocurren en una sola transacción (todo o nada).
+        // Recepción: el cambio de estado, el incremento atómico de stock y el coste medio de
+        // cada producto vinculado ocurren en una sola transacción (todo o nada).
         return prisma.$transaction(async (tx) => {
             const items = await tx.purchaseOrderItem.findMany({
                 where: { purchaseOrderId: id, productId: { not: null } },
@@ -150,6 +156,26 @@ export const purchaseOrderService = {
                     where: { id: item.productId },
                     data: { stock: { increment: item.quantity } },
                 });
+
+                // T5-01 — el coste se lee de la fila que devuelve el `update`, no de una
+                // lectura previa. Ese `update` ya tiene la fila bloqueada hasta el final de la
+                // transacción, así que dos recepciones simultáneas del mismo producto no
+                // pueden promediar las dos sobre el mismo coste de partida: la segunda espera.
+                const stockAntes = product.stock - item.quantity;
+                const costeNuevo = costeMedioTrasRecepcion(stockAntes, product.costPrice, item.quantity, item.unitPrice);
+
+                if (!mismoCoste(product.costPrice, costeNuevo)) {
+                    await tx.product.update({ where: { id: item.productId }, data: { costPrice: costeNuevo } });
+                    await tx.costHistory.create({
+                        data: {
+                            productId: item.productId,
+                            oldCost: product.costPrice,
+                            newCost: costeNuevo,
+                            source: "PURCHASE_RECEIPT",
+                            purchaseOrderId: id,
+                        },
+                    });
+                }
 
                 await tx.stockMovement.create({
                     data: {

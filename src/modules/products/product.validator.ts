@@ -20,6 +20,19 @@ const tagIdsOptional = z.preprocess(
     z.array(z.string().uuid("Cada etiqueta debe ser un UUID válido")).optional(),
 );
 
+// T5-01 — el coste a mano. Llega por `multipart/form-data`, así que es cadena, y la vacía es
+// lo que manda un campo sin rellenar. Al **crear** eso es «sin coste»; al **editar** es
+// «quitar el coste», porque el formulario manda el campo siempre y una clave ausente ya
+// significa «no tocarlo». Sin esa distinción, un coste puesto por error no se podría borrar.
+// El tope es el de `Decimal(12, 4)`.
+const COSTE_MAXIMO = 99_999_999;
+const costeNoNegativo = z.coerce
+    .number()
+    .nonnegative("El coste no puede ser negativo")
+    .max(COSTE_MAXIMO, "El coste es demasiado alto");
+const costeAlCrear = z.preprocess((v) => (v === "" ? undefined : v), costeNoNegativo.optional());
+const costeAlEditar = z.preprocess((v) => (v === "" ? null : v), costeNoNegativo.nullable().optional());
+
 export const importProductsSchema = z.object({
     products: z
         .array(
@@ -42,6 +55,7 @@ export const createProductSchema = z.object({
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
     sku: z.string().trim().max(100, "El SKU no puede superar 100 caracteres").optional(),
     price: z.coerce.number({ error: "El precio es obligatorio" }).positive("El precio debe ser mayor a 0"),
+    costPrice: costeAlCrear,
     stock: z.coerce.number().int("El stock debe ser un entero").min(0, "El stock debe ser mayor o igual a 0").optional(),
     minStock: z.coerce.number().int("El stock mínimo debe ser un entero").min(0, "El stock mínimo debe ser mayor o igual a 0").optional(),
     categoryId: uuidOptional,
@@ -55,6 +69,7 @@ export const updateProductSchema = z.object({
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
     sku: z.string().trim().max(100, "El SKU no puede superar 100 caracteres").optional(),
     price: z.coerce.number().positive("El precio debe ser mayor a 0").optional(),
+    costPrice: costeAlEditar,
     stock: z.coerce.number().int("El stock debe ser un entero").min(0, "El stock debe ser mayor o igual a 0").optional(),
     minStock: z.coerce.number().int("El stock mínimo debe ser un entero").min(0).optional(),
     categoryId: uuidOptional,

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
 import { auditService } from "@/modules/audit-logs";
 import { enviarExportacion } from "@/shared/lib/exportacion";
-import type { CreateProductDto, UpdateProductDto, ProductQuery, MovementsQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, MovementsQuery, CostHistoryQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
 export const productController = {
     async getProducts(
@@ -204,6 +204,19 @@ export const productController = {
                 { items: req.body.items.length, reason: req.body.reason },
             );
             res.json({ success: true, message: "Ajuste masivo completado", data: results });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async getCostHistory(
+        req: Request<{ id: string }, unknown, unknown, CostHistoryQuery>,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> {
+        try {
+            const result = await productService.getCostHistory(req.params.id, req.query);
+            res.json({ success: true, message: "Historial de costes obtenido", data: result });
         } catch (error) {
             next(error);
         }
