@@ -10,6 +10,7 @@
     "check": "tsc --noEmit && tsc --noEmit -p tsconfig.seed.json",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
