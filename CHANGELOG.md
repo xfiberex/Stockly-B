@@ -19,6 +19,11 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Integración continua en los dos repositorios** ([ADR 0008](docs/adr/0008-integracion-continua.md),
+  sustituye a la 0005). GitHub Actions ejecuta `pnpm verify` en cada push a `main` y en cada
+  pull request, y el frontend además el E2E, con el backend clonado al lado. Es la misma puerta
+  que en local, no otra.
+
 - **Sugerencias de reposición y plazo de entrega del proveedor** (`T5-05`). Cada proveedor puede
   tener su plazo en días, y **Compras → Sugerencias de reposición** propone qué pedir:
   salidas diarias × plazo + mínimo − disponible − pendiente de recibir, redondeado hacia arriba.

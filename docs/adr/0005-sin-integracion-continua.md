@@ -1,6 +1,10 @@
 # 0005 — Sin integración continua: la puerta de calidad es local
 
-**Estado:** aceptada · **Fecha:** 2026-08-06 (registrada el 2026-08-10, T3-11)
+**Estado:** **sustituida** por [0008](0008-integracion-continua.md) el 2026-09-28 · **Fecha:** 2026-08-06 (registrada el 2026-08-10, T3-11)
+
+> **Ya no está en vigor.** Los repositorios pasaron a ser públicos y la CI volvió, con la misma
+> puerta que aquí se describe. Se conserva como histórico: explica por qué no la hubo hasta
+> entonces.
 
 ## Contexto
 

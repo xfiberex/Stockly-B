@@ -31,9 +31,9 @@ Vive aquí porque la carpeta que contiene ambos repositorios no está bajo contr
 
 **Al cerrar una tarea, anótala en el ROADMAP** (marca la casilla, añade fila en Progreso y actualiza las métricas). Ese registro es lo que sobrevive entre sesiones y entre equipos.
 
-## Verificación: sin CI, todo en local
+## Verificación: `pnpm verify`, en local y en la CI
 
-Este proyecto **no usa CI**. No hay GitHub Actions ni pipeline de ningún proveedor, y no deben proponerse: se descartaron deliberadamente el 2026-08-06. La puerta de calidad es un comando local:
+La puerta de calidad es un comando, el mismo en el portátil y en GitHub Actions ([ADR 0008](docs/adr/0008-integracion-continua.md), 2026-09-28, desde que los repositorios son públicos; sustituye a la 0005, que la había descartado). **Se ejecuta en local antes de cada commit**: la CI lo repite, no lo sustituye. El workflow ([.github/workflows/verify.yml](.github/workflows/verify.yml)) llama al mismo script y no reproduce sus pasos — si algún día se le añade un paso propio, la CI y el portátil empiezan a pedir cosas distintas:
 
 ```bash
 pnpm verify
@@ -56,6 +56,8 @@ Requisitos para que `verify` pase:
 - `prisma generate` **antes** de `check` y `build`: el cliente se emite en `src/generated/prisma`, que está en `.gitignore`.
 
 `jest.setup.js` reescribe el nombre de la base de `DATABASE_URL` a `Stockly_test`. Los tests nunca tocan la base de desarrollo.
+
+**En la CI**, esa base nace vacía en cada ejecución y el workflow la crea y la migra antes de `verify`. El repositorio es público: permisos de solo lectura, acciones **fijadas por SHA** (se suben a mano, resolviendo la etiqueta con `gh api repos/<acción>/commits/<etiqueta>`) y `pull_request`, nunca `pull_request_target`. **Un cambio de contrato se sube primero aquí**: la CI del frontend clona el `main` de este repositorio para comprobar que su copia está al día.
 
 ## Convenciones
 

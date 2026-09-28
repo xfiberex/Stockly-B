@@ -92,9 +92,9 @@ ADMIN promueva a alguien con `PATCH /api/v1/users/:id/role`—.
 
 ## Verificación
 
-**El proyecto no usa CI**, y es una decisión deliberada
-([ADR 0005](adr/0005-sin-integracion-continua.md)). La puerta de calidad se ejecuta en local, en el
-repositorio que hayas tocado, antes de cada push:
+La puerta de calidad se ejecuta en local, en el repositorio que hayas tocado, antes de cada push,
+y GitHub Actions la repite en cada push a `main` y en cada pull request
+([ADR 0008](adr/0008-integracion-continua.md)):
 
 ```bash
 pnpm verify

@@ -1,0 +1,74 @@
+# La misma puerta que en local, no otra: el job ejecuta `pnpm verify` tal cual, así que lo que
+# pasa aquí pasa en un portátil y al revés. Ver docs/adr/0008-integracion-continua.md.
+#
+# El repositorio es público: permisos de solo lectura, acciones fijadas por SHA (una etiqueta se
+# puede mover, un commit no) y `pull_request`, no `pull_request_target`, para que el código de un
+# fork nunca corra con secretos. Este workflow no usa ninguno.
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # La misma versión mayor que el compose (docs/operaciones.md §9).
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: Stockly
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Las cuatro imprescindibles de `src/config/env.ts`. No son secretos: una base desechable
+    # y un JWT que solo firma tokens de tests.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/Stockly
+      JWT_SECRET: ci-solo-para-tests-no-es-un-secreto-real-000000
+      JWT_EXPIRES_IN: 15m
+      FRONTEND_URL: http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Sin `version`: la toma de `packageManager`, y así no hay dos sitios que la fijen.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      # Node 22, el de la imagen de producción (`Dockerfile`).
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # `jest.setup.js` reescribe la base a `Stockly_test`, y `verify` solo migra la de
+      # `DATABASE_URL`: la de los tests hay que crearla y migrarla antes. En local se hace una
+      # vez a mano; aquí la base nace vacía en cada ejecución.
+      - name: Base de tests
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE "Stockly_test"'
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/Stockly_test pnpm exec prisma migrate deploy
+
+      - run: pnpm verify

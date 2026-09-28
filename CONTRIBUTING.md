@@ -29,12 +29,10 @@ no está bajo control de versiones.
 
 ## La puerta de calidad: `pnpm verify`
 
-**Este proyecto no usa CI**, y es una decisión deliberada — ver
-[ADR 0005](docs/adr/0005-sin-integracion-continua.md). No hay GitHub Actions ni pipeline de
-ningún proveedor, y no deben proponerse.
-
-Eso significa que **nadie va a comprobar tu trabajo después**. Antes de cada push, en el
-repositorio que hayas tocado:
+La misma puerta corre en local y en GitHub Actions, en cada push a `main` y en cada pull
+request ([ADR 0008](docs/adr/0008-integracion-continua.md)). **La CI no te exime de ejecutarla
+antes**: repite la comprobación, no la adelanta, y un push en rojo deja `main` en rojo para todos.
+Antes de cada push, en el repositorio que hayas tocado:
 
 ```bash
 pnpm verify
@@ -113,7 +111,11 @@ mensaje de error.
 
 Hoy el proyecto lo lleva una persona desde varias máquinas, y el historial es lineal sobre
 `main`. Eso está bien mientras siga siendo así, con una condición: **`pnpm verify` en verde
-en la máquina desde la que se hace el push**, porque no hay CI que lo repita.
+en la máquina desde la que se hace el push**. La CI lo repite, pero después: cuando avisa, el
+commit ya está en `main`.
+
+**Un cambio de contrato se sube primero al backend.** La CI del frontend clona el `main` del
+backend para comprobar que su copia está al día; si el frontend llega antes, falla.
 
 En cuanto haya más de una persona, o un cambio que quieras poder revertir de una pieza:
 

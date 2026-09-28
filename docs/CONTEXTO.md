@@ -36,9 +36,11 @@ Tras el seed, el admin es `admin@stockly.app` / `Admin1234!`.
 
 ## 2. Tres decisiones que gobiernan el trabajo
 
-**Sin CI.** No hay GitHub Actions ni pipeline de ningún proveedor, y no deben proponerse.
-Se eliminaron deliberadamente el 2026-08-06. La puerta de calidad es `pnpm verify` en
-local, en cada repositorio, antes de dar por cerrada una tarea.
+**`pnpm verify`, en local y en la CI.** Es la puerta de calidad de cada repositorio y se ejecuta
+en local antes de dar por cerrada una tarea. Desde el 2026-09-28, con los repositorios públicos,
+GitHub Actions la repite en cada push y pull request ([ADR 0008](adr/0008-integracion-continua.md),
+que sustituye a la 0005 «sin CI»); en el frontend, además del E2E. El workflow llama al mismo
+script: no añadirle pasos propios, o la CI y el portátil pedirán cosas distintas.
 
 **Los docs viven en `Stockly-B/docs/`** aunque cubran los dos repositorios: la carpeta que
 los contiene no está bajo control de versiones, así que alojarlos en el backend es lo que
@@ -109,8 +111,9 @@ tabla no cuenta. De todo el recorrido, cuatro cosas conviene saberlas antes de t
   ficha, porque reescribir la consulta daba seis veces más; y T4-14 descubrió que la causa que le
   atribuían era falsa. Los números están en [rendimiento.md](rendimiento.md) y
   [dependencias.md](dependencias.md).
-- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay siete
-  [ADR](adr/). La 0005 —**no hay CI**— es la que más fácilmente se deshace por reflejo.
+- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay ocho
+  [ADR](adr/). La 0005 —**no hay CI**— se deshizo el 2026-09-28, y no por reflejo: la sustituye
+  la 0008, que dice qué cambió.
 - **Lo que se decidió no hacer está escrito**, no omitido: T4-17 aquí arriba, y los tres cabos
   sueltos del §6.
 
@@ -140,7 +143,7 @@ Medir antes de arreglar, y medir otra vez después. La corrección de cada una e
 | [rendimiento.md](rendimiento.md) | Lo que pasa con 100 000 productos: índices medidos antes y después, latencias bajo carga y los dos cuellos que salieron |
 | [accesibilidad.md](accesibilidad.md) | Lighthouse y recorrido de teclado sobre la pila desplegada, y **la mitad del criterio que no se pudo comprobar** |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
-| [adr/](adr/) | **Siete decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0005 explica por qué **no hay CI**, que es lo que más fácilmente se deshace por reflejo |
+| [adr/](adr/) | **Ocho decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0008 explica por qué **hay CI** desde el 2026-09-28 y la 0005, ya sustituida, por qué no la hubo antes |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
 | [CHANGELOG.md](../CHANGELOG.md) | Registro de cambios de los dos repositorios |
@@ -317,8 +320,8 @@ dar un solo error. Y aunque se excluya `then`, vitest comprueba que el mock expo
 módulo real exporta, y un `Proxy` no pasa esa comprobación. Hay que enumerar los componentes.
 
 **La cobertura tiene suelo desde T2-22** (`jest.config.js` y `vite.config.ts`): backend
-85/72/87/87 y frontend 42/50/33/43, unos puntos por debajo de lo real. Sin CI, ese umbral es
-lo único que impide que la cobertura se erosione. **Al subirla, hay que subir el umbral**, o
+85/72/87/87 y frontend 42/50/33/43, unos puntos por debajo de lo real. Ese umbral —ahora
+también en la CI— es lo único que impide que la cobertura se erosione. **Al subirla, hay que subir el umbral**, o
 deja de significar nada.
 
 **React Router no restablece el desplazamiento al cambiar de ruta.** Se conserva el del
@@ -506,7 +509,7 @@ conviene no deshacerlas:
 - **`en.ts` es un `Record` sobre las claves de `es.ts`**, así que una traducción que falte no compila.
   No hace falta ninguna herramienta de sincronización; es la misma idea que el contrato de T4-01.
 - **`literales.test.ts` recorre `src/`** y falla si aparece una cadena escrita a mano en un nodo JSX,
-  en una prop visible o en un `toast`. Sin CI, esa guardia es lo único que impide que la traducción
+  en una prop visible o en un `toast`. Esa guardia —ahora también en la CI— es lo único que impide que la traducción
   se erosione pantalla a pantalla — y encontró dos textos que llevaban meses sin traducir.
 
 Tres decisiones que parecen descuidos y no lo son: las **exportaciones** salen siempre en español

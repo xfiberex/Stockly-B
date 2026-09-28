@@ -1,5 +1,7 @@
 # Stockly — Backend
 
+[![verify](https://github.com/xfiberex/Stockly-B/actions/workflows/verify.yml/badge.svg)](https://github.com/xfiberex/Stockly-B/actions/workflows/verify.yml)
+
 API REST modular para el sistema de gestión de inventario Stockly. El frontend vive en un
 repositorio hermano, `Stockly-F`, que se clona al lado de este.
 
@@ -179,7 +181,8 @@ sí se sigue escribiendo a mano son las **rutas**, en `src/swagger.paths.ts`.
 
 ### `pnpm verify`
 
-El proyecto **no usa CI**: la puerta de calidad se ejecuta en local y encadena
+La puerta de calidad se ejecuta en local antes de cada push, y GitHub Actions la repite en cada
+push y pull request ([ADR 0008](docs/adr/0008-integracion-continua.md)). Encadena
 `prisma generate` → `prisma migrate deploy` → `check` → `test:coverage` → `build` → `smoke`.
 
 El paso `smoke` no es redundante con `build`: `tsc` no reescribe los alias `@/`, así que un
