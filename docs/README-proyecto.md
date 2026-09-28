@@ -36,7 +36,7 @@ que se clonan uno al lado del otro:**
 | Herramienta | Versión |
 |---|---|
 | Node.js | 22 LTS |
-| pnpm | **11.21.0**, fijado en `packageManager` de ambos repos — no usar npm ni yarn |
+| pnpm | **12.4.1**, fijado en `packageManager` de ambos repos — no usar npm ni yarn |
 | Docker + Docker Compose | opcional: solo si no hay un PostgreSQL instalado |
 
 ---

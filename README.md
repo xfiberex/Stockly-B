@@ -32,7 +32,7 @@ Este README documenta **la API**. La documentación que cubre los dos repositori
 | PDFs | PDFKit 0.18 |
 | Documentación | Swagger UI (`/api/v1/docs`, desactivada en producción) |
 | Tests | Jest + Supertest |
-| Package manager | PNPM 11.21.0 *(fijado en `packageManager`; no usar npm ni yarn)* |
+| Package manager | PNPM 12.4.1 *(fijado en `packageManager`; no usar npm ni yarn)* |
 
 ---
 

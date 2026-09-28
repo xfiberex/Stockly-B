@@ -59,7 +59,8 @@ Requisitos para que `verify` pase:
 
 ## Convenciones
 
-- Gestor de paquetes: **pnpm 11.21.0** (fijado en `packageManager` y en el `Dockerfile`). No usar npm ni yarn. Se subió desde 11.2.2 el 2026-08-09: las versiones `<11.8.0` arrastraban avisos de path traversal y de ejecución de lifecycle scripts.
+- Gestor de paquetes: **pnpm 12.4.1** (fijado en `packageManager` y en el `Dockerfile`, en los dos repositorios). No usar npm ni yarn. Se subió desde 11.2.2 el 2026-08-09 —las versiones `<11.8.0` arrastraban avisos de path traversal y de ejecución de lifecycle scripts— y a la 12 el 2026-09-28. pnpm 12 **rechaza ajustes desconocidos** en `pnpm-workspace.yaml`.
+- **Una transitiva vulnerable que su dueño fija a versión exacta se sube con `overrides`** en `pnpm-workspace.yaml`, no esperando a una versión nueva del paquete que la trae. Cada línea es deuda y lleva escrito cuándo retirarla. Ver [docs/dependencias.md](docs/dependencias.md) §2.
 - Comentarios y documentación **en español**, como el resto del código.
 - **`.agents/` y `.claude/` se versionan a propósito** (T3-06): el proyecto se trabaja desde varias máquinas y el tooling viaja con él. Son la mayoría de los archivos rastreados, así que para buscar en el código conviene excluirlos: `git buscar X` —tras activar una vez `git config --local include.path ../.gitconfig-stockly`— o `git grep X -- ":!.agents" ":!.claude"`.
 - Nunca versionar credenciales reales. El `.env` está ignorado y debe seguir así: una fuga de este tipo ya obligó a reescribir el historial del repositorio (tarea T0-06).

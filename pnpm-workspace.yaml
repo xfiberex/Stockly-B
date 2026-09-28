@@ -10,3 +10,13 @@ minimumReleaseAgeExclude:
   - pnpm@11.5.3
   - pnpm@11.7.0
   - pnpm@11.8.0
+# Transitivas con avisos de seguridad que sus dueños no dejan subir (2026-09-28). Las tres
+# primeras cuelgan del CLI `prisma` —peer opcional de `@prisma/client` que la imagen poda
+# (T4-14), pero que `pnpm audit --prod` cuenta—, y `prisma` fija `mysql2` y `deepmerge-ts` a
+# versión exacta: la 7.10 sigue en las vulnerables. `qs` viene de express. Al subir Prisma o
+# express, mirar con `pnpm why <paquete>` si ya traen una versión corregida y retirar la línea.
+overrides:
+  deepmerge-ts: ^8.0.2
+  fast-uri: ^3.1.6
+  mysql2: ^3.23.1
+  qs: ^6.16.0

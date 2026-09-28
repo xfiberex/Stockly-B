@@ -42,6 +42,24 @@ Ninguna, en ninguna severidad. Ayuda que las dependencias se subieran hace poco:
 `pnpm` pasó de 11.2.2 a 11.21.0 el 2026-08-09 precisamente por avisos de path traversal y de
 ejecución de *lifecycle scripts*.
 
+**Un árbol limpio no se queda limpio solo (2026-09-28).** Sin tocar una sola dependencia, el
+backend amaneció el 2026-09-13 con **10 avisos altos** publicados después del último `verify` en
+verde, y la puerta estuvo en rojo dos semanas. Se resolvió así, y es el patrón para la próxima:
+
+- **Directas:** subir dentro de la misma versión mayor — `multer` 2.2.0 → 2.4.0, `nodemailer`
+  9.0.5 → 9.1.1 (no la 10), y de paso `morgan` 1.11.0 → 1.12.1 por un aviso moderado.
+- **Transitivas que su dueño fija a versión exacta:** `overrides` en `pnpm-workspace.yaml`.
+  `prisma` fija `mysql2@3.15.3` y `deepmerge-ts@7.1.5`, y Prisma 7.10 los sigue fijando, así que
+  subir Prisma no servía. Que el CLI se pode de la imagen (T4-14) no lo saca de `pnpm audit
+  --prod`: cuenta el árbol del lockfile, no el de la imagen. `deepmerge-ts` 7 → 8 es salto de
+  mayor, y se aceptó porque Prisma solo llama a `deepmerge()` como fusionador de `c12`, cuya firma
+  no cambia; `prisma generate` y `migrate deploy` dentro de `verify` lo ejercitan.
+- **Cada `override` es deuda:** el comentario del propio archivo dice cuándo retirarlo.
+
+En la misma pasada **pnpm pasó a 12.4.1 en los dos repositorios**, `packageManager` y Dockerfiles.
+El backend ya estaba en 12.4.1 desde el commit de T5-01, que se lo llevó sin querer, y el resto
+seguía en 11.21.0.
+
 ---
 
 ## 3. Licencias

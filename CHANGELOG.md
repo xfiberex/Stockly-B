@@ -349,6 +349,12 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Seguridad
 
+- **Dependencias sin avisos conocidos otra vez** (2026-09-28). `multer` 2.4.0, `nodemailer`
+  9.1.1 y `morgan` 1.12.1, y `overrides` en `pnpm-workspace.yaml` para `mysql2`,
+  `deepmerge-ts`, `fast-uri` y `qs`, que el CLI de Prisma y express fijaban en versiones
+  vulnerables. `pnpm auditoria` estaba en rojo desde el 2026-09-13 con 10 avisos altos. pnpm
+  pasa a **12.4.1** en los dos repositorios y sus Dockerfiles.
+
 - Cuentas desactivadas conservaban acceso hasta 15 minutos, lo que durase su access token
   (`T1-02`).
 - `logout` quedaba expuesto a CSRF (`T1-19`).

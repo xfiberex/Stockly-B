@@ -102,7 +102,7 @@ mensaje de error.
 
 ## Herramientas
 
-- **Gestor de paquetes: pnpm 11.21.0**, fijado en `packageManager` de ambos repositorios y
+- **Gestor de paquetes: pnpm 12.4.1**, fijado en `packageManager` de ambos repositorios y
   en el `Dockerfile`. No usar npm ni yarn.
 - **Comentarios y documentación en español**, como el resto del código. Los comentarios
   explican *por qué*, no *qué*: el qué ya está en la línea de abajo.

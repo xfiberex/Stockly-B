@@ -81,10 +81,12 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
 **Tier 4: 17/17** ✅ · **Tier 5: 4/15** *(abierto el 2026-09-13; T5-01 a T5-04 cerradas)* · Total **118/129**.
 
-**Ojo: el `verify` del backend está en rojo en su último paso desde el 2026-09-13**, y no por el
-código: `pnpm auditoria` encuentra **10 avisos altos** nuevos en `multer`, `nodemailer` y
-transitivas de Prisma. Todo lo anterior —tests, `build`, `smoke`— pasa. Hay que subir esas
-dependencias en una tarea propia; detalle en la ficha de T5-01.
+**`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
+rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
+una dependencia. Se cerró subiendo `multer`, `nodemailer` y `morgan` y con `overrides` en
+`pnpm-workspace.yaml` para las transitivas que el CLI de Prisma fija a versión exacta; cada una dice
+cuándo retirarla. Ese mismo día **pnpm pasó a 12.4.1** en los dos repositorios y sus Dockerfiles.
+Detalle en [dependencias.md §2](dependencias.md).
 
 **Ese 114/114 no significa «todo comprobado».** Una de las tareas, **T4-17** —el recorrido con
 lector de pantalla—, está **descartada y no hecha**: se cerró por decisión de alcance porque no hay

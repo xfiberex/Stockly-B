@@ -4,7 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Versión exacta: corepack rechaza rangos semver y el build no es reproducible con @latest
-RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.4.1 --activate
 
 # pnpm-workspace.yaml lleva la lista `allowBuilds`; sin él pnpm aborta con
 # ERR_PNPM_IGNORED_BUILDS al no poder ejecutar los scripts de instalación de Prisma
@@ -69,7 +69,7 @@ FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.4.1 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY scripts/podar-produccion.js ./scripts/
