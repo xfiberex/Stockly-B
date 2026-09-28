@@ -66,6 +66,7 @@ const RESPUESTAS = {
     Setting: contrato.ajusteSchema,
     AuditLog: contrato.registroAuditoriaSchema,
     ReportSummary: contrato.resumenReporteSchema,
+    PeriodReport: contrato.informePorPeriodoSchema,
     PaginationMeta: contrato.metaPaginacionSchema,
     Error: contrato.errorSchema,
 } as const;

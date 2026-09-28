@@ -1,6 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
+import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
 import { cleanDb, createUser, getAuthCookie } from "./helpers";
 
 /**
@@ -133,7 +134,9 @@ describe("Consultas del dashboard (T4-16)", () => {
             expect(typeof fila.total).toBe("number");
         }
         // Los OUT que ha creado esta suite tienen que estar contados en el mes en curso.
-        const mesActual = new Date().toISOString().slice(0, 7);
+        // El mes **del negocio** (T5-09): en los primeros minutos del mes UTC, en Santo
+        // Domingo todavía es el anterior.
+        const mesActual = hoyEn(ZONA_HORARIA_POR_DEFECTO).slice(0, 7);
         const salidas = res.body.data.movementsByMonth.find(
             (f: { month: string; type: string }) => f.month === mesActual && f.type === "OUT",
         );

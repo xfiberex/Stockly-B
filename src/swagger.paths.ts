@@ -400,6 +400,44 @@ export const rutasAdicionales: Record<string, Ruta> = {
             },
         },
     },
+    "/reports/period": {
+        get: {
+            tags: ["Reports"],
+            summary: "Ventas enviadas y compras recibidas de un periodo (T5-09)",
+            description:
+                "Los días son del negocio, en la zona del ajuste `timezone`. Se pide un atajo (`preset`) o un rango " +
+                "(`from` y `to`, ambos incluidos), no las dos cosas; sin ninguno, este mes. Máximo 60 meses. " +
+                "`format=csv` exporta el desglose por producto completo; `format=pdf`, el informe.",
+            parameters: [
+                { name: "preset", in: "query", schema: { type: "string", enum: ["this-month", "last-month", "this-quarter", "this-year"] } },
+                { name: "from", in: "query", schema: { type: "string", format: "date" }, description: "Primer día, AAAA-MM-DD" },
+                { name: "to", in: "query", schema: { type: "string", format: "date" }, description: "Último día, AAAA-MM-DD, incluido" },
+                { name: "format", in: "query", schema: { type: "string", enum: ["json", "csv", "pdf"], default: "json" } },
+            ],
+            responses: {
+                "200": {
+                    description: "Informe del periodo, o su CSV o PDF.",
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                properties: {
+                                    success: { type: "boolean" },
+                                    message: { type: "string" },
+                                    data: { $ref: "#/components/schemas/PeriodReport" },
+                                },
+                            },
+                        },
+                        "text/csv": { schema: { type: "string" } },
+                        "application/pdf": { schema: { type: "string", format: "binary" } },
+                    },
+                },
+                "400": ERROR("Periodo no válido: fecha mal escrita, atajo desconocido, fin antes del inicio o más de 60 meses"),
+                "401": ERROR("No autenticado"),
+                "413": ERROR("El CSV supera el máximo de filas de una exportación"),
+            },
+        },
+    },
 
     // ── Usuarios ─────────────────────────────────────────────────────────────
     "/users": {

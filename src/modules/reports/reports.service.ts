@@ -1,6 +1,9 @@
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
+import { hoyEn } from "@/shared/lib/zonaHoraria";
+import { settingsService } from "@/modules/settings/settings.service";
+import { mesesDe, resolverPeriodo } from "./reports.periodo";
 
 // Forma del resumen que consumen tanto el JSON como el generador de PDF.
 export type ReportSummary = Awaited<ReturnType<typeof reportsService.getSummary>>;
@@ -150,6 +153,149 @@ function consultarMargen() {
     ]);
 }
 
+// ─────────────────────── T5-09 — informes por periodo ───────────────────────
+
+/**
+ * Los extremos del periodo, como instantes UTC comparables con las columnas.
+ *
+ * Prisma guarda las fechas en `timestamp` **sin zona** y en UTC. `'2026-03-01'::timestamp AT
+ * TIME ZONE 'America/Santo_Domingo'` lee esa medianoche como hora de Santo Domingo y da el
+ * instante (`timestamptz`); el segundo `AT TIME ZONE 'UTC'` lo vuelve a escribir en UTC y sin
+ * zona, que es lo que hay en la columna. PostgreSQL sabe los cambios de horario de cada zona, así
+ * que un mes con cambio de hora dura lo que tiene que durar. `hasta` es la medianoche **del día
+ * siguiente** a `to`, y se compara con `<`: el último día entra entero.
+ */
+function extremos(from: string, to: string, zona: string) {
+    return {
+        desde: Prisma.sql`((${from}::date::timestamp) AT TIME ZONE ${zona} AT TIME ZONE 'UTC')`,
+        hasta: Prisma.sql`(((${to}::date + 1)::timestamp) AT TIME ZONE ${zona} AT TIME ZONE 'UTC')`,
+    };
+}
+
+type Tramo = { desde: Prisma.Sql; hasta: Prisma.Sql };
+
+/**
+ * Ventas: las **enviadas**, por su `shippedAt`, que es cuando la mercancía salió (T5-02). Las
+ * canceladas después de enviarse no cuentan: el estado ya dice que no son una venta. Al precio
+ * congelado en el ítem, no al de hoy.
+ */
+const DE_VENTAS = Prisma.sql`
+    FROM sale_orders so
+    JOIN sale_order_items soi ON soi."saleOrderId" = so.id
+`;
+const ventasEn = ({ desde, hasta }: Tramo) => Prisma.sql`
+    so.status = 'SHIPPED' AND so."shippedAt" >= ${desde} AND so."shippedAt" < ${hasta}
+`;
+
+/**
+ * Compras: cada **recepción**, por la fecha de su movimiento de entrada, al precio de su línea.
+ * Una orden recibida a medias en dos meses cuenta en los dos, cada parte en el suyo. Las de una
+ * orden cancelada no cuentan: la cancelación sacó esas unidades del inventario.
+ *
+ * Las líneas escritas a mano, sin producto, no dejan movimiento —no entran en el inventario— y
+ * por tanto tampoco están aquí: el informe es de lo que entró en el almacén.
+ */
+const DE_COMPRAS = Prisma.sql`
+    FROM stock_movements sm
+    JOIN purchase_order_items poi ON poi.id = sm."purchaseOrderItemId"
+    JOIN purchase_orders po ON po.id = poi."purchaseOrderId"
+`;
+const comprasEn = ({ desde, hasta }: Tramo) => Prisma.sql`
+    sm.type = 'IN' AND po.status <> 'CANCELLED'
+    AND sm."createdAt" >= ${desde} AND sm."createdAt" < ${hasta}
+`;
+
+/** Lo que tiene cada fila del informe: unidades e importe, de ventas y de compras. */
+type CifrasDelPeriodo = {
+    salesUnits: bigint | number;
+    salesRevenue: number;
+    purchaseUnits: bigint | number;
+    purchaseAmount: number;
+};
+
+function cifras<T extends CifrasDelPeriodo>(fila: T) {
+    return {
+        ...fila,
+        salesUnits: Number(fila.salesUnits),
+        salesRevenue: Number(fila.salesRevenue),
+        purchaseUnits: Number(fila.purchaseUnits),
+        purchaseAmount: Number(fila.purchaseAmount),
+    };
+}
+
+/** Productos del desglose en pantalla y en el PDF. El CSV los lleva todos. */
+export const PRODUCTOS_POR_PERIODO = 50;
+
+/**
+ * Por producto, ventas y compras en la misma fila: un producto que solo se compró en el
+ * periodo, o que solo se vendió, tiene que salir igual.
+ *
+ * **Una sola agregación, sobre la unión de las dos fuentes.** La primera versión agregaba
+ * ventas y compras por separado y las cruzaba con un `FULL JOIN`; con el año del conjunto de
+ * carga —443 000 líneas, 100 000 productos— las dos agregaciones y el cruce **ordenaban en
+ * disco** (`external merge`, ~15 MB por proceso) y tardaban 1.8 s. Unidas, es un único
+ * `HashAggregate` sin ordenación previa, y cada fila del grupo lleva solo lo imprescindible:
+ * la clave y cuatro sumas que caben en un registro —`int8` y `float8`, no `numeric`, cuyo
+ * estado de suma es una estructura aparte por grupo—. El `float8` no pierde céntimos aquí: cada
+ * término es exacto en `numeric` antes de convertirse, y el error de sumar miles de términos
+ * queda muy por debajo del redondeo a dos decimales. Los totales, que suman el periodo entero,
+ * siguen en `numeric`.
+ *
+ * La clave es el producto o, si se borró, el nombre congelado en la línea con un `~` delante,
+ * que no puede coincidir con un id: dos productos borrados distintos no se funden en una fila.
+ * Nombre, SKU y categoría son los **actuales**, y se buscan **después** del `LIMIT`: para 51
+ * filas, no para 100 000.
+ *
+ * No hay recuento total: `COUNT(*) OVER ()` obliga a guardar todos los grupos antes de dar el
+ * primero, que es justo lo que se evita. Se pide uno más de los que se enseñan y eso dice si
+ * hay más.
+ */
+function productosDelPeriodo(tramo: Tramo, limite: number | null) {
+    return prisma.$queryRaw<Array<CifrasDelPeriodo & {
+        productId: string | null;
+        name: string;
+        sku: string | null;
+        category: string | null;
+    }>>`
+        WITH lineas AS (
+            SELECT COALESCE(soi."productId", '~' || soi."productName") AS clave,
+                   soi.quantity AS su,
+                   (soi.quantity * soi."unitPrice")::float8 AS sr,
+                   0 AS pu,
+                   0::float8 AS pa
+            ${DE_VENTAS}
+            WHERE ${ventasEn(tramo)}
+            UNION ALL
+            SELECT COALESCE(poi."productId", '~' || poi."productName"),
+                   0,
+                   0::float8,
+                   sm.delta,
+                   (sm.delta * poi."unitPrice")::float8
+            ${DE_COMPRAS}
+            WHERE ${comprasEn(tramo)}
+        ),
+        agregado AS (
+            SELECT clave, SUM(su) AS su, SUM(sr) AS sr, SUM(pu) AS pu, SUM(pa) AS pa
+            FROM lineas
+            GROUP BY clave
+            ORDER BY sr DESC, pa DESC, clave
+            ${limite === null ? Prisma.empty : Prisma.sql`LIMIT ${limite}`}
+        )
+        SELECT p.id AS "productId",
+               COALESCE(p.name, CASE WHEN a.clave LIKE '~%' THEN substr(a.clave, 2) END) AS name,
+               p.sku,
+               cat.name AS category,
+               a.su AS "salesUnits",
+               a.sr AS "salesRevenue",
+               a.pu AS "purchaseUnits",
+               a.pa AS "purchaseAmount"
+        FROM agregado a
+        LEFT JOIN products p ON p.id = a.clave
+        LEFT JOIN categories cat ON cat.id = p."categoryId"
+        ORDER BY a.sr DESC, a.pa DESC, a.clave
+    `;
+}
+
 export const reportsService = {
     async getSummary() {
         // T5-02 — el margen arranca a la vez que el resto y se recoge más abajo: esperarlo
@@ -158,6 +304,10 @@ export const reportsService = {
         // fallando—; solo evita un rechazo sin manejar si antes falla el otro bloque.
         const margenEnCurso = consultarMargen();
         margenEnCurso.catch(() => undefined);
+
+        // T5-09 — el gráfico de movimientos va por meses del negocio. Es una lectura por
+        // clave primaria de `app_settings`; mientras, el margen ya está en marcha.
+        const zona = await settingsService.zonaHoraria();
 
         const [
             totalProducts,
@@ -240,25 +390,29 @@ export const reportsService = {
              * ordenación. Seis recorridos por rango de índice en lugar de una ordenación
              * completa. Medido: **275.6 ms → 74.8 ms**, y en memoria.
              *
-             * `GREATEST(g.mes, …)` conserva el comportamiento exacto del original, **incluido
-             * el primer cubo parcial**: la ventana rueda desde hoy, así que el mes más
-             * antiguo va a medias. Es una rareza del gráfico —una barra corta que no
-             * corresponde a menos actividad— pero cambiarla es una decisión de producto, no
-             * de rendimiento, y esta tarea no la toma. Comprobado cubo a cubo con el instante
-             * de corte fijado: **las dos formas dan las mismas cifras**; sin fijarlo parecen
-             * distintas porque el borde se mueve entre una consulta y la siguiente.
+             * T5-09 — **meses naturales del negocio**: el mes en curso y los cinco anteriores
+             * completos, cada uno de medianoche a medianoche en la zona del ajuste
+             * `timezone`. Hasta T5-09 la ventana rodaba seis meses desde hoy y el mes más
+             * antiguo salía a medias: una barra corta que no correspondía a menos actividad.
+             * T4-16 la conservó a propósito —cambiarla era una decisión de producto— y la ficha
+             * de T5-09 era donde tomarla. Solo el mes en curso puede ir a medias, y ese se sabe
+             * que está sin terminar.
+             *
+             * `g.mes` es una medianoche **local** sin zona; `AT TIME ZONE` la convierte al
+             * instante UTC en que empieza ese mes en el negocio, que es como se guardan las
+             * fechas. Sigue siendo un recorrido por rango de índice por mes.
              */
             prisma.$queryRaw<Array<{ month: string; type: string; total: bigint }>>`
                 SELECT TO_CHAR(g.mes, 'YYYY-MM') AS month, c.type, c.total
                 FROM generate_series(
-                        date_trunc('month', NOW() - INTERVAL '6 months'),
-                        date_trunc('month', NOW()),
+                        date_trunc('month', NOW() AT TIME ZONE ${zona}) - INTERVAL '5 months',
+                        date_trunc('month', NOW() AT TIME ZONE ${zona}),
                         INTERVAL '1 month') AS g(mes),
                      LATERAL (
                         SELECT sm.type, COUNT(*)::bigint AS total
                         FROM stock_movements sm
-                        WHERE sm."createdAt" >= GREATEST(g.mes, NOW() - INTERVAL '6 months')
-                          AND sm."createdAt" < g.mes + INTERVAL '1 month'
+                        WHERE sm."createdAt" >= (g.mes AT TIME ZONE ${zona} AT TIME ZONE 'UTC')
+                          AND sm."createdAt" < ((g.mes + INTERVAL '1 month') AT TIME ZONE ${zona} AT TIME ZONE 'UTC')
                         GROUP BY sm.type
                      ) c
                 ORDER BY g.mes ASC
@@ -400,4 +554,191 @@ export const reportsService = {
             },
         };
     },
+
+    /**
+     * T5-09 — ventas enviadas y compras recibidas de un periodo: totales, por mes, por
+     * categoría y los productos que más facturaron. Cinco consultas en paralelo; ninguna
+     * depende de otra.
+     *
+     * Los totales se calculan con su propia consulta y **no** sumando los meses, aunque darían lo
+     * mismo: así «la suma de los meses coincide con el trimestre», que es el criterio de la
+     * ficha, compara dos cálculos y no uno consigo mismo.
+     */
+    async getPeriod(query: { preset?: unknown; from?: unknown; to?: unknown }) {
+        const zona = await settingsService.zonaHoraria();
+        const periodo = resolverPeriodo(query, hoyEn(zona));
+        const tramo = extremos(periodo.from, periodo.to, zona);
+
+        const [ventas, compras, porMes, porCategoria, productos] = await Promise.all([
+            // Las órdenes se cuentan aparte y no con `COUNT(DISTINCT so.id)` sobre las líneas:
+            // ese `DISTINCT` ordena todas las líneas del periodo, y con el año del conjunto de
+            // carga eran 443 000 filas **ordenadas en disco** (~9 MB por proceso, 1.2 s).
+            prisma.$queryRaw<Array<{ orders: bigint; units: bigint; importe: number }>>`
+                SELECT (SELECT COUNT(*) FROM sale_orders so WHERE ${ventasEn(tramo)}) AS orders,
+                       COALESCE(SUM(soi.quantity), 0)::bigint AS units,
+                       COALESCE(SUM(soi.quantity * soi."unitPrice"), 0)::float8 AS importe
+                ${DE_VENTAS}
+                WHERE ${ventasEn(tramo)}
+            `,
+            // Las órdenes con alguna recepción en el periodo, con `EXISTS`: un semijoin por
+            // hash, sin ordenar. Agrupar las recepciones por orden para contar los grupos
+            // también evitaba el `DISTINCT`, pero el planificador lo resolvía ordenando
+            // (medido: 4.5 MB a disco por proceso con el año del conjunto de carga).
+            prisma.$queryRaw<Array<{ orders: bigint; units: bigint; importe: number }>>`
+                SELECT (
+                           SELECT COUNT(*) FROM purchase_orders po
+                           WHERE po.status <> 'CANCELLED'
+                             AND EXISTS (
+                                 SELECT 1
+                                 FROM purchase_order_items poi
+                                 JOIN stock_movements sm ON sm."purchaseOrderItemId" = poi.id
+                                 WHERE poi."purchaseOrderId" = po.id
+                                   AND sm.type = 'IN'
+                                   AND sm."createdAt" >= ${tramo.desde} AND sm."createdAt" < ${tramo.hasta}
+                             )
+                       ) AS orders,
+                       COALESCE(SUM(sm.delta), 0)::bigint AS units,
+                       COALESCE(SUM(sm.delta * poi."unitPrice"), 0)::float8 AS importe
+                ${DE_COMPRAS}
+                WHERE ${comprasEn(tramo)}
+            `,
+            /**
+             * Un mes por fila, **también los que no tienen nada**: un hueco en la serie se
+             * leería como que el mes no existe. Los meses de los extremos quedan recortados al
+             * periodo sin hacer nada: las filas ya vienen filtradas por sus extremos.
+             *
+             * **Una pasada, cruzando cada fila con su mes.** La primera versión recorría el
+             * periodo mes a mes con un `LATERAL`, como el gráfico de T4-16; con un año del
+             * conjunto de carga eran 443 000 búsquedas por índice y **3.9 s**. Agrupar por la
+             * expresión del mes tampoco sirve: PostgreSQL no tiene estadísticas de una
+             * expresión, estima demasiados grupos y ordena todas las filas (el defecto que
+             * T4-16 encontró en el gráfico). Aquí cada fila se une a la lista de meses por el
+             * texto `YYYY-MM` de su fecha **local**, y se agrupa por la columna de esa lista.
+             *
+             * **La lista va como `VALUES` y no con `generate_series`**, y no es cosmético: de
+             * `generate_series` sobre fechas el planificador supone 1 000 filas, y con eso
+             * prefirió un `Merge Join` que **ordenaba en disco** las 443 000 líneas del año.
+             * Con los meses escritos sabe que son doce, los mete en un hash y agrupa en memoria.
+             *
+             * **Y el cruce de órdenes y líneas va aparte, tras un `OFFSET 0`.** Del cruce con los
+             * meses el planificador estima una fila de cada doscientas —no puede saber que todas
+             * caen en algún mes—, y con esa cifra le salía más barato buscar las líneas de cada
+             * orden por índice: 221 000 búsquedas, 1.7 s de los 2.3 que tardaba el año. El
+             * `OFFSET 0` le obliga a planificar la subconsulta por su cuenta, con el `Hash Join`
+             * en paralelo de los totales, y a cruzar con los meses lo que ya salió de ahí.
+             */
+            prisma.$queryRaw<Array<CifrasDelPeriodo & { month: string }>>`
+                WITH lista (month) AS (
+                    VALUES ${Prisma.join(mesesDe(periodo.from, periodo.to).map((mes) => Prisma.sql`(${mes})`))}
+                ),
+                meses AS MATERIALIZED (
+                    SELECT month,
+                           (to_date(month, 'YYYY-MM')::timestamp AT TIME ZONE ${zona} AT TIME ZONE 'UTC') AS desde,
+                           ((to_date(month, 'YYYY-MM') + INTERVAL '1 month')::timestamp AT TIME ZONE ${zona} AT TIME ZONE 'UTC') AS hasta
+                    FROM lista
+                ),
+                ventas AS (
+                    SELECT meses.month, SUM(l.units)::bigint AS units, SUM(l.importe)::float8 AS importe
+                    FROM (
+                        SELECT so."shippedAt" AS fecha, soi.quantity AS units, soi.quantity * soi."unitPrice" AS importe
+                        ${DE_VENTAS}
+                        WHERE ${ventasEn(tramo)}
+                        OFFSET 0
+                    ) l
+                    JOIN meses ON l.fecha >= meses.desde AND l.fecha < meses.hasta
+                    GROUP BY meses.month
+                ),
+                compras AS (
+                    SELECT meses.month, SUM(l.units)::bigint AS units, SUM(l.importe)::float8 AS importe
+                    FROM (
+                        SELECT sm."createdAt" AS fecha, sm.delta AS units, sm.delta * poi."unitPrice" AS importe
+                        ${DE_COMPRAS}
+                        WHERE ${comprasEn(tramo)}
+                        OFFSET 0
+                    ) l
+                    JOIN meses ON l.fecha >= meses.desde AND l.fecha < meses.hasta
+                    GROUP BY meses.month
+                )
+                SELECT meses.month,
+                       COALESCE(v.units, 0) AS "salesUnits",
+                       COALESCE(v.importe, 0) AS "salesRevenue",
+                       COALESCE(c.units, 0) AS "purchaseUnits",
+                       COALESCE(c.importe, 0) AS "purchaseAmount"
+                FROM meses
+                LEFT JOIN ventas v ON v.month = meses.month
+                LEFT JOIN compras c ON c.month = meses.month
+                ORDER BY meses.month
+            `,
+            // Por la categoría **actual** del producto, como el margen (T5-02). `name` a NULL
+            // para lo que no tiene categoría o ya no tiene producto: la etiqueta la pone
+            // quien pinta, en su idioma.
+            prisma.$queryRaw<Array<CifrasDelPeriodo & { name: string | null }>>`
+                WITH ventas AS (
+                    SELECT p."categoryId" AS cid,
+                           SUM(soi.quantity)::bigint AS units,
+                           SUM(soi.quantity * soi."unitPrice") AS importe
+                    ${DE_VENTAS}
+                    LEFT JOIN products p ON p.id = soi."productId"
+                    WHERE ${ventasEn(tramo)}
+                    GROUP BY 1
+                ),
+                compras AS (
+                    SELECT p."categoryId" AS cid,
+                           SUM(sm.delta)::bigint AS units,
+                           SUM(sm.delta * poi."unitPrice") AS importe
+                    ${DE_COMPRAS}
+                    LEFT JOIN products p ON p.id = poi."productId"
+                    WHERE ${comprasEn(tramo)}
+                    GROUP BY 1
+                )
+                SELECT cat.name AS name,
+                       COALESCE(v.units, 0) AS "salesUnits",
+                       COALESCE(v.importe, 0)::float8 AS "salesRevenue",
+                       COALESCE(c.units, 0) AS "purchaseUnits",
+                       COALESCE(c.importe, 0)::float8 AS "purchaseAmount"
+                FROM ventas v
+                -- Por un texto y no por la columna: el FULL JOIN necesita una igualdad que
+                -- se pueda resolver con hash, y sin categoría las dos claves son NULL.
+                FULL JOIN compras c ON COALESCE(c.cid, '') = COALESCE(v.cid, '')
+                LEFT JOIN categories cat ON cat.id = COALESCE(v.cid, c.cid)
+                ORDER BY "salesRevenue" DESC, "purchaseAmount" DESC, cat.name NULLS LAST
+            `,
+            // Uno más de los que se enseñan: si llega, hay más (ver `productosDelPeriodo`).
+            productosDelPeriodo(tramo, PRODUCTOS_POR_PERIODO + 1),
+        ]);
+
+        return {
+            ...periodo,
+            timezone: zona,
+            totals: {
+                salesOrders: Number(ventas[0]?.orders ?? 0),
+                salesUnits: Number(ventas[0]?.units ?? 0),
+                salesRevenue: Number(ventas[0]?.importe ?? 0),
+                purchaseOrders: Number(compras[0]?.orders ?? 0),
+                purchaseUnits: Number(compras[0]?.units ?? 0),
+                purchaseAmount: Number(compras[0]?.importe ?? 0),
+            },
+            byMonth: porMes.map((m) => cifras(m)),
+            byCategory: porCategoria.map((c) => cifras(c)),
+            byProduct: productos.slice(0, PRODUCTOS_POR_PERIODO).map((p) => cifras(p)),
+            moreProducts: productos.length > PRODUCTOS_POR_PERIODO,
+        };
+    },
+
+    /**
+     * T5-09 — el desglose por producto **completo**, para el CSV. Sin el tope de pantalla: quien
+     * exporta quiere la tabla entera. Es una fila por producto con actividad en el periodo, así
+     * que cabe en memoria de una vez; el tope de filas de las exportaciones sigue aplicando.
+     */
+    async getPeriodProducts(query: { preset?: unknown; from?: unknown; to?: unknown }) {
+        const zona = await settingsService.zonaHoraria();
+        const periodo = resolverPeriodo(query, hoyEn(zona));
+        const filas = await productosDelPeriodo(extremos(periodo.from, periodo.to, zona), null);
+        return {
+            periodo,
+            filas: filas.map((p) => cifras(p)),
+        };
+    },
 };
+
+export type PeriodReport = Awaited<ReturnType<typeof reportsService.getPeriod>>;

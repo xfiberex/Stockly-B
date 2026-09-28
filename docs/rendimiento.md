@@ -323,9 +323,10 @@ primera versión las esperaba al final, y eso sumaba sus ~190 ms a la primera pa
 login; ahora arrancan a la vez que las demás. **No se ha repetido `pnpm carga:ejecutar`**, así
 que el p(95) de 337 ms del §6 no está medido de nuevo con estas consultas.
 
-**Salvedad:** mientras `load/sembrar.js` no genere ventas, rehacer `Stockly_carga` las borra y
-estas cuatro filas no se pueden repetir con el guion versionado. Traerlo al generador es trabajo
-pendiente, anotado en la ficha de T5-02.
+**Salvedad, resuelta en T5-09:** `load/sembrar.js` no generaba ventas, así que rehacer
+`Stockly_carga` las borraba y estas cuatro filas no se podían repetir. Desde el 2026-09-28 el
+generador siembra costes, ventas y compras con recepciones con las proporciones de arriba (§7
+quater). **Estas cuatro filas no se han vuelto a medir** con él.
 
 ---
 
@@ -345,15 +346,69 @@ son ~160 ms de agregar lo comprometido en ventas pendientes, que recorre las 660
 que hace T5-03 en el catálogo. Si alguna vez molesta, el sitio es esa agregación —partir de las
 ventas `PENDING` y no de las líneas—, no `work_mem` (§5).
 
-**Lo que no está medido:** `load/sembrar.js` no genera órdenes de compra, así que el `LATERAL` del
+**Lo que no está medido:** cuando se midió, `load/sembrar.js` no generaba órdenes de compra —desde
+T5-09 sí, pero esto no se ha repetido—, así que el `LATERAL` del
 último precio pagado y lo pendiente de recibir corren aquí sobre una tabla vacía. Con compras reales
 el `LATERAL` se hace solo para las 50 filas de la página y usa el índice de
 `purchase_order_items(productId)`.
 
+## 7 quater. T5-09 — ventas y compras por periodo, sobre el conjunto de carga
+
+Medido el 2026-09-28 sobre `Stockly_carga` rehecha con el generador versionado: 100 000
+productos, 1.2 M movimientos, **660 000 líneas de venta** (330 000 órdenes en un año) y **90 000
+líneas de compra con 105 384 recepciones** (30 000 órdenes). Mejor de cinco pasadas con
+`EXPLAIN (ANALYZE, BUFFERS)` sobre las consultas **tal como las lanza el servicio**, con sus
+parámetros; `work_mem` de fábrica (4 MB).
+
+| Consulta | Un mes | Un trimestre | Un año |
+|---|---:|---:|---:|
+| Totales de ventas | 113 ms | 139 ms | 223 ms |
+| Totales de compras | 282 ms | 325 ms | 701 ms · **4.5 MB a disco** |
+| Por categoría | 299 ms | 359 ms | 489 ms |
+| Por mes | 350 ms | 545 ms | 1 784 ms · hash en 4 lotes, 4.5 MB a disco |
+| Por producto (51 filas) | 350 ms | 601 ms · 3.6 MB a disco | 1 031 ms · **~7 MB a disco** por proceso |
+
+Las cinco corren a la vez, así que la pantalla espera la más lenta. **Con un mes ninguna toca
+el disco.**
+
+**Tres defectos de la primera versión que salieron aquí y no en los tests:**
+
+- `COUNT(DISTINCT so.id)` para contar órdenes **ordena todas las líneas**: un año eran 443 000
+  filas a disco y 1.2 s. Ahora las ventas se cuentan en `sale_orders` y las compras con un
+  `EXISTS`.
+- El desglose por producto agregaba ventas y compras por separado y las cruzaba con un
+  `FULL JOIN`, más un `COUNT(*) OVER ()` para el total: todo ordenado en disco, **1.8 s**. Ahora
+  es un `UNION ALL` y un único `HashAggregate` con la fila más estrecha posible —clave y cuatro
+  sumas `int8`/`float8`—, el `LIMIT` antes de buscar nombres, y un «hay más» en vez del recuento.
+- El desglose por meses recorría el periodo mes a mes con un `LATERAL`, como el gráfico de T4-16,
+  y con un año eran **443 000 búsquedas por índice y 3.9 s**. Ahora es una pasada: los meses van
+  como `VALUES` —de `generate_series` el planificador supone 1 000 filas y eligió un `Merge
+  Join` que ordenaba en disco—, y el cruce de órdenes y líneas va tras un `OFFSET 0`, porque del
+  cruce con los meses el planificador estimaba una fila de cada doscientas y prefería buscar las
+  líneas por índice (1.7 s de los 2.3 de esa versión intermedia).
+
+**Lo que queda a disco con un año, y por qué se deja.** El agregado por producto son ~100 000
+grupos, y no caben en los 8 MB de hash que da el `work_mem` de fábrica. Se probó **en memoria**
+con `SET LOCAL work_mem = '16MB'` dentro de una transacción solo para esa consulta —distinto de lo
+que T4-16 rechazó, que era subirlo en el servidor—: en memoria de verdad (un lote, `quicksort` de
+11.5 MB), y **más lenta, 1.2 s frente a 0.76 s**, en las cinco pasadas. Se quitó. La ordenación de
+las compras (4.5 MB) es de las líneas de compra para un `Merge Join` contra el índice de
+`purchaseOrderItemId`; no se ha perseguido.
+
+**Un tropiezo del propio guion de medición**, anotado por si se repite: al interceptar
+`$queryRaw` para lanzar el `EXPLAIN`, el cliente de una transacción interactiva de Prisma hereda el
+método interceptado del cliente global, y la consulta «dentro» de la transacción se ejecutaba
+fuera, con el `work_mem` de fábrica. Las pasadas alternaban entre 16 MB y 4 MB hasta que se
+comprobó con `current_setting('work_mem')` antes de cada `EXPLAIN`.
+
+**El gráfico de movimientos del dashboard, a meses naturales:** la forma nueva frente a la de
+T4-16, las dos aisladas y sobre la misma base, **77.6 → 76.3 ms**. Dentro del resumen del
+dashboard sale en ~180 ms porque corre a la vez que las otras diez consultas.
+
 ## 8. Repetir las mediciones
 
 ```bash
-pnpm carga:sembrar                    # ~2 min 30 s; recrea Stockly_carga desde cero
+pnpm carga:sembrar                    # ~3 min 20 s; recrea Stockly_carga desde cero, con órdenes
 pnpm carga:sembrar --productos=10000 --movimientos=200000
 pnpm carga:consultas                  # EXPLAIN ANALYZE con y sin índices
 pnpm build && pnpm carga:ejecutar     # k6 en Docker; --sin-caliente para la línea base

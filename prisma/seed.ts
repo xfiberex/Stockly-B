@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import { prisma } from "../src/shared/lib/prisma";
 import { hashPassword } from "../src/shared/lib/hash";
 import { categoriesData } from "./data/categories";
@@ -391,6 +392,8 @@ interface Evento {
     delta: number;
     note: string;
     createdAt: Date;
+    /** T5-09 — la línea de compra que recibe esta entrada, como en producción. */
+    purchaseOrderItemId?: string;
 }
 
 /**
@@ -547,6 +550,10 @@ async function sembrarOrdenesDeCompra(
         const lineas = orden.items.map((i) => {
             const producto = exigirProducto(porSku, i.sku);
             const recibida = unidadesRecibidas(orden, i);
+            // T5-09 — el id se pone aquí y no lo genera la base, para que la entrada que
+            // recibe la línea pueda apuntar a ella: es lo que fecha la compra en el informe
+            // por periodo. Sin el enlace, las compras del seed no aparecerían en él.
+            const id = randomUUID();
             if (recibida > 0) {
                 libro.anotar({
                     productId: producto.id,
@@ -554,9 +561,11 @@ async function sembrarOrdenesDeCompra(
                     delta: recibida,
                     note: `Recepción de orden de compra — ${orden.proveedor}`,
                     createdAt: fecha,
+                    purchaseOrderItemId: id,
                 });
             }
             return {
+                id,
                 productId: producto.id,
                 productName: producto.name,
                 quantity: i.qty,

@@ -333,6 +333,14 @@ describe("Contrato de la API (T4-01)", () => {
             expect(typeof res.body.data.topByValue[0].price).toBe("number");
         });
 
+        it("GET /reports/period", async () => {
+            const res = await request(app).get("/api/v1/reports/period?preset=this-year").set("Cookie", cookieAdmin);
+
+            expect(res.status).toBe(200);
+            conforme(contrato.informePorPeriodoSchema, res.body.data, "GET /reports/period");
+            expect(res.body.data.byMonth).toHaveLength(12);
+        });
+
         /** Los cuatro catálogos responden lista suelta o paginada según el módulo. */
         async function listaDe(ruta: string): Promise<unknown> {
             const res = await request(app).get(`/api/v1/${ruta}`).set("Cookie", cookieAdmin);

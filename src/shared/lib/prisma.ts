@@ -9,7 +9,12 @@ const globalForPrisma = globalThis as unknown as {
 const adapter = new PrismaPg({
     connectionString: env.databaseUrl,
     max: 10,
-    idleTimeoutMillis: 30_000,
+    // En los tests, un segundo. Jest da a cada archivo su propio contexto, así que cada uno
+    // crea su cliente y su pool, y las conexiones del archivo anterior seguían abiertas los
+    // 30 s de inactividad: con 48 archivos en ~40 s se acumulaban hasta el `max_connections`
+    // de 100 de PostgreSQL, y la suite fallaba con «demasiados clientes» (T5-09, al añadir
+    // un archivo que lanza cinco consultas a la vez).
+    idleTimeoutMillis: process.env.NODE_ENV === "test" ? 1_000 : 30_000,
     connectionTimeoutMillis: 5_000,
 });
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/shared/lib/prisma";
+import { ZONA_HORARIA_POR_DEFECTO, zonaHorariaCanonica } from "@/shared/lib/zonaHoraria";
 
 // Catálogo de todos los ajustes disponibles, con sus valores por defecto y metadatos
 export const SETTINGS_CATALOG = [
@@ -20,6 +21,16 @@ export const SETTINGS_CATALOG = [
         entero: true,
         min: 0,
         max: 365,
+    },
+    {
+        // T5-09 — dónde empieza y termina cada día de los informes por periodo. Se valida
+        // contra la base de zonas IANA: un nombre mal escrito rompería todos los informes.
+        key: "timezone",
+        label: "Zona horaria del negocio",
+        description: "Zona horaria IANA en la que empiezan y terminan los días y los meses de los informes.",
+        type: "string" as const,
+        defaultValue: ZONA_HORARIA_POR_DEFECTO,
+        zonaHoraria: true,
     },
 ] as const;
 
@@ -44,6 +55,15 @@ export const settingsService = {
         if (!def) return false;
         const stored = await prisma.appSetting.findUnique({ where: { key } });
         return parseValue(def.type, stored?.value ?? def.defaultValue);
+    },
+
+    /**
+     * T5-09 — la zona del negocio, siempre válida. Si la guardada no lo es —solo puede pasar
+     * editando la tabla a mano, porque el `PATCH` la valida—, se usa la de por defecto en vez
+     * de dejar que PostgreSQL rechace cada informe.
+     */
+    async zonaHoraria(): Promise<string> {
+        return zonaHorariaCanonica(String(await settingsService.get("timezone"))) ?? ZONA_HORARIA_POR_DEFECTO;
     },
 
     async set(key: SettingKey, value: boolean | string | number) {

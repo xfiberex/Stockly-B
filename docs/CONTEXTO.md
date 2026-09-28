@@ -81,7 +81,7 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 (el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 5/15** *(abierto el 2026-09-13; T5-01 a T5-05 cerradas)* · Total **119/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 6/15** *(abierto el 2026-09-13; T5-01 a T5-05 y T5-09 cerradas)* · Total **120/129**.
 
 **`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
 rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
@@ -477,12 +477,12 @@ incluida la extensión `pg_trgm` de T2-09.
 
 **Por dónde seguir (2026-09-28): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
 está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—. Lo que queda no tiene
-orden entre sí: T5-06, T5-07, T5-08, `T5-09 → T5-10`, T5-11, T5-12 y T5-13; T5-14 y T5-15 solo con un
-caso de uso real. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
+orden entre sí: T5-06, T5-07, T5-08, T5-10 (T5-09 ya está hecha: tiene el periodo que necesita),
+T5-11, T5-12 y T5-13; T5-14 y T5-15 solo con un caso de uso real. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
 tiene plazo de entrega. Lo que
-sigue se escribió al cerrar los Tiers 0 a 4, y las dos decisiones de producto que menciona tienen dónde
-tomarse: el cubo parcial en **T5-09**, y la búsqueda por SKU puede resolverla la búsqueda exacta de
-**T5-08** sin tocar el buscador de texto.
+sigue se escribió al cerrar los Tiers 0 a 4. De las dos decisiones de producto que menciona, **el
+cubo parcial se tomó en T5-09** (meses naturales en la zona del negocio), y la búsqueda por SKU puede
+resolverla la búsqueda exacta de **T5-08** sin tocar el buscador de texto.
 
 **Al cierre del 2026-08-12 el ROADMAP estaba en 114/114 y no quedaba nada asignado.** Eso no quería
 decir que no quedara nada que hacer; quería decir que **lo siguiente hay que decidirlo, no consultarlo**. Tres
@@ -490,8 +490,8 @@ cosas quedan escritas y sin dueño, y ninguna es una tarea pendiente disfrazada:
 
 - **T4-17 se descartó, no se hizo.** El recorrido con lector de pantalla sigue sin ejecutarse. Si
   aparece una máquina con NVDA o VoiceOver, es lo primero que vuelve a la lista.
-- **El primer cubo del gráfico de movimientos por mes es parcial**, porque la ventana rueda desde
-  hoy. Se conservó al reescribir la consulta en T4-16: cambiarlo es una decisión de producto.
+- ~~**El primer cubo del gráfico de movimientos por mes es parcial**~~, porque la ventana rodaba desde
+  hoy. Se conservó al reescribir la consulta en T4-16 y **se decidió en T5-09**: meses naturales.
 - **El buscador del catálogo ignora el SKU** (§7 de [rendimiento.md](rendimiento.md)). Lo mismo:
   cambiar lo que busca una pantalla no es una tarea de rendimiento.
 

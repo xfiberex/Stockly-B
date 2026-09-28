@@ -14,6 +14,7 @@
 //   node load/sembrar.js                                   100 000 productos, 1 000 000 movimientos
 //   node load/sembrar.js --productos=10000 --movimientos=200000
 //   node load/sembrar.js --base=Stockly_carga2
+//   node load/sembrar.js --ventas=33000 --compras=3000      órdenes (330 000 y 30 000 por defecto)
 
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
@@ -38,6 +39,10 @@ const AUDITORIA = Math.round(MOVIMIENTOS * 0.2);
 // El histórico de la referencia más movida. Dos años de un producto que entra y sale a
 // diario dan este orden de magnitud, y es el caso que castiga al endpoint sin paginar.
 const CALIENTE = Number(argumento("caliente", 100_000));
+// T5-09 — las órdenes. 330 000 ventas son las de la medición de T5-02 (§7 bis de
+// rendimiento.md); 30 000 compras de tres líneas dan ~100 000 recepciones en un año.
+const VENTAS = Number(argumento("ventas", 330_000));
+const COMPRAS = Number(argumento("compras", 30_000));
 
 const { base: baseDeLaApp, entorno } = conexion();
 
@@ -226,6 +231,115 @@ paso(`producto caliente (${CALIENTE.toLocaleString("es")} movimientos)`, () => {
         FROM generate_series(1, ${CALIENTE}) i, p`);
 });
 
+// ── Costes, ventas y compras (T5-09) ─────────────────────────────────────────
+//
+// Hasta T5-09 el generador no tenía ni una orden, y las mediciones de T5-02 y T5-05 se
+// hicieron con un guion a mano que no se versionó: rehacer la base las borraba. Ahora están
+// aquí, con las proporciones que describe rendimiento.md §7 bis.
+//
+// **El producto de cada línea se sortea en la lista de columnas, nunca en la condición de
+// un `JOIN`.** La siembra a mano de T5-02 lo hizo al revés, el planificador evaluó el
+// `random()` una sola vez y las 660 000 líneas apuntaron al mismo producto. Aquí se sortea un
+// número por línea y se cruza después con los productos numerados.
+
+paso("coste en el 90 % de los productos", () => {
+    psql(`
+        SELECT setseed(0.61);
+        UPDATE products
+        SET "costPrice" = round((price * (0.5 + random() * 0.3))::numeric, 4)
+        WHERE random() < 0.9`);
+});
+
+paso(`${VENTAS.toLocaleString("es")} órdenes de venta (${(VENTAS * 2).toLocaleString("es")} líneas)`, () => {
+    // Un año de ventas: de cada 33, 1 cancelada y 2 pendientes, el resto enviadas. Las
+    // canceladas conservan su `shippedAt`, como en producción cuando se cancela después de
+    // enviar: el informe las descarta por estado, no por fecha.
+    psql(`
+        SELECT setseed(0.53);
+
+        CREATE TEMP TABLE numerados AS
+            SELECT row_number() OVER (ORDER BY id) AS k, id, name, price, "costPrice" FROM products;
+        CREATE UNIQUE INDEX ON numerados (k);
+
+        CREATE TEMP TABLE ordenes AS
+            SELECT gen_random_uuid()::text AS id, i,
+                   (CASE WHEN i % 33 = 0 THEN 'CANCELLED' WHEN i % 33 IN (1, 2) THEN 'PENDING' ELSE 'SHIPPED' END)::"SaleOrderStatus" AS status,
+                   now() - (floor(random() * 525600)::int || ' minutes')::interval AS fecha
+            FROM generate_series(1, ${VENTAS}) i;
+
+        INSERT INTO sale_orders (id, status, "customerName", "shippedAt", "createdAt", "updatedAt")
+        SELECT id, status, 'Cliente '||(i % 5000),
+               CASE WHEN status <> 'PENDING' THEN fecha END,
+               fecha - interval '1 day', fecha
+        FROM ordenes;
+
+        INSERT INTO sale_order_items (id, "saleOrderId", "productId", "productName", quantity, "unitPrice", "unitCost", "createdAt")
+        SELECT gen_random_uuid()::text, l.orden, n.id, n.name, l.cantidad, n.price,
+               -- El 85 % de lo enviado con coste congelado; lo pendiente todavía no lo tiene.
+               CASE WHEN l.status <> 'PENDING' AND l.con_coste THEN n."costPrice" END,
+               l.fecha
+        FROM (
+            SELECT o.id AS orden, o.status, o.fecha,
+                   1 + floor(random() * (SELECT count(*) FROM numerados))::int AS k,
+                   1 + floor(random() * 5)::int AS cantidad,
+                   random() < 0.85 AS con_coste
+            FROM ordenes o, generate_series(1, 2)
+        ) l
+        JOIN numerados n ON n.k = l.k`);
+});
+
+paso(`${COMPRAS.toLocaleString("es")} órdenes de compra (${(COMPRAS * 3).toLocaleString("es")} líneas) y sus recepciones`, () => {
+    // Un año de compras: de cada 20, 1 cancelada sin recibir, 1 pendiente, 2 a medias y el
+    // resto recibidas. Un 30 % de las líneas recibidas llega en **dos entregas** separadas
+    // 17 días, que es el caso que obliga a fechar cada recepción y no la orden.
+    psql(`
+        SELECT setseed(0.37);
+
+        CREATE TEMP TABLE numerados AS
+            SELECT row_number() OVER (ORDER BY id) AS k, id, name, price, "costPrice" FROM products;
+        CREATE UNIQUE INDEX ON numerados (k);
+
+        CREATE TEMP TABLE compras AS
+            SELECT gen_random_uuid()::text AS id, i,
+                   (CASE WHEN i % 20 = 0 THEN 'CANCELLED' WHEN i % 20 = 1 THEN 'PENDING'
+                         WHEN i % 20 IN (2, 3) THEN 'PARTIALLY_RECEIVED' ELSE 'RECEIVED' END)::"PurchaseOrderStatus" AS status,
+                   now() - (floor(random() * 525600)::int || ' minutes')::interval AS fecha
+            FROM generate_series(1, ${COMPRAS}) i;
+
+        INSERT INTO purchase_orders (id, "supplierId", status, "createdAt", "updatedAt")
+        SELECT c.id, s.a[1 + (c.i % ${CATALOGOS})], c.status, c.fecha, c.fecha
+        FROM compras c, (SELECT array_agg(id) a FROM suppliers) s;
+
+        CREATE TEMP TABLE lineas AS
+            SELECT gen_random_uuid()::text AS id, x.orden, x.status, x.fecha, x.cantidad, x.dos_entregas, n.id AS producto, n.name,
+                   round(COALESCE(n."costPrice", n.price * 0.6), 2) AS precio,
+                   CASE x.status WHEN 'RECEIVED' THEN x.cantidad WHEN 'PARTIALLY_RECEIVED' THEN x.cantidad / 2 ELSE 0 END AS recibida
+            FROM (
+                SELECT c.id AS orden, c.status, c.fecha,
+                       1 + floor(random() * (SELECT count(*) FROM numerados))::int AS k,
+                       10 + floor(random() * 90)::int AS cantidad,
+                       random() < 0.3 AS dos_entregas
+                FROM compras c, generate_series(1, 3)
+            ) x
+            JOIN numerados n ON n.k = x.k;
+
+        INSERT INTO purchase_order_items (id, "purchaseOrderId", "productId", "productName", quantity, "receivedQuantity", "unitPrice", "createdAt")
+        SELECT id, orden, producto, name, cantidad, recibida, precio, fecha FROM lineas;
+
+        -- Cada entrega, una entrada enlazada a su línea, con la nota que escribe la recepción.
+        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt", "purchaseOrderItemId")
+        SELECT gen_random_uuid()::text, l.producto, 'IN', e.unidades, 0,
+               'Orden de compra #'||left(l.orden, 8),
+               LEAST(now(), l.fecha + (e.dias || ' days')::interval),
+               l.id
+        FROM lineas l
+        CROSS JOIN LATERAL (VALUES
+            (CASE WHEN l.dos_entregas THEN l.recibida - l.recibida / 2 ELSE l.recibida END, 3),
+            (CASE WHEN l.dos_entregas THEN l.recibida / 2 ELSE 0 END, 20)
+        ) AS e(unidades, dias)
+        WHERE e.unidades > 0`);
+});
+
 // **Sin esto las mediciones no valen.** El planificador decide con estadísticas, y tras una
 // carga masiva están vacías: elegiría planes por corazonada y los `EXPLAIN ANALYZE` de
 // después medirían eso en vez del efecto de los índices.
@@ -237,6 +351,9 @@ const filas = psql(`
     FROM (SELECT 'productos' t, count(*)::text n FROM products
           UNION ALL SELECT 'movimientos', count(*)::text FROM stock_movements
           UNION ALL SELECT 'precios', count(*)::text FROM price_history
-          UNION ALL SELECT 'auditoría', count(*)::text FROM audit_logs) x`);
+          UNION ALL SELECT 'auditoría', count(*)::text FROM audit_logs
+          UNION ALL SELECT 'líneas de venta', count(*)::text FROM sale_order_items
+          UNION ALL SELECT 'líneas de compra', count(*)::text FROM purchase_order_items
+          UNION ALL SELECT 'recepciones', count(*)::text FROM stock_movements WHERE "purchaseOrderItemId" IS NOT NULL) x`);
 
 console.log(`\n✓ «${BASE}» lista — ${tamaño}\n  ${filas}`);

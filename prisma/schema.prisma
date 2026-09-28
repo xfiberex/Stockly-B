@@ -246,6 +246,7 @@ model PurchaseOrderItem {
   receivedQuantity Int          @default(0)
   unitPrice       Decimal       @db.Decimal(10, 2)
   createdAt       DateTime      @default(now())
+  receipts        StockMovement[]
 
   @@index([purchaseOrderId])
   @@index([productId])
@@ -261,11 +262,19 @@ model StockMovement {
   stockAfter Int               // stock resultante tras el movimiento
   note       String?
   createdAt  DateTime          @default(now())
+  // T5-09 — la línea de compra que recibió esta entrada. Es lo que fecha cada recepción, también
+  // las parciales: la orden solo sabe cuánto lleva recibido, no cuándo llegó cada parte. `null`
+  // en todo lo demás (ventas, ajustes, importaciones y la salida que deshace una cancelación).
+  purchaseOrderItemId String?
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
 
   // El histórico de un producto se lee siempre ordenado por fecha: el índice
   // compuesto sirve el filtro y el orden de una sola pasada.
   @@index([productId, createdAt])
   @@index([createdAt])
+  // Sin él, borrar una línea de compra recorre la tabla de movimientos entera para poner a
+  // `null` las entradas que apuntan a ella.
+  @@index([purchaseOrderItemId])
   @@map("stock_movements")
 }
 

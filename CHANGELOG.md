@@ -19,6 +19,14 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Ventas y compras por periodo** (`T5-09`). **Reportes → Ventas y compras por periodo**
+  responde «cuánto vendimos en marzo»: atajos (este mes, mes anterior, este trimestre, este año) o
+  un rango de fechas, con totales, desglose por mes, por categoría y por producto, gráfico y
+  exportación a **CSV** (todos los productos) y **PDF** (`GET /reports/period`). Cuentan las
+  ventas enviadas y la mercancía recibida, **cada entrega en su fecha**. Los días empiezan y
+  terminan en la **zona horaria del negocio**, un ajuste nuevo en Configuración (por defecto
+  `America/Santo_Domingo`).
+
 - **Integración continua en los dos repositorios** ([ADR 0008](docs/adr/0008-integracion-continua.md),
   sustituye a la 0005). GitHub Actions ejecuta `pnpm verify` en cada push a `main` y en cada
   pull request, y el frontend además el E2E, con el backend clonado al lado. Es la misma puerta
@@ -151,6 +159,8 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- El gráfico **Movimientos por mes** enseña el mes en curso y los cinco anteriores **completos**,
+  en la zona horaria del negocio. Antes el mes más antiguo salía a medias (`T5-09`).
 - **«Nuevo proveedor» ya no se abre con los datos del último creado** (`T5-05`). El formulario
   seguía montado tras guardar, y guardarlo sin mirar creaba un duplicado.
 

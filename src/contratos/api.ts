@@ -671,6 +671,57 @@ export const resumenReporteSchema = z.object({
     margin: margenRealizadoSchema,
 });
 
+/**
+ * T5-09 — unidades e importe de lo vendido (enviado) y lo comprado (recibido). Cada fila de
+ * los desgloses por periodo lleva las cuatro cifras.
+ */
+const cifrasDePeriodo = {
+    salesUnits: z.number(),
+    salesRevenue: z.number(),
+    purchaseUnits: z.number(),
+    purchaseAmount: z.number(),
+};
+
+export const atajoDePeriodoSchema = z.enum(["this-month", "last-month", "this-quarter", "this-year"]);
+
+/** Un mes del periodo, `YYYY-MM`. Los de los extremos, recortados a los días del periodo. */
+export const periodoPorMesSchema = z.object({ month: z.string(), ...cifrasDePeriodo });
+
+/** `name` a `null`: sin categoría, o producto borrado. La etiqueta la pone la interfaz. */
+export const periodoPorCategoriaSchema = z.object({ name: z.string().nullable(), ...cifrasDePeriodo });
+
+export const periodoPorProductoSchema = z.object({
+    /** `null` si el producto se borró; `name` es entonces el congelado en la línea. */
+    productId: z.string().nullable(),
+    name: z.string(),
+    sku: z.string().nullable(),
+    category: z.string().nullable(),
+    ...cifrasDePeriodo,
+});
+
+/**
+ * `GET /reports/period`. `from` y `to` son días del negocio (`YYYY-MM-DD`, ambos incluidos) en
+ * la zona `timezone`; `preset` es el atajo que los produjo, o `null` si se pidieron a mano.
+ * `byProduct` trae los primeros por ventas; `moreProducts` dice si hay más (el CSV los trae todos).
+ * No hay recuento total a propósito: obligaría a acumular todos los grupos (ver
+ * `productosDelPeriodo`).
+ */
+export const informePorPeriodoSchema = z.object({
+    from: z.string(),
+    to: z.string(),
+    preset: atajoDePeriodoSchema.nullable(),
+    timezone: z.string(),
+    totals: z.object({
+        salesOrders: z.number(),
+        purchaseOrders: z.number(),
+        ...cifrasDePeriodo,
+    }),
+    byMonth: z.array(periodoPorMesSchema),
+    byCategory: z.array(periodoPorCategoriaSchema),
+    byProduct: z.array(periodoPorProductoSchema),
+    moreProducts: z.boolean(),
+});
+
 // ─────────────────────── Tipos inferidos ───────────────────────
 // Es lo que consume el frontend. No se escriben a mano: si el esquema cambia, el tipo
 // cambia con él y `tsc` señala cada uso que dejó de encajar.
@@ -729,6 +780,11 @@ export type ProductoBajoStock = z.infer<typeof productoBajoStockSchema>;
 export type MetricaStock = z.infer<typeof metricaStockSchema>;
 export type ResumenReporte = z.infer<typeof resumenReporteSchema>;
 export type MargenRealizado = z.infer<typeof margenRealizadoSchema>;
+export type AtajoDePeriodo = z.infer<typeof atajoDePeriodoSchema>;
+export type PeriodoPorMes = z.infer<typeof periodoPorMesSchema>;
+export type PeriodoPorCategoria = z.infer<typeof periodoPorCategoriaSchema>;
+export type PeriodoPorProducto = z.infer<typeof periodoPorProductoSchema>;
+export type InformePorPeriodo = z.infer<typeof informePorPeriodoSchema>;
 export type MargenPorCategoria = z.infer<typeof margenPorCategoriaSchema>;
 export type MargenPorProducto = z.infer<typeof margenPorProductoSchema>;
 

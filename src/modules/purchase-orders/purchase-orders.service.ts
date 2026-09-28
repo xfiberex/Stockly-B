@@ -81,6 +81,8 @@ async function registrarEntradas(tx: Tx, purchaseOrderId: string, lineas: Array<
                 delta: cantidad,
                 stockAfter: product.stock,
                 note: `Orden de compra #${purchaseOrderId.slice(0, 8)}`,
+                // T5-09 — fecha esta recepción para el informe de compras por periodo.
+                purchaseOrderItemId: item.id,
             },
         });
     }

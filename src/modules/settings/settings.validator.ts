@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SETTINGS_CATALOG } from "./settings.service";
+import { zonaHorariaCanonica } from "@/shared/lib/zonaHoraria";
 
 // El esquema se genera desde el catálogo: añadir un ajuste nuevo a
 // SETTINGS_CATALOG lo valida automáticamente, sin tocar este archivo.
@@ -16,6 +17,18 @@ for (const def of SETTINGS_CATALOG) {
 
 /** El validador del tipo, estrechado con los límites que declare el propio ajuste (T5-05). */
 function validadorDe(def: (typeof SETTINGS_CATALOG)[number]): z.ZodTypeAny {
+    // T5-09 — se guarda la forma canónica: `america/santo_domingo` se acepta y se guarda
+    // como `America/Santo_Domingo`, que es como la muestra el selector.
+    if ("zonaHoraria" in def && def.zonaHoraria) {
+        return z.string().transform((valor, ctx) => {
+            const canonica = zonaHorariaCanonica(valor);
+            if (!canonica) {
+                ctx.addIssue({ code: "custom", message: "No es una zona horaria IANA válida (por ejemplo, America/Santo_Domingo)" });
+                return z.NEVER;
+            }
+            return canonica;
+        });
+    }
     if (def.type !== "number") return validadorPorTipo[def.type];
     let numero = z.number();
     if ("entero" in def && def.entero) numero = numero.int();
