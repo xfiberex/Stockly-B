@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
@@ -94,8 +95,20 @@ describe("Contrato de la API (T4-01)", () => {
         });
     });
 
+    /**
+     * Se omite **solo si el repositorio hermano no está**, no si falta la copia: con `Stockly-F`
+     * al lado y sin copia, es un olvido y tiene que fallar.
+     *
+     * Hasta el 2026-09-28 no se omitía nunca, porque en local los dos repositorios están
+     * siempre juntos. La CI (ADR 0008) clona solo este, y **no clona el frontend a propósito**:
+     * cada workflow compararía contra el `main` del otro, y un cambio de contrato dejaría en
+     * rojo al primero que se subiera, fuera cual fuera. La garantía en la CI la da el workflow
+     * del frontend, que compara su copia con el `main` de aquí.
+     */
+    const hayFrontend = fs.existsSync(path.join(path.dirname(DESTINO), "..", "..", "..", "package.json"));
+
     describe("la copia del frontend está al día", () => {
-        it("coincide con la fuente byte a byte", () => {
+        (hayFrontend ? it : it.skip)("coincide con la fuente byte a byte", () => {
             if (!fs.existsSync(DESTINO)) {
                 throw new Error(
                     `Falta la copia del contrato en el frontend (${DESTINO}).\n` +

@@ -56,5 +56,10 @@ desechable y el `JWT_SECRET` solo firma tokens de tests.
 - **Las acciones fijadas por SHA no se actualizan solas.** Subirlas es una tarea a mano: se
   resuelve la etiqueta nueva a su commit con `gh api repos/<acción>/commits/<etiqueta>` y se
   cambia el SHA con el comentario de versión al lado.
+- **La primera ejecución destapó que «pasa en local» incluía el `.env` de quien ejecutaba.**
+  Catorce tests del backend necesitaban credenciales SMTP y Cloudinary reales, y el E2E necesitaba
+  el `VITE_API_URL` del `.env` del frontend. Es el argumento a favor de la CI más claro que hay:
+  llevaban semanas así y ninguna ejecución local podía verlo. Desde entonces el entorno de los
+  tests lo define `jest.setup.js`, no el desarrollador.
 - **La 0005 queda como histórico**, marcada sustituida y enlazada aquí: sin esa marca, el
   registro diría una cosa y los repositorios otra.
