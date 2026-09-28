@@ -124,6 +124,9 @@ model Supplier {
   email          String?         @unique
   phone          String?
   notes          String?
+  // T5-05 — días que tarda en llegar un pedido. `null` es **desconocido**: la sugerencia de
+  // reposición usa entonces el ajuste `defaultLeadTimeDays` y lo dice, en vez de suponer cero.
+  leadTimeDays   Int?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   products       Product[]

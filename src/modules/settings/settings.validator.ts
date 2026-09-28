@@ -11,7 +11,17 @@ const validadorPorTipo = {
 
 const shape: Record<string, z.ZodTypeAny> = {};
 for (const def of SETTINGS_CATALOG) {
-    shape[def.key] = validadorPorTipo[def.type].optional();
+    shape[def.key] = validadorDe(def).optional();
+}
+
+/** El validador del tipo, estrechado con los límites que declare el propio ajuste (T5-05). */
+function validadorDe(def: (typeof SETTINGS_CATALOG)[number]): z.ZodTypeAny {
+    if (def.type !== "number") return validadorPorTipo[def.type];
+    let numero = z.number();
+    if ("entero" in def && def.entero) numero = numero.int();
+    if ("min" in def) numero = numero.min(def.min);
+    if ("max" in def) numero = numero.max(def.max);
+    return numero;
 }
 
 // `.strict()` en lugar del `.strip()` por defecto: una clave desconocida debe ser

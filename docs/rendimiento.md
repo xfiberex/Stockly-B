@@ -329,6 +329,27 @@ pendiente, anotado en la ficha de T5-02.
 
 ---
 
+## 7 ter. T5-05 — las sugerencias de reposición, sobre el conjunto de carga
+
+Medido el 2026-09-28 sobre `Stockly_carga` —100 000 productos, 1.1 M movimientos y 660 000 líneas
+de venta—, mejor de cinco pasadas con `EXPLAIN (ANALYZE, BUFFERS)`:
+
+| Consulta | Tiempo | ¿Ordena en disco? |
+|---|---:|---|
+| Página de 50 sugerencias, con el último precio pagado | **231 ms** | no (`top-N heapsort`, 46 kB) |
+| Recuento total (3 549 sugerencias) | **174 ms** | no |
+
+Las dos corren a la vez, así que la pantalla espera la más lenta. **El grueso no es de la fórmula**:
+son ~160 ms de agregar lo comprometido en ventas pendientes, que recorre las 660 000 líneas de venta
+(`Seq Scan` + `Hash Join` con las órdenes pendientes) para quedarse con 40 000. Es la misma cuenta
+que hace T5-03 en el catálogo. Si alguna vez molesta, el sitio es esa agregación —partir de las
+ventas `PENDING` y no de las líneas—, no `work_mem` (§5).
+
+**Lo que no está medido:** `load/sembrar.js` no genera órdenes de compra, así que el `LATERAL` del
+último precio pagado y lo pendiente de recibir corren aquí sobre una tabla vacía. Con compras reales
+el `LATERAL` se hace solo para las 50 filas de la página y usa el índice de
+`purchase_order_items(productId)`.
+
 ## 8. Repetir las mediciones
 
 ```bash

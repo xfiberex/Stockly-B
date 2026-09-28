@@ -56,12 +56,12 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **547/547** | **582/582** *(+1 omitido)* |
-| Cobertura (sentencias) | 94.23 % *(suelo 85 %)* | 72.27 % *(suelo 45 %)* |
+| Tests | **580/580** | **596/596** *(+1 omitido)* |
+| Cobertura (sentencias) | 94.45 % *(suelo 85 %)* | 73.27 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-08-12): **9 pasados,
+de datos, el backend y el frontend—. En este equipo (2026-09-28, T5-05): **13 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
@@ -79,7 +79,7 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 (el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 4/15** *(abierto el 2026-09-13; T5-01 a T5-04 cerradas)* · Total **118/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 5/15** *(abierto el 2026-09-13; T5-01 a T5-05 cerradas)* · Total **119/129**.
 
 **`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
 rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
@@ -472,8 +472,11 @@ incluida la extensión `pg_trgm` de T2-09.
 
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
-**Por dónde seguir (2026-09-13): el [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio) está
-abierto**, con 15 tareas de funcionalidad de negocio y una ruta sugerida al final del tier. Lo que
+**Por dónde seguir (2026-09-28): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
+está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—. Lo que queda no tiene
+orden entre sí: T5-06, T5-07, T5-08, `T5-09 → T5-10`, T5-11, T5-12 y T5-13; T5-14 y T5-15 solo con un
+caso de uso real. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
+tiene plazo de entrega. Lo que
 sigue se escribió al cerrar los Tiers 0 a 4, y las dos decisiones de producto que menciona tienen dónde
 tomarse: el cubo parcial en **T5-09**, y la búsqueda por SKU puede resolverla la búsqueda exacta de
 **T5-08** sin tocar el buscador de texto.

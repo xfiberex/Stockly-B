@@ -9,6 +9,18 @@ export const SETTINGS_CATALOG = [
         type: "boolean" as const,
         defaultValue: "false",
     },
+    {
+        // T5-05 — el plazo que usa la sugerencia de reposición cuando el proveedor no tiene
+        // uno. Con límites propios: el validador genérico de `number` aceptaría −3 o 2.5.
+        key: "defaultLeadTimeDays",
+        label: "Plazo de entrega por defecto",
+        description: "Días que se suponen para un proveedor sin plazo de entrega al calcular las sugerencias de reposición.",
+        type: "number" as const,
+        defaultValue: "7",
+        entero: true,
+        min: 0,
+        max: 365,
+    },
 ] as const;
 
 export type SettingKey = (typeof SETTINGS_CATALOG)[number]["key"];

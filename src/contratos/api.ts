@@ -137,6 +137,7 @@ export const CODIGOS_DE_ERROR = [
     "ORDER_ALREADY_SHIPPED",
     "ORDER_NOT_RECEIVABLE",
     "PRODUCT_ALREADY_ACTIVE",
+    "PRODUCT_WITHOUT_SUPPLIER",
     "RECEIPT_EXCEEDS_PENDING",
     "STOCK_CANNOT_BE_NEGATIVE",
     // 401 / 403 — quién eres y qué se te permite
@@ -249,6 +250,8 @@ export const proveedorSchema = z.object({
     email: z.string().nullable(),
     phone: z.string().nullable(),
     notes: z.string().nullable(),
+    /** T5-05 — días de entrega; `null` es desconocido y la reposición usa el plazo por defecto. */
+    leadTimeDays: z.number().nullable(),
     createdAt: fechaSchema,
     updatedAt: fechaSchema,
 });
@@ -446,6 +449,49 @@ export const ordenCompraSchema = z.object({
     items: z.array(itemOrdenCompraSchema),
     createdAt: fechaSchema,
     updatedAt: fechaSchema,
+});
+
+/**
+ * T5-05 — de dónde sale el precio propuesto para el borrador: el último pagado a ese
+ * proveedor o el coste medio. `null`, junto a un precio `null`: no hay ninguno y hay que
+ * escribirlo. Nunca el precio de venta.
+ */
+export const origenPrecioSugeridoSchema = z.enum(["LAST_PURCHASE", "COST"]);
+
+/**
+ * T5-05 — una fila de `GET /purchase-orders/suggestions`. Lleva todo lo que entra en la
+ * fórmula para que la pantalla pueda enseñar **por qué** sugiere lo que sugiere, no solo el
+ * número. Los importes llegan como número, igual que en reportes: el servicio convierte.
+ */
+export const sugerenciaReposicionSchema = z.object({
+    productId: z.string(),
+    productName: z.string(),
+    sku: z.string().nullable(),
+    /** `null`: producto sin proveedor. Sale en la lista, pero no se puede generar su orden. */
+    supplier: referenciaSchema.nullable(),
+    leadTimeDays: z.number(),
+    /** El proveedor no tiene plazo y se ha usado el de Configuración. */
+    leadTimeIsDefault: z.boolean(),
+    stock: z.number(),
+    committedStock: z.number(),
+    availableStock: z.number(),
+    minStock: z.number(),
+    /** Lo que falta por llegar de órdenes abiertas, de cualquier proveedor. */
+    pendingReceipt: z.number(),
+    /** Unidades salidas en la ventana de `days` días. */
+    unitsOut: z.number(),
+    dailyVelocity: z.number(),
+    suggestedQuantity: z.number(),
+    proposedUnitPrice: z.number().nullable(),
+    priceSource: origenPrecioSugeridoSchema.nullable(),
+});
+
+export const sugerenciasReposicionSchema = z.object({
+    data: z.array(sugerenciaReposicionSchema),
+    meta: metaPaginacionSchema,
+    /** La ventana de la velocidad de salida, la misma que la rotación. */
+    days: z.number(),
+    defaultLeadTimeDays: z.number(),
 });
 
 // ─────────────────────── Usuarios y sesión ───────────────────────
@@ -664,6 +710,9 @@ export type ItemOrdenVenta = z.infer<typeof itemOrdenVentaSchema>;
 export type OrdenVenta = z.infer<typeof ordenVentaSchema>;
 export type ItemOrdenCompra = z.infer<typeof itemOrdenCompraSchema>;
 export type OrdenCompra = z.infer<typeof ordenCompraSchema>;
+export type OrigenPrecioSugerido = z.infer<typeof origenPrecioSugeridoSchema>;
+export type SugerenciaReposicion = z.infer<typeof sugerenciaReposicionSchema>;
+export type SugerenciasReposicion = z.infer<typeof sugerenciasReposicionSchema>;
 
 export type Usuario = z.infer<typeof usuarioSchema>;
 export type Perfil = z.infer<typeof perfilSchema>;

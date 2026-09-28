@@ -23,3 +23,11 @@ export interface UpdatePurchaseOrderDto {
 export interface ReceivePurchaseOrderDto {
     items: Array<{ itemId: string; quantity: number }>;
 }
+
+/**
+ * T5-05 — las líneas revisadas en la pantalla de sugerencias. Cantidad y precio son los que
+ * decide quien revisa; el proveedor no viaja, sale del producto.
+ */
+export interface GenerarDesdeSugerenciasDto {
+    items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+}

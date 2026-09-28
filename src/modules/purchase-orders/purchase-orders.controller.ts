@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import { purchaseOrderService } from "./purchase-orders.service";
+import { reposicionService } from "./reposicion.service";
 import { auditService } from "@/modules/audit-logs";
 import { enviarExportacion } from "@/shared/lib/exportacion";
-import type { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
+import type {
+    CreatePurchaseOrderDto,
+    GenerarDesdeSugerenciasDto,
+    ReceivePurchaseOrderDto,
+    UpdatePurchaseOrderDto,
+} from "./purchase-orders.types";
 
 export const purchaseOrderController = {
     async getAllOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -76,6 +82,41 @@ export const purchaseOrderController = {
                 { status: order.status, items: req.body.items },
             );
             res.status(201).json({ success: true, message: "Recepción registrada", data: order });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    /** T5-05 — lo que la fórmula de reposición propone pedir, paginado. */
+    async getSuggestions(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const sugerencias = await reposicionService.listar(req.query as { page?: string; limit?: string });
+            res.json({ success: true, message: "Sugerencias de reposición obtenidas", data: sugerencias });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    /**
+     * T5-05 — una orden por proveedor con las líneas revisadas. Cada orden se audita como una
+     * creación más, con su origen: en la lista de compras no se distingue de una escrita a mano,
+     * y la auditoría es el sitio donde queda de dónde salió.
+     */
+    async generateFromSuggestions(
+        req: Request<{}, {}, GenerarDesdeSugerenciasDto>,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> {
+        try {
+            const orders = await reposicionService.generar(req.body);
+            for (const order of orders) {
+                await auditService.log(
+                    { userId: req.userId, userEmail: req.userEmail },
+                    "CREATE", "PurchaseOrder", order.id,
+                    { origen: "REORDER_SUGGESTION", lineas: order.items.length },
+                );
+            }
+            res.status(201).json({ success: true, message: "Órdenes de compra generadas", data: orders });
         } catch (error) {
             next(error);
         }

@@ -194,6 +194,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
         properties: {
             name: { type: "string", example: "Distribuidora Norte" },
             email: { type: "string", format: "email" }, phone: { type: "string" }, notes: { type: "string" },
+            leadTimeDays: { type: "integer", minimum: 0, maximum: 365, nullable: true, description: "Días de entrega (T5-05). Vacío: se usa el plazo por defecto de Configuración" },
         },
     }),
 
@@ -265,6 +266,24 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
     },
     "/purchase-orders/export": exportacion("Purchase Orders", "las órdenes de compra"),
+    "/purchase-orders/suggestions": {
+        get: {
+            tags: ["Purchase Orders"], summary: "Sugerencias de reposición (T5-05)",
+            description: "Productos activos a los que la fórmula pide reponer: `⌈velocidad diaria × plazo + mínimo − disponible − pendiente de recibir⌉`, solo si sale positiva. La velocidad son las salidas `OUT` de los últimos 30 días; el plazo, el del proveedor o, sin él, el ajuste `defaultLeadTimeDays`. Agrupadas por proveedor, con los productos **sin proveedor al final**: se listan, pero no se pueden generar.",
+            parameters: [...PARAMS_PAGINA],
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/ReorderSuggestions" }, "Página de sugerencias"), "401": ERROR("No autenticado") },
+        },
+        post: {
+            tags: ["Purchase Orders"], summary: "Generar órdenes desde las sugerencias (ADMIN, T5-05)",
+            description: "Crea **una orden `PENDING` por proveedor** con las líneas revisadas. Cantidad y precio son los enviados, no los sugeridos. El proveedor sale de cada producto. Todas o ninguna.",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ReorderSuggestionsRequest" } } } },
+            responses: {
+                "201": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/PurchaseOrder" } }, "Órdenes creadas"),
+                "400": ERROR("Un producto sin proveedor (`PRODUCT_WITHOUT_SUPPLIER`)"), "403": ERROR("Requiere rol ADMIN"),
+                "404": ERROR("Producto inexistente o inactivo"), "422": ERROR("Datos inválidos"),
+            },
+        },
+    },
     "/purchase-orders/{id}/receipts": {
         post: {
             tags: ["Purchase Orders"], summary: "Registrar una recepción, parcial o completa (T5-04)",

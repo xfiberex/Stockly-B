@@ -19,6 +19,14 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Sugerencias de reposición y plazo de entrega del proveedor** (`T5-05`). Cada proveedor puede
+  tener su plazo en días, y **Compras → Sugerencias de reposición** propone qué pedir:
+  salidas diarias × plazo + mínimo − disponible − pendiente de recibir, redondeado hacia arriba.
+  La pantalla enseña cada término, deja editar cantidad y precio, y **genera una orden pendiente
+  por proveedor** con lo marcado. El precio propuesto es el último pagado a ese proveedor o el
+  coste medio, **nunca el precio de venta**. Un proveedor sin plazo usa el nuevo ajuste
+  «Plazo de entrega por defecto» (7 días).
+
 - **Recepción parcial de órdenes de compra** (`T5-04`). Una orden ya no pasa de pendiente a
   recibida de golpe: **cada entrega registra lo que llega de cada línea**, suma ese stock con su
   movimiento y su coste medio, y deja la orden **«Recibida a medias»** hasta que se completan
@@ -137,6 +145,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   versionado de las búsquedas por texto. Requieren una activación por clon (`T3-06`).
 
 ### Cambiado
+
+- **«Nuevo proveedor» ya no se abre con los datos del último creado** (`T5-05`). El formulario
+  seguía montado tras guardar, y guardarlo sin mirar creaba un duplicado.
 
 - **Una orden de compra con mercancía recibida ya no vuelve a pendiente, ni se elimina si va a
   medias** (`T5-04`). Volver a pendiente se aceptaba y dejaba ese stock sin orden que lo
