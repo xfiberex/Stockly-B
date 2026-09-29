@@ -258,6 +258,17 @@ migración **marcada como fallida** (`20260807215703_add_missing_indexes`) en un
 `prisma db push` apuntando `DATABASE_URL` a `Stockly_test` — y hay que hacerlo cada vez que
 se añade una migración, porque `pnpm verify` solo migra la base de desarrollo.
 
+**Y el desfase no avisa: se disfraza de fallo del cambio recién hecho.** El 2026-09-14 la base iba
+cuatro migraciones por detrás y cayeron 354 tests con «la tabla `cost_history` no existe»; el
+2026-09-29, al traer T5-05 y T5-09 de la otra máquina, volvía a ir dos por detrás. Antes del push,
+comprobar que el cambio es aditivo. En Prisma 7 ya no existe `--from-url`: se sobrescribe
+`DATABASE_URL` en el entorno —`prisma.config.ts` carga el `.env` con `dotenv`, que no pisa lo ya
+definido— y se usa el datasource de la configuración:
+
+```bash
+DATABASE_URL=<la de Stockly_test> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
+```
+
 **`prisma db push` no ejecuta el SQL de las migraciones.** Solo lleva el *esquema* a la
 base, así que todo lo que viva únicamente en un archivo de migración —un `CREATE
 EXTENSION`, un índice parcial, un trigger— no llega a `Stockly_test`. Desde T2-09 esto
