@@ -11,7 +11,7 @@ Este README documenta **la API**. La documentación que cubre los dos repositori
 | Documento | Para qué |
 |---|---|
 | [docs/CONTEXTO.md](docs/CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado, decisiones vivas y trampas del entorno ya pagadas |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Las 107 tareas con progreso y métricas. La fuente de verdad del trabajo |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Las 129 tareas con progreso y métricas. La fuente de verdad del trabajo |
 | [docs/README-proyecto.md](docs/README-proyecto.md) | Arranque desde cero de los dos repositorios |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura: por qué algo está hecho así, antes de simplificarlo |
 | [docs/INFORME-AUDITORIA.md](docs/INFORME-AUDITORIA.md) | La auditoría del 2026-08-04. **Congelada**: describe un estado que ya no existe |
@@ -42,6 +42,9 @@ Este README documenta **la API**. La documentación que cubre los dos repositori
 
 ```
 Stockly-B/
+├── .github/workflows/
+│   └── verify.yml              # CI: `pnpm verify` en cada push a main y pull request (ADR 0008)
+├── load/                       # Prueba de carga: `Stockly_carga`, EXPLAIN y k6 (fuera de verify)
 ├── prisma/
 │   ├── schema.prisma           # Modelos de la base de datos
 │   ├── seed.ts                 # Datos iniciales (productos, usuarios, movimientos)
@@ -55,13 +58,13 @@ Stockly-B/
     │   ├── brands/             # CRUD de marcas
     │   ├── categories/         # CRUD de categorías
     │   ├── products/           # CRUD de productos, movimientos de stock, exportación CSV
-    │   ├── purchase-orders/    # Órdenes de compra (PENDING → RECEIVED / CANCELLED)
+    │   ├── purchase-orders/    # Órdenes de compra, recepción parcial y sugerencias de reposición
     │   ├── sale-orders/        # Órdenes de venta (PENDING → SHIPPED / CANCELLED)
     │   ├── tags/               # Etiquetas de productos (many-to-many)
     │   ├── users/              # Panel admin: listar, cambiar rol, activar/desactivar
-    │   ├── settings/           # Configuración de la app (key-value)
+    │   ├── settings/           # Configuración de la app (key-value, catálogo tipado)
     │   ├── audit-logs/         # Registro de auditoría de acciones
-    │   ├── reports/            # KPIs, métricas de rotación, exportación PDF
+    │   ├── reports/            # KPIs, rotación, margen, informe por periodo; CSV y PDF
     │   └── suppliers/          # CRUD de proveedores
     ├── shared/
     │   ├── lib/                # Prisma, JWT, bcrypt, Cloudinary, Nodemailer, CSV, tokens
@@ -82,14 +85,15 @@ Stockly-B/
 | `Product` | Producto con SKU, precio, stock, stock mínimo, imagen, categoría, marca, proveedor, etiquetas |
 | `Category` | Categoría de producto |
 | `Brand` | Marca de producto |
-| `Supplier` | Proveedor |
+| `Supplier` | Proveedor, con plazo de entrega en días (`leadTimeDays`, opcional) |
 | `Tag` | Etiqueta de producto (relación many-to-many con Product) |
-| `StockMovement` | Historial de movimientos (`IN`, `OUT`, `ADJUSTMENT`, `IMPORT`) |
+| `StockMovement` | Historial de movimientos (`IN`, `OUT`, `ADJUSTMENT`, `IMPORT`). Las entradas de una recepción apuntan a su línea de compra (`purchaseOrderItemId`), que es lo que las fecha |
 | `PriceHistory` | Registro automático de cambios de precio |
-| `PurchaseOrder` | Orden de compra con ítems y estado |
-| `PurchaseOrderItem` | Ítem de una orden de compra |
-| `SaleOrder` | Orden de venta con ítems y estado |
-| `SaleOrderItem` | Ítem de una orden de venta |
+| `CostHistory` | Cada cambio del coste medio ponderado, con su origen (recepción o manual) |
+| `PurchaseOrder` | Orden de compra con ítems y estado (`PENDING`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED`) |
+| `PurchaseOrderItem` | Ítem de una orden de compra, con lo recibido hasta ahora (`receivedQuantity`) |
+| `SaleOrder` | Orden de venta con ítems, estado y fecha de envío (`shippedAt`) |
+| `SaleOrderItem` | Ítem de una orden de venta, con el coste congelado al enviarse (`unitCost`) |
 | `AppSetting` | Configuración clave-valor de la aplicación |
 | `AuditLog` | Registro de auditoría de acciones del sistema |
 
@@ -183,14 +187,53 @@ sí se sigue escribiendo a mano son las **rutas**, en `src/swagger.paths.ts`.
 
 La puerta de calidad se ejecuta en local antes de cada push, y GitHub Actions la repite en cada
 push y pull request ([ADR 0008](docs/adr/0008-integracion-continua.md)). Encadena
-`prisma generate` → `prisma migrate deploy` → `check` → `test:coverage` → `build` → `smoke`.
+`prisma generate` → `prisma migrate deploy` → `check` → `test:coverage` → `build` → `smoke` → `auditoria`.
 
 El paso `smoke` no es redundante con `build`: `tsc` no reescribe los alias `@/`, así que un
 build que compila puede seguir sin arrancar. Usa `SMOKE_PORT` (3100 por defecto) para no
 chocar con el servidor de desarrollo.
 
 Los tests corren siempre contra la base `Stockly_test`, que `jest.setup.js` deriva de
-`DATABASE_URL`: nunca tocan los datos de desarrollo.
+`DATABASE_URL`: nunca tocan los datos de desarrollo. `verify` solo migra la base de `DATABASE_URL`,
+así que **tras añadir una migración hay que llevarla también a `Stockly_test`**. En la CI se hace
+en cada ejecución (la base nace vacía); en local, una vez, apuntando `DATABASE_URL` a
+`Stockly_test` y ejecutando `pnpm exec prisma db push` —en este equipo la base de tests se
+mantiene así y no con `migrate deploy`—. El entorno de los tests (SMTP y Cloudinary falsos) lo
+define `jest.setup.js`, no el `.env` de quien los ejecuta.
+
+---
+
+## Integración continua
+
+Un workflow, [`.github/workflows/verify.yml`](.github/workflows/verify.yml), con un job que
+ejecuta **la misma puerta que en local**, no otra ([ADR 0008](docs/adr/0008-integracion-continua.md)).
+
+| | |
+|---|---|
+| **Cuándo** | Cada push a `main`, cada pull request y a mano (`workflow_dispatch`). Un push nuevo cancela la ejecución en curso de la misma rama |
+| **Dónde** | `ubuntu-latest`, Node 22 (el de la imagen de producción) y pnpm leído de `packageManager` |
+| **Base de datos** | Un servicio `postgres:17-alpine`, la versión del compose. El job crea `Stockly_test` y la migra antes de `verify` |
+| **Entorno** | Las cuatro variables imprescindibles, con valores de prueba: la base es desechable y el `JWT_SECRET` solo firma tokens de tests |
+| **Qué ejecuta** | `pnpm install --frozen-lockfile` y `pnpm verify` tal cual: `check`, tests con cobertura, `build`, `smoke` y `auditoria` |
+| **Tiempo máximo** | 20 minutos |
+
+El frontend tiene su propio workflow, que **clona el `main` de este repositorio** para comprobar
+que su copia del contrato está al día y para arrancar el backend en el E2E. Por eso **un cambio
+de contrato se sube primero aquí**: si llega antes el frontend, su CI falla, y con razón.
+
+**Endurecido porque el repositorio es público:**
+
+- `permissions: contents: read` y `persist-credentials: false`: el job no puede escribir en el
+  repositorio.
+- `pull_request` y **nunca** `pull_request_target`: el código de un fork no corre con secretos. El
+  workflow tampoco usa ninguno.
+- **Acciones fijadas por SHA**, con la versión en un comentario: una etiqueta se puede mover, un
+  commit no. No se actualizan solas: para subir una, se resuelve la etiqueta nueva con
+  `gh api repos/<acción>/commits/<etiqueta> --jq .sha` y se cambia el SHA y el comentario.
+
+**Si falla en la CI y no en local**, casi siempre es algo que el portátil pone y la CI no: un
+`.env`, una base ya migrada, el repositorio hermano al lado. La primera ejecución destapó dos de
+esos (el SMTP y el Cloudinary reales del `.env`, y el `VITE_API_URL` del frontend).
 
 ---
 
@@ -271,6 +314,8 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | Clave | Tipo | Default | Descripción |
 |---|---|---|---|
 | `lowStockAlertEnabled` | boolean | `false` | Envía correo a admins cuando el stock baja del mínimo |
+| `defaultLeadTimeDays` | number | `7` | Plazo que usan las sugerencias de reposición para un proveedor sin plazo propio (entero, 0–365) (T5-05) |
+| `timezone` | string | `America/Santo_Domingo` | Zona horaria IANA del negocio: dónde empiezan y terminan los días y los meses de los informes (T5-09) |
 
 ### Auditoría — `/api/v1/audit-logs`
 
@@ -300,6 +345,9 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | `GET` | `/:id` | Ver detalle | USER+ |
 | `PATCH` | `/:id` | Actualizar (estado, proveedor, notas) | ADMIN |
 | `DELETE` | `/:id` | Eliminar orden PENDING | ADMIN |
+| `POST` | `/:id/receipts` | Registrar una entrega, parcial o completa, por línea (T5-04) | ADMIN |
+| `GET` | `/suggestions` | Sugerencias de reposición, paginadas (T5-05) | USER+ |
+| `POST` | `/suggestions` | Generar una orden pendiente por proveedor con las líneas elegidas (T5-05) | ADMIN |
 | `GET` | `/export?format=csv` | Exportar todas como CSV | ADMIN |
 
 ### Categorías, Marcas, Proveedores
@@ -317,6 +365,9 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 |---|---|---|
 | `GET` | `/` | KPIs, stock por categoría, top productos, movimientos por mes, bajo stock, **métricas de rotación** |
 | `GET` | `/?format=pdf` | Descargar reporte completo en PDF |
+| `GET` | `/period` | Ventas enviadas y compras recibidas de un periodo: totales, por mes, por categoría y por producto (T5-09). `preset=this-month\|last-month\|this-quarter\|this-year`, o `from` y `to` (`AAAA-MM-DD`, incluidos, máximo 60 meses); sin nada, este mes. En la zona horaria del ajuste `timezone` |
+| `GET` | `/period?format=csv` | Desglose por producto completo, en CSV |
+| `GET` | `/period?format=pdf` | El informe del periodo en PDF |
 
 ### Operación — sin prefijo de módulo
 
@@ -387,8 +438,10 @@ El seed crea:
 - **6 categorías** y **8 marcas**
 - **3 proveedores**
 - **~30 productos** con precios, stock y stock mínimo variados
-- **Movimientos de stock** de los últimos 6 meses
-- **Órdenes de compra** en distintos estados
+- **Movimientos de stock** de los últimos meses, que cuadran con el stock de cada producto
+- **Órdenes de compra** en todos los estados, con sus recepciones enlazadas a cada línea
+- **Órdenes de venta** pendientes, enviadas y canceladas, con el coste congelado en las enviadas
+- **Coste medio** calculado de las compras recibidas, y **plazo de entrega** en los proveedores (uno sin plazo, a propósito)
 - **Historial de precios** para algunos productos
 
 | Rol | Email | Contraseña |

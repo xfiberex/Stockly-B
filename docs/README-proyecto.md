@@ -6,9 +6,11 @@ que se clonan uno al lado del otro:**
 ```
 01-Stockly/
 ├── Stockly-B/                    # API REST (Node 22 / Express 5 / Prisma 7 / PostgreSQL 17)
+│   ├── .github/workflows/        # CI: `pnpm verify` en cada push a main y pull request
 │   ├── docker-compose.yml        # PostgreSQL + backend en contenedores
 │   └── docs/                     # Documentación viva de TODO el proyecto
 └── Stockly-F/                    # SPA (React 19 / TypeScript 6 / Vite 8 / TailwindCSS 4)
+    └── .github/workflows/        # CI: `pnpm verify` y el E2E, con Stockly-B clonado al lado
 ```
 
 > **Por qué los docs viven en `Stockly-B/docs/`:** cubren los dos repositorios, pero la carpeta que
@@ -21,8 +23,9 @@ que se clonan uno al lado del otro:**
 | Documento | Para qué |
 |---|---|
 | [CONTEXTO.md](CONTEXTO.md) | **Empieza aquí al retomar el proyecto.** Estado, decisiones vivas y trampas del entorno ya pagadas |
-| [ROADMAP.md](ROADMAP.md) | Las 114 tareas con progreso y métricas |
+| [ROADMAP.md](ROADMAP.md) | Las 129 tareas con progreso y métricas |
 | [operaciones.md](operaciones.md) | Cuando algo ya ha pasado: copia de seguridad, restauración y reversión |
+| [rendimiento.md](rendimiento.md) | Mediciones con el conjunto de carga (`Stockly_carga`) y cómo repetirlas |
 | [adr/](adr/) | Decisiones de arquitectura no obvias: por qué algo está así antes de simplificarlo |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | La auditoría del 2026-08-04. **Congelada**: describe un estado que ya no existe |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, flujo de ramas y convención de commits |
@@ -102,6 +105,21 @@ pnpm verify
 
 Qué encadena en cada repositorio y qué necesita para pasar, en
 [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+**La primera vez, el backend necesita una segunda base.** Los tests corren contra `Stockly_test`
+(el nombre lo deriva `jest.setup.js` de `DATABASE_URL`), y `verify` solo migra la de `DATABASE_URL`.
+Se crea una vez y se lleva al esquema actual; después, cada migración nueva hay que llevarla
+también ahí:
+
+```bash
+createdb Stockly_test                                           # o CREATE DATABASE desde psql
+DATABASE_URL=postgresql://…/Stockly_test pnpm exec prisma db push
+```
+
+**Los workflows** —[backend](../.github/workflows/verify.yml) y
+[frontend](../../Stockly-F/.github/workflows/verify.yml)— hacen eso mismo en cada ejecución, sobre una
+base que nace vacía, y el del frontend clona además el `main` del backend al lado. Qué hace cada
+job y cómo se mantienen, en la sección «Integración continua» del README de cada repositorio.
 
 ---
 

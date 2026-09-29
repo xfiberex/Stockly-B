@@ -18,7 +18,7 @@ no está bajo control de versiones.
 1. **Lee [`docs/CONTEXTO.md`](docs/CONTEXTO.md).** Es el estado actual, las decisiones vivas
    y las trampas del entorno ya pagadas. Ahorra repetir errores que ya costaron una sesión.
 2. **Mira [`docs/ROADMAP.md`](docs/ROADMAP.md).** Es la fuente de verdad del trabajo
-   pendiente: 107 tareas con dependencias, criterios de aceptación y progreso.
+   pendiente: 129 tareas con dependencias, criterios de aceptación y progreso.
 3. Si tocas la interfaz, lee antes
    [`Stockly-F/docs/design-system.md`](../Stockly-F/docs/design-system.md).
 4. Si una decisión te parece innecesariamente complicada, busca en
@@ -40,8 +40,8 @@ pnpm verify
 
 | Repositorio | Qué encadena |
 |---|---|
-| `Stockly-B` | `prisma generate` → `prisma migrate deploy` → `check` → `test:coverage` → `build` → `smoke` |
-| `Stockly-F` | `check` → `lint` → `test:coverage` → `build` |
+| `Stockly-B` | `prisma generate` → `prisma migrate deploy` → `check` → `test:coverage` → `build` → `smoke` → `auditoria` |
+| `Stockly-F` | `check` → `lint` → `test:coverage` → `build` → `auditoria` |
 
 Debe terminar con **exit 0** en el repositorio que tocaste, y en los dos si el cambio los
 cruza (por ejemplo, la forma de una respuesta de la API).

@@ -58,12 +58,12 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **580/580** | **596/596** *(+1 omitido)* |
-| Cobertura (sentencias) | 94.45 % *(suelo 85 %)* | 73.27 % *(suelo 45 %)* |
+| Tests | **613/613** | **605/605** *(+1 omitido)* |
+| Cobertura (sentencias) | 94.82 % *(suelo 85 %)* | 73.56 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-09-28, T5-05): **13 pasados,
+de datos, el backend y el frontend—. En este equipo (2026-09-28, T5-09): **15 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
