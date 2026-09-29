@@ -81,7 +81,7 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 (el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 6/15** *(abierto el 2026-09-13; T5-01 a T5-05 y T5-09 cerradas)* · Total **120/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 7/15** *(abierto el 2026-09-13; T5-01 a T5-05, T5-09 y T5-10 cerradas)* · Total **121/129**.
 
 **`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
 rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
@@ -268,6 +268,19 @@ definido— y se usa el datasource de la configuración:
 ```bash
 DATABASE_URL=<la de Stockly_test> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
 ```
+
+**El E2E de la descarga del CSV (T5-09) falla con un `VITE_API_URL` absoluto (2026-09-29).** En un
+equipo, el `.env` del frontend tenía `http://localhost:3000/api/v1` y no el `/api/v1` de
+`.env.example` —el que usa la CI—. Los enlaces de descarga se construyen con esa base: apuntan a
+otro origen y el navegador **ignora `download`** entre orígenes, así que el test espera una descarga
+que no llega. Pasan los otros trece. Ojo: cambiarlo solo para el E2E (`VITE_API_URL=/api/v1` en el
+entorno) hizo fallar **todos** los logins en ese equipo; no se investigó más.
+
+**Una ventana con `EXCLUDE` en el marco es cuadrática.** `SUM() OVER (… EXCLUDE GROUP)` obliga a
+PostgreSQL a recalcular la suma para cada fila en vez de acumularla: con cinco productos en los
+tests no se nota, y con los ~100 000 del conjunto de carga la clasificación ABC pasó de cinco
+minutos sin terminar (T5-10, 2026-09-29; [rendimiento.md §7 quinquies](rendimiento.md)). Y **cortar
+el cliente no para la consulta**: sigue en el servidor hasta `pg_cancel_backend`.
 
 **`prisma db push` no ejecuta el SQL de las migraciones.** Solo lleva el *esquema* a la
 base, así que todo lo que viva únicamente en un archivo de migración —un `CREATE
@@ -486,10 +499,12 @@ incluida la extensión `pg_trgm` de T2-09.
 
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
-**Por dónde seguir (2026-09-28): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
-está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—. Lo que queda no tiene
-orden entre sí: T5-06, T5-07, T5-08, T5-10 (T5-09 ya está hecha: tiene el periodo que necesita),
-T5-11, T5-12 y T5-13; T5-14 y T5-15 solo con un caso de uso real. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
+**Por dónde seguir (2026-09-29): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
+está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—, y también T5-09 y T5-10.
+Lo que queda no tiene orden entre sí: T5-06, T5-07, T5-08, T5-11, T5-12 y T5-13; T5-14 y T5-15 solo
+con un caso de uso real. **T5-13 conviene antes que T5-07**, para que los permisos del conteo nazcan
+con el rol de almacén. La clase ABC (T5-10) es la que dice qué productos merecen contarse más a
+menudo en T5-07. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
 tiene plazo de entrega. Lo que
 sigue se escribió al cerrar los Tiers 0 a 4. De las dos decisiones de producto que menciona, **el
 cubo parcial se tomó en T5-09** (meses naturales en la zona del negocio), y la búsqueda por SKU puede

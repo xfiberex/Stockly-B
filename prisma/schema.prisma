@@ -34,6 +34,14 @@ enum CostSource {
   MANUAL
 }
 
+// T5-10 — clasificación ABC por facturación. Solo se guardan los productos **con ventas** en el
+// periodo; uno sin fila en `product_abc` es C sin más, y por eso ninguno desaparece del catálogo.
+enum AbcClass {
+  A
+  B
+  C
+}
+
 enum StockMovementType {
   IN
   OUT
@@ -165,6 +173,7 @@ model Product {
   purchaseItems PurchaseOrderItem[]
   saleItems     SaleOrderItem[]
   tags          Tag[]
+  abc           ProductAbc?
 
   // PostgreSQL no indexa las claves foráneas por sí solo: sin esto, filtrar por
   // categoría, marca o proveedor recorre la tabla entera.
@@ -185,6 +194,33 @@ model Product {
   // (T2-09). Requiere la extensión `pg_trgm`, que crea la propia migración.
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("products")
+}
+
+// T5-10 — la clase ABC de cada producto con ventas en los últimos doce meses naturales
+// completos. Es una **caché**, no un dato: la rellena entera `reports.abc.ts` a partir de las
+// ventas, como mucho una vez al día. Existe porque el catálogo filtra por clase, y ese filtro
+// tiene que ir en el `where` (T4-15): calcularla en cada listado costaría recorrer un año de
+// ventas por página. `revenue` es la facturación del periodo, la que decidió la clase.
+model ProductAbc {
+  productId String   @id
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  abcClass  AbcClass
+  revenue   Decimal  @db.Decimal(14, 2)
+
+  @@index([abcClass])
+  @@map("product_abc")
+}
+
+// T5-10 — de qué periodo y zona salió `product_abc` y cuándo. Una sola fila (`id = 1`): con
+// ella se sabe si la caché sigue valiendo sin tener que mirarla entera.
+model AbcCalculation {
+  id           Int      @id @default(1)
+  from         String
+  to           String
+  timezone     String
+  calculatedAt DateTime
+
+  @@map("abc_calculations")
 }
 
 model PriceHistory {

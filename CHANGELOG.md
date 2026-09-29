@@ -19,6 +19,13 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Clasificación ABC de productos** (`T5-10`). El catálogo tiene una columna **ABC** y un filtro
+  por clase: **A** son los productos que reúnen el 80 % de la facturación, **B** el 15 % siguiente
+  y **C** el resto, incluidos los que no se vendieron. Cuenta lo facturado en los **doce meses
+  naturales completos** anteriores al actual, en la zona horaria del negocio, y una leyenda bajo
+  los filtros dice qué meses son. Se recalcula sola una vez al día sin hacer esperar al catálogo
+  (`GET /reports/abc`, `?abcClass=` en `GET /products`).
+
 - **Ventas y compras por periodo** (`T5-09`). **Reportes → Ventas y compras por periodo**
   responde «cuánto vendimos en marzo»: atajos (este mes, mes anterior, este trimestre, este año) o
   un rango de fechas, con totales, desglose por mes, por categoría y por producto, gráfico y

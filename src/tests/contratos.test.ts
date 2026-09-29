@@ -48,6 +48,7 @@ describe("Contrato de la API (T4-01)", () => {
             ["SaleOrderStatus", contrato.estadoOrdenVentaSchema.options, $Enums.SaleOrderStatus],
             ["StockMovementType", contrato.tipoMovimientoSchema.options, $Enums.StockMovementType],
             ["CostSource", contrato.origenCosteSchema.options, $Enums.CostSource],
+            ["AbcClass", contrato.claseAbcSchema.options, $Enums.AbcClass],
             ["AuditAction", contrato.accionAuditoriaSchema.options, $Enums.AuditAction],
             ["AuditEntity", contrato.entidadAuditoriaSchema.options, $Enums.AuditEntity],
         ];
@@ -339,6 +340,13 @@ describe("Contrato de la API (T4-01)", () => {
             expect(res.status).toBe(200);
             conforme(contrato.informePorPeriodoSchema, res.body.data, "GET /reports/period");
             expect(res.body.data.byMonth).toHaveLength(12);
+        });
+
+        it("GET /reports/abc", async () => {
+            const res = await request(app).get("/api/v1/reports/abc").set("Cookie", cookieAdmin);
+
+            expect(res.status).toBe(200);
+            conforme(contrato.resumenAbcSchema, res.body.data, "GET /reports/abc");
         });
 
         /** Los cuatro catálogos responden lista suelta o paginada según el módulo. */

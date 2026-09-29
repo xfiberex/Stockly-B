@@ -405,6 +405,48 @@ comprobó con `current_setting('work_mem')` antes de cada `EXPLAIN`.
 T4-16, las dos aisladas y sobre la misma base, **77.6 → 76.3 ms**. Dentro del resumen del
 dashboard sale en ~180 ms porque corre a la vez que las otras diez consultas.
 
+## 7 quinquies. T5-10 — la clasificación ABC, sobre el conjunto de carga
+
+Medido el 2026-09-29 sobre `Stockly_carga` recién sembrada (el mismo generador que §7 quater:
+100 000 productos, 660 000 líneas de venta en un año). Periodo `2025-09-01`–`2026-08-31` en
+`America/Santo_Domingo`: **99 624 productos con ventas**. `work_mem` de fábrica. El guion de
+medición repite a mano el SQL de `reports.abc.ts`.
+
+**La primera versión no terminaba.** Para que los empates compartieran clase, la suma acumulada
+de «los que facturan más» usaba `RANGE … CURRENT ROW EXCLUDE GROUP`. Con una exclusión en el marco,
+PostgreSQL **no puede ir acumulando la suma fila a fila**: la recalcula entera para cada fila, y
+eso es cuadrático. Con 99 624 filas pasaron **más de cinco minutos** sin respuesta y hubo que
+cancelarla en el servidor (cortar el cliente no la para). Los tests, con cinco productos, no lo
+podían ver.
+
+**La corrección es aritmética, no de planificador.** Las cifras son céntimos enteros, así que
+«facturar estrictamente más» es «facturar al menos un céntimo más»: `ORDER BY centimos::bigint
+DESC RANGE BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING`. Dice lo mismo, sin exclusión, y el marco
+empieza en `UNBOUNDED PRECEDING`, que es lo que permite acumular. Los 19 tests pasan igual con
+las dos formas.
+
+| Paso | Tiempo |
+|---|---:|
+| Clasificar (la consulta, `EXPLAIN ANALYZE`) | **2.3 s** · agregado por producto en disco (~12 MB en paralelo) y la ventana, 6.4 MB |
+| Recálculo completo: `DELETE` + `INSERT` de ~100 000 filas | **4.9–5.4 s** (cinco pasadas) |
+| Catálogo filtrado por A, página 1 | 2.6 ms |
+| Recuento de A | 154 ms |
+| Catálogo filtrado por C, página 1 | 0.1 ms |
+| Recuento de C (incluye los ~400 sin ventas) | 89 ms |
+
+**Por qué el recálculo no se persigue más.** Corre como mucho una vez al día y **nadie lo
+espera**: el catálogo sirve la clasificación anterior y lo lanza en segundo plano. Solo lo espera
+el primer listado de una base que no tiene ninguna. El agregado en disco es el mismo que §7
+quater dejó a sabiendas con un año de datos.
+
+**El reparto de este conjunto no es el de un negocio real**: 50 085 A, 24 984 B y 24 555 C. Las
+ventas del generador se sortean con la misma probabilidad para todos los productos, así que no
+hay pocos productos que facturen casi todo, que es justo lo que el ABC existe para destapar. Las
+cifras sirven para medir el coste, no para juzgar la clasificación.
+
+**Los recuentos de los filtros** se midieron con SQL escrito a mano equivalente al que genera
+Prisma (`EXISTS` para A y B, `LEFT JOIN … IS NULL OR` para C), no capturando el suyo.
+
 ## 8. Repetir las mediciones
 
 ```bash

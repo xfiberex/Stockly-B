@@ -438,6 +438,35 @@ export const rutasAdicionales: Record<string, Ruta> = {
             },
         },
     },
+    "/reports/abc": {
+        get: {
+            tags: ["Reports"],
+            summary: "Periodo de la clasificación ABC y productos por clase (T5-10)",
+            description:
+                "La clase de cada producto sale de lo que facturó en los doce meses naturales completos anteriores al " +
+                "actual: A hasta el 80 % acumulado, B hasta el 95 %, C el resto y los que no vendieron. Se recalcula " +
+                "sola al cambiar el periodo o la zona, o pasado un día. En el catálogo, `abcClass` en cada producto y " +
+                "`?abcClass=` para filtrar.",
+            responses: {
+                "200": {
+                    description: "Periodo, fecha del cálculo y recuento por clase.",
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                properties: {
+                                    success: { type: "boolean" },
+                                    message: { type: "string" },
+                                    data: { $ref: "#/components/schemas/AbcSummary" },
+                                },
+                            },
+                        },
+                    },
+                },
+                "401": ERROR("No autenticado"),
+            },
+        },
+    },
 
     // ── Usuarios ─────────────────────────────────────────────────────────────
     "/users": {

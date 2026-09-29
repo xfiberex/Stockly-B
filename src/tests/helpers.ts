@@ -11,6 +11,9 @@ export async function cleanDb() {
     await prisma.priceHistory.deleteMany();
     await prisma.costHistory.deleteMany();
     await prisma.stockMovement.deleteMany();
+    // T5-10 — `product_abc` cae con sus productos (Cascade); la fila del cálculo no, y sin
+    // borrarla la caché se daría por vigente con una tabla vacía.
+    await prisma.abcCalculation.deleteMany();
     await prisma.product.deleteMany();
     await prisma.tag.deleteMany();
     await prisma.category.deleteMany();

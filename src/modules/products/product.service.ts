@@ -7,6 +7,7 @@ import { conDisponible } from "@/shared/lib/stockComprometido";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
+import { abcService } from "@/modules/reports/reports.abc";
 import { $Enums } from "@/generated/prisma/client";
 import type {
     CreateProductDto,
@@ -126,6 +127,25 @@ function filaDeExportacion(p: ProductoExportado) {
     };
 }
 
+/**
+ * T5-10 — el filtro por clase ABC, en el `where`. A y B son los que tienen esa fila; C son los
+ * clasificados como C **y los que no tienen fila**, que son los que no vendieron nada en el
+ * periodo: sin eso, un producto sin ventas no saldría con ningún filtro.
+ */
+function whereDeClaseAbc(valor: string | undefined) {
+    const clase = filtroDeEnum($Enums.AbcClass, valor, "abcClass");
+    if (!clase) return {};
+    if (clase === "C") return { OR: [{ abc: { is: null } }, { abc: { is: { abcClass: clase } } }] };
+    return { abc: { is: { abcClass: clase } } };
+}
+
+/** La clase de cada producto leído con `abc`, y sin la relación: la respuesta lleva solo la letra. */
+function conClaseAbc<T extends { abc: { abcClass: $Enums.AbcClass } | null }>(productos: T[]) {
+    return productos.map(({ abc, ...producto }) => ({ ...producto, abcClass: abc?.abcClass ?? $Enums.AbcClass.C }));
+}
+
+const CON_CLASE_ABC = { ...PRODUCT_INCLUDE, abc: { select: { abcClass: true } } } as const;
+
 async function recordMovement(
     productId: string,
     type: StockMovementType,
@@ -155,25 +175,30 @@ export const productService = {
             ...(query.brandId && { brandId: query.brandId }),
             ...(query.supplierId && { supplierId: query.supplierId }),
             ...(query.tagId && { tags: { some: { id: query.tagId } } }),
+            ...whereDeClaseAbc(query.abcClass),
         };
 
+        // T5-10 — la clase sale de una caché que se rehace sola; si toca, en segundo plano.
+        await abcService.refrescar();
+
         const [products, total] = await prisma.$transaction([
-            prisma.product.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" }, include: PRODUCT_INCLUDE }),
+            prisma.product.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" }, include: CON_CLASE_ABC }),
             prisma.product.count({ where }),
         ]);
 
         return {
             // T5-03 — con comprometido y disponible: es la lista de la que elige el formulario
             // de venta. Una sola consulta agrupada para la página entera, no una por producto.
-            data: await conDisponible(products),
+            data: await conDisponible(conClaseAbc(products)),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     },
 
     async getById(id: string) {
-        const product = await prisma.product.findUnique({ where: { id }, include: PRODUCT_INCLUDE });
+        await abcService.refrescar();
+        const product = await prisma.product.findUnique({ where: { id }, include: CON_CLASE_ABC });
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
-        const [conCifras] = await conDisponible([product]);
+        const [conCifras] = await conDisponible(conClaseAbc([product]));
         return conCifras!;
     },
 

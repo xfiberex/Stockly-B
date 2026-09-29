@@ -5,7 +5,11 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-09-28 — **120 / 129**
+> ## Estado al 2026-09-29 — **121 / 129**
+>
+> **2026-09-29: se cierra T5-10**, clasificación ABC: columna y filtro en el catálogo, con los doce
+> meses naturales completos anteriores al actual. La primera versión tardaba más de cinco minutos
+> con el conjunto de carga por una ventana con `EXCLUDE`; la corregida, 2.3 s, en segundo plano.
 >
 > **2026-09-28: se cierra T5-09**, ventas y compras por periodo: atajos y rangos en la zona horaria
 > del negocio (ajuste nuevo, por defecto `America/Santo_Domingo`), compras fechadas por recepción,
@@ -39,8 +43,8 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > y el dashboard en **337 ms de p(95)** donde estaba en 1.91 s. Detalle en
 > [rendimiento.md](rendimiento.md).
 >
-> Backend **481/481** tests y 91.83 % de sentencias; frontend **536/536** y 1 omitido; E2E 9
-> pasados y 1 omitido en `chromium` y en `Mobile Chrome`. Detalle en [Métricas](#métricas).
+> Backend **634/634** tests y 94.87 % de sentencias; frontend **608/608** y 1 omitido (2026-09-29).
+> Detalle, y el E2E, en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
 > 104/110 y el índice daba 13 tareas al Tier 4 mientras las casillas sumaban 107/114: al cerrar una
@@ -1829,13 +1833,23 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
     - **La suite del backend se quedaba sin conexiones de PostgreSQL.** Jest da a cada archivo su contexto y su pool, y las conexiones inactivas vivían 30 s: con 48 archivos en ~40 s rozaban el `max_connections` de 100, y el archivo nuevo —cinco consultas a la vez— lo cruzó (21 fallos con «demasiados clientes»). En tests, el pool cierra las inactivas al segundo.
     - **`load/sembrar.js` ya genera costes, ventas y compras** con recepciones. Hasta ahora las mediciones de T5-02 y T5-05 se hicieron con un guion a mano no versionado, y rehacer la base las borraba; la salvedad de rendimiento.md §7 bis queda resuelta. El producto de cada línea se sortea en la lista de columnas, no en la condición del `JOIN`, que es el error que esa siembra a mano dejó anotado.
 
-- [ ] **[T5-10] Clasificación ABC de productos**
+- [x] **[T5-10] Clasificación ABC de productos** ✅ *(2026-09-29)*
   - **Área:** Informes
   - **Ubicación:** `src/modules/reports/`, `Stockly-F/src/modules/reports/`, `Stockly-F/src/modules/products/`
   - **Qué hacer:** ordenar los productos por lo que facturan en un periodo y clasificarlos: **A** hasta el 80 % acumulado, **B** hasta el 95 %, **C** el resto. Distintivo en el catálogo y filtro por clase, para saber qué productos merecen conteos más frecuentes y márgenes de seguridad mayores.
   - **Criterio de aceptación:** con un conjunto de prueba de facturación conocida, las clases coinciden con un cálculo hecho a mano, incluido el producto que cae justo en el 80 %; los productos sin ventas en el periodo son **C**, no desaparecen.
   - **Esfuerzo:** bajo
   - **Depende de:** T5-09
+  - **Decisiones tomadas (2026-09-29):**
+    - **Periodo: los doce meses naturales completos anteriores al actual**, en la zona del negocio (T5-09). Decidido con el dueño del producto frente a una ventana móvil de 90 días —la clase saltaría de un día para otro y castiga lo estacional— y frente a un ajuste configurable. Sin el mes en curso, la clase no cambia a mitad de mes.
+    - **Una caché, no un cálculo por petición.** El filtro tiene que ir en el `where` (T4-15), y clasificar recorre un año de ventas. `product_abc` guarda la clase de cada producto **con ventas** —sin fila es C— y `abc_calculations` de qué periodo y zona salió. Se rehace entera al cambiar el periodo o la zona, o pasado un día; **el catálogo no espera**: sirve la anterior y recalcula detrás, salvo si no hay ninguna. Un bloqueo consultivo sin espera evita dos recálculos a la vez.
+    - **El corte cuenta lo acumulado *antes* del producto**: es A si los que facturan más no llegan al 80 %. El que cae justo en el 80 % es A, el que lo cruza también, y el más vendido lo es siempre. **Los empates comparten clase.** Céntimos enteros en `float8`, exactos: la igualdad del criterio es una igualdad de verdad.
+    - **Qué ventas:** las mismas que T5-09 —enviadas, por `shippedAt`, al precio del ítem—. Los inactivos con ventas se clasifican; las líneas de un producto borrado no cuentan.
+    - **En la interfaz:** columna «ABC» con insignia **neutra** —una clase no es un estado—, filtro con el recuento de cada clase y una leyenda que dice qué meses cuentan. `GET /reports/abc` da periodo, fecha y recuentos.
+  - **Verificado localmente (2026-09-29):** `verify` backend **634/634** (19 nuevos en `clasificacion-abc.test.ts`, uno en `contratos.test.ts` y la guardia del enum), sentencias **94.87 %**; `verify` frontend **608 + 1 omitido** (uno en `ProductTable`, uno en `ProductFilters`, uno en `ProductsPage`). **E2E 13/16**: pasan los del catálogo; fallan en los dos proyectos la descarga del CSV de T5-09 —el `.env` de esta máquina tiene `VITE_API_URL` absoluta, el enlace apunta a otro origen y el navegador ignora `download`— y hay uno omitido de siempre. No es de esta tarea, y queda anotado en CONTEXTO.
+  - **El criterio, con su test:** facturaciones de 50, 30, 15, 4 y 1 sobre 100 dan A, A, B, C, C —el segundo cae justo en el 80 %, el tercero justo en el 95 %—; 50 y 35 dan A a los dos; 90, 6 y 4 dan A, B, C; 60, 20 y 20 dan tres A; y los productos sin ventas salen C **y en el filtro de C**. Bordes del periodo en hora de Santo Domingo, pendientes y canceladas fuera, caducidad de un día, cambio de zona y el bloqueo.
+  - **Falsificado:** con `≤` en vez de `<` en el corte fallan **4** tests; sin el tratamiento de empates, **10**.
+  - **Lo que destapó la medición, y no los tests:** la primera versión trataba los empates con `EXCLUDE GROUP`, que obliga a PostgreSQL a recalcular la suma de la ventana fila a fila. Con los ~100 000 productos del conjunto de carga **pasó de cinco minutos sin terminar**. Con `RANGE … 1 PRECEDING` sobre céntimos enteros —lo mismo, sin exclusión—, **2.3 s** la consulta y **~5 s** el recálculo completo, que nadie espera. Detalle en [rendimiento.md §7 quinquies](rendimiento.md).
 
 - [ ] **[T5-11] Resumen periódico por correo**
   - **Área:** Notificaciones
@@ -1996,6 +2010,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-09-29 | **T5-10** Clasificación ABC de productos — **completada** | **El criterio con tests:** 50/30/15/4/1 da A, A, B, C, C, con el producto que cae justo en el 80 % en A; los empates comparten clase y los productos sin ventas son C y salen en su filtro. `verify` ✅ backend **634/634** (94.87 %) y frontend **608 + 1 omitido**; E2E **13/16** —falla la descarga del CSV de T5-09 por el `VITE_API_URL` absoluto del `.env` local, ajena a esta tarea— | Doce meses naturales completos, en la zona del negocio. Caché `product_abc` que se rehace sola una vez al día **sin hacer esperar al catálogo**. **La medición cambió el SQL:** con `EXCLUDE GROUP` la clasificación no terminaba en cinco minutos sobre 100 000 productos; con `RANGE … 1 PRECEDING` sobre céntimos, 2.3 s. |
 | 2026-09-28 | **T5-09** Informes de ventas y compras por periodo — **completada** | **El criterio con tests:** la suma de enero, febrero y marzo es el trimestre; una venta enviada a las 23:30 del 31 de marzo en Santo Domingo cae en marzo; con Nueva York los dos bordes de horario. `verify` ✅ backend **613/613** (94.82 %) y frontend **605 + 1 omitido**; E2E ✅ **15 + 1 omitido** | Zona horaria del negocio como ajuste (`America/Santo_Domingo`), compras fechadas por recepción (`stock_movements.purchaseOrderItemId`, con relleno de las antiguas), atajos resueltos por el backend, CSV y PDF, y el gráfico de movimientos a meses naturales. **El `EXPLAIN` sin disco se cumple para un mes, no del todo para un año**: el agregado por producto en memoria fue más lento (1.2 s frente a 0.76 s), y se deja; decisión abierta en la ficha. De paso: la suite del backend se quedaba sin conexiones de PostgreSQL, y `load/sembrar.js` ya genera ventas y compras. |
 | 2026-09-28 | *Mantenimiento, sin ficha:* **integración continua**, con los dos repositorios ya públicos | Workflow `verify` en cada repositorio: el backend ejecuta `pnpm verify` tal cual con PostgreSQL 17 de servicio; el frontend, `verify` con `Stockly-B` clonado al lado —la frescura del contrato deja de omitirse— y un job con el E2E completo. Validados con `actionlint`, sin avisos; la cadena de migraciones, aplicada entera sobre una base vacía, como la creará la CI. **La primera ejecución en GitHub falló en los dos, y por defectos reales, no de la CI:** (1) **14 tests del backend dependían del `.env` del desarrollador** —pasaban con SMTP y Cloudinary reales configurados y fallaban en un clon limpio—; `jest.setup.js` fija ahora credenciales falsas siempre, lo que además impide que un test sin mock mande un correo de verdad. (2) `contratos.test.ts` exigía el frontend al lado; ahora se omite **solo** si el repositorio hermano no está, como su gemelo del frontend. (3) El E2E se quedaba en blanco: **sin `VITE_API_URL` la aplicación lanza al cargar**, y en la CI no hay `.env`. Reproducido en local sin el `.env` del frontend y con `CI=true`: 13/13 + 1 omitido. **Segunda ejecución en GitHub, en verde en los dos:** backend 579 + 1 omitido (la copia del contrato, sin el frontend al lado) y sentencias 94.2 %; frontend `verify` 596 + 1 omitido, con la frescura del contrato comparada de verdad contra el `main` del backend, y **E2E 13/13 + 1 omitido** en escritorio y móvil | **Revierte una decisión escrita**: la [ADR 0005](adr/0005-sin-integracion-continua.md) queda **sustituida** por la [0008](adr/0008-integracion-continua.md), que dice qué cambió —repositorios públicos, pull requests de terceros, y dos semanas con `auditoria` en rojo que solo se supieron porque alguien ejecutó `verify`—. **La CI llama al mismo script que el portátil**, no reproduce sus pasos. Públicos: `contents: read`, acciones fijadas por SHA, `pull_request` y no `pull_request_target`, ningún secreto. `forbidOnly` pasa a depender de `CI`; los reintentos siguen en 0. **Un cambio de contrato se sube primero al backend.** |
 | 2026-09-28 | **T5-05** Plazo de entrega del proveedor y sugerencias de reposición — **completada** | **El criterio con tests:** 2/día × 7 + 10 − 5 − 0 → **19**; con 19 pedidos → **0**; generar produce ese 0 solo; los borradores se cancelan y la sugerencia vuelve. Cada término de la fórmula con un test propio. **En la app levantada**, revisada a 1280 y 412 px. `verify` backend ✅ **580/580**, **94.45 %**, `auditoria` en verde; frontend ✅ **596/596 + 1 omitido**, **73.27 %**; **E2E 13/13 + 1 omitido**. Sobre `Stockly_carga`: 231 ms la página, sin ordenar en disco | **Decisiones:** precio = último pagado a ese proveedor → coste medio → vacío, **nunca el de venta**; plazo por defecto 7 días en Configuración. **La ficha daba por editables los borradores y una orden de compra no deja editar sus líneas:** la revisión se hace antes, en una pantalla con cantidad y precio editables. **Cálculo en enteros:** en coma flotante 31 salidas × plazo 30 daba una unidad de más (contraejemplo buscado por fuerza bruta). **Destapó** que «Nuevo proveedor» se abría con los datos del anterior (`key` fija, defecto previo) y que `type="number"` sin `step` para «2.5» con la validación nativa. Fuera: selección por página, concurrencia de dos ADMIN, y las cancelaciones de compras recibidas inflan la velocidad (igual que en la rotación). |
@@ -2143,10 +2158,10 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 9 (el Tier 5, abierto el 2026-09
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **613/613** ✅ *(2026-09-28, T5-09)* | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **94.82 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **605/605** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-28, T5-09)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **73.56 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests backend | 198/198 ✅ | **634/634** ✅ *(2026-09-29, T5-10)* | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **94.87 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **608/608** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-29, T5-10)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **73.63 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |

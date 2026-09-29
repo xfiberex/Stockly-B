@@ -37,6 +37,8 @@ export interface ProductQuery {
     supplierId?: string;
     isActive?: string;
     tagId?: string;
+    /** T5-10 — `A`, `B` o `C`. C incluye los productos sin ventas en el periodo. */
+    abcClass?: string;
 }
 
 /**

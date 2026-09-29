@@ -47,6 +47,8 @@ export const estadoOrdenVentaSchema = z.enum(["PENDING", "SHIPPED", "CANCELLED"]
 export const tipoMovimientoSchema = z.enum(["IN", "OUT", "ADJUSTMENT", "IMPORT"]);
 /** T5-01 — de dónde sale un cambio de coste: una recepción de compra o una edición a mano. */
 export const origenCosteSchema = z.enum(["PURCHASE_RECEIPT", "MANUAL"]);
+/** T5-10 — clase ABC por facturación. C es también la de los productos sin ventas. */
+export const claseAbcSchema = z.enum(["A", "B", "C"]);
 
 export const accionAuditoriaSchema = z.enum([
     "CREATE", "UPDATE", "DELETE", "RESTORE", "STOCK_MOVEMENT", "BULK_STOCK",
@@ -304,10 +306,13 @@ export const productoSchema = z.object({
  * pendientes y el disponible (`stock − comprometido`). El resto de respuestas con producto
  * —crear, editar, restaurar, el histórico— **no**: calcularlo en cada una costaría una consulta
  * más donde nadie lo pinta. **El disponible puede ser negativo** con datos anteriores a T5-03.
+ *
+ * T5-10 — y, por lo mismo, la clase ABC: solo la pintan el catálogo y la ficha.
  */
 export const productoConDisponibleSchema = productoSchema.extend({
     committedStock: z.number(),
     availableStock: z.number(),
+    abcClass: claseAbcSchema,
 });
 
 export const movimientoStockSchema = z.object({
@@ -722,6 +727,19 @@ export const informePorPeriodoSchema = z.object({
     moreProducts: z.boolean(),
 });
 
+/**
+ * T5-10 — `GET /reports/abc`. `from` y `to` son los doce meses naturales completos anteriores
+ * al actual, en la zona `timezone`; `calculatedAt`, cuándo se calculó por última vez.
+ * `counts.C` cuenta **todos** los productos que no son A ni B, con ventas o sin ellas.
+ */
+export const resumenAbcSchema = z.object({
+    from: z.string(),
+    to: z.string(),
+    timezone: z.string(),
+    calculatedAt: fechaSchema,
+    counts: z.object({ A: z.number(), B: z.number(), C: z.number() }),
+});
+
 // ─────────────────────── Tipos inferidos ───────────────────────
 // Es lo que consume el frontend. No se escriben a mano: si el esquema cambia, el tipo
 // cambia con él y `tsc` señala cada uso que dejó de encajar.
@@ -732,6 +750,7 @@ export type EstadoOrdenCompra = z.infer<typeof estadoOrdenCompraSchema>;
 export type EstadoOrdenVenta = z.infer<typeof estadoOrdenVentaSchema>;
 export type TipoMovimiento = z.infer<typeof tipoMovimientoSchema>;
 export type OrigenCoste = z.infer<typeof origenCosteSchema>;
+export type ClaseAbc = z.infer<typeof claseAbcSchema>;
 export type AccionAuditoria = z.infer<typeof accionAuditoriaSchema>;
 export type EntidadAuditoria = z.infer<typeof entidadAuditoriaSchema>;
 
@@ -785,6 +804,7 @@ export type PeriodoPorMes = z.infer<typeof periodoPorMesSchema>;
 export type PeriodoPorCategoria = z.infer<typeof periodoPorCategoriaSchema>;
 export type PeriodoPorProducto = z.infer<typeof periodoPorProductoSchema>;
 export type InformePorPeriodo = z.infer<typeof informePorPeriodoSchema>;
+export type ResumenAbc = z.infer<typeof resumenAbcSchema>;
 export type MargenPorCategoria = z.infer<typeof margenPorCategoriaSchema>;
 export type MargenPorProducto = z.infer<typeof margenPorProductoSchema>;
 

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import PDFDocument from "pdfkit";
 import { reportsService } from "./reports.service";
+import { abcService } from "./reports.abc";
 import { renderPeriodReportPdf, renderReportPdf } from "./reports.pdf";
 import { enviarExportacion } from "@/shared/lib/exportacion";
 
@@ -81,6 +82,16 @@ export const reportsController = {
             }
 
             res.json({ success: true, message: "Informe por periodo generado", data: informe });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    /** T5-10 — el periodo de la clasificación ABC y cuántos productos hay en cada clase. */
+    async getAbc(_req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const resumen = await abcService.resumen();
+            res.json({ success: true, message: "Clasificación ABC obtenida", data: resumen });
         } catch (error) {
             next(error);
         }

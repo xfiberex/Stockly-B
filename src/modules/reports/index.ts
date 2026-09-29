@@ -7,3 +7,4 @@ export const reportsRouter = Router();
 reportsRouter.use(requireAuth);
 reportsRouter.get("/", reportsController.getSummary);
 reportsRouter.get("/period", reportsController.getPeriod);
+reportsRouter.get("/abc", reportsController.getAbc);
