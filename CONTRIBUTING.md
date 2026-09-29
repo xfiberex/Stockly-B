@@ -114,8 +114,10 @@ Hoy el proyecto lo lleva una persona desde varias máquinas, y el historial es l
 en la máquina desde la que se hace el push**. La CI lo repite, pero después: cuando avisa, el
 commit ya está en `main`.
 
-**Un cambio de contrato se sube primero al backend.** La CI del frontend clona el `main` del
-backend para comprobar que su copia está al día; si el frontend llega antes, falla.
+**Primero el backend, y con su CI en verde; después el frontend.** La CI del frontend clona el
+`main` del backend tal como esté —para comprobar la copia del contrato y para arrancar la API en
+el E2E—, así que si el frontend llega antes que el backend del que depende, o con el backend en
+rojo, falla aunque su código esté bien. Los pasos, en el [README](README.md#orden-de-subida-primero-el-backend-en-verde-después-el-frontend).
 
 En cuanto haya más de una persona, o un cambio que quieras poder revertir de una pieza:
 

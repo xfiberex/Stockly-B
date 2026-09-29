@@ -262,6 +262,12 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Corregido
 
+- **Las descargas fallaban con la API en otro origen, y con la sesión caducada guardaban el
+  error** (sin tarea). El PDF del resumen, el informe por periodo y los CSV de compras y ventas
+  se descargan ahora por la API como el histórico de movimientos (`T2-34`): con el nombre de
+  archivo correcto, renovando la sesión si hace falta y, si la exportación falla, con un aviso
+  en el idioma del usuario en lugar de nada.
+
 - **Dos recepciones simultáneas de la misma compra podían sumar el stock dos veces** (`T5-04`).
   El estado se comprobaba fuera de la transacción; ahora la orden se bloquea antes de leerlo.
 

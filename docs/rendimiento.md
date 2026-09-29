@@ -395,6 +395,11 @@ que T4-16 rechazó, que era subirlo en el servidor—: en memoria de verdad (un 
 las compras (4.5 MB) es de las líneas de compra para un `Merge Join` contra el índice de
 `purchaseOrderItemId`; no se ha perseguido.
 
+**Decisión (2026-09-29): el criterio de la ficha se relaja a «un mes».** Con un año la pantalla
+espera ~1.8 s, la del desglose por meses. Si los informes anuales pasan a ser habituales, lo que
+lo cambia de escala no es `work_mem` sino no agregar las líneas en cada petición: una tabla con
+las cifras ya sumadas por mes y producto, mantenida al enviar y al recibir. Sería tarea propia.
+
 **Un tropiezo del propio guion de medición**, anotado por si se repite: al interceptar
 `$queryRaw` para lanzar el `EXPLAIN`, el cliente de una transacción interactiva de Prisma hereda el
 método interceptado del cliente global, y la consulta «dentro» de la transacción se ejecutaba

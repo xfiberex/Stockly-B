@@ -269,12 +269,12 @@ definido— y se usa el datasource de la configuración:
 DATABASE_URL=<la de Stockly_test> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
 ```
 
-**El E2E de la descarga del CSV (T5-09) falla con un `VITE_API_URL` absoluto (2026-09-29).** En un
+**Las descargas de la API van por axios, nunca por un enlace (resuelto el 2026-09-29).** En un
 equipo, el `.env` del frontend tenía `http://localhost:3000/api/v1` y no el `/api/v1` de
-`.env.example` —el que usa la CI—. Los enlaces de descarga se construyen con esa base: apuntan a
-otro origen y el navegador **ignora `download`** entre orígenes, así que el test espera una descarga
-que no llega. Pasan los otros trece. Ojo: cambiarlo solo para el E2E (`VITE_API_URL=/api/v1` en el
-entorno) hizo fallar **todos** los logins en ese equipo; no se investigó más.
+`.env.example`, y el E2E del CSV de T5-09 fallaba: el enlace apuntaba a otro origen y el navegador
+**ignora `download`** entre orígenes. No era el `.env`, era el enlace: todas las descargas pasan
+ahora por `descargarDeLaApi` (`shared/api/descargar.ts`), y el E2E pasa con los dos valores. Una
+descarga nueva va por ahí, no por `<a href={api.defaults.baseURL + …}>`.
 
 **Una ventana con `EXCLUDE` en el marco es cuadrática.** `SUM() OVER (… EXCLUDE GROUP)` obliga a
 PostgreSQL a recalcular la suma para cada fila en vez de acumularla: con cinco productos en los

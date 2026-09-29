@@ -217,10 +217,6 @@ ejecuta **la misma puerta que en local**, no otra ([ADR 0008](docs/adr/0008-inte
 | **Qué ejecuta** | `pnpm install --frozen-lockfile` y `pnpm verify` tal cual: `check`, tests con cobertura, `build`, `smoke` y `auditoria` |
 | **Tiempo máximo** | 20 minutos |
 
-El frontend tiene su propio workflow, que **clona el `main` de este repositorio** para comprobar
-que su copia del contrato está al día y para arrancar el backend en el E2E. Por eso **un cambio
-de contrato se sube primero aquí**: si llega antes el frontend, su CI falla, y con razón.
-
 **Endurecido porque el repositorio es público:**
 
 - `permissions: contents: read` y `persist-credentials: false`: el job no puede escribir en el
@@ -234,6 +230,25 @@ de contrato se sube primero aquí**: si llega antes el frontend, su CI falla, y 
 **Si falla en la CI y no en local**, casi siempre es algo que el portátil pone y la CI no: un
 `.env`, una base ya migrada, el repositorio hermano al lado. La primera ejecución destapó dos de
 esos (el SMTP y el Cloudinary reales del `.env`, y el `VITE_API_URL` del frontend).
+
+### Orden de subida: primero el backend, en verde; después el frontend
+
+La CI del frontend **no usa una versión fija del backend: clona el `main` de `Stockly-B` tal como
+esté en ese momento**, tanto para comprobar la copia del contrato como para arrancar la API en el
+E2E. Si el frontend se sube antes que el backend del que depende —un endpoint nuevo, una
+migración, un cambio de contrato—, o con el `main` del backend en rojo, **la CI del frontend
+falla aunque su código esté bien**.
+
+1. `pnpm verify` en local en los dos repositorios.
+2. **Push de `Stockly-B`** y esperar a que su workflow termine **en verde**:
+   `gh run watch` (o `gh run list --workflow verify.yml -L 1`) desde `Stockly-B`, o la pestaña
+   *Actions* en GitHub.
+3. **Solo entonces, push de `Stockly-F`.**
+
+Si el cambio es solo del frontend, el paso 2 se reduce a comprobar que la última ejecución del
+backend está en verde. Si la del frontend falló por haberlo subido antes, no hace falta otro
+commit: con el backend ya en verde, se relanza desde *Actions* (*Re-run all jobs*) o con
+`gh run rerun <id>`.
 
 ---
 
