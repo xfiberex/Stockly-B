@@ -52,6 +52,18 @@ export const saleOrderController = {
         } catch (error) { next(error); }
     },
 
+    /** T5-13 — `POST /:id/ship`: solo el envío, sin nada más de la orden que se pueda tocar. */
+    async shipSaleOrder(req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const order = await saleOrderService.update(req.params.id, { status: "SHIPPED" });
+            await auditService.log(
+                { userId: req.userId, userEmail: req.userEmail },
+                "SALE_SHIP", "SaleOrder", req.params.id,
+            );
+            res.json({ success: true, message: "Orden de venta enviada", data: order });
+        } catch (error) { next(error); }
+    },
+
     async deleteSaleOrder(req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> {
         try {
             await saleOrderService.delete(req.params.id);

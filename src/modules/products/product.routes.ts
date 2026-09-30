@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { upload, verificarFirmaDeImagen } from "@/shared/middlewares/upload.middleware";
 import { validate } from "@/shared/middlewares/validate.middleware";
-import { requireAuth, requireRole } from "@/shared/middlewares/auth.middleware";
+import { requireAuth, permitir } from "@/shared/middlewares/auth.middleware";
 import {
     createProductSchema,
     updateProductSchema,
@@ -16,21 +16,21 @@ export const productRouter = Router();
 productRouter.use(requireAuth);
 
 // Lectura — cualquier usuario autenticado
-productRouter.get("/", productController.getProducts);
-productRouter.get("/export", productController.exportProducts);
-productRouter.get("/:id", productController.getProductById);
-productRouter.get("/:id/movements", productController.getProductMovements);
-productRouter.get("/:id/movements/export", productController.exportProductMovements);
-productRouter.get("/:id/price-history", productController.getPriceHistory);
-productRouter.get("/:id/cost-history", productController.getCostHistory);
+productRouter.get("/", permitir("GET /products"), productController.getProducts);
+productRouter.get("/export", permitir("GET /products/export"), productController.exportProducts);
+productRouter.get("/:id", permitir("GET /products/:id"), productController.getProductById);
+productRouter.get("/:id/movements", permitir("GET /products/:id/movements"), productController.getProductMovements);
+productRouter.get("/:id/movements/export", permitir("GET /products/:id/movements/export"), productController.exportProductMovements);
+productRouter.get("/:id/price-history", permitir("GET /products/:id/price-history"), productController.getPriceHistory);
+productRouter.get("/:id/cost-history", permitir("GET /products/:id/cost-history"), productController.getCostHistory);
 
 // Escritura — solo ADMIN
-productRouter.post("/import", requireRole("ADMIN"), validate(importProductsSchema), productController.importProducts);
+productRouter.post("/import", permitir("POST /products/import"), validate(importProductsSchema), productController.importProducts);
 // T2-32: la firma se comprueba **después** de multer, que es cuando existe el buffer, y
 // antes de validar el resto: si el archivo no es una imagen, no hay nada más que mirar.
-productRouter.post("/", requireRole("ADMIN"), upload.single("image"), verificarFirmaDeImagen, validate(createProductSchema), productController.createProduct);
-productRouter.put("/:id", requireRole("ADMIN"), upload.single("image"), verificarFirmaDeImagen, validate(updateProductSchema), productController.updateProduct);
-productRouter.delete("/:id", requireRole("ADMIN"), productController.deleteProduct);
-productRouter.patch("/:id/restore", requireRole("ADMIN"), productController.restoreProduct);
-productRouter.post("/:id/movements", requireRole("ADMIN"), validate(createManualMovementSchema), productController.createManualMovement);
-productRouter.patch("/bulk-stock", requireRole("ADMIN"), validate(bulkStockSchema), productController.bulkUpdateStock);
+productRouter.post("/", permitir("POST /products"), upload.single("image"), verificarFirmaDeImagen, validate(createProductSchema), productController.createProduct);
+productRouter.put("/:id", permitir("PUT /products/:id"), upload.single("image"), verificarFirmaDeImagen, validate(updateProductSchema), productController.updateProduct);
+productRouter.delete("/:id", permitir("DELETE /products/:id"), productController.deleteProduct);
+productRouter.patch("/:id/restore", permitir("PATCH /products/:id/restore"), productController.restoreProduct);
+productRouter.post("/:id/movements", permitir("POST /products/:id/movements"), validate(createManualMovementSchema), productController.createManualMovement);
+productRouter.patch("/bulk-stock", permitir("PATCH /products/bulk-stock"), validate(bulkStockSchema), productController.bulkUpdateStock);

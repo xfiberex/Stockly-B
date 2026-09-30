@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { requireAuth } from "@/shared/middlewares/auth.middleware";
+import { requireAuth, permitir } from "@/shared/middlewares/auth.middleware";
 import { reportsController } from "./reports.controller";
 
 export const reportsRouter = Router();
 
 reportsRouter.use(requireAuth);
-reportsRouter.get("/", reportsController.getSummary);
-reportsRouter.get("/period", reportsController.getPeriod);
-reportsRouter.get("/abc", reportsController.getAbc);
+reportsRouter.get("/", permitir("GET /reports"), reportsController.getSummary);
+reportsRouter.get("/period", permitir("GET /reports/period"), reportsController.getPeriod);
+reportsRouter.get("/abc", permitir("GET /reports/abc"), reportsController.getAbc);

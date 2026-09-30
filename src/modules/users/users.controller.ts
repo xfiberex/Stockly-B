@@ -19,7 +19,7 @@ export const usersController = {
 
     async updateRole(req: Request<{ id: string }>, res: Response, next: NextFunction) {
         try {
-            // El `z.enum(["ADMIN", "USER"])` de la ruta ya lo garantiza; el cast solo
+            // El `rolSchema` de la ruta ya lo garantiza; el cast solo
             // traslada esa garantía al tipo, que desde T3-02 es el enum de Prisma.
             const { role } = req.body as { role: $Enums.Role };
             const user = await usersService.updateRole(req.params.id, role, req.userId!);

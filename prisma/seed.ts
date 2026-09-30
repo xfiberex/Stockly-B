@@ -109,6 +109,16 @@ async function sembrarUsuarios(): Promise<User[]> {
                 idioma: "EN",
             },
         }),
+        // T5-13 — recibe compras, envía ventas y mueve stock; no toca precios ni catálogo.
+        prisma.user.create({
+            data: {
+                name: "Mateo Rivas",
+                email: "almacen@stockly.app",
+                password: await hashPassword("Almacen1234!"),
+                role: "WAREHOUSE",
+                isVerified: true,
+            },
+        }),
     ]);
     console.log(`  - ${usuarios.length} usuarios creados`);
     return usuarios;
@@ -849,6 +859,7 @@ async function main(): Promise<void> {
     admin@stockly.app    Admin1234!   (ADMIN)
     carlos@stockly.app   Admin1234!   (ADMIN)
     laura@stockly.app    User1234!    (USER, correos en ingles)
+    almacen@stockly.app  Almacen1234!  (WAREHOUSE)
 `);
 }
 

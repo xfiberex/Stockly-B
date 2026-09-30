@@ -94,15 +94,24 @@ router.get("/metrics", async (req, res, next) => {
     res.set("content-type", tipo).send(cuerpo);
 });
 
-router.use("/auth", authRouter);
-router.use("/products", productRouter);
-router.use("/categories", categoriesRouter);
-router.use("/brands", brandsRouter);
-router.use("/suppliers", suppliersRouter);
-router.use("/purchase-orders", purchaseOrdersRouter);
-router.use("/sale-orders", saleOrdersRouter);
-router.use("/reports", reportsRouter);
-router.use("/tags", tagsRouter);
-router.use("/users", usersRouter);
-router.use("/settings", settingsRouter);
-router.use("/audit-logs", auditLogsRouter);
+/**
+ * Dónde se monta cada módulo. Exportado para `permisos.test.ts` (T5-13), que recorre estas
+ * rutas contra la matriz `PERMISOS` del contrato: un módulo montado aquí es un módulo que el
+ * test revisa, sin una segunda lista que mantener.
+ */
+export const MONTAJES = [
+    ["/auth", authRouter],
+    ["/products", productRouter],
+    ["/categories", categoriesRouter],
+    ["/brands", brandsRouter],
+    ["/suppliers", suppliersRouter],
+    ["/purchase-orders", purchaseOrdersRouter],
+    ["/sale-orders", saleOrdersRouter],
+    ["/reports", reportsRouter],
+    ["/tags", tagsRouter],
+    ["/users", usersRouter],
+    ["/settings", settingsRouter],
+    ["/audit-logs", auditLogsRouter],
+] as const;
+
+for (const [prefijo, modulo] of MONTAJES) router.use(prefijo, modulo);

@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { requireAuth, requireRole } from "@/shared/middlewares/auth.middleware";
+import { requireAuth, permitir } from "@/shared/middlewares/auth.middleware";
 import { auditLogsController } from "./audit-logs.controller";
 
 export const auditLogsRouter = Router();
 
-auditLogsRouter.use(requireAuth, requireRole("ADMIN"));
-auditLogsRouter.get("/", auditLogsController.getAuditLogs);
+auditLogsRouter.use(requireAuth);
+auditLogsRouter.get("/", permitir("GET /audit-logs"), auditLogsController.getAuditLogs);

@@ -31,7 +31,106 @@ import { z } from "zod";
 // ─────────────────────────── Enums ───────────────────────────
 // Espejo de `prisma/schema.prisma`, vigilado por `contratos.test.ts`.
 
-export const rolSchema = z.enum(["ADMIN", "USER"]);
+export const rolSchema = z.enum(["ADMIN", "USER", "WAREHOUSE"]);
+
+// ─────────────────────── Permisos (T5-13) ───────────────────────
+
+const TODOS = ["ADMIN", "USER", "WAREHOUSE"] as const;
+const SOLO_ADMIN = ["ADMIN"] as const;
+const ALMACEN = ["ADMIN", "WAREHOUSE"] as const;
+
+/**
+ * T5-13 — qué rol puede llamar a cada ruta de la API. **Es la única copia de la matriz.**
+ *
+ * El backend protege cada ruta con `permitir("<MÉTODO> <ruta>")`, que lee de aquí, y el
+ * frontend decide con `puede()` qué botones enseñar, así que la interfaz no puede ofrecer lo
+ * que la API va a rechazar ni esconder lo que admite. `permisos.test.ts` recorre las rutas
+ * montadas: una ruta sin fila aquí, una fila sin ruta, o una ruta que responda distinto de lo
+ * que dice su fila para algún rol **rompe la suite**.
+ *
+ * `WAREHOUSE` recibe compras, envía ventas y mueve stock. No crea ni edita productos, órdenes
+ * ni catálogo —todo eso fija precios o costes—, no cancela ni borra —deshacer es una decisión
+ * comercial—, y no ve usuarios, configuración, auditoría ni exportaciones de órdenes. Lee lo
+ * mismo que `USER`.
+ *
+ * `/auth` queda fuera: sus rutas son de la propia sesión y no dependen del rol.
+ */
+export const PERMISOS = {
+    // Productos
+    "GET /products": TODOS,
+    "GET /products/export": TODOS,
+    "GET /products/:id": TODOS,
+    "GET /products/:id/movements": TODOS,
+    "GET /products/:id/movements/export": TODOS,
+    "GET /products/:id/price-history": TODOS,
+    "GET /products/:id/cost-history": TODOS,
+    "POST /products/import": SOLO_ADMIN,
+    "POST /products": SOLO_ADMIN,
+    "PUT /products/:id": SOLO_ADMIN,
+    "DELETE /products/:id": SOLO_ADMIN,
+    "PATCH /products/:id/restore": SOLO_ADMIN,
+    "POST /products/:id/movements": ALMACEN,
+    "PATCH /products/bulk-stock": ALMACEN,
+    // Catálogo
+    "GET /categories": TODOS,
+    "GET /categories/:id": TODOS,
+    "POST /categories": SOLO_ADMIN,
+    "PUT /categories/:id": SOLO_ADMIN,
+    "DELETE /categories/:id": SOLO_ADMIN,
+    "GET /brands": TODOS,
+    "GET /brands/:id": TODOS,
+    "POST /brands": SOLO_ADMIN,
+    "PUT /brands/:id": SOLO_ADMIN,
+    "DELETE /brands/:id": SOLO_ADMIN,
+    "GET /suppliers": TODOS,
+    "GET /suppliers/:id": TODOS,
+    "POST /suppliers": SOLO_ADMIN,
+    "PUT /suppliers/:id": SOLO_ADMIN,
+    "DELETE /suppliers/:id": SOLO_ADMIN,
+    "GET /tags": TODOS,
+    "GET /tags/:id": TODOS,
+    "POST /tags": SOLO_ADMIN,
+    "PUT /tags/:id": SOLO_ADMIN,
+    "DELETE /tags/:id": SOLO_ADMIN,
+    // Compras
+    "GET /purchase-orders": TODOS,
+    "GET /purchase-orders/export": SOLO_ADMIN,
+    "GET /purchase-orders/suggestions": TODOS,
+    "POST /purchase-orders/suggestions": SOLO_ADMIN,
+    "GET /purchase-orders/:id": TODOS,
+    "POST /purchase-orders": SOLO_ADMIN,
+    "POST /purchase-orders/:id/receipts": ALMACEN,
+    "PATCH /purchase-orders/:id": SOLO_ADMIN,
+    "DELETE /purchase-orders/:id": SOLO_ADMIN,
+    // Ventas
+    "GET /sale-orders": TODOS,
+    "GET /sale-orders/export": SOLO_ADMIN,
+    "GET /sale-orders/:id": TODOS,
+    "POST /sale-orders": SOLO_ADMIN,
+    "POST /sale-orders/:id/ship": ALMACEN,
+    "PATCH /sale-orders/:id": SOLO_ADMIN,
+    "DELETE /sale-orders/:id": SOLO_ADMIN,
+    // Informes
+    "GET /reports": TODOS,
+    "GET /reports/period": TODOS,
+    "GET /reports/abc": TODOS,
+    // Administración
+    "GET /users": SOLO_ADMIN,
+    "GET /users/:id": SOLO_ADMIN,
+    "PATCH /users/:id/role": SOLO_ADMIN,
+    "PATCH /users/:id/activate": SOLO_ADMIN,
+    "PATCH /users/:id/deactivate": SOLO_ADMIN,
+    "GET /settings": SOLO_ADMIN,
+    "PATCH /settings": SOLO_ADMIN,
+    "GET /audit-logs": SOLO_ADMIN,
+} as const satisfies Record<string, readonly z.infer<typeof rolSchema>[]>;
+
+export type RutaConPermiso = keyof typeof PERMISOS;
+
+/** Si `rol` puede llamar a `ruta`. Sin rol —sin sesión— no puede nada. */
+export function puede(rol: z.infer<typeof rolSchema> | undefined, ruta: RutaConPermiso): boolean {
+    return rol !== undefined && (PERMISOS[ruta] as readonly string[]).includes(rol);
+}
 
 /**
  * T4-12 — el idioma en el que el servidor le escribe a un usuario.
@@ -145,6 +244,8 @@ export const CODIGOS_DE_ERROR = [
     // 401 / 403 — quién eres y qué se te permite
     "ACCOUNT_DISABLED",
     "EMAIL_NOT_CONFIRMED",
+    // T5-13 — el rol no alcanza para esa ruta (`PERMISOS`).
+    "FORBIDDEN",
     "INVALID_CREDENTIALS",
     "NOT_AUTHENTICATED",
     "SESSION_EXPIRED",

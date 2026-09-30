@@ -55,9 +55,13 @@ enum StockMovementType {
 // o cualquier cadena, y el único filtro era el `z.enum` de la ruta. Todo lo que escriba
 // saltándose esa ruta —una migración, un seed, un `psql` a mano— podía dejar una cuenta
 // con un rol que `requireRole` no reconoce: sin permisos y sin error visible.
+// T5-13 — `WAREHOUSE`: recibe compras, envía ventas y mueve stock, sin tocar precios, costes,
+// catálogo, usuarios ni configuración. Qué puede cada rol en cada ruta está en la matriz de
+// `src/shared/permisos.ts`, y `permisos.test.ts` la recorre contra las rutas montadas.
 enum Role {
   ADMIN
   USER
+  WAREHOUSE
 }
 
 // T4-12 — el idioma en el que se le escribe a este usuario.

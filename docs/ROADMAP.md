@@ -5,7 +5,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-09-29 — **121 / 129**
+> ## Estado al 2026-09-29 — **122 / 129**
+>
+> **2026-09-29: se cierra T5-13**, rol de almacén: `WAREHOUSE` recibe compras, envía ventas y mueve
+> stock, sin tocar precios, catálogo, usuarios ni configuración. La matriz rol × ruta vive una sola
+> vez, en el contrato: el backend protege cada ruta con ella, el frontend decide con ella qué botones
+> enseñar, y un test recorre las 61 rutas contra ella con cada rol.
 >
 > **2026-09-29: se cierra T5-10**, clasificación ABC: columna y filtro en el catálogo, con los doce
 > meses naturales completos anteriores al actual. La primera versión tardaba más de cinco minutos
@@ -43,7 +48,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > y el dashboard en **337 ms de p(95)** donde estaba en 1.91 s. Detalle en
 > [rendimiento.md](rendimiento.md).
 >
-> Backend **634/634** tests y 94.87 % de sentencias; frontend **611/611** y 1 omitido (2026-09-29).
+> Backend **827/827** tests y 95.93 % de sentencias; frontend **621/621** y 1 omitido (2026-09-29).
 > Detalle, y el E2E, en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
@@ -1871,7 +1876,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Acceso
 
-- [ ] **[T5-13] Rol de almacén**
+- [x] **[T5-13] Rol de almacén** ✅ *(2026-09-29)*
   - **Área:** Autorización
   - **Ubicación:** `prisma/schema.prisma` (`Role`), `src/shared/middlewares/auth.middleware.ts`, rutas de `products`, `purchase-orders`, `sale-orders` y (con T5-07) `inventory-counts`, `Stockly-F/src/modules/users/`, transversal en el frontend
   - **Qué hacer:** solo existen `ADMIN` y `USER`, y todo lo que escribe exige `ADMIN`: la persona que recibe mercancía o cuenta el almacén necesita **los mismos permisos que quien cambia precios y desactiva usuarios**. Añadir un rol `WAREHOUSE` que pueda registrar movimientos, recibir compras, enviar ventas y contar, pero no editar precios ni costes, ni borrar, ni tocar usuarios o configuración.
@@ -1880,6 +1885,37 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** un usuario `WAREHOUSE` recibe una orden de compra y recibe **403** al cambiar un precio, tanto por API como porque la interfaz no le ofrece el botón; la matriz y el test coinciden ruta a ruta.
   - **Esfuerzo:** medio
   - **Depende de:** —
+  - **La matriz (2026-09-29), antes del código.** 61 rutas fuera de `/auth`: 32 de escritura —las 31 que había y la nueva de enviar— y 29 de lectura. Las de lectura quedan igual para `WAREHOUSE` que para `USER`; la tabla completa, ruta a ruta, es `PERMISOS` en `src/contratos/api.ts`.
+
+    | Ruta | ADMIN | WAREHOUSE | USER |
+    |---|:-:|:-:|:-:|
+    | `POST /products/:id/movements` (movimiento manual) | ✅ | ✅ | ❌ |
+    | `PATCH /products/bulk-stock` (ajuste en bloque) | ✅ | ✅ | ❌ |
+    | `POST /purchase-orders/:id/receipts` (recibir, parcial o completa) | ✅ | ✅ | ❌ |
+    | `POST /sale-orders/:id/ship` (enviar) — **ruta nueva** | ✅ | ✅ | ❌ |
+    | `PATCH /purchase-orders/:id` y `PATCH /sale-orders/:id` (editar, cancelar) | ✅ | ❌ | ❌ |
+    | Crear, editar, borrar, restaurar e importar productos (5) | ✅ | ❌ | ❌ |
+    | Categorías, marcas, proveedores y etiquetas: crear, editar, borrar (12) | ✅ | ❌ | ❌ |
+    | Crear órdenes de compra y venta, y generar desde sugerencias (3) | ✅ | ❌ | ❌ |
+    | Borrar órdenes de compra y venta (2) | ✅ | ❌ | ❌ |
+    | Usuarios (3 de escritura, 2 de lectura), configuración (2) y auditoría (1) | ✅ | ❌ | ❌ |
+    | Exportar órdenes de compra y de venta (2 lecturas) | ✅ | ❌ | ❌ |
+    | El resto de lecturas (23): catálogo, órdenes, informes, sugerencias | ✅ | ✅ | ✅ |
+
+  - **Decisiones tomadas con el dueño del producto (2026-09-29):**
+    - **Rutas dedicadas, no campos por rol.** Enviar una venta vivía en el mismo `PATCH` que editar cliente y notas o cancelar. Se añade `POST /sale-orders/:id/ship` —lo mismo que `PATCH status: SHIPPED`, sin nada más que tocar— y el `PATCH` sigue siendo de ADMIN, y se conserva con `SHIPPED` para no romper a quien ya lo usa. Para compras no hizo falta: la interfaz ya recibe siempre por `/receipts` (T5-04), y el `PATCH status: RECEIVED` queda de ADMIN.
+    - **El ajuste en bloque es de almacén**: cuadrar tras un recuento es su trabajo y no toca precios ni costes. T5-07 lo sustituirá en parte con un conteo formal.
+    - **Cancelar es solo de ADMIN**, pendiente o no: deshace una decisión comercial y, en las enviadas o recibidas, mueve stock hacia atrás. El almacén ejecuta, no anula.
+    - Con T5-07, `inventory-counts` entra en la matriz: el test la hará fallar hasta que se decida su fila.
+  - **Una sola copia de la matriz, en el contrato.** El backend protege cada ruta con `permitir("<MÉTODO> <ruta>")`, que lee su fila, y el frontend decide qué botones enseñar con `puede()` sobre la misma tabla (`usePuede`). La interfaz no puede ofrecer lo que la API rechaza ni esconder lo que admite. `requireRole` pasa a recibir `$Enums.Role` —la advertencia de la ficha—, y el 403 lleva código (`FORBIDDEN`, T4-04), que antes no tenía.
+  - **Verificado localmente (2026-09-29):** `verify` backend **827/827** (193 nuevos en `permisos.test.ts`), sentencias **95.93 %**, `smoke` y `auditoria` en verde; `verify` frontend **621 + 1 omitido** (10 nuevos: ventas, compras, productos y usuarios), sentencias **74.83 %**; **E2E 17/17 + 1 omitido** en escritorio y móvil, con un escenario nuevo.
+  - **El criterio, con su test:** `permisos.test.ts` exige que **cada ruta montada tenga su fila**, que **cada fila tenga su ruta**, que **cada ruta se proteja con su propia fila** —la clave va pegada al middleware— y que **cada uno de los tres roles reciba 403 exactamente donde su fila lo dice**, con una petición real a cada una de las 61 rutas (183 casos). Además: un `WAREHOUSE` recibe una compra (stock +12, auditoría a su nombre), recibe **403 `FORBIDDEN`** al cambiar un precio y el precio no cambia, no puede cancelar, y envía una venta por la ruta nueva sin poder enviarla dos veces. En el E2E, la cuenta de almacén del seed recibe por la interfaz, no ve «Editar» en el producto y la API le rechaza el `PUT` del precio.
+  - **Falsificado:** proteger el ajuste en bloque con un `requireRole("ADMIN")` escrito al lado en vez de su fila tumba **2** tests; añadir una ruta sin fila, **2**. En el frontend, gobernar «Eliminar» de una venta con la fila de enviar, o «Nuevo producto» con la del ajuste en bloque, tumba 1 cada uno. En el E2E, enseñar «Editar» a todos lo tumba («Expected: 0, Received: 1»).
+  - **Lo que destapó por el camino:**
+    - **Los botones de exportar órdenes de compra y de venta salían a cualquier rol**, y la API solo los admite para ADMIN: un `USER` pulsaba y recibía un 403. Ahora los decide la matriz.
+    - **El usuario de la sesión tenía `role: string`** en el esquema del frontend, escrito a mano; ahora es el enum del contrato. Y la ruta de cambiar rol validaba contra `["ADMIN", "USER"]` escrito al lado: `WAREHOUSE` habría existido sin poderse asignar. Ahora usa `rolSchema`.
+  - **El seed** añade `almacen@stockly.app` / `Almacen1234!` (Mateo Rivas, `WAREHOUSE`).
+  - **Fuera de alcance:** la navegación sigue enseñando a `WAREHOUSE` lo mismo que a `USER` (lee todo); `ProtectedRoute` sigue comparando con un único rol, porque las páginas solo de ADMIN siguen siéndolo. Los `isAdmin` que quedan en catálogo, proveedores y la tabla de productos gobiernan acciones que la matriz reserva a ADMIN, y son correctos; convertirlos a `usePuede` sería uniformidad, no un arreglo.
 
 ### Condicionadas: solo si el negocio lo pide
 
@@ -2010,6 +2046,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-09-29 | **T5-13** Rol de almacén — **completada** | **El criterio con tests:** `permisos.test.ts` recorre las **61 rutas** montadas fuera de `/auth` con cada uno de los tres roles (183 casos) y exige 403 exactamente donde dice su fila; una ruta sin fila, una fila sin ruta o una ruta protegida con la fila de otra **rompen la suite**. Un `WAREHOUSE` recibe una compra y recibe **403 `FORBIDDEN`** al cambiar un precio, por API y en el E2E, donde además la interfaz no le ofrece «Editar». `verify` ✅ backend **827/827** (95.93 %) y frontend **621 + 1 omitido** (74.83 %); **E2E 17/17 + 1 omitido** | **Primero la matriz**, escrita en la ficha y decidida con el dueño del producto: el almacén recibe, envía, registra movimientos y ajusta en bloque; no crea, edita, cancela ni borra, y no ve usuarios, configuración, auditoría ni exportaciones de órdenes. **Rutas dedicadas** en vez de campos por rol: `POST /sale-orders/:id/ship` nueva; el `PATCH` sigue de ADMIN. **La matriz es una sola, `PERMISOS` en el contrato**: `permitir()` en el backend y `usePuede()` en el frontend leen la misma tabla. `requireRole` tipado con el enum, y el 403 con código. **Destapó** que los botones de exportar órdenes salían a todos los roles y devolvían 403, que el usuario de sesión del frontend tenía `role: string`, y que la ruta de cambiar rol validaba contra una lista escrita a mano donde `WAREHOUSE` no habría cabido. |
 | 2026-09-29 | *Mantenimiento, sin ficha:* **todas las descargas de la API por axios** | El E2E de la descarga del CSV de T5-09 fallaba en un equipo con `VITE_API_URL` absoluto. **Reproducido y falsificado:** con la descarga antigua y la API en otro origen, el escenario agota los 30 s esperando la descarga en los dos proyectos; con la nueva pasa. `verify` frontend ✅ **611 + 1 omitido** (3 nuevos en `descargar.test.ts`, que caen uno cada uno al quitar la lectura del error o la excepción del 401), sentencias **74.52 %**; **E2E 15/15 + 1 omitido** con `/api/v1` y también con `http://localhost:3000/api/v1`, logins incluidos | Cuatro descargas —PDF del resumen, informe por periodo, CSV de compras y de ventas— seguían con un `<a href>` a la API, el patrón que T2-34 ya había retirado del histórico de movimientos: entre orígenes el navegador ignora `download`, y la petición no pasa por el interceptor (con la sesión caducada se guardaba el JSON del 401). Ahora las cinco van por `descargarDeLaApi` (`shared/api/descargar.ts`): `blob` con los bytes del servidor —la marca de orden de bytes la pone el backend— y, si falla, aviso con el mensaje traducido de su código (un 413 dice cuántas filas y el máximo). Antes un 413 del histórico de movimientos era un rechazo sin capturar y no se veía nada. |
 | 2026-09-29 | **T5-10** Clasificación ABC de productos — **completada** | **El criterio con tests:** 50/30/15/4/1 da A, A, B, C, C, con el producto que cae justo en el 80 % en A; los empates comparten clase y los productos sin ventas son C y salen en su filtro. `verify` ✅ backend **634/634** (94.87 %) y frontend **608 + 1 omitido**; E2E **13/16** —falla la descarga del CSV de T5-09 por el `VITE_API_URL` absoluto del `.env` local, ajena a esta tarea— | Doce meses naturales completos, en la zona del negocio. Caché `product_abc` que se rehace sola una vez al día **sin hacer esperar al catálogo**. **La medición cambió el SQL:** con `EXCLUDE GROUP` la clasificación no terminaba en cinco minutos sobre 100 000 productos; con `RANGE … 1 PRECEDING` sobre céntimos, 2.3 s. |
 | 2026-09-28 | **T5-09** Informes de ventas y compras por periodo — **completada** | **El criterio con tests:** la suma de enero, febrero y marzo es el trimestre; una venta enviada a las 23:30 del 31 de marzo en Santo Domingo cae en marzo; con Nueva York los dos bordes de horario. `verify` ✅ backend **613/613** (94.82 %) y frontend **605 + 1 omitido**; E2E ✅ **15 + 1 omitido** | Zona horaria del negocio como ajuste (`America/Santo_Domingo`), compras fechadas por recepción (`stock_movements.purchaseOrderItemId`, con relleno de las antiguas), atajos resueltos por el backend, CSV y PDF, y el gráfico de movimientos a meses naturales. **El `EXPLAIN` sin disco se cumple para un mes, no del todo para un año**: el agregado por producto en memoria fue más lento (1.2 s frente a 0.76 s), y se deja; el 2026-09-29 el criterio se relajó a «un mes». De paso: la suite del backend se quedaba sin conexiones de PostgreSQL, y `load/sembrar.js` ya genera ventas y compras. |
@@ -2137,16 +2174,16 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
 | **Tier 4** | **17** | **17** | **100 %** ✅ |
-| **Tier 5** | 6 | 15 | 40 % |
-| **Total** | **120** | **129** | **93 %** |
+| **Tier 5** | 8 | 15 | 53 % |
+| **Total** | **122** | **129** | **95 %** |
 
 *El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que ese 100 % es sobre 114, no sobre las 100 originales. **Y una de las 114 está descartada, no hecha** (T4-17).*
 
 ***Esta tabla se ha quedado atrás dos veces, y las dos por lo mismo:** se cierra una tarea, se marca la casilla y se actualiza la cabecera, y el resumen —que está 1 800 líneas más abajo— no se toca. La primera vez decía 102/109 con las casillas en 104/110 (cierres de T4-05 y T4-06, alta de T4-13); la segunda, 107/114 con las casillas en **112/114**, porque no llegaron aquí los cinco cierres del 2026-08-11 y 12 —T4-12, T4-13, T4-14, T4-10 y T4-17—. **Se cuentan las casillas, no se recuerdan**, y contarlas es un comando:*
 
 ```bash
-grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 120
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 9 (el Tier 5, abierto el 2026-09-13)
+grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 122
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 7 (el Tier 5, abierto el 2026-09-13)
 ```
 
 *Al cerrar una tarea hay que tocar **la casilla, la cabecera, el índice, esta tabla y la de [CONTEXTO §3](CONTEXTO.md)**. Si los cinco números no coinciden, manda el `grep`.*
@@ -2159,10 +2196,10 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 9 (el Tier 5, abierto el 2026-09
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **634/634** ✅ *(2026-09-29, T5-10)* | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **94.87 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **611/611** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-29, descargas por axios)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **74.52 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests backend | 198/198 ✅ | **827/827** ✅ *(2026-09-29, T5-13)* | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **95.93 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **621/621** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-29, T5-13)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **74.83 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
@@ -2174,7 +2211,7 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 9 (el Tier 5, abierto el 2026-09
 | Interacciones para alcanzar una sección a ≥1024 px | 2 *(nueve de los doce módulos vivían dentro de un desplegable)* | **1** ✅ *(los doce a un clic; ni un botón en el lateral, T4-10)* | 1 |
 | Recorridos de navegación que mantener a la vez | 2 *(el de la barra y el del panel de móvil, con órdenes distintos)* | **1** ✅ *(un array, dos envoltorios; lo vigila un test, T4-10)* | 1 |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
-| E2E (Playwright) | 2 escenarios, arranque manual | **8 escenarios en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 15 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome`, también en la CI ✅ *(2026-09-28, T5-09)* | escenarios que crucen la frontera |
+| E2E (Playwright) | 2 escenarios, arranque manual | **9 escenarios en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 17 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome`, también en la CI ✅ *(2026-09-29, T5-13)* | escenarios que crucen la frontera |
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Tiempo hasta enterarse de un pico de 5xx | *nunca: lo reportaba un usuario* | **inmediato** ✅ *(alerta en proceso al 5.º error; ~8 min y medio la de Prometheus, medido con `promtool`, T4-06)* | antes que el usuario |

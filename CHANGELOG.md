@@ -19,6 +19,14 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Rol de almacén** (`T5-13`). Un tercer rol, **Almacén** (`WAREHOUSE`), para quien recibe
+  mercancía y prepara envíos: recibe órdenes de compra, envía órdenes de venta, registra
+  movimientos y ajusta stock en bloque, pero no crea ni edita productos, órdenes ni catálogo, no
+  cancela ni borra, y no ve usuarios, configuración ni auditoría. Se asigna desde **Usuarios**. La
+  interfaz solo le enseña los botones que la API le admite. Nueva ruta
+  `POST /sale-orders/:id/ship`, y el 403 lleva el código `FORBIDDEN`. El seed trae una cuenta de
+  almacén (`almacen@stockly.app`).
+
 - **Clasificación ABC de productos** (`T5-10`). El catálogo tiene una columna **ABC** y un filtro
   por clase: **A** son los productos que reúnen el 80 % de la facturación, **B** el 15 % siguiente
   y **C** el resto, incluidos los que no se vendieron. Cuenta lo facturado en los **doce meses
@@ -261,6 +269,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   traerse el catálogo entero (`T2-02`).
 
 ### Corregido
+
+- **Los botones de exportar órdenes de compra y de venta salían a cualquier rol** (`T5-13`), y a
+  quien no era ADMIN la API le devolvía un error. Ahora solo los ve quien puede usarlos.
 
 - **Las descargas fallaban con la API en otro origen, y con la sesión caducada guardaban el
   error** (sin tarea). El PDF del resumen, el informe por periodo y los CSV de compras y ventas

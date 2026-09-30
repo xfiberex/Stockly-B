@@ -81,7 +81,7 @@ Stockly-B/
 
 | Modelo | Descripción |
 |---|---|
-| `User` | Usuarios con roles `ADMIN` / `USER`, `isActive`, tokens de verificación, reset y refresh |
+| `User` | Usuarios con roles `ADMIN` / `USER` / `WAREHOUSE` (T5-13), `isActive`, tokens de verificación, reset y refresh |
 | `Product` | Producto con SKU, precio, stock, stock mínimo, imagen, categoría, marca, proveedor, etiquetas |
 | `Category` | Categoría de producto |
 | `Brand` | Marca de producto |
@@ -292,9 +292,9 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | `POST` | `/import` | Importación masiva por CSV | ADMIN |
 | `GET` | `/export` | Exportar todos como JSON (default) | USER+ |
 | `GET` | `/export?format=csv` | Exportar todos como CSV | USER+ |
-| `PATCH` | `/bulk-stock` | Ajuste masivo de stock | ADMIN |
+| `PATCH` | `/bulk-stock` | Ajuste masivo de stock | ADMIN, WAREHOUSE |
 | `GET` | `/:id/movements` | Historial de movimientos — **paginado** (`page`, `limit`) y filtrable (`type`, `dateFrom`, `dateTo`) | USER+ |
-| `POST` | `/:id/movements` | Registrar movimiento manual | ADMIN |
+| `POST` | `/:id/movements` | Registrar movimiento manual | ADMIN, WAREHOUSE |
 | `GET` | `/:id/movements/export?format=csv` | Exportar movimientos como CSV — acepta los **mismos filtros** que el listado | USER+ |
 | `GET` | `/:id/price-history` | Historial de precios | USER+ |
 
@@ -345,6 +345,7 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | `GET` | `/` | Listar órdenes (paginado) | USER+ |
 | `POST` | `/` | Crear orden de venta | ADMIN |
 | `GET` | `/:id` | Ver detalle | USER+ |
+| `POST` | `/:id/ship` | Enviar: descuenta el stock y fija `shippedAt` (T5-13) | ADMIN, WAREHOUSE |
 | `PATCH` | `/:id` | Actualizar (cambiar estado, campos cliente) | ADMIN |
 | `DELETE` | `/:id` | Eliminar orden PENDING | ADMIN |
 | `GET` | `/export?format=csv` | Exportar todas como CSV | ADMIN |
@@ -360,7 +361,7 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | `GET` | `/:id` | Ver detalle | USER+ |
 | `PATCH` | `/:id` | Actualizar (estado, proveedor, notas) | ADMIN |
 | `DELETE` | `/:id` | Eliminar orden PENDING | ADMIN |
-| `POST` | `/:id/receipts` | Registrar una entrega, parcial o completa, por línea (T5-04) | ADMIN |
+| `POST` | `/:id/receipts` | Registrar una entrega, parcial o completa, por línea (T5-04) | ADMIN, WAREHOUSE |
 | `GET` | `/suggestions` | Sugerencias de reposición, paginadas (T5-05) | USER+ |
 | `POST` | `/suggestions` | Generar una orden pendiente por proveedor con las líneas elegidas (T5-05) | ADMIN |
 | `GET` | `/export?format=csv` | Exportar todas como CSV | ADMIN |
@@ -437,7 +438,7 @@ La diferencia es la que hace falta: `git grep -il z.object` devuelve **57** arch
 | Correo | STARTTLS obligatorio (`requireTLS`); TLS implícito en el puerto 465. Un servidor sin cifrado aborta el envío en lugar de transmitir en claro |
 | Rate limiting | 100 peticiones / 15 min por IP (10/15 min en login, 5/h en registro) |
 | Autenticación | JWT en cookie `httpOnly` (15 min) + refresh token rotativo y hasheado |
-| Roles | Middleware `requireRole("ADMIN")` en rutas de escritura |
+| Roles | `ADMIN`, `USER` (solo lectura) y `WAREHOUSE` (recibe, envía y mueve stock; T5-13). Cada ruta se protege con `permitir("<MÉTODO> <ruta>")`, que lee su fila de la matriz `PERMISOS` del contrato; `permisos.test.ts` recorre todas las rutas contra ella con cada rol. El 403 lleva el código `FORBIDDEN` |
 | Contraseñas | `bcryptjs` con salt 12 |
 | Integridad de stock | Ajustes con transacciones atómicas (decremento condicional, sin race conditions) |
 | Soft delete | Los productos nunca se borran físicamente |
@@ -449,7 +450,7 @@ La diferencia es la que hace falta: `git grep -il z.object` devuelve **57** arch
 
 El seed crea:
 
-- **3 usuarios** (`admin@stockly.app`, `carlos@stockly.app` y `laura@stockly.app`)
+- **4 usuarios**: dos ADMIN, uno USER y uno de almacén
 - **6 categorías** y **8 marcas**
 - **3 proveedores**
 - **~30 productos** con precios, stock y stock mínimo variados
@@ -464,5 +465,6 @@ El seed crea:
 | ADMIN | `admin@stockly.app` | `Admin1234!` |
 | ADMIN | `carlos@stockly.app` | `Admin1234!` |
 | USER | `laura@stockly.app` | `User1234!` |
+| WAREHOUSE | `almacen@stockly.app` | `Almacen1234!` |
 
 > **El administrador inicial sale de aquí.** El registro público (`POST /auth/register`) crea **siempre** usuarios con rol `USER`. En un despliegue nuevo hay que ejecutar `pnpm db:seed` —o promover a alguien con `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN— porque ningún registro se convierte en administrador por sí solo.

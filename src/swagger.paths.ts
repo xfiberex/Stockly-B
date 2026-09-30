@@ -125,7 +125,7 @@ const exportacion = (etiqueta: string, nombre: string): Ruta => ({
  */
 export const postDeMovimientoManual = {
     post: {
-        tags: ["Stock Movements"], summary: "Registrar un movimiento manual (ADMIN)", parameters: [PARAM_ID],
+        tags: ["Stock Movements"], summary: "Registrar un movimiento manual (ADMIN o WAREHOUSE)", parameters: [PARAM_ID],
         requestBody: {
             required: true,
             content: { "application/json": { schema: {
@@ -201,7 +201,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     // ── Productos: lo que faltaba ────────────────────────────────────────────
     "/products/bulk-stock": {
         patch: {
-            tags: ["Products"], summary: "Ajuste masivo de stock (ADMIN)",
+            tags: ["Products"], summary: "Ajuste masivo de stock (ADMIN o WAREHOUSE)",
             requestBody: {
                 required: true,
                 content: { "application/json": { schema: {
@@ -286,7 +286,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     },
     "/purchase-orders/{id}/receipts": {
         post: {
-            tags: ["Purchase Orders"], summary: "Registrar una recepción, parcial o completa (T5-04)",
+            tags: ["Purchase Orders"], summary: "Registrar una recepción, parcial o completa (T5-04; ADMIN o WAREHOUSE)",
             description: "Suma a cada línea indicada la cantidad recibida, con su stock, su movimiento `IN` y el coste medio calculado sobre lo recibido. La orden queda `RECEIVED` si todas sus líneas se completan y `PARTIALLY_RECEIVED` si no. Las líneas que no se envían no reciben nada.",
             parameters: [PARAM_ID],
             requestBody: { required: true, content: { "application/json": { schema: {
@@ -368,6 +368,18 @@ export const rutasAdicionales: Record<string, Ruta> = {
         delete: {
             tags: ["Sale Orders"], summary: "Eliminar (no permitido si ya se envió)", parameters: [PARAM_ID],
             responses: { "200": JSON_OK(undefined, "Eliminada"), "400": ERROR("No se puede eliminar una orden enviada"), "404": ERROR("No encontrada") },
+        },
+    },
+
+    "/sale-orders/{id}/ship": {
+        post: {
+            tags: ["Sale Orders"], summary: "Enviar la orden (ADMIN o WAREHOUSE)",
+            description: "T5-13 — lo mismo que `PATCH` con `status: SHIPPED` —**descuenta stock** y fija `shippedAt`—, sin nada más de la orden que se pueda tocar. Es la ruta del rol de almacén: el `PATCH`, que también edita y cancela, es solo de ADMIN.",
+            parameters: [PARAM_ID],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Enviada"),
+                "400": ERROR("Ya enviada, cancelada o sin stock suficiente"), "403": ERROR("Requiere rol ADMIN o WAREHOUSE"), "404": ERROR("No encontrada"),
+            },
         },
     },
 
@@ -475,7 +487,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
             parameters: [
                 ...PARAMS_PAGINA,
                 { name: "search", in: "query", schema: { type: "string" }, description: "Busca en nombre y correo (índice de trigramas, T2-09)" },
-                { name: "role", in: "query", schema: { type: "string", enum: ["ADMIN", "USER"] } },
+                { name: "role", in: "query", schema: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE"] } },
                 { name: "isActive", in: "query", schema: { type: "string", enum: ["true", "false"] } },
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/User"), "Listado paginado"), "403": ERROR("Requiere rol ADMIN") },
@@ -490,7 +502,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/users/{id}/role": {
         patch: {
             tags: ["Users"], summary: "Cambiar el rol (ADMIN)", parameters: [PARAM_ID],
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["role"], properties: { role: { type: "string", enum: ["ADMIN", "USER"] } } } } } },
+            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["role"], properties: { role: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE"] } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/User" }, "Rol actualizado"),
                 "400": ERROR("No puedes cambiar tu propio rol"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("No encontrado"),
