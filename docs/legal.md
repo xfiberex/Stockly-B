@@ -36,7 +36,8 @@ monta una empresa con el código, es esa empresa.
 |---|---|---|
 | Nombre, correo, idioma y hash de la contraseña de cada usuario | `users` | Un usuario **no se borra**: solo se desactiva (`PATCH /users/:id/deactivate`) |
 | Correo de quien hizo cada operación | `audit_logs.userEmail`, `inventory_counts.createdByEmail` / `closedByEmail`, `inventory_count_lines.countedByEmail` | Se guardan como texto y no como clave foránea **a propósito**, para que el registro sobreviva al usuario. Nada los purga |
-| Nombre, correo y teléfono del cliente de un pedido de venta | `sale_orders.customerName` / `customerEmail` / `customerPhone` | Opcionales. Pueden ser de una persona física |
+| Nombre, correo, teléfono y notas de cada cliente | `customers` (T5-06) | Se crea al darlo de alta o al vender con un correo nuevo. **Se puede borrar**, pero sus órdenes conservan la instantánea de la fila siguiente |
+| Nombre, correo y teléfono del cliente de un pedido de venta | `sale_orders.customerName` / `customerEmail` / `customerPhone` | Opcionales. Pueden ser de una persona física. Es la instantánea de a quién se vendió: no cambia al editar ni al borrar el cliente |
 | Correo y teléfono de proveedores | `suppliers` | Suelen ser de empresas, pero pueden ser de una persona |
 | IP y cabeceras (entre ellas el *user-agent*) de cada petición | Registros de `pino-http` en producción | `authorization`, `cookie` y `set-cookie` se ocultan; la IP no. Dónde y cuánto tiempo se guarden depende de la plataforma de despliegue |
 | Todo lo anterior, en copia | Copias de seguridad, **14 días** y nunca menos de 3 | [operaciones.md](operaciones.md) |
@@ -61,7 +62,9 @@ exentas de consentimiento, pero **debe confirmarlo un profesional** para el paí
   y de los registros de peticiones. Hoy son indefinidos.
 - [ ] **Derechos de los interesados.** No hay un procedimiento para exportar, corregir o
   **borrar o anonimizar** los datos de una persona concreta: desactivar un usuario no los
-  borra, y su correo sigue en la auditoría.
+  borra, y su correo sigue en la auditoría. Desde T5-06 los datos de un **cliente** viven en un
+  sitio (`customers`) y se corrigen o se borran desde su ficha, pero borrarlo deja su nombre,
+  su correo y su teléfono en la instantánea de cada orden.
 - [ ] **Contratos de encargo del tratamiento** con el proveedor SMTP, Cloudinary y el
   alojamiento. Los grandes proveedores los ofrecen como parte de sus condiciones.
 - [ ] **Procedimiento ante una brecha de seguridad:** a quién se avisa y en qué plazo (72 horas

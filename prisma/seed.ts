@@ -56,6 +56,7 @@ function hace(dias: number, hora = 10): Date {
 async function limpiar(): Promise<void> {
     await prisma.saleOrderItem.deleteMany();
     await prisma.saleOrder.deleteMany();
+    await prisma.customer.deleteMany();
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.priceHistory.deleteMany();
@@ -380,6 +381,25 @@ const ordenesDeVenta: OrdenDeVenta[] = [
             { sku: "ALM-KIN-USB128", qty: 6 },
         ],
     },
+    // T5-06 — el mismo cliente que la anterior, un mes antes: su ficha tiene historial.
+    {
+        status: "SHIPPED",
+        customerName: "Distribuidora Vega",
+        customerEmail: "compras@distribuidoravega.mx",
+        customerPhone: "+52 55 4821 9930",
+        dias: 40,
+        items: [
+            { sku: "PER-LOG-MXM3S", qty: 2 },
+            { sku: "ACC-ANK-USBC-2M", qty: 5 },
+        ],
+    },
+    // T5-06 — sin correo: se queda sin cliente, como en la migración. No se agrupa por nombre.
+    {
+        status: "SHIPPED",
+        customerName: "Venta de mostrador",
+        dias: 6,
+        items: [{ sku: "ALM-KIN-USB128", qty: 1 }],
+    },
     {
         status: "SHIPPED",
         customerName: "Estudio Nómada",
@@ -695,9 +715,21 @@ async function sembrarOrdenesDeVenta(
             };
         });
 
+        // T5-06 — como el servicio: la venta con correo va al cliente de ese correo, que se crea
+        // con la primera. El correo del cliente se guarda normalizado.
+        const email = orden.customerEmail?.trim().toLowerCase();
+
         await prisma.saleOrder.create({
             data: {
                 status: orden.status,
+                ...(email && {
+                    customer: {
+                        connectOrCreate: {
+                            where: { email },
+                            create: { name: orden.customerName, email, phone: orden.customerPhone ?? null, createdAt: fecha },
+                        },
+                    },
+                }),
                 customerName: orden.customerName,
                 customerEmail: orden.customerEmail,
                 customerPhone: orden.customerPhone,
@@ -710,7 +742,7 @@ async function sembrarOrdenesDeVenta(
         items += lineas.length;
     }
 
-    console.log(`  - ${ordenesDeVenta.length} órdenes de venta creadas (${items} ítems)`);
+    console.log(`  - ${ordenesDeVenta.length} órdenes de venta creadas (${items} ítems), ${await prisma.customer.count()} clientes`);
     return items;
 }
 

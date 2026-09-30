@@ -110,6 +110,7 @@ enum AuditEntity {
   Brand
   Supplier
   InventoryCount
+  Customer
 }
 
 model Category {
@@ -394,9 +395,38 @@ model Tag {
   @@map("tags")
 }
 
+// ─── T5-06 — Clientes ──────────────────────────────────────────────────────────
+//
+// Antes de T5-06 el cliente solo existía como tres textos sueltos en cada orden, así que no
+// había forma de ver qué había comprado ni de corregir su teléfono una vez para todas.
+
+model Customer {
+  id         String      @id @default(uuid())
+  name       String
+  // **Normalizado**: minúsculas y sin espacios alrededor. Es la clave con la que se agrupan
+  // las órdenes —las antiguas en la migración y las nuevas al crearse—, así que
+  // `Ana@Correo.com` y `ana@correo.com ` tienen que ser el mismo cliente.
+  email      String?     @unique
+  phone      String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  saleOrders SaleOrder[]
+
+  @@index([name])
+  @@map("customers")
+}
+
 model SaleOrder {
   id            String          @id @default(uuid())
   status        SaleOrderStatus @default(PENDING)
+  // T5-06 — opcional: una venta sin correo no se vincula a nadie, y borrar el cliente deja
+  // sus órdenes sin él, no las borra.
+  customerId    String?
+  customer      Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  // Instantánea de a quién se vendió, **aunque haya cliente**: igual que `productName` en los
+  // ítems, una orden pasada tiene que seguir diciendo a quién se envió aunque el cliente
+  // cambie después de teléfono o de nombre.
   customerName  String?
   customerEmail String?
   customerPhone String?
@@ -412,6 +442,8 @@ model SaleOrder {
   @@index([status, createdAt])
   // El informe de margen filtra por estado y por fecha de envío, en ese orden.
   @@index([status, shippedAt])
+  // La ficha del cliente lista sus órdenes de la más reciente a la más antigua.
+  @@index([customerId, createdAt])
   @@map("sale_orders")
 }
 

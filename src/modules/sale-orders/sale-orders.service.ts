@@ -6,6 +6,7 @@ import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
+import { normalizarCorreo } from "@/shared/lib/correo";
 import { Prisma } from "@/generated/prisma/client";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
@@ -24,12 +25,49 @@ function parseStatusFilter(status?: string): $Enums.SaleOrderStatus | undefined 
     return filtroDeEnum($Enums.SaleOrderStatus, status, "status");
 }
 
+function clienteNoEncontrado(): HttpError {
+    return new HttpError(404, "Cliente no encontrado", "CUSTOMER_NOT_FOUND");
+}
+
+/**
+ * T5-06 — a qué cliente va una venta nueva.
+ *
+ * - Con `customerId`, a ese, que tiene que existir.
+ * - Sin él, **por su correo normalizado**: al cliente que ya lo tiene, o a uno nuevo con el nombre
+ *   y el teléfono de la venta. Es la misma regla con la que la migración agrupó las órdenes
+ *   antiguas, así que el pasado y lo nuevo se agrupan igual, y quien llama a la API sin saber
+ *   nada de clientes sigue viendo sus ventas juntas en la ficha.
+ * - Sin correo, a nadie. **No se agrupa por nombre**: dos «Juan Pérez» no son la misma persona.
+ */
+async function clienteDeLaVenta(tx: Prisma.TransactionClient, dto: CreateSaleOrderDto) {
+    if (dto.customerId) {
+        const cliente = await tx.customer.findUnique({ where: { id: dto.customerId } });
+        if (!cliente) throw clienteNoEncontrado();
+        return cliente;
+    }
+
+    const email = normalizarCorreo(dto.customerEmail);
+    if (!email) return null;
+
+    return tx.customer.upsert({
+        where: { email },
+        update: {},
+        create: { name: dto.customerName?.trim() || email, email, phone: dto.customerPhone?.trim() || null },
+    });
+}
+
 export const saleOrderService = {
-    async getAll(query: { page?: string; limit?: string; status?: string }) {
+    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown }) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
-        const where = statusFilter ? { status: statusFilter } : {};
+        // T5-06 — el historial de la ficha del cliente. Un `customerId` repetido llega como array
+        // y se ignora, como el `search` de clientes.
+        const customerId = typeof query.customerId === "string" && query.customerId ? query.customerId : undefined;
+        const where = {
+            ...(statusFilter && { status: statusFilter }),
+            ...(customerId && { customerId }),
+        };
 
         const [orders, total] = await prisma.$transaction([
             prisma.saleOrder.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" }, include: ORDER_INCLUDE }),
@@ -90,11 +128,15 @@ export const saleOrderService = {
                 }
             }
 
+            const cliente = await clienteDeLaVenta(tx, dto);
+
             return tx.saleOrder.create({
                 data: {
-                    customerName: dto.customerName,
-                    customerEmail: dto.customerEmail,
-                    customerPhone: dto.customerPhone,
+                    customerId: cliente?.id ?? null,
+                    // La instantánea: lo que diga la venta y, si calla, lo que diga el cliente.
+                    customerName: dto.customerName ?? cliente?.name,
+                    customerEmail: dto.customerEmail ?? cliente?.email,
+                    customerPhone: dto.customerPhone ?? cliente?.phone,
                     notes: dto.notes,
                     items: {
                         create: dto.items.map((item) => ({
@@ -118,7 +160,14 @@ export const saleOrderService = {
             throw new HttpError(400, "La orden ya fue enviada", "ORDER_ALREADY_SHIPPED");
         }
 
+        if (dto.customerId) {
+            const cliente = await prisma.customer.findUnique({ where: { id: dto.customerId } });
+            if (!cliente) throw clienteNoEncontrado();
+        }
+
         const customerData = {
+            // T5-06 — cambiar el vínculo no toca la instantánea: son dos cosas distintas.
+            ...(dto.customerId !== undefined && { customerId: dto.customerId }),
             ...(dto.customerName !== undefined && { customerName: dto.customerName }),
             ...(dto.customerEmail !== undefined && { customerEmail: dto.customerEmail }),
             ...(dto.customerPhone !== undefined && { customerPhone: dto.customerPhone }),

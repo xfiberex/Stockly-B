@@ -81,7 +81,7 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 (el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 10/15** *(abierto el 2026-09-13; T5-01 a T5-05, T5-07 a T5-10 y T5-13 cerradas)* · Total **124/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 11/15** *(abierto el 2026-09-13; T5-01 a T5-10 y T5-13 cerradas)* · Total **125/129**.
 
 **`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
 rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara

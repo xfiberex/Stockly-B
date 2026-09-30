@@ -8,6 +8,8 @@ export interface SaleOrderItemDto {
 }
 
 export interface CreateSaleOrderDto {
+    /** T5-06 — sin él, la venta se vincula sola por su correo, si lo tiene. */
+    customerId?: string;
     customerName?: string;
     customerEmail?: string;
     customerPhone?: string;
@@ -16,6 +18,8 @@ export interface CreateSaleOrderDto {
 }
 
 export interface UpdateSaleOrderDto {
+    /** T5-06 — `null` desvincula la orden; ausente, no la toca. */
+    customerId?: string | null;
     customerName?: string;
     customerEmail?: string;
     customerPhone?: string;

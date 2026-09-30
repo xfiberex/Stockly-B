@@ -8,6 +8,7 @@ const itemSchema = z.object({
 });
 
 export const createSaleOrderSchema = z.object({
+    customerId: z.string().uuid("Cliente inválido").optional(),
     customerName: z.string().trim().max(200).optional(),
     customerEmail: z.email("Correo del cliente inválido").optional(),
     customerPhone: z.string().trim().max(30).optional(),
@@ -16,6 +17,7 @@ export const createSaleOrderSchema = z.object({
 });
 
 export const updateSaleOrderSchema = z.object({
+    customerId: z.string().uuid("Cliente inválido").nullable().optional(),
     customerName: z.string().trim().max(200).optional(),
     customerEmail: z.email("Correo del cliente inválido").optional(),
     customerPhone: z.string().trim().max(30).optional(),

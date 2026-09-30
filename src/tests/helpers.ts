@@ -6,6 +6,7 @@ import type { $Enums } from "@/generated/prisma/client";
 export async function cleanDb() {
     await prisma.saleOrderItem.deleteMany();
     await prisma.saleOrder.deleteMany();
+    await prisma.customer.deleteMany();
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
     await prisma.priceHistory.deleteMany();

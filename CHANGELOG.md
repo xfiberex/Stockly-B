@@ -19,6 +19,11 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Clientes** (`T5-06`). Nueva sección **Clientes**, dentro de Órdenes: cada cliente tiene su ficha
+  —órdenes, importe de lo enviado e historial de ventas— y se elige con un buscador al crear una
+  venta. Las ventas se vinculan solas por el correo, también las que ya existían; cada venta sigue
+  diciendo a quién se vendió, así que editar el cliente no cambia las pasadas.
+
 - **Código de barras, escáner y etiquetas** (`T5-08`). Cada producto puede tener su código de
   barras (EAN-13, UPC, EAN-8 o uno interno), y un EAN mal tecleado se detecta al guardarlo. El
   botón **Escanear** lee el código con la cámara del móvil, de una foto o de una pistola USB: en el
@@ -290,6 +295,10 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Corregido
 
+- **La barra de selección del catálogo ensanchaba la página en el móvil** (`T5-06`). Con el botón
+  «Etiquetas» (`T5-08`) medía 508 px, y en una pantalla de 393 el navegador ampliaba la página
+  entera: la ficha que se abría después quedaba descolocada. Ahora salta de línea.
+
 - **Dar a un producto un SKU que ya tenía otro daba un error del servidor** (`T5-08`). Ahora se
   dice que ese SKU ya es de otro producto, igual que con el código de barras.
 
@@ -421,6 +430,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   listas como «un array de algo» y `/products/export` no declaraba esquema (`T4-02`).
 
 ### Seguridad
+
+- **`axios` 1.20.0** en el frontend (2026-09-30), por siete avisos altos publicados ese día sobre la
+  1.19. Dentro de la misma versión mayor.
 
 - **`nodemailer` 10** (2026-09-30). Un aviso alto nuevo (GHSA-v53p-9fqp-m79j, corregido en la
   10.0.6) volvió a poner en rojo la auditoría: `nodemailer` pasa de la 9.1.1 a la **10.0.12** —su

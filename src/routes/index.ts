@@ -16,6 +16,7 @@ import { usersRouter } from "@/modules/users";
 import { settingsRouter } from "@/modules/settings";
 import { auditLogsRouter } from "@/modules/audit-logs";
 import { saleOrdersRouter } from "@/modules/sale-orders";
+import { customersRouter } from "@/modules/customers";
 import { inventoryCountsRouter } from "@/modules/inventory-counts";
 
 export const router = Router();
@@ -107,6 +108,7 @@ export const MONTAJES = [
     ["/brands", brandsRouter],
     ["/suppliers", suppliersRouter],
     ["/purchase-orders", purchaseOrdersRouter],
+    ["/customers", customersRouter],
     ["/sale-orders", saleOrdersRouter],
     ["/inventory-counts", inventoryCountsRouter],
     ["/reports", reportsRouter],

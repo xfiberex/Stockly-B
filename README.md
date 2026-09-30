@@ -61,6 +61,7 @@ Stockly-B/
     │   │                       # búsqueda por código y etiquetas con código de barras (T5-08)
     │   ├── purchase-orders/    # Órdenes de compra, recepción parcial y sugerencias de reposición
     │   ├── sale-orders/        # Órdenes de venta (PENDING → SHIPPED / CANCELLED)
+    │   ├── customers/          # Clientes: ficha, cifras e historial de ventas (T5-06)
     │   ├── inventory-counts/   # Conteo físico: sesiones, captura, cierre con ajustes (T5-07)
     │   ├── tags/               # Etiquetas de productos (many-to-many)
     │   ├── users/              # Panel admin: listar, cambiar rol, activar/desactivar
@@ -343,11 +344,21 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 |---|---|---|---|
 | `GET` | `/` | Listar registros (paginado, filtros) | ADMIN |
 
+### Clientes — `/api/v1/customers`
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar por nombre (paginado, `?search=` en nombre, correo y teléfono) | USER+ |
+| `GET` | `/:id` | Ficha con sus cifras: órdenes por estado, importe de lo enviado, última orden | USER+ |
+| `POST` | `/` | Crear cliente (el correo se guarda normalizado y es único) | ADMIN |
+| `PUT` | `/:id` | Editar; **no** cambia sus órdenes pasadas | ADMIN |
+| `DELETE` | `/:id` | Borrar; sus órdenes se quedan, sin cliente | ADMIN |
+
 ### Órdenes de venta — `/api/v1/sale-orders`
 
 | Método | Ruta | Descripción | Rol |
 |---|---|---|---|
-| `GET` | `/` | Listar órdenes (paginado) | USER+ |
+| `GET` | `/` | Listar órdenes (paginado; `?customerId=` para las de un cliente, T5-06) | USER+ |
 | `POST` | `/` | Crear orden de venta | ADMIN |
 | `GET` | `/:id` | Ver detalle | USER+ |
 | `POST` | `/:id/ship` | Enviar: descuenta el stock y fija `shippedAt` (T5-13) | ADMIN, WAREHOUSE |

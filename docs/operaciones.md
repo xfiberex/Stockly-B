@@ -192,6 +192,28 @@ anterior en cuanto se despliega, y entonces el rollback de aplicación ya no es 
 **Antes de cualquier despliegue con migración, una copia manual**: `pnpm db:backup`. Es el
 único momento en que el RPO de 24 h se queda corto a propósito.
 
+### Migraciones que mueven datos: comprobar después
+
+Algunas migraciones no solo cambian el esquema, también reparten los datos que ya había. **Lo que
+hicieron no se ve al aplicarlas**: `prisma migrate deploy` no enseña los avisos de PostgreSQL, así
+que su recuento se consulta a mano después de desplegar.
+
+**T5-06 — clientes.** La migración crea un cliente por cada correo distinto de las órdenes de
+venta y las vincula. Las órdenes sin correo se quedan sin cliente, a propósito: no se agrupa por
+nombre. Cuántas quedaron de cada lado:
+
+```sql
+-- T5-06: órdenes vinculadas a un cliente, órdenes sin cliente y clientes creados
+SELECT
+    (SELECT COUNT(*) FROM "sale_orders" WHERE "customerId" IS NOT NULL) AS vinculadas,
+    (SELECT COUNT(*) FROM "sale_orders" WHERE "customerId" IS NULL) AS sin_cliente,
+    (SELECT COUNT(*) FROM "customers") AS clientes;
+```
+
+`src/tests/clientes-migracion.test.ts` ejecuta esta misma consulta: si se edita aquí, se prueba.
+Sobre los datos del seed antes de T5-06, la migración vinculó **las 4 órdenes a 4 clientes**
+(2026-09-30); todas tenían correo.
+
 ## 7. Trampas ya pagadas
 
 Las cuatro se encontraron montando esto, y las cuatro fallan en silencio o con un mensaje que

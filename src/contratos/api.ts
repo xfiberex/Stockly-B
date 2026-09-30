@@ -105,6 +105,12 @@ export const PERMISOS = {
     "POST /purchase-orders/:id/receipts": ALMACEN,
     "PATCH /purchase-orders/:id": SOLO_ADMIN,
     "DELETE /purchase-orders/:id": SOLO_ADMIN,
+    // Clientes (T5-06): los ve quien ve las ventas; los crea y los edita quien crea ventas.
+    "GET /customers": TODOS,
+    "GET /customers/:id": TODOS,
+    "POST /customers": SOLO_ADMIN,
+    "PUT /customers/:id": SOLO_ADMIN,
+    "DELETE /customers/:id": SOLO_ADMIN,
     // Ventas
     "GET /sale-orders": TODOS,
     "GET /sale-orders/export": SOLO_ADMIN,
@@ -169,7 +175,7 @@ export const accionAuditoriaSchema = z.enum([
 
 export const entidadAuditoriaSchema = z.enum([
     "Product", "PurchaseOrder", "SaleOrder", "User", "Tag", "Category", "Brand", "Supplier",
-    "InventoryCount",
+    "InventoryCount", "Customer",
 ]);
 
 // ─────────────────────── Primitivas del cable ───────────────────────
@@ -318,6 +324,7 @@ export const CODIGOS_DE_ERROR = [
     // 404
     "BRAND_NOT_FOUND",
     "CATEGORY_NOT_FOUND",
+    "CUSTOMER_NOT_FOUND",
     "INVENTORY_COUNT_NOT_FOUND",
     "PRODUCT_NOT_FOUND",
     "PURCHASE_ORDER_ITEM_NOT_FOUND",
@@ -333,6 +340,8 @@ export const CODIGOS_DE_ERROR = [
     "BARCODE_EXISTS",
     "BRAND_NAME_EXISTS",
     "CATEGORY_NAME_EXISTS",
+    // T5-06 — el correo de un cliente es su clave: dos clientes no pueden compartirlo.
+    "CUSTOMER_EMAIL_EXISTS",
     "EMAIL_ALREADY_REGISTERED",
     "EMAIL_IN_USE",
     "SKU_EXISTS",
@@ -599,6 +608,12 @@ export const itemOrdenVentaSchema = z.object({
 export const ordenVentaSchema = z.object({
     id: z.string(),
     status: estadoOrdenVentaSchema,
+    /**
+     * T5-06 — el cliente vinculado, o `null`: la venta no tenía correo, o su cliente se borró.
+     * Los tres campos de abajo son la **instantánea** de a quién se vendió, y no cambian al
+     * editar el cliente.
+     */
+    customerId: z.string().nullable(),
     customerName: z.string().nullable(),
     customerEmail: z.string().nullable(),
     customerPhone: z.string().nullable(),
@@ -607,6 +622,39 @@ export const ordenVentaSchema = z.object({
     createdAt: fechaSchema,
     updatedAt: fechaSchema,
 });
+
+// ─────────────────────── Clientes (T5-06) ───────────────────────
+
+/** El correo se guarda normalizado —minúsculas, sin espacios alrededor—: es la clave del cliente. */
+export const clienteSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+    notes: z.string().nullable(),
+    createdAt: fechaSchema,
+    updatedAt: fechaSchema,
+});
+
+/** Una fila de `GET /customers`: el cliente y cuántas órdenes tiene, en cualquier estado. */
+export const clienteEnListadoSchema = clienteSchema.extend({ ordersCount: z.number() });
+
+/**
+ * Las cifras de la ficha. **`shippedRevenue` suma solo las órdenes enviadas**: una pendiente
+ * todavía puede cancelarse y una cancelada no se cobró. Llega como número, igual que en
+ * reportes: el servicio convierte.
+ */
+export const resumenClienteSchema = z.object({
+    orders: z.number(),
+    pending: z.number(),
+    shipped: z.number(),
+    cancelled: z.number(),
+    shippedRevenue: z.number(),
+    lastOrderAt: fechaSchema.nullable(),
+});
+
+/** `GET /customers/:id`. Sus órdenes van aparte, por `GET /sale-orders?customerId=`, paginadas. */
+export const fichaClienteSchema = clienteSchema.extend({ summary: resumenClienteSchema });
 
 export const itemOrdenCompraSchema = z.object({
     id: z.string(),
@@ -1015,6 +1063,10 @@ export type ResultadoImportacion = z.infer<typeof resultadoImportacionSchema>;
 
 export type ItemOrdenVenta = z.infer<typeof itemOrdenVentaSchema>;
 export type OrdenVenta = z.infer<typeof ordenVentaSchema>;
+export type Cliente = z.infer<typeof clienteSchema>;
+export type ClienteEnListado = z.infer<typeof clienteEnListadoSchema>;
+export type ResumenCliente = z.infer<typeof resumenClienteSchema>;
+export type FichaCliente = z.infer<typeof fichaClienteSchema>;
 export type ItemOrdenCompra = z.infer<typeof itemOrdenCompraSchema>;
 export type OrdenCompra = z.infer<typeof ordenCompraSchema>;
 export type OrigenPrecioSugerido = z.infer<typeof origenPrecioSugeridoSchema>;

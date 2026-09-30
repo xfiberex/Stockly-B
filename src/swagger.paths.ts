@@ -323,18 +323,70 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
     },
 
+    // ── Clientes (T5-06) ─────────────────────────────────────────────────────
+    "/customers": {
+        get: {
+            tags: ["Customers"], summary: "Listar clientes, por nombre",
+            parameters: [
+                ...PARAMS_PAGINA,
+                { name: "search", in: "query", schema: { type: "string" }, description: "Busca en nombre, correo y teléfono" },
+            ],
+            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/CustomerListItem"), "Listado paginado"), "401": ERROR("No autenticado") },
+        },
+        post: {
+            tags: ["Customers"], summary: "Crear cliente (ADMIN)",
+            description: "El correo se guarda en minúsculas y sin espacios alrededor: es la clave con la que las ventas se vinculan solas a su cliente.",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/CustomerWrite" } } } },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/Customer" }, "Creado"),
+                "403": ERROR("Requiere rol ADMIN"), "409": ERROR("Ya hay un cliente con ese correo (`CUSTOMER_EMAIL_EXISTS`)"),
+                "422": ERROR("Datos inválidos"),
+            },
+        },
+    },
+    "/customers/{id}": {
+        get: {
+            tags: ["Customers"], summary: "Ficha del cliente, con sus cifras",
+            description: "`summary.shippedRevenue` suma **solo las órdenes enviadas**. Las órdenes, paginadas, en `GET /sale-orders?customerId=`.",
+            parameters: [PARAM_ID],
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/CustomerDetail" }, "Encontrado"), "404": ERROR("No encontrado") },
+        },
+        put: {
+            tags: ["Customers"], summary: "Actualizar cliente (ADMIN)",
+            description: "Un campo ausente no se toca y uno vacío se borra. **No reescribe las órdenes pasadas**: cada una conserva a quién se vendió.",
+            parameters: [PARAM_ID],
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/CustomerWrite" } } } },
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Customer" }, "Actualizado"), "403": ERROR("Requiere rol ADMIN"),
+                "404": ERROR("No encontrado"), "409": ERROR("Ya hay un cliente con ese correo"), "422": ERROR("Datos inválidos"),
+            },
+        },
+        delete: {
+            tags: ["Customers"], summary: "Eliminar cliente (ADMIN)",
+            description: "Sus órdenes se quedan, sin cliente y con los datos de a quién se vendió.",
+            parameters: [PARAM_ID],
+            responses: { "200": JSON_OK(undefined, "Eliminado"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("No encontrado") },
+        },
+    },
+
     // ── Órdenes de venta ─────────────────────────────────────────────────────
     "/sale-orders": {
         get: {
             tags: ["Sale Orders"], summary: "Listar órdenes de venta",
-            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] } }],
+            parameters: [
+                ...PARAMS_PAGINA,
+                { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] } },
+                { name: "customerId", in: "query", schema: { type: "string", format: "uuid" }, description: "Solo las de un cliente (T5-06)" },
+            ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/SaleOrder"), "Listado paginado"), "401": ERROR("No autenticado") },
         },
         post: {
             tags: ["Sale Orders"], summary: "Crear orden de venta",
+            description: "T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
             requestBody: { required: true, content: { "application/json": { schema: {
                 type: "object", required: ["items"],
                 properties: {
+                    customerId: { type: "string", format: "uuid" },
                     customerName: { type: "string" }, customerEmail: { type: "string", format: "email" },
                     customerPhone: { type: "string" }, notes: { type: "string" },
                     items: { type: "array", minItems: 1, items: { type: "object", properties: { productId: { type: "string", format: "uuid" }, productName: { type: "string" }, quantity: { type: "integer" }, unitPrice: { type: "number" } } } },
@@ -342,7 +394,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
             } } } },
             responses: {
                 "201": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Creada"),
-                "404": ERROR("Un productId no existe"),
+                "404": ERROR("Un productId o el customerId no existe"),
                 // T5-03 — la venta pide más de lo disponible (stock menos ventas pendientes).
                 "409": ERROR("INSUFFICIENT_AVAILABLE_STOCK: la cantidad supera lo disponible de un producto"),
                 "422": ERROR("Datos inválidos"),
@@ -359,7 +411,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
             tags: ["Sale Orders"], summary: "Actualizar o cambiar de estado",
             description: "Pasar a `SHIPPED` **descuenta stock**; cancelar una ya enviada lo repone (T0-03). La interfaz pide confirmación antes de esa reposición (T2-42).",
             parameters: [PARAM_ID],
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] }, customerName: { type: "string" }, notes: { type: "string" } } } } } },
+            requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] }, customerId: { type: "string", format: "uuid", nullable: true, description: "T5-06 — `null` desvincula; no cambia los datos de cliente de la orden" }, customerName: { type: "string" }, notes: { type: "string" } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Actualizada"),
                 "400": ERROR("Stock insuficiente o transición inválida"), "404": ERROR("No encontrada"),
@@ -648,6 +700,7 @@ export const etiquetasAdicionales = [
     { name: "Tags", description: "Etiquetas de producto" },
     { name: "Suppliers", description: "Proveedores" },
     { name: "Purchase Orders", description: "Órdenes de compra — recibir suma stock" },
+    { name: "Customers", description: "Clientes y su historial de ventas" },
     { name: "Sale Orders", description: "Órdenes de venta — enviar descuenta stock" },
     { name: "Reports", description: "Resumen de inventario y exportación en PDF" },
     { name: "Users", description: "Gestión de usuarios (solo ADMIN)" },

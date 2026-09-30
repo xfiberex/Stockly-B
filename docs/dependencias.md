@@ -70,6 +70,11 @@ siete moderados de `nodemailer` y de `ip-address`. Esta vez **sí hubo salto de 
   que bastó `pnpm update ip-address` para que el lockfile tomara la corregida.
 - Sale de `minimumReleaseAgeExclude` la entrada `nodemailer@9.0.1`, que ya no está en el árbol.
 
+**Y ese mismo día, el frontend.** Al cerrar T5-06, `pnpm auditoria` del frontend salió con **siete
+avisos altos y cinco moderados**, todos de `axios` < 1.20.0 y publicados ese día. Dependencia
+directa y dentro de la misma versión mayor: `axios` 1.19.0 → 1.20.0, que llevaba un mes publicada.
+El E2E completo, que pasa entero por `axios`, en verde después.
+
 En la misma pasada **pnpm pasó a 12.4.1 en los dos repositorios**, `packageManager` y Dockerfiles.
 El backend ya estaba en 12.4.1 desde el commit de T5-01, que se lo llevó sin querer, y el resto
 seguía en 11.21.0.
