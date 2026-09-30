@@ -488,3 +488,15 @@ El seed crea:
 | WAREHOUSE | `almacen@stockly.app` | `Almacen1234!` |
 
 > **El administrador inicial sale de aquí.** El registro público (`POST /auth/register`) crea **siempre** usuarios con rol `USER`. En un despliegue nuevo hay que ejecutar `pnpm db:seed` —o promover a alguien con `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN— porque ningún registro se convierte en administrador por sí solo.
+
+---
+
+## Licencia
+
+Copyright © 2026 Ricky Angel Jiménez Bueno.
+
+Stockly es software libre: puedes redistribuirlo y modificarlo bajo los términos de la
+**[GNU Affero General Public License v3](LICENSE)** (`AGPL-3.0-only`). Quien ofrezca una versión
+modificada a otros usuarios **por la red** tiene que ofrecerles también su código. El porqué de la
+elección está en el [ADR 0009](docs/adr/0009-licencia-agpl.md). Las versiones publicadas antes del
+2026-09-30 se distribuyeron con la MIT.

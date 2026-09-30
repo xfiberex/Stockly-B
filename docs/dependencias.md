@@ -248,6 +248,10 @@ tiene que responder bajo qué licencia se distribuye esto.
 Corregido: los dos repositorios declaran ahora `"license": "MIT"` y su autor, y los dos
 archivos `LICENSE` son el mismo texto MIT a nombre de Ricky Angel Jiménez Bueno.
 
+**Desde el 2026-09-30 la licencia es la AGPL-3.0-only** ([ADR 0009](adr/0009-licencia-agpl.md)):
+`LICENSE` con el texto oficial y `"license": "AGPL-3.0-only"` en los dos `package.json`. Todas las
+licencias de la lista permitida son compatibles con ella, así que la puerta no cambia.
+
 ---
 
 ## 7. Repetir el análisis

@@ -185,6 +185,13 @@ línea del código.
 
 ---
 
+## Licencia de las contribuciones
+
+Stockly se distribuye con la **GNU AGPL v3** ([ADR 0009](docs/adr/0009-licencia-agpl.md)), y lo
+que se aporte se publica con esa misma licencia. **Si el proyecto llega a ofrecer una licencia
+comercial además de la AGPL**, hará falta un acuerdo de cesión (CLA) **antes** de aceptar la primera
+contribución externa: sin él, lo aportado es de quien lo escribió y no se puede relicenciar.
+
 ## Seguridad
 
 - **Nunca versionar credenciales reales.** El `.env` está ignorado y debe seguir así: una

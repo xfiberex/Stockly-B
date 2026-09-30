@@ -11,6 +11,9 @@ export const spec = {
         title: "Stockly API",
         description: "API REST para gestión de inventario de productos con autenticación y roles.",
         version: "1.0.0",
+        // ADR 0009 — la AGPL pide que quien use la API por la red pueda llegar al código.
+        license: { name: "AGPL-3.0-only", url: "https://www.gnu.org/licenses/agpl-3.0.html" },
+        contact: { name: "Código fuente", url: "https://github.com/xfiberex/Stockly-B" },
     },
     servers: [{ url: "/api/v1", description: "Servidor principal" }],
     components: {

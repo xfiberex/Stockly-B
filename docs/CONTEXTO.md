@@ -532,6 +532,11 @@ de `vite.config.ts` manda a `vendor` todo lo que no nombra, y `vendor` se descar
 `Modal` lleva una pila de los abiertos: solo el de arriba atiende a Escape y al tabulador, y el
 scroll de la página se libera al cerrar el último. Un modal nuevo no necesita hacer nada.
 
+**La licencia es la AGPL-3.0-only desde el 2026-09-30 ([ADR 0009](adr/0009-licencia-agpl.md)).**
+Dos cosas que no conviene romper: el enlace al código en «Acerca de Stockly» del perfil —la
+cláusula 13 pide ofrecerlo a quien usa la aplicación por la red— y, **si algún día se quiere vender
+una licencia comercial**, no aceptar contribuciones externas sin un acuerdo de cesión antes.
+
 **Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA` (T5-07).** Su ancho mínimo
 de 640 px deja las columnas de la derecha detrás de un desplazamiento horizontal **sin barra**, y en
 la captura del conteo eso era el campo donde se escribe. Ni jsdom ni el E2E lo ven solos: Playwright

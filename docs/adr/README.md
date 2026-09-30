@@ -17,6 +17,7 @@ evidente es la equivocada. Si algo se hizo de la forma obvia, no necesita una en
 | [0006](0006-contrato-copiado-entre-repositorios.md) | El contrato de la API se copia entre repositorios, no se comparte como paquete | Aceptada |
 | [0007](0007-i18n-propio.md) | La internacionalización se hace con un motor propio, no con `i18next` | Aceptada |
 | [0008](0008-integracion-continua.md) | Integración continua: la misma puerta, también en GitHub | Aceptada |
+| [0009](0009-licencia-agpl.md) | Licencia: GNU AGPL v3, no MIT | Aceptada |
 
 ## Formato
 

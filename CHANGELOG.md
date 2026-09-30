@@ -189,6 +189,11 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Cambiado
 
+- **Stockly pasa a ser software libre bajo la GNU AGPL v3**, en lugar de la MIT (ADR 0009). Se
+  puede usar, estudiar, modificar y compartir, y quien ofrezca una versión modificada como servicio
+  tiene que publicar sus cambios. El perfil tiene ahora un apartado **Acerca de Stockly** con la
+  licencia y el enlace al código. Lo publicado antes del 2026-09-30 sigue siendo MIT.
+
 - El gráfico **Movimientos por mes** enseña el mes en curso y los cinco anteriores **completos**,
   en la zona horaria del negocio. Antes el mes más antiguo salía a medias (`T5-09`).
 - **«Nuevo proveedor» ya no se abre con los datos del último creado** (`T5-05`). El formulario

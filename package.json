@@ -29,7 +29,7 @@
   },
   "keywords": [],
   "author": "Ricky Angel Jiménez Bueno",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@12.4.1",
   "devEngines": {
     "packageManager": {
