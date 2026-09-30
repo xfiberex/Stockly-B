@@ -2,6 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../src/shared/lib/prisma";
 import { hashPassword } from "../src/shared/lib/hash";
+import { digitoDeControlGtin } from "../src/contratos/api";
 import { categoriesData } from "./data/categories";
 import { brandsData } from "./data/brands";
 import { suppliersData } from "./data/suppliers";
@@ -185,6 +186,18 @@ const descontinuado = (i: number): boolean => i >= productsData.length - 2;
 
 // ─── Productos ────────────────────────────────────────────────────────────────
 
+/**
+ * T5-08 — un EAN-13 válido para el producto `i`, o ninguno en uno de cada cinco: esos se
+ * etiquetan con su SKU, que es el otro caso que hay que poder probar. El prefijo **200** es de
+ * los que GS1 reserva para uso interno de cada tienda, así que no coincide con ningún artículo
+ * real que alguien escanee al probar.
+ */
+function codigoDeBarrasDe(i: number): string | undefined {
+    if (i % 5 === 4) return undefined;
+    const cuerpo = `200${String(i + 1).padStart(9, "0")}`;
+    return cuerpo + digitoDeControlGtin(cuerpo);
+}
+
 async function sembrarProductos(
     categorias: Map<string, string>,
     marcas: Map<string, string>,
@@ -198,6 +211,7 @@ async function sembrarProductos(
                     name: p.name,
                     description: p.description,
                     sku: p.sku,
+                    barcode: codigoDeBarrasDe(i),
                     price: p.price,
                     stock: p.stock,
                     minStock: p.minStock,
@@ -213,7 +227,8 @@ async function sembrarProductos(
         ),
     );
     const bajos = creados.filter((p) => p.stock <= p.minStock).length;
-    console.log(`  - ${creados.length} productos creados (${bajos} en o por debajo del mínimo, 2 descontinuados)`);
+    const conCodigo = creados.filter((p) => p.barcode).length;
+    console.log(`  - ${creados.length} productos creados (${bajos} en o por debajo del mínimo, 2 descontinuados, ${conCodigo} con código de barras)`);
     return creados;
 }
 

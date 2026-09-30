@@ -18,6 +18,9 @@ productRouter.use(requireAuth);
 // Lectura — cualquier usuario autenticado
 productRouter.get("/", permitir("GET /products"), productController.getProducts);
 productRouter.get("/export", permitir("GET /products/export"), productController.exportProducts);
+// T5-08 — antes de `/:id`, o «lookup» y «labels» se leerían como identificadores.
+productRouter.get("/lookup", permitir("GET /products/lookup"), productController.getProductByCode);
+productRouter.get("/labels", permitir("GET /products/labels"), productController.printLabels);
 productRouter.get("/:id", permitir("GET /products/:id"), productController.getProductById);
 productRouter.get("/:id/movements", permitir("GET /products/:id/movements"), productController.getProductMovements);
 productRouter.get("/:id/movements/export", permitir("GET /products/:id/movements/export"), productController.exportProductMovements);

@@ -2,6 +2,7 @@ export interface CreateProductDto {
     name: string;
     description?: string;
     sku?: string;
+    barcode?: string;
     price: number;
     costPrice?: number;
     stock?: number;
@@ -16,6 +17,8 @@ export interface UpdateProductDto {
     name?: string;
     description?: string;
     sku?: string;
+    /** `null` quita el código (T5-08). */
+    barcode?: string | null;
     price?: number;
     /** `null` quita el coste: vuelve a ser desconocido (T5-01). */
     costPrice?: number | null;
@@ -39,6 +42,13 @@ export interface ProductQuery {
     tagId?: string;
     /** T5-10 — `A`, `B` o `C`. C incluye los productos sin ventas en el periodo. */
     abcClass?: string;
+}
+
+/** T5-08 — `GET /products/labels`. Todo llega como cadena de la query. */
+export interface LabelsQuery {
+    ids?: string;
+    format?: string;
+    copies?: string;
 }
 
 /**

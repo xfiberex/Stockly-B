@@ -8,13 +8,16 @@ import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
 import { abcService } from "@/modules/reports/reports.abc";
-import { $Enums } from "@/generated/prisma/client";
+import { $Enums, Prisma } from "@/generated/prisma/client";
+import { variantesDeBusqueda } from "@/modules/products/codigoDeBarras";
+import { cabeEnEtiqueta, type Etiqueta, type FormatoEtiqueta } from "@/modules/products/product.etiquetas";
 import type {
     CreateProductDto,
     UpdateProductDto,
     ProductQuery,
     MovementsQuery,
     CostHistoryQuery,
+    LabelsQuery,
     ImportProductDto,
     StockMovementType,
     CreateManualMovementDto,
@@ -62,6 +65,39 @@ function fechaDeFiltro(valor: string | undefined, campo: string): Date | undefin
         );
     }
     return fecha;
+}
+
+/**
+ * T5-08 — un SKU o un código de barras repetido, dicho como 409 y no como 500.
+ *
+ * Se traduce el error de la base en lugar de comprobar antes con `findFirst`, como hacen
+ * categorías y marcas: entre esa comprobación y la escritura cabe otra petición con el mismo
+ * valor, y esa segunda acababa en un 500. El índice único es el que decide, así que es su error
+ * el que se traduce. **El SKU daba 500 hasta ahora en cualquier caso**: nadie lo traducía.
+ */
+function traducirUnicidad(error: unknown): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const campos = JSON.stringify(error.meta ?? {});
+        if (campos.includes("barcode")) {
+            throw new HttpError(409, "Ese código de barras ya es de otro producto", "BARCODE_EXISTS");
+        }
+        if (campos.includes("sku")) throw new HttpError(409, "Ese SKU ya es de otro producto", "SKU_EXISTS");
+    }
+    throw error;
+}
+
+/** Máximos de una petición de etiquetas: 200 productos y 2 000 etiquetas, unas 84 hojas A4. */
+const MAX_PRODUCTOS_EN_ETIQUETAS = 200;
+const MAX_ETIQUETAS = 2000;
+const FORMATOS_DE_ETIQUETA = { sheet: "sheet", label: "label" } as const satisfies Record<FormatoEtiqueta, FormatoEtiqueta>;
+
+function filtroInvalido(campo: string, valor: string, validos: string): HttpError {
+    return new HttpError(
+        400,
+        `El filtro «${campo}» no admite el valor «${valor}». Valores válidos: ${validos}.`,
+        "INVALID_FILTER_VALUE",
+        { campo, valor, validos },
+    );
 }
 
 const PRODUCT_INCLUDE = {
@@ -202,6 +238,84 @@ export const productService = {
         return conCifras!;
     },
 
+    /**
+     * T5-08 — el producto de un código escaneado o tecleado. **Búsqueda exacta**: primero por
+     * código de barras —con sus variantes UPC-A/EAN-13— y después por SKU, los dos por su índice
+     * único. No pasa por el buscador de texto del catálogo ni por su `ILIKE`.
+     *
+     * Si el mismo texto es el código de barras de un producto y el SKU de otro, gana el código de
+     * barras: es lo que lleva impreso el artículo. Devuelve también los inactivos, que la ficha
+     * enseña como tales, y la misma forma que `getById`.
+     */
+    async getByCode(codigo: string | undefined) {
+        const c = codigo?.trim() ?? "";
+        if (!c) throw filtroInvalido("code", c, "un código de barras o un SKU");
+
+        const encontrado =
+            (await prisma.product.findFirst({ where: { barcode: { in: variantesDeBusqueda(c) } }, select: { id: true } })) ??
+            (await prisma.product.findUnique({ where: { sku: c }, select: { id: true } }));
+        if (!encontrado) {
+            throw new HttpError(404, `Ningún producto tiene el código «${c}»`, "PRODUCT_NOT_FOUND", { codigo: c });
+        }
+        return this.getById(encontrado.id);
+    },
+
+    /**
+     * T5-08 — lo que va en cada etiqueta, repetido `copies` veces y en el orden de `ids`. El
+     * código es el de barras si lo hay y, si no, el SKU. Un producto sin ninguno de los dos no
+     * tiene nada que imprimir y **se rechaza la petición entera**: una hoja con huecos donde
+     * faltaba un código se descubre al pegarla.
+     */
+    async prepararEtiquetas(query: LabelsQuery): Promise<{ etiquetas: Etiqueta[]; formato: FormatoEtiqueta }> {
+        const ids = [...new Set((query.ids ?? "").split(",").map((id) => id.trim()).filter(Boolean))];
+        if (ids.length === 0 || ids.length > MAX_PRODUCTOS_EN_ETIQUETAS) {
+            throw filtroInvalido("ids", query.ids ?? "", `entre 1 y ${MAX_PRODUCTOS_EN_ETIQUETAS} identificadores separados por comas`);
+        }
+
+        const formato = filtroDeEnum(FORMATOS_DE_ETIQUETA, query.format, "format") ?? "sheet";
+
+        const copias = query.copies === undefined || query.copies === "" ? 1 : Number(query.copies);
+        if (!Number.isInteger(copias) || copias < 1 || ids.length * copias > MAX_ETIQUETAS) {
+            throw filtroInvalido("copies", query.copies ?? "", `un entero desde 1, hasta ${MAX_ETIQUETAS} etiquetas en total`);
+        }
+
+        const productos = await prisma.product.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true, sku: true, barcode: true, price: true },
+        });
+        if (productos.length !== ids.length) {
+            throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+        }
+        const sinCodigo = productos.filter((p) => !p.barcode && !p.sku).length;
+        if (sinCodigo > 0) {
+            throw new HttpError(
+                400,
+                `${sinCodigo} de los productos no tienen código de barras ni SKU que imprimir`,
+                "PRODUCTS_WITHOUT_CODE",
+                { productos: sinCodigo },
+            );
+        }
+
+        // Antes de empezar el PDF: a mitad del archivo ya no se puede responder con un error.
+        const largo = productos.find((p) => !cabeEnEtiqueta((p.barcode ?? p.sku)!, formato));
+        if (largo) {
+            throw new HttpError(
+                400,
+                `El código de «${largo.name}» es demasiado largo para ese formato de etiqueta`,
+                "CODE_TOO_LONG_FOR_LABEL",
+                { producto: largo.name },
+            );
+        }
+
+        const porId = new Map(productos.map((p) => [p.id, p]));
+        const etiquetas = ids.flatMap((id) => {
+            const p = porId.get(id)!;
+            const etiqueta = { nombre: p.name, codigo: (p.barcode ?? p.sku)!, precio: Number(p.price) };
+            return Array.from({ length: copias }, () => etiqueta);
+        });
+        return { etiquetas, formato };
+    },
+
     async create(dto: CreateProductDto, file?: Express.Multer.File) {
         let imageUrl: string | undefined;
         let imagePublicId: string | undefined;
@@ -220,6 +334,7 @@ export const productService = {
                 name: dto.name,
                 description: dto.description,
                 sku: dto.sku || null,
+                barcode: dto.barcode ?? null,
                 price: dto.price !== undefined ? parseFloat(String(dto.price)) : 0,
                 costPrice: dto.costPrice ?? null,
                 stock,
@@ -232,7 +347,7 @@ export const productService = {
                 ...(dto.tagIds?.length && { tags: { connect: dto.tagIds.map((id) => ({ id })) } }),
             },
             include: PRODUCT_INCLUDE,
-        });
+        }).catch(traducirUnicidad);
 
         await recordMovement(product.id, "IN", stock, stock, "Stock inicial");
 
@@ -282,6 +397,7 @@ export const productService = {
                     ...(dto.name !== undefined && { name: dto.name }),
                     ...(dto.description !== undefined && { description: dto.description }),
                     ...(dto.sku !== undefined && { sku: dto.sku || null }),
+                    ...(dto.barcode !== undefined && { barcode: dto.barcode }),
                     ...(newPrice !== undefined && { price: newPrice }),
                     ...(costChanged && { costPrice: dto.costPrice }),
                     ...(hasStockChange && { stock: newStock }),
@@ -321,7 +437,7 @@ export const productService = {
             }
 
             return product;
-        });
+        }).catch(traducirUnicidad);
 
         if (hasStockChange && stockDelta < 0) {
             dispararAlertaStock(updated.name, newStock!, updated.minStock);

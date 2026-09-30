@@ -224,11 +224,15 @@ export const inventoryCountsService = {
                 countedQuantity: { not: null },
                 NOT: { countedQuantity: { equals: prisma.inventoryCountLine.fields.expectedQuantity } },
             }),
+            // T5-08 — la línea de un producto concreto: la del que se acaba de escanear.
+            ...(query.productId && { productId: query.productId }),
             ...(busqueda && {
                 product: {
                     OR: [
                         { name: { contains: busqueda, mode: "insensitive" as const } },
                         { sku: { contains: busqueda, mode: "insensitive" as const } },
+                        // Exacto, como la búsqueda por código: un código a medias no identifica nada.
+                        { barcode: busqueda },
                     ],
                 },
             }),

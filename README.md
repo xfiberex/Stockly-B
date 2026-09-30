@@ -57,7 +57,8 @@ Stockly-B/
     │   ├── auth/               # Registro, login, logout, JWT, perfil, contraseña, verificación
     │   ├── brands/             # CRUD de marcas
     │   ├── categories/         # CRUD de categorías
-    │   ├── products/           # CRUD de productos, movimientos de stock, exportación CSV
+    │   ├── products/           # CRUD de productos, movimientos de stock, exportación CSV,
+    │   │                       # búsqueda por código y etiquetas con código de barras (T5-08)
     │   ├── purchase-orders/    # Órdenes de compra, recepción parcial y sugerencias de reposición
     │   ├── sale-orders/        # Órdenes de venta (PENDING → SHIPPED / CANCELLED)
     │   ├── inventory-counts/   # Conteo físico: sesiones, captura, cierre con ajustes (T5-07)
@@ -83,7 +84,7 @@ Stockly-B/
 | Modelo | Descripción |
 |---|---|
 | `User` | Usuarios con roles `ADMIN` / `USER` / `WAREHOUSE` (T5-13), `isActive`, tokens de verificación, reset y refresh |
-| `Product` | Producto con SKU, precio, stock, stock mínimo, imagen, categoría, marca, proveedor, etiquetas |
+| `Product` | Producto con SKU, código de barras (T5-08), precio, stock, stock mínimo, imagen, categoría, marca, proveedor, etiquetas |
 | `Category` | Categoría de producto |
 | `Brand` | Marca de producto |
 | `Supplier` | Proveedor, con plazo de entrega en días (`leadTimeDays`, opcional) |
@@ -287,6 +288,8 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 |---|---|---|---|
 | `GET` | `/` | Listar (paginado, filtros: búsqueda, categoría, tag, estado) | USER+ |
 | `GET` | `/:id` | Obtener por ID | USER+ |
+| `GET` | `/lookup?code=` | Buscar por código de barras o SKU **exacto** (T5-08). 404 si no es de nadie | USER+ |
+| `GET` | `/labels?ids=&format=&copies=` | Etiquetas en PDF con código de barras (T5-08): `sheet` (A4, 3 × 8) o `label` (50 × 25 mm) | USER+ |
 | `POST` | `/` | Crear producto (imagen + tags opcionales) | ADMIN |
 | `PUT` | `/:id` | Actualizar producto | ADMIN |
 | `DELETE` | `/:id` | Soft delete | ADMIN |
@@ -469,7 +472,7 @@ El seed crea:
 - **4 usuarios**: dos ADMIN, uno USER y uno de almacén
 - **6 categorías** y **8 marcas**
 - **3 proveedores**
-- **~30 productos** con precios, stock y stock mínimo variados
+- **~30 productos** con precios, stock y stock mínimo variados; cuatro de cada cinco con un **EAN-13** (prefijo 200, de uso interno) y el resto solo con SKU
 - **Movimientos de stock** de los últimos meses, que cuadran con el stock de cada producto
 - **Órdenes de compra** en todos los estados, con sus recepciones enlazadas a cada línea
 - **Órdenes de venta** pendientes, enviadas y canceladas, con el coste congelado en las enviadas

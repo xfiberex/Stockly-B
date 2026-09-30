@@ -128,7 +128,7 @@ export const spec = {
             post: {
                 tags: ["Products"], summary: "Crear producto (ADMIN)",
                 requestBody: { required: true, content: { "multipart/form-data": { schema: { allOf: [{ $ref: "#/components/schemas/ProductWrite" }, { required: ["name", "price"] }] } } } },
-                responses: { "201": { description: "Producto creado", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/Product" } } } } } }, "403": { description: "Solo ADMIN" }, "422": { description: "Datos inválidos" } },
+                responses: { "201": { description: "Producto creado", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/Product" } } } } } }, "403": { description: "Solo ADMIN" }, "409": { description: "El SKU o el código de barras ya es de otro producto (T5-08)" }, "422": { description: "Datos inválidos" } },
             },
         },
         "/products/export": {
@@ -150,6 +150,34 @@ export const spec = {
                 },
             },
         },
+        "/products/lookup": {
+            get: {
+                tags: ["Products"], summary: "Buscar un producto por código de barras o SKU exacto (T5-08)",
+                description: "Lo que usa el escáner. Primero por código de barras —un UPC-A se encuentra con 12 cifras o con 13— y después por SKU, los dos por su índice único; no pasa por el buscador de texto. Devuelve también los inactivos.",
+                parameters: [{ name: "code", in: "query", required: true, schema: { type: "string" } }],
+                responses: {
+                    "200": { description: "El producto, con comprometido y disponible, como `GET /products/{id}`", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/ProductWithAvailability" } } } } } },
+                    "400": { description: "Sin código" },
+                    "404": { description: "Ningún producto tiene ese código; `params.codigo` lo repite" },
+                },
+            },
+        },
+        "/products/labels": {
+            get: {
+                tags: ["Products"], summary: "Etiquetas con código de barras en PDF (T5-08)",
+                description: "Cada etiqueta lleva el nombre, el precio y el código de barras del producto o, si no tiene, su SKU. Los GTIN van en EAN-13 o EAN-8 y el resto en Code 128. Si algún producto no tiene ni código ni SKU, se rechaza la petición entera.",
+                parameters: [
+                    { name: "ids", in: "query", required: true, description: "Identificadores separados por comas, hasta 200. El PDF sigue su orden.", schema: { type: "string" } },
+                    { name: "format", in: "query", description: "`sheet`: A4 de 3 × 8 etiquetas de 70 × 37 mm. `label`: una de 50 × 25 mm por página, para impresora de rollo.", schema: { type: "string", enum: ["sheet", "label"], default: "sheet" } },
+                    { name: "copies", in: "query", description: "Copias de cada producto; hasta 2 000 etiquetas en total", schema: { type: "integer", minimum: 1, default: 1 } },
+                ],
+                responses: {
+                    "200": { description: "El PDF", content: { "application/pdf": { schema: { type: "string", format: "binary" } } } },
+                    "400": { description: "Filtro inválido, productos sin código de barras ni SKU (`PRODUCTS_WITHOUT_CODE`), o un código tan largo que sus barras saldrían de menos de 0,2 mm en ese formato (`CODE_TOO_LONG_FOR_LABEL`): 17 caracteres en `label`, 24 en `sheet`" },
+                    "404": { description: "Algún producto no existe" },
+                },
+            },
+        },
         "/products/import": {
             post: {
                 tags: ["Products"], summary: "Importar productos en masa (ADMIN, máx 1000)",
@@ -167,7 +195,7 @@ export const spec = {
                 tags: ["Products"], summary: "Actualizar producto (ADMIN)",
                 parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
                 requestBody: { required: true, content: { "multipart/form-data": { schema: { allOf: [{ $ref: "#/components/schemas/ProductWrite" }, { type: "object", properties: { removeImage: { type: "string", description: "Cualquier valor no vacío elimina la imagen actual" } } }] } } } },
-                responses: { "200": { description: "Producto actualizado" }, "403": { description: "Solo ADMIN" }, "404": { description: "No encontrado" } },
+                responses: { "200": { description: "Producto actualizado" }, "403": { description: "Solo ADMIN" }, "404": { description: "No encontrado" }, "409": { description: "El SKU o el código de barras ya es de otro producto (T5-08)" } },
             },
             delete: {
                 tags: ["Products"], summary: "Eliminar producto — soft delete (ADMIN)",

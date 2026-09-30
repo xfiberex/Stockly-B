@@ -414,7 +414,8 @@ export const rutasAdicionales: Record<string, Ruta> = {
             parameters: [
                 PARAM_ID, ...PARAMS_PAGINA,
                 { name: "filter", in: "query", schema: { type: "string", enum: ["pending", "counted", "difference"] } },
-                { name: "search", in: "query", schema: { type: "string" }, description: "Nombre o SKU" },
+                { name: "search", in: "query", schema: { type: "string" }, description: "Nombre o SKU, o el código de barras exacto (T5-08)" },
+                { name: "productId", in: "query", schema: { type: "string", format: "uuid" }, description: "La línea de un producto: la del que se acaba de escanear (T5-08)" },
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/InventoryCountLine"), "Listado paginado"), "404": ERROR("No encontrada") },
         },

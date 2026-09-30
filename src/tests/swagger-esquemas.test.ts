@@ -78,6 +78,7 @@ describe("Esquemas derivados del spec (T4-02)", () => {
                 name: "Producto de ejemplo",
                 description: "Descripción",
                 sku: "SKU-1",
+                barcode: "4006381333931",
                 price: 10,
                 costPrice: 6.5,
                 stock: 1,

@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
 import { auditService } from "@/modules/audit-logs";
 import { enviarExportacion } from "@/shared/lib/exportacion";
-import type { CreateProductDto, UpdateProductDto, ProductQuery, MovementsQuery, CostHistoryQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
+import { nuevoDocumentoDeEtiquetas, renderEtiquetas } from "@/modules/products/product.etiquetas";
+import type { CreateProductDto, UpdateProductDto, ProductQuery, MovementsQuery, CostHistoryQuery, LabelsQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
 export const productController = {
     async getProducts(
@@ -26,6 +27,39 @@ export const productController = {
         try {
             const product = await productService.getById(req.params.id);
             res.json({ success: true, message: "Producto obtenido exitosamente", data: product });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async getProductByCode(
+        req: Request<{}, {}, {}, { code?: string }>,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> {
+        try {
+            const product = await productService.getByCode(req.query.code);
+            res.json({ success: true, message: "Producto obtenido exitosamente", data: product });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async printLabels(
+        req: Request<{}, {}, {}, LabelsQuery>,
+        res: Response,
+        next: NextFunction,
+    ): Promise<void> {
+        try {
+            // Se valida y se lee todo **antes** de escribir la cabecera: un error después de
+            // empezar el PDF ya no puede ser una respuesta JSON.
+            const { etiquetas, formato } = await productService.prepararEtiquetas(req.query);
+            const doc = nuevoDocumentoDeEtiquetas();
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader("Content-Disposition", "attachment; filename=etiquetas-stockly.pdf");
+            doc.pipe(res);
+            renderEtiquetas(doc, etiquetas, formato);
+            doc.end();
         } catch (error) {
             next(error);
         }

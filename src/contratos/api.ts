@@ -59,6 +59,9 @@ export const PERMISOS = {
     // Productos
     "GET /products": TODOS,
     "GET /products/export": TODOS,
+    // T5-08 — buscar por código (el escáner) e imprimir etiquetas: leer, como el catálogo.
+    "GET /products/lookup": TODOS,
+    "GET /products/labels": TODOS,
     "GET /products/:id": TODOS,
     "GET /products/:id/movements": TODOS,
     "GET /products/:id/movements/export": TODOS,
@@ -193,6 +196,49 @@ export const importeSchema = z.union([z.string(), z.number()]);
 /** `DateTime` de Prisma serializado por `JSON.stringify`: ISO 8601 en cadena. */
 export const fechaSchema = z.string();
 
+// ─────────────────── Código de barras (T5-08) ───────────────────
+
+/** El más largo que se admite. Code 128 no tiene tope, pero una etiqueta de 50 mm sí. */
+export const LARGO_MAXIMO_CODIGO_DE_BARRAS = 48;
+
+/**
+ * El dígito de control GTIN (EAN-13, UPC-A, EAN-8) de `cuerpo`, que son todos los dígitos
+ * **menos** el último. Pesos 3 y 1 alternos empezando **por la derecha**: por eso sirve igual
+ * para los tres largos sin saber cuál es.
+ */
+export function digitoDeControlGtin(cuerpo: string): number {
+    let suma = 0;
+    for (let i = 0; i < cuerpo.length; i++) {
+        suma += Number(cuerpo[cuerpo.length - 1 - i]) * (i % 2 === 0 ? 3 : 1);
+    }
+    return (10 - (suma % 10)) % 10;
+}
+
+/** Solo dígitos y con largo de EAN-8, UPC-A o EAN-13: se imprime y se valida como tal. */
+export function esLargoGtin(codigo: string): boolean {
+    return /^\d+$/.test(codigo) && [8, 12, 13].includes(codigo.length);
+}
+
+/**
+ * Por qué `codigo` no vale como código de barras, o `null` si vale. **Es la regla de los dos
+ * lados**: el validador del backend y el formulario del frontend la leen de aquí.
+ *
+ * - ASCII imprimible sin espacios, hasta 48: lo que Code 128 imprime y un lector de teclado
+ *   (los de pistola USB escriben el código y pulsan Intro) devuelve igual.
+ * - Si **parece** un GTIN —solo dígitos, 8, 12 o 13— tiene que cuadrar su dígito de control.
+ *   Un EAN tecleado con una cifra cambiada es un código que ningún escáner va a leer nunca:
+ *   mejor rechazarlo al guardar que descubrirlo delante de la estantería. El precio es que un
+ *   código interno de 8, 12 o 13 cifras que no sea GTIN no se admite; con otro largo, sí.
+ */
+export function motivoCodigoDeBarrasInvalido(codigo: string): "largo" | "caracteres" | "digitoDeControl" | null {
+    if (codigo.length === 0 || codigo.length > LARGO_MAXIMO_CODIGO_DE_BARRAS) return "largo";
+    if (!/^[\x21-\x7E]+$/.test(codigo)) return "caracteres";
+    if (esLargoGtin(codigo) && digitoDeControlGtin(codigo.slice(0, -1)) !== Number(codigo.at(-1))) {
+        return "digitoDeControl";
+    }
+    return null;
+}
+
 /** Convierte un importe del cable a número. Devuelve `NaN` si no lo es, como `Number`. */
 export function aNumero(importe: z.infer<typeof importeSchema>): number {
     return typeof importe === "number" ? importe : Number(importe);
@@ -254,6 +300,10 @@ export const CODIGOS_DE_ERROR = [
     "PRODUCT_ALREADY_ACTIVE",
     "PRODUCT_NOT_IN_COUNT",
     "PRODUCT_WITHOUT_SUPPLIER",
+    // T5-08 — se piden etiquetas de productos sin código de barras ni SKU que imprimir, o con
+    // uno tan largo que sus barras saldrían más finas de lo que se puede leer.
+    "PRODUCTS_WITHOUT_CODE",
+    "CODE_TOO_LONG_FOR_LABEL",
     "RECEIPT_EXCEEDS_PENDING",
     "STOCK_CANNOT_BE_NEGATIVE",
     // 401 / 403 — quién eres y qué se te permite
@@ -278,10 +328,14 @@ export const CODIGOS_DE_ERROR = [
     "TAG_NOT_FOUND",
     "USER_NOT_FOUND",
     // 409 — colisiones de unicidad
+    // T5-08 — el código de barras o el SKU ya es de otro producto. El SKU daba **500** hasta
+    // entonces: nadie traducía el error de unicidad de la base.
+    "BARCODE_EXISTS",
     "BRAND_NAME_EXISTS",
     "CATEGORY_NAME_EXISTS",
     "EMAIL_ALREADY_REGISTERED",
     "EMAIL_IN_USE",
+    "SKU_EXISTS",
     "SUPPLIER_EMAIL_EXISTS",
     "TAG_NAME_EXISTS",
     // 409 — el estado del inventario no admite la petición
@@ -398,6 +452,8 @@ export const productoSchema = z.object({
     name: z.string(),
     description: z.string().nullable(),
     sku: z.string().nullable(),
+    /** T5-08 — EAN-13, UPC-A, EAN-8 o un código interno; ver `motivoCodigoDeBarrasInvalido`. */
+    barcode: z.string().nullable(),
     price: importeSchema,
     /**
      * T5-01 — coste medio ponderado, con cuatro decimales. **`null` es desconocido, no

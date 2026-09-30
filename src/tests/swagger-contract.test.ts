@@ -55,6 +55,7 @@ describe("Contrato entre Swagger y el validador de productos", () => {
             minStock: 0,
             description: "Descripción",
             sku: "SKU-1",
+            barcode: "4006381333931",
             categoryId: "11111111-1111-4111-8111-111111111111",
             brandId: "22222222-2222-4222-8222-222222222222",
             supplierId: "33333333-3333-4333-8333-333333333333",

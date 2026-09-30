@@ -222,6 +222,23 @@ solo se revisó para el otro.
 
 ---
 
+### T5-08 — el escáner (2026-09-29)
+
+`Stockly-F` añade dos dependencias de producción, las dos **MIT**: `barcode-detector`, la API
+`BarcodeDetector` para los navegadores que no la traen, y `zxing-wasm`, sobre la que se apoya. Dos
+cosas que el recuento por paquetes no ve y que hubo que resolver a mano:
+
+- **`type-fest`**, que llega con `zxing-wasm`, declara `(MIT OR CC0-1.0)`: doble licencia a elegir.
+  La puerta la paró, como debía, y se añadió a la lista tomando la MIT. Solo trae tipos: no viaja.
+- **El `.wasm` es ZXing-C++ compilado, y ZXing-C++ es Apache-2.0**, aunque el paquete declare MIT
+  —la de sus enlaces en JavaScript—. La aplicación sirve ese binario, así que tiene que acompañarlo
+  del texto de la licencia. `pnpm licenses` no puede saberlo; `scripts/auditoria.js` lleva una lista
+  `EMBEBIDOS` con lo que viaja dentro de otro paquete, y el aviso de terceros lo incluye.
+
+En desarrollo, el backend añade `zxing-wasm` para que sus tests vuelvan a leer las barras que
+dibuja, y el frontend `pdfjs-dist` (Apache-2.0) y `@napi-rs/canvas` (MIT) para que el E2E convierta
+en imagen el PDF de etiquetas. Ninguna de las tres llega a producción.
+
 ## 6. Licencia declarada
 
 `Stockly-B/package.json` declaraba **ISC** mientras que su archivo `LICENSE` es **MIT**, que

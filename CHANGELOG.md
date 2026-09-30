@@ -19,6 +19,14 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Código de barras, escáner y etiquetas** (`T5-08`). Cada producto puede tener su código de
+  barras (EAN-13, UPC, EAN-8 o uno interno), y un EAN mal tecleado se detecta al guardarlo. El
+  botón **Escanear** lee el código con la cámara del móvil, de una foto o de una pistola USB: en el
+  catálogo abre la ficha del producto, y si el código no es de nadie ofrece darlo de alta con el
+  código ya puesto; en un conteo físico lleva a la línea del producto para escribir lo contado.
+  **Etiquetas** imprime en PDF el nombre, el precio y el código de barras —o el SKU— de uno o varios
+  productos, en hoja A4 de 24 etiquetas o en rollo de 50 × 25 mm.
+
 - **Conteo físico de inventario** (`T5-07`). Nueva sección **Conteos físicos**: se abre un conteo
   de una categoría o de todo el catálogo, se anota lo que hay en la estantería **sin ver lo que
   espera el sistema**, se revisan las diferencias en unidades y en valor a coste, y al cerrarlo cada
@@ -276,6 +284,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   traerse el catálogo entero (`T2-02`).
 
 ### Corregido
+
+- **Dar a un producto un SKU que ya tenía otro daba un error del servidor** (`T5-08`). Ahora se
+  dice que ese SKU ya es de otro producto, igual que con el código de barras.
 
 - **Los botones de exportar órdenes de compra y de venta salían a cualquier rol** (`T5-13`), y a
   quien no era ADMIN la API le devolvía un error. Ahora solo los ve quien puede usarlos.

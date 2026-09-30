@@ -292,6 +292,10 @@ producto cuyo SKU es exactamente ese — se descubrió porque la prueba de carga
 su producto. El buscador de usuarios sí mira dos campos (nombre y correo). No se toca aquí:
 no es rendimiento, y cambiar lo que busca una pantalla es una decisión de producto.
 
+**Desde T5-08 (2026-09-29) hay búsqueda exacta por SKU y por código de barras**, en
+`GET /products/lookup`: dos consultas por índice único, sin `ILIKE`. Es la que usa el escáner, y
+la que escribe un código a mano en su campo. El buscador de texto del catálogo sigue igual.
+
 ## 7 bis. T5-02 — el valor a coste y el margen, sobre el conjunto de carga
 
 El criterio de T5-02 pedía que las consultas nuevas no ordenaran en disco con este conjunto,

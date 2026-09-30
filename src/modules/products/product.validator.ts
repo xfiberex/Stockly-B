@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { motivoCodigoDeBarrasInvalido } from "@/contratos/api";
 
 // Normaliza "" → undefined: los formularios envían "" para "sin categoría/marca/proveedor".
 const uuidOptional = z.preprocess(
@@ -33,6 +34,21 @@ const costeNoNegativo = z.coerce
 const costeAlCrear = z.preprocess((v) => (v === "" ? undefined : v), costeNoNegativo.optional());
 const costeAlEditar = z.preprocess((v) => (v === "" ? null : v), costeNoNegativo.nullable().optional());
 
+// T5-08 — el código de barras. La regla vive en el contrato (`motivoCodigoDeBarrasInvalido`),
+// que es la que aplica también el formulario; aquí solo se le pone el mensaje. Como el coste,
+// la cadena vacía es «sin código» al crear y «quitarlo» al editar.
+const MENSAJE_CODIGO = {
+    largo: "El código de barras debe tener entre 1 y 48 caracteres",
+    caracteres: "El código de barras solo admite letras, cifras y símbolos, sin espacios ni acentos",
+    digitoDeControl: "El dígito de control no cuadra: revisa el código, es un EAN o UPC mal escrito",
+} as const;
+const codigoDeBarras = z.string().trim().superRefine((codigo, ctx) => {
+    const motivo = motivoCodigoDeBarrasInvalido(codigo);
+    if (motivo) ctx.addIssue({ code: "custom", message: MENSAJE_CODIGO[motivo] });
+});
+const codigoAlCrear = z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), codigoDeBarras.optional());
+const codigoAlEditar = z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), codigoDeBarras.nullable().optional());
+
 export const importProductsSchema = z.object({
     products: z
         .array(
@@ -54,6 +70,7 @@ export const createProductSchema = z.object({
     name: z.string().trim().min(1, "El nombre es obligatorio").max(200, "El nombre no puede superar 200 caracteres"),
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
     sku: z.string().trim().max(100, "El SKU no puede superar 100 caracteres").optional(),
+    barcode: codigoAlCrear,
     price: z.coerce.number({ error: "El precio es obligatorio" }).positive("El precio debe ser mayor a 0"),
     costPrice: costeAlCrear,
     stock: z.coerce.number().int("El stock debe ser un entero").min(0, "El stock debe ser mayor o igual a 0").optional(),
@@ -68,6 +85,7 @@ export const updateProductSchema = z.object({
     name: z.string().trim().min(1, "El nombre no puede estar vacío").max(200, "El nombre no puede superar 200 caracteres").optional(),
     description: z.string().trim().max(1000, "La descripción no puede superar 1000 caracteres").optional(),
     sku: z.string().trim().max(100, "El SKU no puede superar 100 caracteres").optional(),
+    barcode: codigoAlEditar,
     price: z.coerce.number().positive("El precio debe ser mayor a 0").optional(),
     costPrice: costeAlEditar,
     stock: z.coerce.number().int("El stock debe ser un entero").min(0, "El stock debe ser mayor o igual a 0").optional(),

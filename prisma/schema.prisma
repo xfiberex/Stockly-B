@@ -157,6 +157,10 @@ model Product {
   name          String
   description   String?
   sku           String?              @unique
+  // T5-08 — el código que lleva impreso el artículo: EAN-13, UPC-A, EAN-8 o uno interno. Único
+  // como el SKU, y por la misma razón: un escaneo tiene que llevar a **un** producto. El índice
+  // único es además lo que hace barata la búsqueda exacta de `GET /products/lookup`.
+  barcode       String?              @unique
   price         Decimal              @db.Decimal(10, 2)
   // T5-01 — coste medio ponderado. `null` es **desconocido**, no cero: un producto que nunca
   // se ha comprado ni se ha costeado a mano no vale nada a coste, simplemente no se sabe.
