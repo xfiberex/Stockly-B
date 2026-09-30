@@ -20,6 +20,7 @@ Está en [`docs/`](docs/), y cubre **los dos repositorios**:
 | [docs/dependencias.md](docs/dependencias.md) | Vulnerabilidades y licencias de las dependencias de producción, y cómo funciona la puerta de `pnpm auditoria`. Léelo **antes** de añadir una dependencia |
 | [docs/rendimiento.md](docs/rendimiento.md) | Mediciones con 100 000 productos: índices antes/después, latencias bajo carga y los cuellos conocidos. Léelo **antes** de tocar una consulta de listado |
 | [docs/accesibilidad.md](docs/accesibilidad.md) | Lighthouse y recorrido de teclado sobre la aplicación desplegada, y **lo que no se comprobó** |
+| [docs/legal.md](docs/legal.md) | Qué cubre la licencia AGPL y **qué no**: datos personales que guarda la aplicación, privacidad, condiciones del servicio, marca y CLA. Léelo **antes** de añadir un dato personal, un proveedor externo o una cookie |
 | [docs/INFORME-AUDITORIA.md](docs/INFORME-AUDITORIA.md) | Los hallazgos que justifican cada tarea. **Congelado a propósito:** está escrito en presente y describe el 2026-08-04, no el estado actual |
 | [docs/README-proyecto.md](docs/README-proyecto.md) | Arranque desde cero de los dos repositorios |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura no obvias: por qué algo está hecho así antes de simplificarlo |

@@ -143,8 +143,9 @@ Medir antes de arreglar, y medir otra vez después. La corrección de cada una e
 | [dependencias.md](dependencias.md) | Vulnerabilidades y licencias del árbol de producción de los dos repos, y cómo funciona la puerta de `pnpm auditoria` — incluida **la lista de lo que no cubre** |
 | [rendimiento.md](rendimiento.md) | Lo que pasa con 100 000 productos: índices medidos antes y después, latencias bajo carga y los dos cuellos que salieron |
 | [accesibilidad.md](accesibilidad.md) | Lighthouse y recorrido de teclado sobre la pila desplegada, y **la mitad del criterio que no se pudo comprobar** |
+| [legal.md](legal.md) | Qué cubre la licencia AGPL y **qué no**: los datos personales que guarda la aplicación y lo pendiente antes de tener usuarios reales o de cobrar |
 | [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
-| [adr/](adr/) | **Ocho decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0008 explica por qué **hay CI** desde el 2026-09-28 y la 0005, ya sustituida, por qué no la hubo antes |
+| [adr/](adr/) | **Nueve decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0008 explica por qué **hay CI** desde el 2026-09-28 y la 0005, ya sustituida, por qué no la hubo antes; la 0009, por qué la licencia es la AGPL v3 |
 | [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
 | [CHANGELOG.md](../CHANGELOG.md) | Registro de cambios de los dos repositorios |
