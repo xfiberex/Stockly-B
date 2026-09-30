@@ -58,12 +58,12 @@ aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **827/827** | **621/621** *(+1 omitido)* |
-| Cobertura (sentencias) | 95.93 % *(suelo 85 %)* | 74.83 % *(suelo 45 %)* |
+| Tests | **866/866** | **629/629** *(+1 omitido)* |
+| Cobertura (sentencias) | 96.13 % *(suelo 85 %)* | 75.16 % *(suelo 45 %)* |
 | Lint | — | **0 errores, 0 avisos** |
 
 **E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-09-29, T5-13): **17 pasados,
+de datos, el backend y el frontend—. En este equipo (2026-09-29, T5-07): **19 pasados,
 1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
 puerto 5173: ver §4, que aquí costó tres pasadas.
 
@@ -81,7 +81,7 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 (el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 8/15** *(abierto el 2026-09-13; T5-01 a T5-05, T5-09, T5-10 y T5-13 cerradas)* · Total **122/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 9/15** *(abierto el 2026-09-13; T5-01 a T5-05, T5-07, T5-09, T5-10 y T5-13 cerradas)* · Total **123/129**.
 
 **`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
 rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
@@ -500,15 +500,21 @@ incluida la extensión `pg_trgm` de T2-09.
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
 **Por dónde seguir (2026-09-29): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
-está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—, y también T5-09, T5-10 y
-T5-13. Lo que queda no tiene orden entre sí: T5-06, T5-07, T5-08, T5-11 y T5-12; T5-14 y T5-15 solo
-con un caso de uso real. **T5-07 ya puede nacer con el rol de almacén**: sus rutas entran en
-`PERMISOS` y el test de la matriz fallará hasta que se decida su fila. La clase ABC (T5-10) es la
-que dice qué productos merecen contarse más a menudo en T5-07. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
+está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—, y también T5-07, T5-09,
+T5-10 y T5-13. Lo que queda no tiene orden entre sí: T5-06, T5-08, T5-11 y T5-12; T5-14 y T5-15 solo
+con un caso de uso real. **T5-08 encaja con T5-07**: escanear un código en la pantalla de captura
+evitaría buscar cada producto a mano. La clase ABC (T5-10) podría ser un filtro al abrir un conteo;
+hoy solo lo es la categoría. T5-11 y T5-12 pueden añadir las **órdenes atrasadas** ahora que el proveedor
 tiene plazo de entrega. Lo que
 sigue se escribió al cerrar los Tiers 0 a 4. De las dos decisiones de producto que menciona, **el
 cubo parcial se tomó en T5-09** (meses naturales en la zona del negocio), y la búsqueda por SKU puede
 resolverla la búsqueda exacta de **T5-08** sin tocar el buscador de texto.
+
+**Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA` (T5-07).** Su ancho mínimo
+de 640 px deja las columnas de la derecha detrás de un desplazamiento horizontal **sin barra**, y en
+la captura del conteo eso era el campo donde se escribe. Ni jsdom ni el E2E lo ven solos: Playwright
+desplaza hasta el elemento antes de actuar. Si una pantalla es de trabajo en el almacén, se revisa a
+393 px y, si el campo importa, el E2E mide que quede dentro del ancho.
 
 **Quién puede qué se decide en una sola tabla: `PERMISOS`, en el contrato (T5-13).** Una ruta
 nueva se protege con `permitir("<MÉTODO> <ruta>")` y lleva su fila; un botón nuevo se enseña con

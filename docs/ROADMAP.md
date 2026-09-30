@@ -5,7 +5,11 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-09-29 — **122 / 129**
+> ## Estado al 2026-09-29 — **123 / 129**
+>
+> **2026-09-29: se cierra T5-07**, conteo físico: sesiones por categoría, captura a ciegas, revisión
+> y cierre que convierte cada diferencia en un ajuste, todo en una transacción. Se compara con el
+> stock **del momento de contar cada línea**, así que lo vendido mientras se cuenta no es merma.
 >
 > **2026-09-29: se cierra T5-13**, rol de almacén: `WAREHOUSE` recibe compras, envía ventas y mueve
 > stock, sin tocar precios, catálogo, usuarios ni configuración. La matriz rol × ruta vive una sola
@@ -48,7 +52,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 > y el dashboard en **337 ms de p(95)** donde estaba en 1.91 s. Detalle en
 > [rendimiento.md](rendimiento.md).
 >
-> Backend **827/827** tests y 95.93 % de sentencias; frontend **621/621** y 1 omitido (2026-09-29).
+> Backend **866/866** tests y 96.13 % de sentencias; frontend **629/629** y 1 omitido (2026-09-29).
 > Detalle, y el E2E, en [Métricas](#métricas).
 >
 > **Los contadores de este documento se cuentan, no se recuerdan.** El 2026-08-12 la cabecera decía
@@ -1793,7 +1797,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 ### Almacén
 
-- [ ] **[T5-07] Conteo físico de inventario**
+- [x] **[T5-07] Conteo físico de inventario** ✅ *(2026-09-29)*
   - **Área:** Negocio
   - **Ubicación:** `prisma/schema.prisma` (modelos nuevos `InventoryCount`, `InventoryCountLine`), `src/modules/inventory-counts/` (nuevo), `Stockly-F/src/modules/inventory-counts/` (nuevo)
   - **Qué hacer:** hoy la única forma de cuadrar el sistema con la estantería es un movimiento manual producto a producto, sin rastro de que fue un recuento. Una sesión de conteo (`OPEN → CLOSED` o `CANCELLED`) filtrable por categoría, donde se captura la cantidad contada de cada producto; al cerrarla, cada diferencia genera un movimiento `ADJUSTMENT` con la nota del conteo, en **una sola transacción**. Informe de la sesión: diferencias en unidades y, con T5-01, en valor a coste.
@@ -1801,6 +1805,20 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** contar 8 donde el sistema espera 10 genera un `ADJUSTMENT` de −2 al cerrar, y ninguno antes; una sesión cancelada no mueve nada; la auditoría registra el cierre con el número de ajustes.
   - **Esfuerzo:** alto
   - **Depende de:** —
+  - **Decisiones tomadas con el dueño del producto (2026-09-29):**
+    - **Se compara con el stock del momento de contar cada línea.** Al anotar, la línea guarda el stock que esperaba el sistema **en ese instante**; al cerrar se aplica `contado − esperado` sobre el stock de ese momento. Una venta o una recepción entre contar y cerrar no se lee como merma ni como sobrante, y el almacén no tiene que parar. Volver a contar sobrescribe cifra y esperado.
+    - **Conteo a ciegas.** La pantalla de captura no enseña el stock del sistema: poner ese número delante hace que el conteo tienda a darle la razón. La diferencia aparece en «Revisar». Es una decisión de interfaz, no una barrera: el stock se ve en el catálogo.
+    - **El almacén hace el ciclo entero** —abrir, contar, cerrar y cancelar—, igual que ADMIN; `USER` consulta. Coherente con T5-13: el almacén ya ajusta stock en bloque, y cancelar un conteo no mueve nada.
+    - **Lo que nadie cuenta se ignora y se informa**: sin ajuste, y el cierre avisa de cuántos quedan antes de confirmar.
+  - **Además, decidido al diseñar:** una sesión abarca los productos **activos** de una categoría o de todo el catálogo; **un producto no puede estar en dos sesiones abiertas** (409 `PRODUCTS_IN_OPEN_COUNT`: el segundo cierre ajustaría otra vez lo que corrigió el primero). Si un ajuste dejara un producto **en negativo** —se contaron 8 de 10 y luego salieron 9—, el cierre se rechaza entero (409 `COUNT_ADJUSTMENT_NEGATIVE`) y ese producto se vuelve a contar. El cierre guarda en cada línea **lo aplicado y el coste medio de ese momento**, para que el informe de una sesión cerrada no cambie cuando cambie el coste.
+  - **Diseño:** `inventory_counts` y `inventory_count_lines` (esperado, contado, quién y cuándo, ajuste aplicado y coste). Siete rutas bajo `/inventory-counts`, las siete en `PERMISOS` (T5-13), así que la matriz de permisos las recorre sola. Las líneas de una sesión de todo el catálogo se insertan con una sentencia, sin pasar por Node. La sesión se bloquea con `FOR UPDATE` al anotar, cerrar y cancelar, y los productos en orden de id al cerrar. La auditoría registra la apertura (`CREATE`, con las líneas), el cierre (`COUNT_CLOSE`, con `{ ajustes, sinContar }`) y la cancelación (`COUNT_CANCEL`).
+  - **Verificado localmente (2026-09-29):** `verify` backend **866/866** (15 nuevos en `conteo-fisico.test.ts`, 21 más en la matriz de permisos, dos de contrato y uno de cobertura de Swagger), sentencias **96.13 %**, `smoke` y `auditoria` en verde; `verify` frontend **629 + 1 omitido** (8 nuevos en `Conteo.test.tsx`), sentencias **75.16 %**; **E2E 19/19 + 1 omitido** en escritorio y móvil, con un escenario nuevo.
+  - **El criterio, con su test:** contar 8 donde se esperan 10 no deja ningún movimiento ni cambia el stock; cerrar genera **un `ADJUSTMENT` de −2** con la nota «Conteo #…» y deja 8. Una sesión cancelada no mueve nada y ya no admite cifras ni cierre. La auditoría registra el cierre con `{ ajustes: 2, sinContar: 1 }` en una sesión con dos diferencias, una línea que cuadra y una sin contar. Además: una venta entre contar y cerrar no es merma (10 → contados 8 → salen 3 → cierra en 5); recontar con mercancía nueva usa el esperado nuevo; el negativo no cierra nada; el solape entre sesiones abiertas; el valor a coste, fijo tras cerrar aunque el coste cambie; y un cierre que llega mientras otro está en curso no ajusta dos veces. En el E2E, la cuenta de almacén abre un conteo de una categoría, anota a ciegas, revisa el −2 y cierra: el stock queda en 8 con un único ajuste.
+  - **Falsificado:** comparar con el stock al cerrar en vez del esperado tumba **2** tests; quitar la comprobación de solape, **1**; quitar el `FOR UPDATE` de la sesión, **1** («Expected: 400, Received: 200»). En el frontend, enseñar el esperado en la captura tumba el de «a ciegas», y reenviar lo que no cambió, el de guardar. **Dos tests pasaban sin probar nada y se rehicieron:** el de dos cierres a la vez con un `Promise.all` —no llega a solaparse en la base; ahora la carrera se fuerza como en T5-04— y el de «no reenvía lo que no cambió», porque cambiar un campo a su propio valor no dispara `onChange`.
+  - **Lo que enseñó el navegador:** con la tabla compartida (`min-w-160`, 640 px), **el campo de lo contado quedaba fuera de la pantalla del móvil**, detrás de un desplazamiento horizontal sin barra. El E2E en `Mobile Chrome` pasaba igual, porque Playwright desplaza hasta el campo antes de escribir. Las dos tablas del conteo caben ahora a 393 px —el SKU, el esperado y el contado van bajo el nombre hasta `sm`— y el E2E comprueba que el campo termina dentro del ancho de la pantalla: con la tabla anterior, «Expected: <= 393, Received: 641».
+  - **El seed** deja un conteo **abierto** de la categoría con más productos, con una línea que cuadra y otra a la que le falta una unidad. Abierto a propósito: cerrado generaría un ajuste y el seed es un libro mayor que cierra en el stock del catálogo.
+  - **De paso:** `swagger-cobertura.test.ts` recorre ahora `MONTAJES` en vez de su propia lista de módulos, que se habría quedado sin el nuevo.
+  - **Fuera de alcance:** sin exportación CSV ni PDF de la sesión; la selección por clase ABC (T5-10 dice qué contar más a menudo) no es un filtro de apertura; el escaneo por código de barras llegará con T5-08; las notas de los movimientos las escribe el servidor en español, como las de compras y ventas.
 
 - [ ] **[T5-08] Código de barras: búsqueda, escaneo y etiquetas**
   - **Área:** Negocio / UI
@@ -2046,6 +2064,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-09-29 | **T5-07** Conteo físico de inventario — **completada** | **El criterio con tests:** contar 8 donde se esperan 10 no mueve nada hasta cerrar, y cerrar genera un `ADJUSTMENT` de −2; cancelar no mueve nada; la auditoría registra el cierre con `{ ajustes, sinContar }`. Una venta entre contar y cerrar no se lee como merma. `verify` ✅ backend **866/866** (96.13 %) y frontend **629 + 1 omitido** (75.16 %); **E2E 19/19 + 1 omitido**, con el almacén haciendo el ciclo entero por la interfaz | **Decisiones:** esperado **al contar cada línea**, conteo **a ciegas**, el almacén hace el ciclo entero, lo no contado se ignora y se informa. Un producto no puede estar en dos sesiones abiertas; un cierre que dejaría un negativo no se aplica. **El navegador destapó** que el campo de lo contado quedaba fuera de la pantalla del móvil con la tabla compartida de 640 px, y que el E2E no lo veía porque Playwright desplaza antes de escribir; ahora lo mide. **Dos tests no probaban nada** —una carrera con `Promise.all` y un cambio de campo a su propio valor— y se rehicieron hasta caer al falsificar. |
 | 2026-09-29 | **T5-13** Rol de almacén — **completada** | **El criterio con tests:** `permisos.test.ts` recorre las **61 rutas** montadas fuera de `/auth` con cada uno de los tres roles (183 casos) y exige 403 exactamente donde dice su fila; una ruta sin fila, una fila sin ruta o una ruta protegida con la fila de otra **rompen la suite**. Un `WAREHOUSE` recibe una compra y recibe **403 `FORBIDDEN`** al cambiar un precio, por API y en el E2E, donde además la interfaz no le ofrece «Editar». `verify` ✅ backend **827/827** (95.93 %) y frontend **621 + 1 omitido** (74.83 %); **E2E 17/17 + 1 omitido** | **Primero la matriz**, escrita en la ficha y decidida con el dueño del producto: el almacén recibe, envía, registra movimientos y ajusta en bloque; no crea, edita, cancela ni borra, y no ve usuarios, configuración, auditoría ni exportaciones de órdenes. **Rutas dedicadas** en vez de campos por rol: `POST /sale-orders/:id/ship` nueva; el `PATCH` sigue de ADMIN. **La matriz es una sola, `PERMISOS` en el contrato**: `permitir()` en el backend y `usePuede()` en el frontend leen la misma tabla. `requireRole` tipado con el enum, y el 403 con código. **Destapó** que los botones de exportar órdenes salían a todos los roles y devolvían 403, que el usuario de sesión del frontend tenía `role: string`, y que la ruta de cambiar rol validaba contra una lista escrita a mano donde `WAREHOUSE` no habría cabido. |
 | 2026-09-29 | *Mantenimiento, sin ficha:* **todas las descargas de la API por axios** | El E2E de la descarga del CSV de T5-09 fallaba en un equipo con `VITE_API_URL` absoluto. **Reproducido y falsificado:** con la descarga antigua y la API en otro origen, el escenario agota los 30 s esperando la descarga en los dos proyectos; con la nueva pasa. `verify` frontend ✅ **611 + 1 omitido** (3 nuevos en `descargar.test.ts`, que caen uno cada uno al quitar la lectura del error o la excepción del 401), sentencias **74.52 %**; **E2E 15/15 + 1 omitido** con `/api/v1` y también con `http://localhost:3000/api/v1`, logins incluidos | Cuatro descargas —PDF del resumen, informe por periodo, CSV de compras y de ventas— seguían con un `<a href>` a la API, el patrón que T2-34 ya había retirado del histórico de movimientos: entre orígenes el navegador ignora `download`, y la petición no pasa por el interceptor (con la sesión caducada se guardaba el JSON del 401). Ahora las cinco van por `descargarDeLaApi` (`shared/api/descargar.ts`): `blob` con los bytes del servidor —la marca de orden de bytes la pone el backend— y, si falla, aviso con el mensaje traducido de su código (un 413 dice cuántas filas y el máximo). Antes un 413 del histórico de movimientos era un rechazo sin capturar y no se veía nada. |
 | 2026-09-29 | **T5-10** Clasificación ABC de productos — **completada** | **El criterio con tests:** 50/30/15/4/1 da A, A, B, C, C, con el producto que cae justo en el 80 % en A; los empates comparten clase y los productos sin ventas son C y salen en su filtro. `verify` ✅ backend **634/634** (94.87 %) y frontend **608 + 1 omitido**; E2E **13/16** —falla la descarga del CSV de T5-09 por el `VITE_API_URL` absoluto del `.env` local, ajena a esta tarea— | Doce meses naturales completos, en la zona del negocio. Caché `product_abc` que se rehace sola una vez al día **sin hacer esperar al catálogo**. **La medición cambió el SQL:** con `EXCLUDE GROUP` la clasificación no terminaba en cinco minutos sobre 100 000 productos; con `RANGE … 1 PRECEDING` sobre céntimos, 2.3 s. |
@@ -2174,16 +2193,16 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
 | **Tier 4** | **17** | **17** | **100 %** ✅ |
-| **Tier 5** | 8 | 15 | 53 % |
-| **Total** | **122** | **129** | **95 %** |
+| **Tier 5** | 9 | 15 | 60 % |
+| **Total** | **123** | **129** | **95 %** |
 
 *El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que ese 100 % es sobre 114, no sobre las 100 originales. **Y una de las 114 está descartada, no hecha** (T4-17).*
 
 ***Esta tabla se ha quedado atrás dos veces, y las dos por lo mismo:** se cierra una tarea, se marca la casilla y se actualiza la cabecera, y el resumen —que está 1 800 líneas más abajo— no se toca. La primera vez decía 102/109 con las casillas en 104/110 (cierres de T4-05 y T4-06, alta de T4-13); la segunda, 107/114 con las casillas en **112/114**, porque no llegaron aquí los cinco cierres del 2026-08-11 y 12 —T4-12, T4-13, T4-14, T4-10 y T4-17—. **Se cuentan las casillas, no se recuerdan**, y contarlas es un comando:*
 
 ```bash
-grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 122
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 7 (el Tier 5, abierto el 2026-09-13)
+grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 123
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 6 (el Tier 5, abierto el 2026-09-13)
 ```
 
 *Al cerrar una tarea hay que tocar **la casilla, la cabecera, el índice, esta tabla y la de [CONTEXTO §3](CONTEXTO.md)**. Si los cinco números no coinciden, manda el `grep`.*
@@ -2196,10 +2215,10 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 7 (el Tier 5, abierto el 2026-09
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **827/827** ✅ *(2026-09-29, T5-13)* | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **95.93 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **621/621** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-29, T5-13)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **74.83 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests backend | 198/198 ✅ | **866/866** ✅ *(2026-09-29, T5-07)* | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **96.13 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **629/629** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-29, T5-07)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **75.16 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
@@ -2211,7 +2230,7 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 7 (el Tier 5, abierto el 2026-09
 | Interacciones para alcanzar una sección a ≥1024 px | 2 *(nueve de los doce módulos vivían dentro de un desplegable)* | **1** ✅ *(los doce a un clic; ni un botón en el lateral, T4-10)* | 1 |
 | Recorridos de navegación que mantener a la vez | 2 *(el de la barra y el del panel de móvil, con órdenes distintos)* | **1** ✅ *(un array, dos envoltorios; lo vigila un test, T4-10)* | 1 |
 | Listados de la API sin paginar | 1 *(órdenes de compra)* | **0** ✅ | 0 |
-| E2E (Playwright) | 2 escenarios, arranque manual | **9 escenarios en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 17 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome`, también en la CI ✅ *(2026-09-29, T5-13)* | escenarios que crucen la frontera |
+| E2E (Playwright) | 2 escenarios, arranque manual | **10 escenarios en 2 proyectos, `pnpm test:e2e:full` sin pasos previos** — 19 pasados y 1 omitido, en verde en `chromium` **y** `Mobile Chrome`, también en la CI ✅ *(2026-09-29, T5-07)* | escenarios que crucen la frontera |
 | Flujos de venta alcanzables desde la interfaz | cancelar una orden **enviada**, no | **sí** ✅ *(T2-42)* | ninguna corrección del backend inalcanzable desde la UI |
 | Variables de entorno obligatorias | 12 | **4** ✅ | solo las imprescindibles |
 | Tiempo hasta enterarse de un pico de 5xx | *nunca: lo reportaba un usuario* | **inmediato** ✅ *(alerta en proceso al 5.º error; ~8 min y medio la de Prometheus, medido con `promtool`, T4-06)* | antes que el usuario |

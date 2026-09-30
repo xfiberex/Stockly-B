@@ -60,6 +60,7 @@ Stockly-B/
     │   ├── products/           # CRUD de productos, movimientos de stock, exportación CSV
     │   ├── purchase-orders/    # Órdenes de compra, recepción parcial y sugerencias de reposición
     │   ├── sale-orders/        # Órdenes de venta (PENDING → SHIPPED / CANCELLED)
+    │   ├── inventory-counts/   # Conteo físico: sesiones, captura, cierre con ajustes (T5-07)
     │   ├── tags/               # Etiquetas de productos (many-to-many)
     │   ├── users/              # Panel admin: listar, cambiar rol, activar/desactivar
     │   ├── settings/           # Configuración de la app (key-value, catálogo tipado)
@@ -95,6 +96,7 @@ Stockly-B/
 | `SaleOrder` | Orden de venta con ítems, estado y fecha de envío (`shippedAt`) |
 | `SaleOrderItem` | Ítem de una orden de venta, con el coste congelado al enviarse (`unitCost`) |
 | `AppSetting` | Configuración clave-valor de la aplicación |
+| `InventoryCount` / `InventoryCountLine` | Conteo físico (T5-07): la sesión y, por producto, lo contado, lo que esperaba el sistema al contarlo y lo que se ajustó al cerrar |
 | `AuditLog` | Registro de auditoría de acciones del sistema |
 
 ---
@@ -352,6 +354,20 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 
 > Al cambiar el estado a `SHIPPED`, el backend descuenta el stock de cada ítem y dispara alertas de bajo stock si corresponde.
 
+### Conteos físicos — `/api/v1/inventory-counts` (T5-07)
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Listar sesiones con sus cifras (paginado, `?status=`) | USER+ |
+| `POST` | `/` | Abrir: una línea por producto activo de `categoryId` o del catálogo | ADMIN, WAREHOUSE |
+| `GET` | `/:id` | Una sesión: contados, diferencias en unidades y valor a coste | USER+ |
+| `GET` | `/:id/lines` | Líneas paginadas (`?filter=pending\|counted\|difference`, `?search=`) | USER+ |
+| `PATCH` | `/:id/lines` | Anotar lo contado; guarda también el stock esperado **en ese momento** | ADMIN, WAREHOUSE |
+| `POST` | `/:id/close` | Cerrar: un `ADJUSTMENT` de `contado − esperado` por diferencia, en una transacción | ADMIN, WAREHOUSE |
+| `POST` | `/:id/cancel` | Cancelar sin mover nada | ADMIN, WAREHOUSE |
+
+> Un producto no puede estar en dos conteos abiertos, y un cierre que dejaría un producto en negativo no se aplica: hay que volver a contarlo.
+
 ### Órdenes de compra — `/api/v1/purchase-orders`
 
 | Método | Ruta | Descripción | Rol |
@@ -459,6 +475,7 @@ El seed crea:
 - **Órdenes de venta** pendientes, enviadas y canceladas, con el coste congelado en las enviadas
 - **Coste medio** calculado de las compras recibidas, y **plazo de entrega** en los proveedores (uno sin plazo, a propósito)
 - **Historial de precios** para algunos productos
+- **Un conteo físico abierto**, con una línea que cuadra y otra a la que le falta una unidad
 
 | Rol | Email | Contraseña |
 |---|---|---|

@@ -19,6 +19,13 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Conteo físico de inventario** (`T5-07`). Nueva sección **Conteos físicos**: se abre un conteo
+  de una categoría o de todo el catálogo, se anota lo que hay en la estantería **sin ver lo que
+  espera el sistema**, se revisan las diferencias en unidades y en valor a coste, y al cerrarlo cada
+  diferencia se convierte en un ajuste de stock, todos a la vez. Lo vendido o recibido mientras se
+  cuenta no se confunde con merma: cada producto se compara con el stock del momento en que se
+  contó. Un conteo cancelado no mueve nada. Lo hace el rol de almacén o un ADMIN.
+
 - **Rol de almacén** (`T5-13`). Un tercer rol, **Almacén** (`WAREHOUSE`), para quien recibe
   mercancía y prepara envíos: recibe órdenes de compra, envía órdenes de venta, registra
   movimientos y ajusta stock en bloque, pero no crea ni edita productos, órdenes ni catálogo, no

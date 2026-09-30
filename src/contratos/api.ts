@@ -110,6 +110,14 @@ export const PERMISOS = {
     "POST /sale-orders/:id/ship": ALMACEN,
     "PATCH /sale-orders/:id": SOLO_ADMIN,
     "DELETE /sale-orders/:id": SOLO_ADMIN,
+    // Conteos físicos (T5-07): el almacén hace el ciclo entero; los demás lo consultan.
+    "GET /inventory-counts": TODOS,
+    "POST /inventory-counts": ALMACEN,
+    "GET /inventory-counts/:id": TODOS,
+    "GET /inventory-counts/:id/lines": TODOS,
+    "PATCH /inventory-counts/:id/lines": ALMACEN,
+    "POST /inventory-counts/:id/close": ALMACEN,
+    "POST /inventory-counts/:id/cancel": ALMACEN,
     // Informes
     "GET /reports": TODOS,
     "GET /reports/period": TODOS,
@@ -153,10 +161,12 @@ export const accionAuditoriaSchema = z.enum([
     "CREATE", "UPDATE", "DELETE", "RESTORE", "STOCK_MOVEMENT", "BULK_STOCK",
     "ORDER_RECEIVE", "ORDER_CANCEL", "USER_ROLE_CHANGE", "USER_ACTIVATE",
     "USER_DEACTIVATE", "SALE_SHIP", "SALE_CANCEL", "REFRESH_REUSE",
+    "COUNT_CLOSE", "COUNT_CANCEL",
 ]);
 
 export const entidadAuditoriaSchema = z.enum([
     "Product", "PurchaseOrder", "SaleOrder", "User", "Tag", "Category", "Brand", "Supplier",
+    "InventoryCount",
 ]);
 
 // ─────────────────────── Primitivas del cable ───────────────────────
@@ -231,6 +241,10 @@ export const CODIGOS_DE_ERROR = [
     "CANNOT_DELETE_SHIPPED_ORDER",
     "CANNOT_MODIFY_CANCELLED_ORDER",
     "CANNOT_REOPEN_RECEIVED_ORDER",
+    // T5-07 — la sesión ya está cerrada o cancelada.
+    "COUNT_NOT_OPEN",
+    // T5-07 — el filtro de la sesión no alcanza a ningún producto activo.
+    "COUNT_WITHOUT_PRODUCTS",
     "INACTIVE_PRODUCT_MOVEMENT",
     "INSUFFICIENT_STOCK",
     "INVALID_FILTER_VALUE",
@@ -238,6 +252,7 @@ export const CODIGOS_DE_ERROR = [
     "ORDER_ALREADY_SHIPPED",
     "ORDER_NOT_RECEIVABLE",
     "PRODUCT_ALREADY_ACTIVE",
+    "PRODUCT_NOT_IN_COUNT",
     "PRODUCT_WITHOUT_SUPPLIER",
     "RECEIPT_EXCEEDS_PENDING",
     "STOCK_CANNOT_BE_NEGATIVE",
@@ -253,6 +268,7 @@ export const CODIGOS_DE_ERROR = [
     // 404
     "BRAND_NOT_FOUND",
     "CATEGORY_NOT_FOUND",
+    "INVENTORY_COUNT_NOT_FOUND",
     "PRODUCT_NOT_FOUND",
     "PURCHASE_ORDER_ITEM_NOT_FOUND",
     "PURCHASE_ORDER_NOT_FOUND",
@@ -270,6 +286,9 @@ export const CODIGOS_DE_ERROR = [
     "TAG_NAME_EXISTS",
     // 409 — el estado del inventario no admite la petición
     "INSUFFICIENT_AVAILABLE_STOCK",
+    // T5-07 — cerrar dejaría un producto en negativo, o un producto ya está en otro conteo abierto.
+    "COUNT_ADJUSTMENT_NEGATIVE",
+    "PRODUCTS_IN_OPEN_COUNT",
     // 413 / 422 — el cuerpo o el archivo
     "EXPORT_TOO_LARGE",
     "INVALID_IMAGE_FILE",
@@ -600,6 +619,67 @@ export const sugerenciasReposicionSchema = z.object({
     defaultLeadTimeDays: z.number(),
 });
 
+// ─────────────────────── Conteos físicos (T5-07) ───────────────────────
+
+export const estadoConteoSchema = z.enum(["OPEN", "CLOSED", "CANCELLED"]);
+
+/** El filtro de líneas de un conteo: por contar, contadas, o contadas con diferencia. */
+export const filtroLineasConteoSchema = z.enum(["pending", "counted", "difference"]);
+
+/**
+ * Las cifras de una sesión. Las diferencias se valoran al coste medio (T5-01): el de **cada
+ * línea al cerrar** en una sesión cerrada, el actual en una abierta. Las líneas de productos sin
+ * coste no entran en el valor, y `linesWithoutCost` dice cuántas son.
+ */
+export const resumenConteoSchema = z.object({
+    lines: z.number(),
+    counted: z.number(),
+    uncounted: z.number(),
+    withDifference: z.number(),
+    unitsOver: z.number(),
+    unitsShort: z.number(),
+    valueOver: z.number(),
+    valueShort: z.number(),
+    linesWithoutCost: z.number(),
+});
+
+export const conteoSchema = z.object({
+    id: z.string(),
+    status: estadoConteoSchema,
+    note: z.string().nullable(),
+    category: z.object({ id: z.string(), name: z.string() }).nullable(),
+    createdByEmail: z.string().nullable(),
+    closedByEmail: z.string().nullable(),
+    createdAt: fechaSchema,
+    closedAt: fechaSchema.nullable(),
+    summary: resumenConteoSchema,
+});
+
+/**
+ * Una línea. `expectedQuantity` y `difference` solo existen **después** de contarla: la pantalla
+ * de captura no los enseña (conteo a ciegas) y la de revisión sí. No es una barrera de
+ * seguridad —el stock se ve en el catálogo—, es no poner el número delante de quien cuenta.
+ */
+export const lineaConteoSchema = z.object({
+    id: z.string(),
+    productId: z.string(),
+    name: z.string(),
+    sku: z.string().nullable(),
+    category: z.string().nullable(),
+    countedQuantity: z.number().nullable(),
+    expectedQuantity: z.number().nullable(),
+    difference: z.number().nullable(),
+    countedAt: fechaSchema.nullable(),
+    countedByEmail: z.string().nullable(),
+    adjustment: z.number().nullable(),
+    unitCost: z.number().nullable(),
+});
+
+export const lineasConteoSchema = z.object({
+    data: z.array(lineaConteoSchema),
+    meta: metaPaginacionSchema,
+});
+
 // ─────────────────────── Usuarios y sesión ───────────────────────
 
 /** `USER_SELECT` de `users.service.ts`. La contraseña y los tokens nunca salen de aquí. */
@@ -884,6 +964,12 @@ export type OrdenCompra = z.infer<typeof ordenCompraSchema>;
 export type OrigenPrecioSugerido = z.infer<typeof origenPrecioSugeridoSchema>;
 export type SugerenciaReposicion = z.infer<typeof sugerenciaReposicionSchema>;
 export type SugerenciasReposicion = z.infer<typeof sugerenciasReposicionSchema>;
+export type EstadoConteo = z.infer<typeof estadoConteoSchema>;
+export type FiltroLineasConteo = z.infer<typeof filtroLineasConteoSchema>;
+export type ResumenConteo = z.infer<typeof resumenConteoSchema>;
+export type Conteo = z.infer<typeof conteoSchema>;
+export type LineaConteo = z.infer<typeof lineaConteoSchema>;
+export type LineasConteo = z.infer<typeof lineasConteoSchema>;
 
 export type Usuario = z.infer<typeof usuarioSchema>;
 export type Perfil = z.infer<typeof perfilSchema>;

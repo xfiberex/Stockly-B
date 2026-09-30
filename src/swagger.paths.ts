@@ -383,6 +383,74 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
     },
 
+    // ── Conteos físicos (T5-07) ──────────────────────────────────────────────
+    "/inventory-counts": {
+        get: {
+            tags: ["Inventory Counts"], summary: "Listar sesiones de conteo, con sus cifras",
+            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED", "CANCELLED"] } }],
+            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/InventoryCount"), "Listado paginado") },
+        },
+        post: {
+            tags: ["Inventory Counts"], summary: "Abrir un conteo (ADMIN o WAREHOUSE)",
+            description: "Crea una línea sin contar por cada producto **activo** del filtro (`categoryId`, o todo el catálogo). Un producto no puede estar en dos conteos abiertos.",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/InventoryCountCreate" } } } },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Abierto"),
+                "400": ERROR("Ningún producto activo con ese filtro"), "404": ERROR("Categoría no encontrada"),
+                "409": ERROR("Algún producto ya está en otro conteo abierto"),
+            },
+        },
+    },
+    "/inventory-counts/{id}": {
+        get: {
+            tags: ["Inventory Counts"], summary: "Una sesión y sus cifras", parameters: [PARAM_ID],
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Encontrada"), "404": ERROR("No encontrada") },
+        },
+    },
+    "/inventory-counts/{id}/lines": {
+        get: {
+            tags: ["Inventory Counts"], summary: "Líneas de una sesión, paginadas",
+            description: "`expectedQuantity` y `difference` solo existen en las líneas ya contadas: la pantalla de captura no las enseña (conteo a ciegas).",
+            parameters: [
+                PARAM_ID, ...PARAMS_PAGINA,
+                { name: "filter", in: "query", schema: { type: "string", enum: ["pending", "counted", "difference"] } },
+                { name: "search", in: "query", schema: { type: "string" }, description: "Nombre o SKU" },
+            ],
+            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/InventoryCountLine"), "Listado paginado"), "404": ERROR("No encontrada") },
+        },
+        patch: {
+            tags: ["Inventory Counts"], summary: "Anotar lo contado (ADMIN o WAREHOUSE)",
+            description: "Guarda la cantidad contada y, **en ese momento**, el stock que esperaba el sistema: es contra lo que se comparará al cerrar. Volver a contar sobrescribe los dos.",
+            parameters: [PARAM_ID],
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/InventoryCountLinesRequest" } } } },
+            responses: {
+                "200": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/InventoryCountLine" } }, "Anotadas"),
+                "400": ERROR("Sesión cerrada, o un producto que no está en ella"), "404": ERROR("No encontrada"),
+            },
+        },
+    },
+    "/inventory-counts/{id}/close": {
+        post: {
+            tags: ["Inventory Counts"], summary: "Cerrar: aplicar las diferencias (ADMIN o WAREHOUSE)",
+            description: "Cada línea contada con diferencia genera un movimiento `ADJUSTMENT` de `contado − esperado` sobre el stock actual, todos en una transacción. Las no contadas no se tocan. Si algún ajuste dejara un producto en negativo, no se cierra nada.",
+            parameters: [PARAM_ID],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Cerrada"),
+                "400": ERROR("Ya cerrada o cancelada"), "404": ERROR("No encontrada"),
+                "409": ERROR("Algún ajuste dejaría un producto en negativo"),
+            },
+        },
+    },
+    "/inventory-counts/{id}/cancel": {
+        post: {
+            tags: ["Inventory Counts"], summary: "Cancelar sin mover nada (ADMIN o WAREHOUSE)", parameters: [PARAM_ID],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Cancelada"),
+                "400": ERROR("Ya cerrada o cancelada"), "404": ERROR("No encontrada"),
+            },
+        },
+    },
+
     // ── Reportes ─────────────────────────────────────────────────────────────
     "/reports": {
         get: {

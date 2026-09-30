@@ -95,6 +95,9 @@ enum AuditAction {
   SALE_SHIP
   SALE_CANCEL
   REFRESH_REUSE
+  // T5-07
+  COUNT_CLOSE
+  COUNT_CANCEL
 }
 
 enum AuditEntity {
@@ -106,15 +109,17 @@ enum AuditEntity {
   Category
   Brand
   Supplier
+  InventoryCount
 }
 
 model Category {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  products    Product[]
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  products        Product[]
+  inventoryCounts InventoryCount[]
 
   @@map("categories")
 }
@@ -148,34 +153,35 @@ model Supplier {
 }
 
 model Product {
-  id            String     @id @default(uuid())
+  id            String               @id @default(uuid())
   name          String
   description   String?
-  sku           String?    @unique
-  price         Decimal    @db.Decimal(10, 2)
+  sku           String?              @unique
+  price         Decimal              @db.Decimal(10, 2)
   // T5-01 — coste medio ponderado. `null` es **desconocido**, no cero: un producto que nunca
   // se ha comprado ni se ha costeado a mano no vale nada a coste, simplemente no se sabe.
   // Cuatro decimales y no dos, como `price`: una media se recalcula en cada recepción y
   // redondear cada vez a céntimos acumula el error compra tras compra.
-  costPrice     Decimal?   @db.Decimal(12, 4)
-  stock         Int        @default(0)
-  minStock      Int        @default(0)
+  costPrice     Decimal?             @db.Decimal(12, 4)
+  stock         Int                  @default(0)
+  minStock      Int                  @default(0)
   categoryId    String?
-  category      Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category      Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   brandId       String?
-  brand         Brand?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brand         Brand?               @relation(fields: [brandId], references: [id], onDelete: SetNull)
   supplierId    String?
-  supplier      Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplier      Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   imageUrl      String?
   imagePublicId String?
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
   movements     StockMovement[]
   priceHistory  PriceHistory[]
   costHistory   CostHistory[]
   purchaseItems PurchaseOrderItem[]
   saleItems     SaleOrderItem[]
+  countLines    InventoryCountLine[]
   tags          Tag[]
   abc           ProductAbc?
 
@@ -258,14 +264,14 @@ model CostHistory {
 }
 
 model PurchaseOrder {
-  id         String              @id @default(uuid())
-  supplierId String?
-  supplier   Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  status     PurchaseOrderStatus @default(PENDING)
-  notes      String?
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-  items      PurchaseOrderItem[]
+  id          String              @id @default(uuid())
+  supplierId  String?
+  supplier    Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  status      PurchaseOrderStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  items       PurchaseOrderItem[]
   costChanges CostHistory[]
 
   @@index([status, createdAt])
@@ -273,20 +279,20 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id              String        @id @default(uuid())
-  purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  productId       String?
-  product         Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productName     String
-  quantity        Int
+  id               String          @id @default(uuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId        String?
+  product          Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName      String
+  quantity         Int
   // T5-04 — lo que ha entrado de esta línea, entre todas sus recepciones. Nunca pasa de
   // `quantity`. Es lo que retira una cancelación (T0-04): retirar `quantity` de una orden
   // recibida a medias sacaría del inventario unidades que nunca entraron.
-  receivedQuantity Int          @default(0)
-  unitPrice       Decimal       @db.Decimal(10, 2)
-  createdAt       DateTime      @default(now())
-  receipts        StockMovement[]
+  receivedQuantity Int             @default(0)
+  unitPrice        Decimal         @db.Decimal(10, 2)
+  createdAt        DateTime        @default(now())
+  receipts         StockMovement[]
 
   @@index([purchaseOrderId])
   @@index([productId])
@@ -294,14 +300,14 @@ model PurchaseOrderItem {
 }
 
 model StockMovement {
-  id         String            @id @default(uuid())
-  productId  String
-  product    Product           @relation(fields: [productId], references: [id])
-  type       StockMovementType
-  delta      Int               // positivo = entrada, negativo = salida
-  stockAfter Int               // stock resultante tras el movimiento
-  note       String?
-  createdAt  DateTime          @default(now())
+  id                  String             @id @default(uuid())
+  productId           String
+  product             Product            @relation(fields: [productId], references: [id])
+  type                StockMovementType
+  delta               Int // positivo = entrada, negativo = salida
+  stockAfter          Int // stock resultante tras el movimiento
+  note                String?
+  createdAt           DateTime           @default(now())
   // T5-09 — la línea de compra que recibió esta entrada. Es lo que fecha cada recepción, también
   // las parciales: la orden solo sabe cuánto lleva recibido, no cuándo llegó cada parte. `null`
   // en todo lo demás (ventas, ajustes, importaciones y la salida que deshace una cancelación).
@@ -319,28 +325,28 @@ model StockMovement {
 }
 
 model User {
-  id             String    @id @default(uuid())
-  name           String
-  email          String    @unique
-  password       String
-  role           Role      @default(USER)
+  id                   String    @id @default(uuid())
+  name                 String
+  email                String    @unique
+  password             String
+  role                 Role      @default(USER)
   // Por defecto español: es el idioma de referencia del catálogo, y una cuenta creada por
   // seed o por migración no tiene ningún navegador detrás del que deducirlo (T4-12).
-  idioma         Idioma    @default(ES)
-  isActive       Boolean   @default(true)
-  isVerified     Boolean   @default(false)
-  verifyToken    String?   @unique
-  verifyExpires  DateTime?
-  resetToken     String?   @unique
-  resetExpires   DateTime?
-  refreshToken   String?   @unique
-  refreshExpires DateTime?
+  idioma               Idioma    @default(ES)
+  isActive             Boolean   @default(true)
+  isVerified           Boolean   @default(false)
+  verifyToken          String?   @unique
+  verifyExpires        DateTime?
+  resetToken           String?   @unique
+  resetExpires         DateTime?
+  refreshToken         String?   @unique
+  refreshExpires       DateTime?
   // T2-31 — el hash del refresh token **anterior**, el que acaba de rotarse. Si llega uno
   // que ya no está en `refreshToken` pero sí aquí, alguien está reutilizando un token ya
   // gastado: la sesión se cierra entera y queda constancia en la auditoría.
-  previousRefreshToken String? @unique
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  previousRefreshToken String?   @unique
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   // El buscador de usuarios mira **nombre y correo** con el mismo `ILIKE '%…%'`, así que
   // se indexan los dos: con uno solo, la mitad del `OR` seguiría recorriendo la tabla y
@@ -359,14 +365,14 @@ model AppSetting {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   userId    String?
   userEmail String?
   action    AuditAction
   entity    AuditEntity
   entityId  String?
   details   Json?
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
 
   @@index([createdAt])
   @@index([entity, action])
@@ -424,4 +430,59 @@ model SaleOrderItem {
   @@index([saleOrderId])
   @@index([productId])
   @@map("sale_order_items")
+}
+
+// ─── T5-07 — Conteo físico de inventario ───────────────────────────────────────
+//
+// Una sesión recoge lo que hay en la estantería y, al cerrarla, convierte cada diferencia en un
+// movimiento `ADJUSTMENT`, todo en una transacción. Lo delicado es **contra qué se compara**:
+// cada línea guarda el stock que el sistema esperaba **en el momento de contarla**, y al cerrar
+// se aplica la diferencia (`contado − esperado`) sobre el stock de ese momento. Así una venta o
+// una recepción entre contar y cerrar no se convierte en merma ni en sobrante.
+
+enum InventoryCountStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+model InventoryCount {
+  id             String               @id @default(uuid())
+  status         InventoryCountStatus @default(OPEN)
+  note           String?
+  // El filtro con el que se abrió: `null` es todo el catálogo activo.
+  categoryId     String?
+  category       Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // Correos y no claves foráneas, como la auditoría: la sesión tiene que seguir diciendo quién la
+  // abrió aunque esa cuenta se borre.
+  createdByEmail String?
+  closedByEmail  String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  closedAt       DateTime?
+  lines          InventoryCountLine[]
+
+  @@index([status, createdAt])
+  @@map("inventory_counts")
+}
+
+model InventoryCountLine {
+  id               String         @id @default(uuid())
+  countId          String
+  count            InventoryCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // `null` mientras nadie lo cuente. Volver a contar sobrescribe los tres.
+  countedQuantity  Int?
+  expectedQuantity Int?
+  countedAt        DateTime?
+  countedByEmail   String?
+  // Lo que se aplicó al cerrar, y el coste medio de ese momento para valorar la diferencia
+  // (T5-01). `adjustment` es `null` en las no contadas y 0 en las que cuadraban.
+  adjustment       Int?
+  unitCost         Decimal?       @db.Decimal(12, 4)
+
+  @@unique([countId, productId])
+  @@index([productId])
+  @@map("inventory_count_lines")
 }

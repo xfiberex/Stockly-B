@@ -40,10 +40,10 @@ function archivosPorSufijo(sufijo: string): Array<{ modulo: string; ruta: string
 }
 
 describe("Convención de exportación de los módulos (T3-03)", () => {
-    it("hay doce módulos, y ese número es el que se está comprobando", () => {
+    it("hay trece módulos, y ese número es el que se está comprobando", () => {
         // Si aparece un módulo nuevo, este número cambia y obliga a mirar los otros dos
         // tests en vez de asumir que siguen cubriendo todo.
-        expect(readdirSync(MODULOS)).toHaveLength(12);
+        expect(readdirSync(MODULOS)).toHaveLength(13);
     });
 
     it.each(["controller", "service"])("todos los %s exportan un objeto con nombre", (sufijo) => {

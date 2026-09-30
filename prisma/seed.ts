@@ -60,6 +60,8 @@ async function limpiar(): Promise<void> {
     await prisma.priceHistory.deleteMany();
     await prisma.costHistory.deleteMany();
     await prisma.stockMovement.deleteMany();
+    // T5-07 — las líneas caen con su sesión (Cascade).
+    await prisma.inventoryCount.deleteMany();
     await prisma.auditLog.deleteMany();
     // T5-10 — `product_abc` cae con sus productos (Cascade); la fila del cálculo no, y sin
     // borrarla la caché se daría por vigente con una tabla vacía.
@@ -805,6 +807,41 @@ function exigir(mapa: Map<string, string>, clave: string, que: string): string {
 
 // ─── Principal ────────────────────────────────────────────────────────────────
 
+// ─── Conteo físico (T5-07) ────────────────────────────────────────────────────
+
+/**
+ * Un conteo **abierto** de la categoría con más productos activos, con dos líneas contadas: una
+ * cuadra y a la otra le falta una unidad. Abierto a propósito: cerrarlo generaría un ajuste, y
+ * este seed es un libro mayor que tiene que cerrar exactamente en el stock del catálogo. Así se
+ * puede probar la revisión y el cierre desde la interfaz.
+ */
+async function sembrarConteo(productos: Product[]): Promise<void> {
+    const porCategoria = new Map<string, Product[]>();
+    for (const p of productos) {
+        if (!p.isActive || !p.categoryId) continue;
+        porCategoria.set(p.categoryId, [...(porCategoria.get(p.categoryId) ?? []), p]);
+    }
+    const [categoryId, suyos] = [...porCategoria.entries()].sort((a, b) => b[1].length - a[1].length)[0]!;
+    const [cuadra, falta] = suyos.filter((p) => p.stock > 0);
+
+    const ahora = new Date();
+    await prisma.inventoryCount.create({
+        data: {
+            categoryId,
+            note: "Recuento trimestral del pasillo 2",
+            createdByEmail: "almacen@stockly.app",
+            lines: {
+                create: suyos.map((p) => ({
+                    productId: p.id,
+                    ...(p.id === cuadra!.id && { countedQuantity: p.stock, expectedQuantity: p.stock, countedAt: ahora, countedByEmail: "almacen@stockly.app" }),
+                    ...(p.id === falta!.id && { countedQuantity: p.stock - 1, expectedQuantity: p.stock, countedAt: ahora, countedByEmail: "almacen@stockly.app" }),
+                })),
+            },
+        },
+    });
+    console.log(`  - 1 conteo abierto (${suyos.length} productos, 2 contados)`);
+}
+
 async function main(): Promise<void> {
     console.log("\nSembrando la base de Stockly...\n");
 
@@ -833,6 +870,7 @@ async function main(): Promise<void> {
 
     await sembrarHistorialDePrecios(productos);
     await sembrarAuditoria(usuarios, productos);
+    await sembrarConteo(productos);
 
     // `app_settings` se deja vacía a propósito: `SETTINGS_CATALOG` ya define el valor por
     // defecto de cada ajuste y la tabla solo guarda lo que alguien haya cambiado. Sembrar

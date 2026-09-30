@@ -33,6 +33,7 @@ import { z } from "zod";
 import * as contrato from "@/contratos/api";
 import { createProductSchema, importProductsSchema } from "@/modules/products/product.validator";
 import { generarDesdeSugerenciasSchema } from "@/modules/purchase-orders/purchase-orders.validator";
+import { createInventoryCountSchema, recordInventoryCountLinesSchema } from "@/modules/inventory-counts/inventory-counts.validator";
 
 type EsquemaOpenApi = Record<string, unknown>;
 
@@ -68,6 +69,8 @@ const RESPUESTAS = {
     ReportSummary: contrato.resumenReporteSchema,
     PeriodReport: contrato.informePorPeriodoSchema,
     AbcSummary: contrato.resumenAbcSchema,
+    InventoryCount: contrato.conteoSchema,
+    InventoryCountLine: contrato.lineaConteoSchema,
     PaginationMeta: contrato.metaPaginacionSchema,
     Error: contrato.errorSchema,
 } as const;
@@ -80,6 +83,8 @@ const PETICIONES = {
     ProductWrite: createProductSchema,
     ProductImport: importProductsSchema.shape.products.element,
     ReorderSuggestionsRequest: generarDesdeSugerenciasSchema,
+    InventoryCountCreate: createInventoryCountSchema,
+    InventoryCountLinesRequest: recordInventoryCountLinesSchema,
 } as const;
 
 /** OpenAPI no usa `$id`; Zod lo emite para poder resolver los `$ref` entre esquemas. */

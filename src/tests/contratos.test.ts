@@ -51,6 +51,7 @@ describe("Contrato de la API (T4-01)", () => {
             ["AbcClass", contrato.claseAbcSchema.options, $Enums.AbcClass],
             ["AuditAction", contrato.accionAuditoriaSchema.options, $Enums.AuditAction],
             ["AuditEntity", contrato.entidadAuditoriaSchema.options, $Enums.AuditEntity],
+            ["InventoryCountStatus", contrato.estadoConteoSchema.options, $Enums.InventoryCountStatus],
         ];
 
         it.each(casos)("%s", (_nombre, delContrato, dePrisma) => {
@@ -347,6 +348,28 @@ describe("Contrato de la API (T4-01)", () => {
 
             expect(res.status).toBe(200);
             conforme(contrato.resumenAbcSchema, res.body.data, "GET /reports/abc");
+        });
+
+        it("los conteos físicos: sesión, listado y líneas (T5-07)", async () => {
+            const abierto = await request(app).post("/api/v1/inventory-counts").set("Cookie", cookieAdmin).send({ note: "Contrato" });
+            expect(abierto.status).toBe(201);
+            conforme(contrato.conteoSchema, abierto.body.data, "POST /inventory-counts");
+
+            const lineas = await request(app).get(`/api/v1/inventory-counts/${abierto.body.data.id}/lines`).set("Cookie", cookieAdmin);
+            conforme(contrato.lineasConteoSchema, lineas.body.data, "GET /inventory-counts/:id/lines");
+
+            const [primera] = lineas.body.data.data as Array<{ productId: string }>;
+            const anotadas = await request(app)
+                .patch(`/api/v1/inventory-counts/${abierto.body.data.id}/lines`)
+                .set("Cookie", cookieAdmin)
+                .send({ items: [{ productId: primera!.productId, countedQuantity: 1 }] });
+            conforme(contrato.lineaConteoSchema.array(), anotadas.body.data, "PATCH /inventory-counts/:id/lines");
+
+            const cancelado = await request(app).post(`/api/v1/inventory-counts/${abierto.body.data.id}/cancel`).set("Cookie", cookieAdmin);
+            conforme(contrato.conteoSchema, cancelado.body.data, "POST /inventory-counts/:id/cancel");
+
+            const listado = await request(app).get("/api/v1/inventory-counts").set("Cookie", cookieAdmin);
+            conforme(contrato.paginadoSchema(contrato.conteoSchema), listado.body.data, "GET /inventory-counts");
         });
 
         /** Los cuatro catálogos responden lista suelta o paginada según el módulo. */

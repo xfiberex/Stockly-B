@@ -1,16 +1,5 @@
 import { spec } from "@/swagger";
-import { productRouter } from "@/modules/products";
-import { authRouter } from "@/modules/auth";
-import { categoriesRouter } from "@/modules/categories";
-import { brandsRouter } from "@/modules/brands";
-import { suppliersRouter } from "@/modules/suppliers";
-import { purchaseOrdersRouter } from "@/modules/purchase-orders";
-import { reportsRouter } from "@/modules/reports";
-import { tagsRouter } from "@/modules/tags";
-import { usersRouter } from "@/modules/users";
-import { settingsRouter } from "@/modules/settings";
-import { auditLogsRouter } from "@/modules/audit-logs";
-import { saleOrdersRouter } from "@/modules/sale-orders";
+import { MONTAJES } from "@/routes";
 
 jest.mock("@/shared/middlewares/upload.middleware", () => ({
     verificarFirmaDeImagen: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -24,21 +13,11 @@ jest.mock("@/shared/middlewares/upload.middleware", () => ({
 // alguien añade una ruta, así que lo que se comprueba aquí es **el router real**:
 // se recorre el árbol de Express y se exige que cada operación exista en el spec.
 
-/** Los mismos prefijos con los que `src/routes/index.ts` monta cada módulo. */
-const MODULOS: Array<[string, unknown]> = [
-    ["/auth", authRouter],
-    ["/products", productRouter],
-    ["/categories", categoriesRouter],
-    ["/brands", brandsRouter],
-    ["/suppliers", suppliersRouter],
-    ["/purchase-orders", purchaseOrdersRouter],
-    ["/sale-orders", saleOrdersRouter],
-    ["/reports", reportsRouter],
-    ["/tags", tagsRouter],
-    ["/users", usersRouter],
-    ["/settings", settingsRouter],
-    ["/audit-logs", auditLogsRouter],
-];
+/**
+ * Los prefijos con los que `src/routes/index.ts` monta cada módulo, leídos de allí (T5-07): la copia
+ * que había aquí se habría quedado atrás con el primer módulo nuevo.
+ */
+const MODULOS: Array<[string, unknown]> = MONTAJES.map(([prefijo, modulo]) => [prefijo, modulo]);
 
 type Capa = { route?: { path: string; methods: Record<string, boolean> } };
 
