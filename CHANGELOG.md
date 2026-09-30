@@ -422,6 +422,11 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Seguridad
 
+- **`nodemailer` 10** (2026-09-30). Un aviso alto nuevo (GHSA-v53p-9fqp-m79j, corregido en la
+  10.0.6) volvió a poner en rojo la auditoría: `nodemailer` pasa de la 9.1.1 a la **10.0.12** —su
+  única ruptura es exigir Node 20, y el proyecto usa 22— e `ip-address`, transitiva de
+  `express-rate-limit`, de la 10.4.0 a la 10.7.2 dentro de su rango.
+
 - **Dependencias sin avisos conocidos otra vez** (2026-09-28). `multer` 2.4.0, `nodemailer`
   9.1.1 y `morgan` 1.12.1, y `overrides` en `pnpm-workspace.yaml` para `mysql2`,
   `deepmerge-ts`, `fast-uri` y `qs`, que el CLI de Prisma y express fijaban en versiones

@@ -88,7 +88,8 @@ rojo dos semanas por **10 avisos altos** publicados después del último verde, 
 una dependencia. Se cerró subiendo `multer`, `nodemailer` y `morgan` y con `overrides` en
 `pnpm-workspace.yaml` para las transitivas que el CLI de Prisma fija a versión exacta; cada una dice
 cuándo retirarla. Ese mismo día **pnpm pasó a 12.4.1** en los dos repositorios y sus Dockerfiles.
-Detalle en [dependencias.md §2](dependencias.md).
+El 2026-09-30 volvió a pasar con un aviso alto en `nodemailer`, y esa vez hubo que saltar a su
+versión 10. Detalle en [dependencias.md §2](dependencias.md).
 
 **Ese 114/114 no significa «todo comprobado».** Una de las tareas, **T4-17** —el recorrido con
 lector de pantalla—, está **descartada y no hecha**: se cerró por decisión de alcance porque no hay

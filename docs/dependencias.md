@@ -56,6 +56,20 @@ verde, y la puerta estuvo en rojo dos semanas. Se resolvió así, y es el patró
   no cambia; `prisma generate` y `migrate deploy` dentro de `verify` lo ejercitan.
 - **Cada `override` es deuda:** el comentario del propio archivo dice cuándo retirarlo.
 
+**Y dos días después, otra vez (2026-09-30).** El commit de la licencia (ADR 0009) falló en la CI
+por un aviso alto nuevo en `nodemailer` (GHSA-v53p-9fqp-m79j, ≤10.0.5, corregido en 10.0.6), más
+siete moderados de `nodemailer` y de `ip-address`. Esta vez **sí hubo salto de mayor**:
+
+- **`nodemailer` 9.1.1 → 10.0.12.** La rama 9 no recibe el arreglo. La única ruptura de la 10 es
+  exigir Node 20, y la CI y los Dockerfiles usan Node 22; el resto es la migración del paquete a
+  TypeScript con compilación ESM y CommonJS, que conserva la exportación por defecto y la forma de
+  los tipos de `@types/nodemailer`. `smtp-tls.test.ts`, que usa `nodemailer` sin mock contra un
+  servidor SMTP falso, ejercita el transporte real. Se toma la 10.0.12 y no la 10.0.13, publicada
+  ese mismo día: una versión de horas es justo lo que la cadena de suministro aconseja dejar reposar.
+- **`ip-address` 10.4.0 → 10.7.2** sin `override`: `express-rate-limit` lo pide como `^10.2.0`, así
+  que bastó `pnpm update ip-address` para que el lockfile tomara la corregida.
+- Sale de `minimumReleaseAgeExclude` la entrada `nodemailer@9.0.1`, que ya no está en el árbol.
+
 En la misma pasada **pnpm pasó a 12.4.1 en los dos repositorios**, `packageManager` y Dockerfiles.
 El backend ya estaba en 12.4.1 desde el commit de T5-01, que se lo llevó sin querer, y el resto
 seguía en 11.21.0.
