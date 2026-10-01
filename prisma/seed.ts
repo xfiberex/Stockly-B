@@ -74,6 +74,8 @@ async function limpiar(): Promise<void> {
     await prisma.brand.deleteMany();
     await prisma.supplier.deleteMany();
     await prisma.appSetting.deleteMany();
+    // T5-11 — sin borrarla, un resumen ya «enviado» sobreviviría a la limpieza.
+    await prisma.weeklyDigest.deleteMany();
     await prisma.user.deleteMany();
     console.log("  - Base de datos limpiada");
 }

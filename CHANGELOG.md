@@ -19,6 +19,12 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Resumen semanal por correo** (`T5-11`). Cada administrador puede recibir, en su idioma, lo
+  vendido la semana anterior y lo que sigue pendiente: productos en stock bajo, ventas sin enviar y
+  compras fuera de plazo. Se activa en **Configuración** y lo envía un comando
+  (`pnpm resumen:enviar`) que se programa desde fuera; repetirlo no manda el mismo resumen dos
+  veces. Cómo programarlo, en [`docs/operaciones.md`](docs/operaciones.md) §10.
+
 - **Clientes** (`T5-06`). Nueva sección **Clientes**, dentro de Órdenes: cada cliente tiene su ficha
   —órdenes, importe de lo enviado e historial de ventas— y se elige con un buscador al crear una
   venta. Las ventas se vinculan solas por el correo, también las que ya existían; cada venta sigue
@@ -294,6 +300,9 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   traerse el catálogo entero (`T2-02`).
 
 ### Corregido
+
+- **Los correos se salían de la pantalla en el móvil** (`T5-11`). La tarjeta de todos los correos
+  medía 600 px fijos; ahora ocupa el ancho disponible, con ese tope.
 
 - **La barra de selección del catálogo ensanchaba la página en el móvil** (`T5-06`). Con el botón
   «Etiquetas» (`T5-08`) medía 508 px, y en una pantalla de 393 el navegador ampliaba la página

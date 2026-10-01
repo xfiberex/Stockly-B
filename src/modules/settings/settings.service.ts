@@ -11,6 +11,16 @@ export const SETTINGS_CATALOG = [
         defaultValue: "false",
     },
     {
+        // T5-11 — apagado por defecto, como la alerta: nadie debería empezar a recibir correo
+        // por actualizar la aplicación. El envío lo lanza un comando programado desde fuera
+        // (`docs/operaciones.md`); con esto apagado, el comando no manda nada.
+        key: "weeklyDigestEnabled",
+        label: "Resumen semanal por correo",
+        description: "Envía a los administradores un resumen de la semana anterior: ventas, lo más vendido, stock bajo, ventas pendientes de enviar y compras fuera de plazo.",
+        type: "boolean" as const,
+        defaultValue: "false",
+    },
+    {
         // T5-05 — el plazo que usa la sugerencia de reposición cuando el proveedor no tiene
         // uno. Con límites propios: el validador genérico de `number` aceptaría −3 o 2.5.
         key: "defaultLeadTimeDays",

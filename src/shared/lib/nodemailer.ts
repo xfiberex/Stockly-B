@@ -7,7 +7,11 @@ import {
     emailButton,
     emailParagraph,
     emailNote,
+    emailSubheading,
+    emailTable,
 } from "@/shared/lib/emailTemplates";
+import { formatearImporte } from "@/shared/lib/moneda";
+import type { DatosDelResumen } from "@/shared/lib/resumenSemanal";
 import {
     traducirCorreo,
     type Idioma,
@@ -226,6 +230,120 @@ export async function sendServerErrorAlertEmail(
         html: renderEmail({
             preheader: t("errores.preencabezado", { total: resumen.total, minutos: resumen.ventanaMinutos }),
             heading: t("errores.titulo"),
+            bodyHtml,
+            idioma,
+        }),
+    });
+}
+
+/** El `locale` con el que se escriben las fechas de un correo. */
+const localeDe = (idioma: Idioma) => (idioma === "EN" ? "en-US" : "es");
+
+/** `21–27 sept 2026`: los dos extremos son días del negocio (`AAAA-MM-DD`), sin hora ni zona. */
+function rangoDeDias(idioma: Idioma, from: string, to: string): string {
+    const formato = new Intl.DateTimeFormat(localeDe(idioma), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+    return formato.formatRange(new Date(`${from}T00:00:00Z`), new Date(`${to}T00:00:00Z`));
+}
+
+/**
+ * T5-11 — el resumen semanal: lo vendido la semana anterior y lo que sigue pendiente hoy.
+ *
+ * Como la alerta de stock, **no lo pide nadie**: lo lanza un comando programado, así que el
+ * idioma sale de la fila de cada destinatario. Las secciones sin nada que decir no salen,
+ * salvo «lo más vendido», que dice que no hubo ventas: es la que da sentido a las cifras.
+ *
+ * No lleva nombres de clientes: una venta pendiente se identifica por su número.
+ */
+export async function sendWeeklyDigestEmail(to: string, adminName: string, datos: DatosDelResumen, idioma: Idioma) {
+    requireSmtp();
+    const t = traductorDeCorreo(idioma);
+    const periodo = rangoDeDias(idioma, datos.from, datos.to);
+    const numero = (id: string) => id.slice(0, 8).toUpperCase();
+    const dia = new Intl.DateTimeFormat(localeDe(idioma), { day: "numeric", month: "short", timeZone: datos.zona });
+
+    /** «Se muestran 10 de 37», solo cuando la tabla no los trae todos. */
+    const recorte = (mostrados: number, total: number) =>
+        total > mostrados ? emailNote(t("resumen.mostrados", { mostrados, total })) : "";
+
+    const cifras = emailTable(null, [
+        [t("resumen.cifra.ordenes"), String(datos.ventas.ordenes)],
+        [t("resumen.cifra.unidades"), String(datos.ventas.unidades)],
+        [t("resumen.cifra.importe"), formatearImporte(datos.ventas.importe)],
+        [t("resumen.cifra.pendientes"), String(datos.pendientes.total)],
+        [t("resumen.cifra.stockBajo"), String(datos.stockBajo.total)],
+        [t("resumen.cifra.comprasAtrasadas"), String(datos.comprasAtrasadas.total)],
+    ]);
+
+    const masVendido =
+        emailSubheading(t("resumen.masVendido.titulo")) +
+        (datos.masVendido.length > 0
+            ? emailTable(
+                [t("resumen.col.producto"), t("resumen.col.unidades"), t("resumen.col.importe")],
+                datos.masVendido.map((p) => [escapeHtml(p.nombre), String(p.unidades), formatearImporte(p.importe)]),
+            )
+            : emailParagraph(t("resumen.masVendido.vacio")));
+
+    const stockBajo =
+        datos.stockBajo.total > 0
+            ? emailSubheading(t("resumen.stockBajo.titulo")) +
+              emailTable(
+                  [t("resumen.col.producto"), t("resumen.col.stock"), t("resumen.col.minimo")],
+                  datos.stockBajo.productos.map((p) => [escapeHtml(p.nombre), String(p.stock), String(p.minimo)]),
+              ) +
+              recorte(datos.stockBajo.productos.length, datos.stockBajo.total)
+            : "";
+
+    const pendientes =
+        datos.pendientes.total > 0
+            ? emailSubheading(t("resumen.pendientes.titulo")) +
+              emailTable(
+                  [t("resumen.col.orden"), t("resumen.col.fecha"), t("resumen.col.importe")],
+                  datos.pendientes.ordenes.map((o) => [
+                      t("resumen.venta", { numero: numero(o.id) }),
+                      dia.format(o.fecha),
+                      formatearImporte(o.importe),
+                  ]),
+              ) +
+              recorte(datos.pendientes.ordenes.length, datos.pendientes.total)
+            : "";
+
+    const compras =
+        datos.comprasAtrasadas.total > 0
+            ? emailSubheading(t("resumen.compras.titulo")) +
+              emailTable(
+                  [t("resumen.col.orden"), t("resumen.col.proveedor"), t("resumen.col.retraso")],
+                  datos.comprasAtrasadas.ordenes.map((o) => [
+                      t("resumen.compra", { numero: numero(o.id) }),
+                      o.proveedor ? escapeHtml(o.proveedor) : t("resumen.sinProveedor"),
+                      String(o.diasDeRetraso),
+                  ]),
+              ) +
+              recorte(datos.comprasAtrasadas.ordenes.length, datos.comprasAtrasadas.total)
+            : "";
+
+    const bodyHtml =
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(adminName) })) +
+        emailParagraph(t("resumen.cuerpo", { periodo })) +
+        cifras +
+        masVendido +
+        stockBajo +
+        pendientes +
+        compras +
+        emailButton(`${env.frontendUrl}/reports`, t("resumen.boton")) +
+        emailNote(t("resumen.nota"));
+
+    await transporter.sendMail({
+        from: env.smtp.from,
+        to,
+        subject: t("resumen.asunto", { periodo }),
+        html: renderEmail({
+            preheader: t("resumen.preencabezado", {
+                ordenes: datos.ventas.ordenes,
+                importe: formatearImporte(datos.ventas.importe),
+                pendientes: datos.pendientes.total,
+                stockBajo: datos.stockBajo.total,
+            }),
+            heading: t("resumen.titulo"),
             bodyHtml,
             idioma,
         }),

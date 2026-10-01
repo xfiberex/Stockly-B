@@ -522,3 +522,26 @@ model InventoryCountLine {
   @@index([productId])
   @@map("inventory_count_lines")
 }
+
+// ─── T5-11 — Resumen semanal por correo ────────────────────────────────────────
+//
+// Una fila por semana resumida. El backend no tiene planificador: el resumen lo lanza un
+// comando programado desde fuera, y esta tabla es lo que impide que dos ejecuciones —dos
+// réplicas, un cron mal puesto, alguien que lo repite a mano— manden el mismo correo dos veces.
+
+model WeeklyDigest {
+  id            String    @id @default(uuid())
+  // El lunes de la semana resumida, `AAAA-MM-DD` en la zona del negocio. **Único**: crear la
+  // fila es reclamar la semana, y la base decide quién gana si dos lo intentan a la vez.
+  weekStart     String    @unique
+  weekEnd       String
+  // A quién le llegó ya, por id de usuario y no por correo: una ejecución que falló a medias
+  // se repite solo para los que faltan, y la dirección no se copia a un segundo sitio.
+  sentToUserIds String[]
+  // `finishedAt` a `null` con un `startedAt` reciente es una ejecución en curso; con uno
+  // antiguo, una que murió a medias y se puede retomar.
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@map("weekly_digests")
+}

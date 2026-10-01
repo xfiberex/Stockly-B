@@ -16,6 +16,7 @@
     "db:reset": "prisma migrate reset && prisma db seed",
     "db:backup": "node scripts/backup.js",
     "db:restaurar": "node scripts/restaurar.js",
+    "resumen:enviar": "tsx src/cli/resumen-semanal.ts",
     "test": "jest --runInBand --forceExit --detectOpenHandles",
     "test:watch": "jest --watch --runInBand",
     "test:coverage": "jest --coverage --runInBand --forceExit",

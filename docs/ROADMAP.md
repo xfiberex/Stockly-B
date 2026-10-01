@@ -5,7 +5,12 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-09-30 — **125 / 129**
+> ## Estado al 2026-10-01 — **126 / 129**
+>
+> **2026-10-01: se cierra T5-11**, resumen semanal por correo: lo vendido la semana natural
+> anterior y lo que sigue pendiente —stock bajo, ventas sin enviar, compras fuera de plazo—, a cada
+> administrador en su idioma. Lo lanza un comando programado desde fuera, y una tabla recuerda qué
+> semana se envió y a quién: repetirlo no manda nada dos veces y reintenta solo lo que falló.
 >
 > **2026-09-30: se cierra T5-06**, clientes como entidad: ficha con su historial y lo enviado, alta,
 > edición y borrado, y un buscador en el formulario de venta. Las ventas se vinculan por el correo
@@ -1911,7 +1916,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Falsificado:** con `≤` en vez de `<` en el corte fallan **4** tests; sin el tratamiento de empates, **10**.
   - **Lo que destapó la medición, y no los tests:** la primera versión trataba los empates con `EXCLUDE GROUP`, que obliga a PostgreSQL a recalcular la suma de la ventana fila a fila. Con los ~100 000 productos del conjunto de carga **pasó de cinco minutos sin terminar**. Con `RANGE … 1 PRECEDING` sobre céntimos enteros —lo mismo, sin exclusión—, **2.3 s** la consulta y **~5 s** el recálculo completo, que nadie espera. Detalle en [rendimiento.md §7 quinquies](rendimiento.md).
 
-- [ ] **[T5-11] Resumen periódico por correo**
+- [x] **[T5-11] Resumen periódico por correo** ✅ *(2026-10-01)*
   - **Área:** Notificaciones
   - **Ubicación:** `scripts/` (nuevo comando), `src/shared/lib/emailTemplates.ts`, `src/shared/lib/nodemailer.ts`, `src/modules/settings/`
   - **Qué hacer:** un correo semanal a los ADMIN con los productos en stock bajo, las ventas pendientes de enviar, lo más vendido de la semana y, si T5-05 está hecha, las órdenes de compra que superan el plazo de entrega de su proveedor. Activable en Configuración, como `lowStockAlertEnabled`, y en el idioma de cada destinatario (T4-12).
@@ -1919,6 +1924,14 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** ejecutar el comando dos veces el mismo día no envía dos correos (se registra la última ejecución); con el ajuste desactivado no envía nada y sale con 0; cada ADMIN lo recibe en su idioma.
   - **Esfuerzo:** medio
   - **Depende de:** —
+  - **Decidido al diseñar (2026-10-01):**
+    - **El periodo es la semana natural completa anterior**, de lunes a domingo, en la zona del negocio (T5-09). Se lance el lunes o el jueves, resume la misma semana; por eso lo que no se repite es **la semana**, no el día, que es más de lo que pedía el criterio. Las ventas son las **enviadas**, por fecha de envío, como en los informes.
+    - **Lo pendiente es lo de hoy, no lo de la semana:** stock bajo —el mismo criterio que el panel—, ventas sin enviar y compras abiertas que pasaron el plazo de su proveedor, o el de Configuración si no tiene (T5-05).
+    - **Una fila por semana** (`weekly_digests`, con `weekStart` único). Crearla es reclamar la semana: entre dos ejecuciones a la vez decide la base. Guarda **a quién le llegó** —por id de usuario, no por correo— y se anota tras cada envío: una ejecución que falla a medias, o un administrador dado de alta después, se resuelven repitiendo el comando, que solo envía a los que faltan. Una ejecución sin terminar se respeta 15 minutos; después se da por muerta y se retoma.
+    - **El comando es TypeScript de la aplicación, no un guion de `scripts/`:** `src/cli/resumen-semanal.ts` usa el mismo cliente de Prisma, los mismos ajustes y las mismas plantillas. `pnpm resumen:enviar` en desarrollo y `node dist/cli/resumen-semanal.js` en producción, donde no hay `tsx`. Sale con 0 si envió o no había nada que hacer y con 1 si algún envío falló o falta el SMTP, que es lo que mira el planificador.
+    - **Sin nombres de clientes en el correo:** una venta pendiente se identifica por su número.
+    - **Apagado por defecto** (`weeklyDigestEnabled`), como la alerta de stock.
+  - **Fuera de alcance:** elegir el día de corte de la semana o los destinatarios; un resumen diario o mensual.
 
 - [ ] **[T5-12] Notificaciones dentro de la aplicación**
   - **Área:** Notificaciones / UI
@@ -2101,6 +2114,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-10-01 | **T5-11** Resumen periódico por correo — **completada** | **El criterio con tests:** dos ejecuciones el mismo día envían un correo; con el ajuste apagado no sale nada y el comando devuelve 0; dos administradores reciben asunto, `lang` y cuerpo en su idioma. Además: dos ejecuciones **a la vez** envían una sola vez, un envío fallido se reintenta solo con ese destinatario, y los extremos de la semana son los de la zona del negocio —una venta del domingo a las 23:30 entra, la del lunes a las 00:30 no—. Sin la zona, o sin recordar a quién se envió, fallan 1 y 6 tests. `verify` ✅ backend **1012/1012** (96.35 %) y frontend **672 + 1 omitido** (76.59 %) | **Decisiones:** en la ficha. **Al ver el correo, y no en los tests:** la tarjeta de **todos** los correos medía 600 px fijos y en un móvil de 390 se salía (624); ahora encoge. No se ha enviado ningún correo real: el HTML se generó con los datos del seed y se revisó en capturas a 700 y 390 px. **De paso:** el formato de importe, copiado en el PDF y en las etiquetas, pasa a `shared/lib/moneda.ts`. |
 | 2026-09-30 | **T5-06** Clientes como entidad — **completada** | **El criterio con tests:** la ficha suma solo lo enviado —el test falla si se quita el filtro de estado—; editar el cliente deja intactas sus órdenes; la migración se prueba ejecutando **su propio SQL** sobre órdenes de prueba (correo con mayúsculas y espacios, dos «Juan Pérez» sin correo, un correo en blanco), y su recuento es una consulta de `operaciones.md` que el mismo test ejecuta. E2E: una venta con correo nuevo crea el cliente, la siguiente lo elige con el buscador y solo con el teclado, y enviar una suma su importe a la ficha, en escritorio y en móvil. `verify` ✅ backend **984/984** (96.35 %) y frontend **672 + 1 omitido** (76.59 %); **E2E 23/23 + 1 omitido** | **Decisiones:** en la ficha. **El E2E destapó dos defectos.** (1) El buscador de clientes enseñaba los resultados de la búsqueda anterior mientras llegaba la nueva, y en el móvil un Enter rápido elegía uno que no era lo escrito; ahora solo ofrece los de lo escrito. (2) **De T5-08:** la barra de selección del catálogo, con «Etiquetas», medía 508 px, y en un móvil de 393 el navegador ensanchaba la página entera; la ficha que se abría después quedaba descolocada. Ahora salta de línea y el E2E comprueba el ancho. Su test marcaba los productos antes de que se aplicara la búsqueda —que vacía la selección— y fallaba en un proyecto distinto en cada pasada: ahora espera a la respuesta. **De paso:** `axios` 1.20.0 en el frontend, por siete avisos altos publicados hoy; `Paginacion` pasa a `shared/components`; el formulario de cliente valida el correo con el mensaje de la aplicación, no con la burbuja del navegador. |
 | 2026-09-29 | **T5-08** Código de barras: búsqueda, escaneo y etiquetas — **completada** | **El criterio con tests:** el E2E imprime desde el catálogo las etiquetas de un producto con EAN-13 y de otro solo con SKU (Code 128), rasteriza el PDF y el escáner de la aplicación abre la ficha de cada uno, en escritorio y en móvil; un código desconocido se da de alta con el código puesto. En el backend, cada simbología se vuelve a leer con ZXing. `verify` ✅ backend **935/935** (96.28 %) y frontend **654 + 1 omitido** (76.57 %); **E2E 21/21 + 1 omitido** | **Decisiones:** `barcode-detector` —nativo donde sirve, ZXing en WebAssembly donde no, todo bajo demanda y el `.wasm` servido por la aplicación—; en el catálogo el escaneo abre la ficha; en el conteo lleva a la línea; etiquetas en A4 y en rollo. **El E2E destapó** que un SKU de 22 caracteres en la etiqueta de 50 mm salía con barras de 0,15 mm que no se leían: ahora hay un módulo mínimo de 0,2 mm y lo que no cabe se rechaza nombrando el producto. **El build destapó** que la librería viajaba en el primer arranque por la regla de trozos de Vite. **De paso:** un SKU repetido daba 500 y ahora es 409. |
 | 2026-09-29 | **T5-07** Conteo físico de inventario — **completada** | **El criterio con tests:** contar 8 donde se esperan 10 no mueve nada hasta cerrar, y cerrar genera un `ADJUSTMENT` de −2; cancelar no mueve nada; la auditoría registra el cierre con `{ ajustes, sinContar }`. Una venta entre contar y cerrar no se lee como merma. `verify` ✅ backend **866/866** (96.13 %) y frontend **629 + 1 omitido** (75.16 %); **E2E 19/19 + 1 omitido**, con el almacén haciendo el ciclo entero por la interfaz | **Decisiones:** esperado **al contar cada línea**, conteo **a ciegas**, el almacén hace el ciclo entero, lo no contado se ignora y se informa. Un producto no puede estar en dos sesiones abiertas; un cierre que dejaría un negativo no se aplica. **El navegador destapó** que el campo de lo contado quedaba fuera de la pantalla del móvil con la tabla compartida de 640 px, y que el E2E no lo veía porque Playwright desplaza antes de escribir; ahora lo mide. **Dos tests no probaban nada** —una carrera con `Promise.all` y un cambio de campo a su propio valor— y se rehicieron hasta caer al falsificar. |
@@ -2232,16 +2246,16 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
 | **Tier 4** | **17** | **17** | **100 %** ✅ |
-| **Tier 5** | 11 | 15 | 73 % |
-| **Total** | **125** | **129** | **97 %** |
+| **Tier 5** | 12 | 15 | 80 % |
+| **Total** | **126** | **129** | **98 %** |
 
 *El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que ese 100 % es sobre 114, no sobre las 100 originales. **Y una de las 114 está descartada, no hecha** (T4-17).*
 
 ***Esta tabla se ha quedado atrás dos veces, y las dos por lo mismo:** se cierra una tarea, se marca la casilla y se actualiza la cabecera, y el resumen —que está 1 800 líneas más abajo— no se toca. La primera vez decía 102/109 con las casillas en 104/110 (cierres de T4-05 y T4-06, alta de T4-13); la segunda, 107/114 con las casillas en **112/114**, porque no llegaron aquí los cinco cierres del 2026-08-11 y 12 —T4-12, T4-13, T4-14, T4-10 y T4-17—. **Se cuentan las casillas, no se recuerdan**, y contarlas es un comando:*
 
 ```bash
-grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 125
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 4 (el Tier 5, abierto el 2026-09-13)
+grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 126
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 3 (el Tier 5, abierto el 2026-09-13)
 ```
 
 *Al cerrar una tarea hay que tocar **la casilla, la cabecera, el índice, esta tabla y la de [CONTEXTO §3](CONTEXTO.md)**. Si los cinco números no coinciden, manda el `grep`.*
@@ -2254,12 +2268,12 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 4 (el Tier 5, abierto el 2026-09
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **984/984** ✅ *(2026-09-30, T5-06)* | mantener en verde |
+| Tests backend | 198/198 ✅ | **1012/1012** ✅ *(2026-10-01, T5-11)* | mantener en verde |
 | Cobertura backend (sentencias) | 86.92 % | **96.35 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **672/672** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-09-30, T5-06)* | mantener en verde |
+| Tests frontend | 181/181 ✅ | **672/672** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-10-01, T5-11)* | mantener en verde |
 | Cobertura frontend (sentencias) | 19.88 % | **76.59 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
-| Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cuatro que envía la aplicación, T4-12)* | los mismos que la interfaz |
+| Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cinco que envía la aplicación: T4-12, y el resumen semanal de T5-11)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
 | Errores de la API con código estable | 0 *(solo `message`, siempre en español)* | **61 códigos** ✅ *(el cliente compone la frase en su idioma, T4-04; 2026-09-30, T5-06)* | que ningún mensaje de error dependa del idioma del servidor |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |

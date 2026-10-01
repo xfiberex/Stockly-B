@@ -45,6 +45,13 @@ interface EmailOptions {
     idioma: Idioma;
 }
 
+/**
+ * El armazón de todos los correos.
+ *
+ * La tarjeta lleva `width="600"` como atributo, para Outlook —que ignora `max-width`—, y
+ * `width:100%;max-width:600px` como estilo para el resto. Al revés (`width:600px;max-width:100%`),
+ * dentro de una tabla no encoge: en un móvil de 390 px el correo medía 624 (T5-11).
+ */
 export function renderEmail({ preheader, heading, bodyHtml, idioma }: EmailOptions): string {
     return `<!DOCTYPE html>
 <html lang="${etiquetaDeIdioma(idioma)}" xmlns="http://www.w3.org/1999/xhtml">
@@ -61,7 +68,7 @@ export function renderEmail({ preheader, heading, bodyHtml, idioma }: EmailOptio
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:${BRAND.pageBg};">
         <tr>
             <td align="center" style="padding:24px 12px;">
-                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:100%;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;">
                     <!-- Cabecera de marca -->
                     <tr>
                         <td align="center" style="padding:8px 0 20px;">
@@ -100,4 +107,43 @@ export function emailParagraph(html: string): string {
 // Nota secundaria (expiración de enlaces, avisos).
 export function emailNote(html: string): string {
     return `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:${BRAND.muted};">${html}</p>`;
+}
+
+// Subtítulo de sección dentro de la tarjeta (T5-11): el resumen semanal es el primer correo
+// con más de un bloque.
+export function emailSubheading(html: string): string {
+    return `<h2 style="margin:24px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:${BRAND.text};">${html}</h2>`;
+}
+
+/**
+ * Tabla de datos con estilos en línea, que es lo único que respetan los gestores de correo.
+ * La primera columna va a la izquierda y el resto a la derecha: son cifras. **Las celdas
+ * llegan ya escapadas**, como el resto del cuerpo.
+ */
+export function emailTable(cabecera: string[] | null, filas: string[][]): string {
+    const celda = "padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;";
+    const alineacion = (i: number) => (i === 0 ? "left" : "right");
+    // Una cifra, un importe o una fecha no se parten; un nombre —el del proveedor— sí. En un
+    // móvil la tarjeta deja unos 300 px, y una celda larga sin partir ensanchaba el correo entero.
+    const enUnaLinea = (texto: string, i: number) => i > 0 && texto.length <= 14;
+
+    const encabezado = cabecera
+        ? `<tr>${cabecera
+            .map((texto, i) => `<th align="${alineacion(i)}" style="${celda}font-size:12px;font-weight:bold;color:${BRAND.muted};background:${BRAND.pageBg};border-bottom:1px solid ${BRAND.border};">${texto}</th>`)
+            .join("")}</tr>`
+        : "";
+
+    const cuerpo = filas
+        .map((fila, n) => {
+            const borde = n < filas.length - 1 ? `border-bottom:1px solid ${BRAND.border};` : "";
+            return `<tr>${fila
+                .map((texto, i) => `<td align="${alineacion(i)}" style="${celda}${borde}color:${i === 0 ? BRAND.text : BRAND.muted};${enUnaLinea(texto, i) ? "white-space:nowrap;" : ""}">${texto}</td>`)
+                .join("")}</tr>`;
+        })
+        .join("");
+
+    return `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:4px 0 8px;border:1px solid ${BRAND.border};border-radius:8px;">
+        ${encabezado}${cuerpo}
+    </table>`;
 }

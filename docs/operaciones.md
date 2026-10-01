@@ -403,3 +403,64 @@ del compose se recrea a diario, el ciclo de volcado y restauración es más cort
 **Ejecutado el 2026-08-12** en este equipo: volcado de 17.10 (81.1 KB, 102 objetos) restaurado en la
 pila ya sobre `postgres:17-alpine` en **0.2 s**, con las siete tablas y las 13 migraciones
 completas; después, seed, `/health` 200, `/ready` 200 y login hasta el dashboard.
+
+---
+
+## 10. El resumen semanal por correo (T5-11)
+
+Cada administrador activo recibe, en su idioma, lo vendido la **semana natural anterior** —de lunes
+a domingo, en la zona horaria del negocio— y lo que sigue pendiente hoy: productos en stock bajo,
+ventas sin enviar y compras fuera de plazo. **El backend no tiene planificador**: el correo lo
+envía un comando que se programa desde fuera, igual que la copia de §3. Dentro del proceso, saldría
+una vez por réplica en cuanto hubiera más de una.
+
+```bash
+pnpm resumen:enviar                  # en desarrollo
+node dist/cli/resumen-semanal.js     # en producción, tras `pnpm build`: ahí no hay `tsx`
+```
+
+**Antes de programarlo:** activar *Resumen semanal por correo* en **Configuración** —está apagado
+por defecto— y tener el SMTP configurado. Con el ajuste apagado el comando no envía nada y sale
+con 0, así que se puede dejar programado y encenderlo después.
+
+### Programarlo
+
+Los lunes por la mañana, con la semana recién cerrada. La hora es la del servidor; lo que decide
+qué semana se resume es la zona del negocio.
+
+**Linux / producción** — `crontab -e`, los lunes a las 08:00:
+
+```cron
+0 8 * * 1 cd /ruta/a/Stockly-B && /usr/bin/node dist/cli/resumen-semanal.js >> /var/log/stockly-resumen.log 2>&1
+```
+
+**Windows** — Programador de tareas, en una línea:
+
+```powershell
+schtasks /create /tn "Stockly resumen" /tr "cmd /c cd /d C:\ruta\a\Stockly-B && node dist\cli\resumen-semanal.js" /sc weekly /d MON /st 08:00
+```
+
+**Con la pila en contenedores**, dentro del servicio `backend`, que ya tiene el `.env` y el código compilado:
+
+```bash
+docker compose exec -T backend node dist/cli/resumen-semanal.js
+```
+
+### Qué pasa si se lanza de más, o si falla
+
+| Situación | Qué hace | Sale con |
+|---|---|---|
+| El ajuste está apagado | Nada | 0 |
+| Ya se envió el de esa semana | Nada: es **un resumen por semana**, se lance el día que se lance | 0 |
+| Otra ejecución lo está enviando | Nada | 0 |
+| Falló el envío a algún administrador | Lo dice. **Al repetir el comando se reintenta solo con ese** | 1 |
+| Activado, pero sin SMTP configurado | Dice qué variables faltan, sin reclamar la semana | 1 |
+| Se dio de alta un administrador después | Al repetirlo, lo recibe solo él | 0 |
+
+El código de salida distinto de cero es lo que tiene que vigilar el planificador. La tabla
+`weekly_digests` guarda una fila por semana enviada y a qué usuarios les llegó; una ejecución que
+muere a medias deja la semana reclamada **15 minutos**, y después cualquier otra la retoma.
+
+**Programarlo a diario no manda un correo diario**: los seis días restantes sale con «ya se envió».
+Es la forma barata de que una semana en la que el servidor estuvo apagado el lunes no se quede sin
+resumen.

@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import { barrasDe, tramosDeBarra, type Barras } from "@/modules/products/codigoDeBarras";
+import { formatearImporte } from "@/shared/lib/moneda";
 
 type Doc = InstanceType<typeof PDFDocument>;
 
@@ -95,8 +96,7 @@ export function cabeEnEtiqueta(codigo: string, formato: FormatoEtiqueta): boolea
     return anchoDeModulo(GEOMETRIAS[formato], barrasDe(codigo)) >= MODULO_MINIMO;
 }
 
-const precioDe = (n: number) =>
-    `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const precioDe = formatearImporte;
 
 // Igual que en `reports.pdf.ts`: en pdfkit 0.18 `lineBreak: false` no evita el ajuste de línea.
 function recortar(doc: Doc, texto: string, ancho: number): string {

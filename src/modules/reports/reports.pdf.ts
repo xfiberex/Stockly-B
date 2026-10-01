@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { PeriodReport, ReportSummary } from "./reports.service";
+import { formatearImporte } from "@/shared/lib/moneda";
 
 type Doc = InstanceType<typeof PDFDocument>;
 
@@ -18,8 +19,7 @@ const PAGE_W = 595.28; // A4
 const CONTENT_W = PAGE_W - MARGIN * 2; // 515.28
 
 // ─── Formato ──────────────────────────────────────────────────────────────
-const money = (n: number) =>
-    `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = formatearImporte;
 const moneyShort = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
 const int = (n: number) => n.toLocaleString("es-MX");
 /** T5-02 — sin ventas no hay porcentaje: se dice «—», no «0.0%». */

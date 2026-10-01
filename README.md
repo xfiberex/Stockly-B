@@ -155,6 +155,7 @@ pnpm db:reset         # Resetear DB y re-ejecutar migraciones + seed
 pnpm db:studio        # Abrir Prisma Studio en el navegador
 pnpm db:backup        # Volcar la base a backups/, con retención (docs/operaciones.md)
 pnpm db:restaurar     # Restaurar un volcado — por defecto en una base de ensayo
+pnpm resumen:enviar   # Enviar el resumen semanal por correo, si está activado (docs/operaciones.md §10)
 
 pnpm test             # Suite completa de tests
 pnpm test:watch       # Modo watch
@@ -335,6 +336,7 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | Clave | Tipo | Default | Descripción |
 |---|---|---|---|
 | `lowStockAlertEnabled` | boolean | `false` | Envía correo a admins cuando el stock baja del mínimo |
+| `weeklyDigestEnabled` | boolean | `false` | Resumen semanal por correo a los admins; lo envía `pnpm resumen:enviar`, programado desde fuera (T5-11) |
 | `defaultLeadTimeDays` | number | `7` | Plazo que usan las sugerencias de reposición para un proveedor sin plazo propio (entero, 0–365) (T5-05) |
 | `timezone` | string | `America/Santo_Domingo` | Zona horaria IANA del negocio: dónde empiezan y terminan los días y los meses de los informes (T5-09) |
 
