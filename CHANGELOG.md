@@ -304,6 +304,15 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - **Los correos se salían de la pantalla en el móvil** (`T5-11`). La tarjeta de todos los correos
   medía 600 px fijos; ahora ocupa el ancho disponible, con ese tope.
 
+- **Los interruptores de Configuración no tenían nombre para un lector de pantalla** (`T5-11`). Se
+  anunciaban como «interruptor, desactivado» y nada más; con el del resumen semanal ya eran dos y
+  no había forma de distinguirlos. Tampoco lo tenía el campo del plazo de entrega. Ahora cada
+  control lleva el título de su ajuste como nombre y la descripción como ayuda.
+
+- **Los botones de la ficha de un producto salían partidos y desiguales** (`T5-08`). Con
+  «Etiquetas» eran tres en una fila donde cabían dos: «Ver movimientos» y «Editar producto» se
+  partían en dos líneas. Ahora los dos secundarios van juntos y «Editar producto» debajo, a lo ancho.
+
 - **La barra de selección del catálogo ensanchaba la página en el móvil** (`T5-06`). Con el botón
   «Etiquetas» (`T5-08`) medía 508 px, y en una pantalla de 393 el navegador ampliaba la página
   entera: la ficha que se abría después quedaba descolocada. Ahora salta de línea.
