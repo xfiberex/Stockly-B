@@ -691,6 +691,43 @@ export const rutasAdicionales: Record<string, Ruta> = {
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/AuditLog"), "Listado paginado"), "403": ERROR("Requiere rol ADMIN") },
         },
     },
+
+    // ── Avisos (T5-12) ───────────────────────────────────────────────────────
+    "/notifications": {
+        get: {
+            tags: ["Notifications"], summary: "Mis avisos más recientes",
+            description:
+                "Los 30 últimos **del usuario de la sesión**, del más reciente al más antiguo, y cuántos tiene sin leer en total. " +
+                "Cada aviso lleva los huecos de su texto en `data`, no el texto: lo compone el cliente en su idioma.",
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/Notifications" }, "Avisos y contador"), "401": ERROR("No autenticado") },
+        },
+    },
+    "/notifications/unread-count": {
+        get: {
+            tags: ["Notifications"], summary: "Cuántos avisos tengo sin leer",
+            description:
+                "La consulta periódica de la campana. De paso, y como mucho cada cinco minutos, genera los avisos de " +
+                "compras que pasaron su plazo y purga los leídos hace más de 90 días.",
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/NotificationsUnread" }, "Contador"), "401": ERROR("No autenticado") },
+        },
+    },
+    "/notifications/read-all": {
+        post: {
+            tags: ["Notifications"], summary: "Marcar todos mis avisos como leídos",
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/NotificationsUnread" }, "Marcados"), "401": ERROR("No autenticado") },
+        },
+    },
+    "/notifications/{id}/read": {
+        post: {
+            tags: ["Notifications"], summary: "Marcar un aviso como leído",
+            description: "Marcarlo dos veces no es un error. El aviso de otro usuario responde 404, igual que uno que no existe.",
+            parameters: [PARAM_ID],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/NotificationsUnread" }, "Marcado; devuelve los que quedan sin leer"),
+                "404": ERROR("No encontrado (`NOTIFICATION_NOT_FOUND`)"),
+            },
+        },
+    },
 };
 
 export const etiquetasAdicionales = [
@@ -706,4 +743,5 @@ export const etiquetasAdicionales = [
     { name: "Users", description: "Gestión de usuarios (solo ADMIN)" },
     { name: "Settings", description: "Configuración de la aplicación" },
     { name: "Audit Logs", description: "Rastro de acciones sensibles" },
+    { name: "Notifications", description: "Avisos dentro de la aplicación, por usuario" },
 ];

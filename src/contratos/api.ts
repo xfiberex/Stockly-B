@@ -140,6 +140,11 @@ export const PERMISOS = {
     "GET /settings": SOLO_ADMIN,
     "PATCH /settings": SOLO_ADMIN,
     "GET /audit-logs": SOLO_ADMIN,
+    // Avisos (T5-12): cada cual lee y marca **los suyos**; no hay ruta que enseñe los de otro.
+    "GET /notifications": TODOS,
+    "GET /notifications/unread-count": TODOS,
+    "POST /notifications/read-all": TODOS,
+    "POST /notifications/:id/read": TODOS,
 } as const satisfies Record<string, readonly z.infer<typeof rolSchema>[]>;
 
 export type RutaConPermiso = keyof typeof PERMISOS;
@@ -326,6 +331,8 @@ export const CODIGOS_DE_ERROR = [
     "CATEGORY_NOT_FOUND",
     "CUSTOMER_NOT_FOUND",
     "INVENTORY_COUNT_NOT_FOUND",
+    // T5-12 — el aviso no existe **o es de otro usuario**: desde fuera no se distinguen.
+    "NOTIFICATION_NOT_FOUND",
     "PRODUCT_NOT_FOUND",
     "PURCHASE_ORDER_ITEM_NOT_FOUND",
     "PURCHASE_ORDER_NOT_FOUND",
@@ -655,6 +662,55 @@ export const resumenClienteSchema = z.object({
 
 /** `GET /customers/:id`. Sus órdenes van aparte, por `GET /sale-orders?customerId=`, paginadas. */
 export const fichaClienteSchema = clienteSchema.extend({ summary: resumenClienteSchema });
+
+// ─────────────────────── Avisos (T5-12) ───────────────────────
+
+export const tipoDeAvisoSchema = z.enum(["LOW_STOCK", "SALE_UNSHIPPABLE", "PURCHASE_OVERDUE"]);
+
+/**
+ * `entityId` es de qué habla el aviso —el producto, la venta o la compra, según el tipo—, y
+ * es adonde lleva al pulsarlo.
+ */
+const camposDeAviso = {
+    id: z.string(),
+    entityId: z.string(),
+    /** `null` mientras no se ha leído. */
+    readAt: z.string().nullable(),
+    createdAt: z.string(),
+};
+
+/**
+ * Un aviso lleva **los huecos de su texto, no el texto**: el servidor no sabe en qué idioma
+ * está la pantalla de quien lo lee, y un mensaje ya escrito en español no se traduce en el
+ * cliente (T4-04). Cada tipo tiene los suyos, y por eso es una unión discriminada.
+ *
+ * Son una copia del momento: `stock` es el que quedó entonces, no el de ahora.
+ */
+export const avisoSchema = z.discriminatedUnion("type", [
+    z.object({
+        ...camposDeAviso,
+        type: z.literal("LOW_STOCK"),
+        data: z.object({ productName: z.string(), stock: z.number(), minStock: z.number() }),
+    }),
+    z.object({
+        ...camposDeAviso,
+        type: z.literal("SALE_UNSHIPPABLE"),
+        /** El primer producto que no alcanzó: cuánto había y cuánto pedía la orden. */
+        data: z.object({ productName: z.string(), available: z.number(), required: z.number() }),
+    }),
+    z.object({
+        ...camposDeAviso,
+        type: z.literal("PURCHASE_OVERDUE"),
+        /** `dueDate` es el día en que vencía el plazo, `AAAA-MM-DD` en la zona del negocio. */
+        data: z.object({ supplierName: z.string().nullable(), dueDate: z.string() }),
+    }),
+]);
+
+/** `GET /notifications`: los más recientes —no todos— y cuántos hay sin leer **en total**. */
+export const avisosSchema = z.object({ items: z.array(avisoSchema), unread: z.number() });
+
+/** `GET /notifications/unread-count`, y lo que devuelven las dos rutas que marcan como leído. */
+export const avisosSinLeerSchema = z.object({ unread: z.number() });
 
 export const itemOrdenCompraSchema = z.object({
     id: z.string(),
@@ -1067,6 +1123,10 @@ export type Cliente = z.infer<typeof clienteSchema>;
 export type ClienteEnListado = z.infer<typeof clienteEnListadoSchema>;
 export type ResumenCliente = z.infer<typeof resumenClienteSchema>;
 export type FichaCliente = z.infer<typeof fichaClienteSchema>;
+export type TipoDeAviso = z.infer<typeof tipoDeAvisoSchema>;
+export type Aviso = z.infer<typeof avisoSchema>;
+export type Avisos = z.infer<typeof avisosSchema>;
+export type AvisosSinLeer = z.infer<typeof avisosSinLeerSchema>;
 export type ItemOrdenCompra = z.infer<typeof itemOrdenCompraSchema>;
 export type OrdenCompra = z.infer<typeof ordenCompraSchema>;
 export type OrigenPrecioSugerido = z.infer<typeof origenPrecioSugeridoSchema>;

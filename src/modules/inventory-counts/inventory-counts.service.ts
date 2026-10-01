@@ -3,7 +3,7 @@ import { $Enums, Prisma } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
 import { filtroDeEnum } from "@/shared/lib/enums";
-import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
+import { dispararAlertaStock, type ProductoEnAlerta } from "@/shared/lib/stockAlerts";
 import type { CreateInventoryCountInput, RecordInventoryCountLinesInput } from "./inventory-counts.validator";
 
 /**
@@ -329,7 +329,7 @@ export const inventoryCountsService = {
                 .map((l) => ({ productId: l.productId, delta: l.countedQuantity! - l.expectedQuantity! }))
                 .filter((l) => l.delta !== 0);
 
-            const alertas: Array<{ name: string; stock: number; minStock: number }> = [];
+            const alertas: ProductoEnAlerta[] = [];
 
             if (conDiferencia.length > 0) {
                 // En orden de id, como cualquier otro bloqueo de varios productos: dos cierres que
@@ -359,7 +359,7 @@ export const inventoryCountsService = {
                     await tx.stockMovement.create({
                         data: { productId, type: "ADJUSTMENT", delta, stockAfter, note: nota },
                     });
-                    if (delta < 0) alertas.push({ name: producto.name, stock: stockAfter, minStock: producto.minStock });
+                    if (delta < 0) alertas.push({ id: productId, name: producto.name, stock: stockAfter, minStock: producto.minStock });
                 }
             }
 
@@ -379,7 +379,7 @@ export const inventoryCountsService = {
         }, PLAZO_DE_CIERRE);
 
         // Fuera de la transacción: el correo no puede deshacer un cierre ya guardado.
-        for (const a of alertas) dispararAlertaStock(a.name, a.stock, a.minStock);
+        for (const a of alertas) dispararAlertaStock(a);
 
         return { conteo: await inventoryCountsService.getById(id), ajustes, sinContar };
     },

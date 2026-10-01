@@ -1,7 +1,7 @@
 import { prisma } from "@/shared/lib/prisma";
 import { $Enums } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
-import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
+import { dispararAlertaStock, dispararAvisoDeVentaSinStock, type ProductoEnAlerta } from "@/shared/lib/stockAlerts";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
@@ -152,7 +152,8 @@ export const saleOrderService = {
         });
     },
 
-    async update(id: string, dto: UpdateSaleOrderDto) {
+    /** `actorId` es quien hace el cambio: si el envío falla por stock, es a quien **no** se avisa (T5-12). */
+    async update(id: string, dto: UpdateSaleOrderDto, actorId?: string) {
         const existing = await prisma.saleOrder.findUnique({ where: { id } });
         if (!existing) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
         if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada", "CANNOT_MODIFY_CANCELLED_ORDER");
@@ -225,7 +226,7 @@ export const saleOrderService = {
         // Envío: verificación de stock, descuento, movimientos y cambio de estado ocurren
         // en UNA sola transacción. El decremento condicional (stock >= cantidad) cierra la
         // ventana entre "comprobar" y "descontar"; si cualquier ítem falla, todo se revierte.
-        const lowStockTargets: Array<{ name: string; newStock: number; minStock: number }> = [];
+        const lowStockTargets: ProductoEnAlerta[] = [];
 
         const updated = await prisma.$transaction(async (tx) => {
             const items = await tx.saleOrderItem.findMany({
@@ -269,8 +270,9 @@ export const saleOrderService = {
 
                 if (refreshed.stock <= item.product.minStock) {
                     lowStockTargets.push({
+                        id: item.productId,
                         name: item.product.name,
-                        newStock: refreshed.stock,
+                        stock: refreshed.stock,
                         minStock: item.product.minStock,
                     });
                 }
@@ -281,14 +283,23 @@ export const saleOrderService = {
                 data: { ...customerData, status: "SHIPPED", shippedAt: new Date() },
                 include: ORDER_INCLUDE,
             });
+        }).catch((error: unknown) => {
+            // T5-12 — fuera de la transacción, que ya se ha deshecho: un aviso creado dentro
+            // se habría ido con ella. El error sigue su camino tal cual.
+            if (error instanceof HttpError && error.code === "INSUFFICIENT_STOCK" && error.params) {
+                dispararAvisoDeVentaSinStock(id, {
+                    productName: String(error.params.producto),
+                    available: Number(error.params.disponible),
+                    required: Number(error.params.requerido),
+                }, actorId);
+            }
+            throw error;
         });
 
         // Alertas best-effort, fuera de la transacción y **sin esperarlas** (T2-07):
         // aquí eran una por producto y en serie, así que enviar la orden costaba
         // tantas idas y vueltas al SMTP como productos bajaran de mínimo.
-        for (const target of lowStockTargets) {
-            dispararAlertaStock(target.name, target.newStock, target.minStock);
-        }
+        for (const target of lowStockTargets) dispararAlertaStock(target);
 
         return updated;
     },

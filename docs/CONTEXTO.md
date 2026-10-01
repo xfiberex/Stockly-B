@@ -81,7 +81,7 @@ RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el prox
 (el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
 
 **Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 12/15** *(abierto el 2026-09-13; T5-01 a T5-11 y T5-13 cerradas)* · Total **126/129**.
+**Tier 4: 17/17** ✅ · **Tier 5: 13/15** *(abierto el 2026-09-13; T5-01 a T5-13 cerradas)* · Total **127/129**.
 
 **`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
 rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
@@ -509,10 +509,16 @@ incluida la extensión `pg_trgm` de T2-09.
 
 **Por dónde seguir (2026-09-29): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
 está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—, y también T5-07, T5-08,
-T5-09, T5-10 y T5-13, y después T5-06 y T5-11. Queda T5-12; T5-14 y T5-15 solo
-con un caso de uso real. La clase ABC (T5-10) podría ser un filtro al abrir un conteo;
-hoy solo lo es la categoría. El resumen semanal (T5-11) ya lista las **órdenes atrasadas**; T5-12 puede reutilizar su consulta
-(`reunirDatosDelResumen`). Lo que
+T5-09, T5-10 y T5-13, y después T5-06, T5-11 y T5-12. Quedan T5-14 y T5-15, solo
+con un caso de uso real.
+
+**Los avisos (T5-12) no tienen planificador detrás:** las compras atrasadas y la purga de los
+leídos se hacen al consultar el contador de la campana, como mucho cada cinco minutos por proceso
+(`notificationsService.mantenerSiToca`). Si nadie abre la aplicación, no se generan —y nadie los
+echa de menos—. Un aviso nuevo se añade en tres sitios: el enum `NotificationType`, su forma en
+`avisoSchema` (contrato) y su frase en `presentar()` de `CampanaDeAvisos.tsx`. La clase ABC (T5-10) podría ser un filtro al abrir un conteo;
+hoy solo lo es la categoría. El resumen semanal (T5-11) y los avisos (T5-12) deciden qué compra está **atrasada** con el mismo
+criterio, escrito dos veces —`reunirDatosDelResumen` y `notificationsService.mantener`—: si cambia, cambia en los dos. Lo que
 sigue se escribió al cerrar los Tiers 0 a 4. De las dos decisiones de producto que menciona, **el
 cubo parcial se tomó en T5-09** (meses naturales en la zona del negocio), y **la búsqueda exacta por
 SKU existe desde T5-08** —`GET /products/lookup`, la del escáner—; el buscador de texto del catálogo

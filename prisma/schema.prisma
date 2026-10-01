@@ -353,6 +353,8 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  notifications Notification[]
+
   // El buscador de usuarios mira **nombre y correo** con el mismo `ILIKE '%…%'`, así que
   // se indexan los dos: con uno solo, la mitad del `OR` seguiría recorriendo la tabla y
   // el planificador descartaría el índice entero (T2-09).
@@ -544,4 +546,43 @@ model WeeklyDigest {
   finishedAt    DateTime?
 
   @@map("weekly_digests")
+}
+
+// ─── T5-12 — Avisos dentro de la aplicación ────────────────────────────────────
+//
+// La alerta de stock bajo solo salía por correo, y solo si estaba activada: quien tenía la
+// aplicación abierta no se enteraba. Un aviso es de **un usuario** y habla de **una cosa** —un
+// producto, una venta, una compra—.
+
+enum NotificationType {
+  LOW_STOCK
+  SALE_UNSHIPPABLE
+  PURCHASE_OVERDUE
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  // Los avisos de una cuenta borrada no son de nadie: se van con ella.
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  // De qué habla: el producto, la venta o la compra. Sin clave foránea a propósito —son tres
+  // tablas distintas—; si aquello se borra, el aviso sigue diciendo lo que pasó.
+  entityId  String
+  // Los huecos del texto —nombre del producto, cantidades, fecha—, no el texto: lo compone la
+  // interfaz en el idioma de quien lo lee (T4-04), y una copia del momento no cambia si luego
+  // el producto se renombra. La forma de cada tipo está en `avisoSchema`, en el contrato.
+  data      Json
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  // **Un aviso por usuario y asunto.** Que el mismo producto vuelva a bajar no apila una fila
+  // más: reabre la que había, con las cifras nuevas. Es también lo que deja generar los avisos
+  // de compras atrasadas con un `ON CONFLICT DO NOTHING`, sin apuntar aparte cuáles ya se dieron.
+  @@unique([userId, type, entityId])
+  // La campana: los últimos de un usuario, y cuántos tiene sin leer.
+  @@index([userId, createdAt])
+  // La purga de los leídos hace más de 90 días.
+  @@index([readAt])
+  @@map("notifications")
 }

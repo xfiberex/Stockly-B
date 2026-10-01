@@ -40,7 +40,7 @@ export const saleOrderController = {
         next: NextFunction,
     ): Promise<void> {
         try {
-            const order = await saleOrderService.update(req.params.id, req.body);
+            const order = await saleOrderService.update(req.params.id, req.body, req.userId);
             const action = req.body.status === "SHIPPED" ? "SALE_SHIP"
                 : req.body.status === "CANCELLED" ? "SALE_CANCEL"
                 : "UPDATE";
@@ -55,7 +55,7 @@ export const saleOrderController = {
     /** T5-13 — `POST /:id/ship`: solo el envío, sin nada más de la orden que se pueda tocar. */
     async shipSaleOrder(req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> {
         try {
-            const order = await saleOrderService.update(req.params.id, { status: "SHIPPED" });
+            const order = await saleOrderService.update(req.params.id, { status: "SHIPPED" }, req.userId);
             await auditService.log(
                 { userId: req.userId, userEmail: req.userEmail },
                 "SALE_SHIP", "SaleOrder", req.params.id,

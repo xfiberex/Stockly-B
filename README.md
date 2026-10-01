@@ -63,6 +63,7 @@ Stockly-B/
     │   ├── sale-orders/        # Órdenes de venta (PENDING → SHIPPED / CANCELLED)
     │   ├── customers/          # Clientes: ficha, cifras e historial de ventas (T5-06)
     │   ├── inventory-counts/   # Conteo físico: sesiones, captura, cierre con ajustes (T5-07)
+    │   ├── notifications/      # Avisos dentro de la aplicación, por usuario (T5-12)
     │   ├── tags/               # Etiquetas de productos (many-to-many)
     │   ├── users/              # Panel admin: listar, cambiar rol, activar/desactivar
     │   ├── settings/           # Configuración de la app (key-value, catálogo tipado)
@@ -345,6 +346,20 @@ un producto, y costó caro: con 100 000 movimientos hundía la API entera (T4-15
 | Método | Ruta | Descripción | Rol |
 |---|---|---|---|
 | `GET` | `/` | Listar registros (paginado, filtros) | ADMIN |
+
+### Avisos — `/api/v1/notifications`
+
+Cada usuario lee y marca **los suyos**; no hay ruta que enseñe los de otro.
+
+| Método | Ruta | Descripción | Rol |
+|---|---|---|---|
+| `GET` | `/` | Mis 30 avisos más recientes y cuántos tengo sin leer | USER+ |
+| `GET` | `/unread-count` | Solo el contador: es la consulta periódica de la campana | USER+ |
+| `POST` | `/read-all` | Marcar todos como leídos | USER+ |
+| `POST` | `/:id/read` | Marcar uno como leído (404 si no es mío) | USER+ |
+
+Tres tipos, cada uno con sus datos en `data`: `LOW_STOCK`, `SALE_UNSHIPPABLE` y `PURCHASE_OVERDUE`.
+El texto lo compone el cliente en su idioma.
 
 ### Clientes — `/api/v1/customers`
 

@@ -19,6 +19,13 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ### Añadido
 
+- **Avisos dentro de la aplicación** (`T5-12`). Una campana en la cabecera con los avisos de cada
+  usuario y cuántos tiene sin leer: productos que quedan en su mínimo o por debajo, ventas que no
+  se pudieron enviar por falta de stock y compras que pasaron el plazo de su proveedor. El de
+  stock bajo sale **aunque la alerta por correo esté desactivada**. El contador se actualiza cada
+  minuto y al volver a la pestaña; los avisos leídos se borran a los 90 días. Rutas nuevas bajo
+  `/notifications`.
+
 - **Resumen semanal por correo** (`T5-11`). Cada administrador puede recibir, en su idioma, lo
   vendido la semana anterior y lo que sigue pendiente: productos en stock bajo, ventas sin enviar y
   compras fuera de plazo. Se activa en **Configuración** y lo envía un comando
@@ -199,6 +206,10 @@ en [`docs/ROADMAP.md`](docs/ROADMAP.md).
   versionado de las búsquedas por texto. Requieren una activación por clon (`T3-06`).
 
 ### Cambiado
+
+- **La consulta periódica de avisos no cuenta en el límite global de peticiones** (`T5-12`).
+  `GET /notifications/unread-count` tiene su propio cupo, del mismo tamaño (`RATE_LIMIT_MAX`):
+  tener la aplicación abierta en varias pestañas ya no acerca al 429 a quien está trabajando.
 
 - **Stockly pasa a ser software libre bajo la GNU AGPL v3**, en lugar de la MIT (ADR 0009). Se
   puede usar, estudiar, modificar y compartir, y quien ofrezca una versión modificada como servicio

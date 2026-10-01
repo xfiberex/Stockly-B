@@ -5,7 +5,13 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
 
 > **Convención de commits:** `fix(T0-01): resolver alias de rutas en el build de producción`
 
-> ## Estado al 2026-10-01 — **126 / 129**
+> ## Estado al 2026-10-01 — **127 / 129**
+>
+> **2026-10-01: se cierra T5-12**, avisos dentro de la aplicación: una campana en la cabecera con
+> los avisos de cada usuario —stock bajo, venta que no se pudo enviar, compra fuera de plazo— y su
+> contador de no leídos, que se consulta cada minuto y al volver a la pestaña. El aviso de stock
+> bajo sale **aunque el correo esté desactivado**. Quedan T5-14 y T5-15, que solo se abren con un
+> caso de uso real.
 >
 > **2026-10-01: se cierra T5-11**, resumen semanal por correo: lo vendido la semana natural
 > anterior y lo que sigue pendiente —stock bajo, ventas sin enviar, compras fuera de plazo—, a cada
@@ -1933,7 +1939,7 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
     - **Apagado por defecto** (`weeklyDigestEnabled`), como la alerta de stock.
   - **Fuera de alcance:** elegir el día de corte de la semana o los destinatarios; un resumen diario o mensual.
 
-- [ ] **[T5-12] Notificaciones dentro de la aplicación**
+- [x] **[T5-12] Notificaciones dentro de la aplicación** ✅ *(2026-10-01)*
   - **Área:** Notificaciones / UI
   - **Ubicación:** `prisma/schema.prisma` (modelo nuevo `Notification`), `src/shared/lib/stockAlerts.ts`, `src/modules/notifications/` (nuevo), `Stockly-F/src/shared/components/` (cabecera)
   - **Qué hacer:** la alerta de stock bajo **solo sale por correo**, y solo si está activada: quien tiene la aplicación abierta no se entera. Notificación por usuario, campana en la cabecera con contador de no leídas y marcar como leídas. Primeras fuentes: stock bajo (desde `dispararAlertaStock`), venta que no se puede enviar por falta de stock y, con T5-05, órdenes atrasadas. Consulta periódica al volver a la pestaña antes que SSE o WebSocket: menos piezas, y suficiente para avisos que no son de segundos.
@@ -1941,6 +1947,18 @@ Cada tarea es independiente, marcable y referenciable desde commits e issues por
   - **Criterio de aceptación:** reducir un producto por debajo del mínimo crea una notificación para cada ADMIN activo aunque el correo esté desactivado; marcarla leída la quita del contador en todas las pestañas en la siguiente consulta; las leídas de más de 90 días se purgan.
   - **Esfuerzo:** medio
   - **Depende de:** —
+  - **Decidido al diseñar (2026-10-01):**
+    - **Un aviso por usuario y asunto**, con índice único (`userId`, `type`, `entityId`). Que el mismo producto vuelva a bajar **no apila otra fila: reabre la suya**, sin leer y con la cifra nueva. Un producto que baja cinco veces en una mañana es una línea en la campana. Crear los avisos es una sola sentencia —`INSERT … SELECT` sobre los administradores activos con `ON CONFLICT`—, no «buscar y crear».
+    - **El aviso lleva los huecos de su texto, no el texto** (`data`, con una forma por tipo en `avisoSchema`): el servidor no sabe en qué idioma está la pantalla de quien lo lee. La frase la compone la interfaz, como los errores desde T4-04. Son una copia del momento: el stock que quedó entonces, no el de ahora.
+    - **A quién.** Stock bajo y compras atrasadas, a cada ADMIN activo. La venta que no se pudo enviar, a los ADMIN activos **menos a quien lo intentó**, que ya tiene el error delante: quien envía suele ser el almacén, y quien puede comprar lo que falta es el administrador. La campana la tienen todos los roles —cada cual ve solo los suyos—, aunque hoy las tres fuentes avisan solo a administradores.
+    - **Compras atrasadas y purga, sin planificador.** No las dispara ninguna petición, y el backend no tiene planificador (T5-11): van a lomos de la consulta del contador, **como mucho cada cinco minutos por proceso**. Las atrasadas usan el criterio del resumen semanal y `ON CONFLICT DO NOTHING` —una orden sigue atrasada mañana, y reabrir su aviso lo haría imposible de marcar como leído—. Un fallo ahí se registra y el contador responde igual.
+    - **La purga solo toca los leídos**, a los 90 días. Los que nadie ha leído no caducan; el índice único los acota a uno por asunto.
+    - **Consulta periódica, no SSE ni WebSocket:** cada minuto con la pestaña a la vista —React Query la pausa sola en segundo plano— y al volver a ella, que es lo que hace que marcar en una pestaña se note en otra. La lista solo se pide con el panel abierto; el sondeo solo cuenta filas.
+    - **Accesibilidad.** La región `aria-live` lleva el recuento y su texto se deriva del número: una consulta que devuelve lo mismo no cambia el DOM y no se anuncia. El botón se llama «Avisos: 3 sin leer». El panel es un diálogo no modal —dentro hay enlaces y un botón, no ítems de menú—: recibe el foco al abrirse, se cierra con Escape devolviéndolo a la campana, al pulsar fuera y al salir tabulando. «Sin leer» va también en palabras, no solo en el punto.
+    - **El sondeo tiene su propio cupo de peticiones.** Una pestaña abierta pregunta una vez por minuto: quince peticiones cada quince minutos que nadie ha pedido. Contadas en el límite global —100 por IP—, tres pestañas se comían casi la mitad y el 429 lo veía quien estaba trabajando. `GET /notifications/unread-count` queda fuera del límite global y lleva otro, del mismo tamaño (`RATE_LIMIT_MAX`), en un cubo aparte: lo peor que le pasa al sondeo es quedarse sin el suyo, y entonces la campana conserva el último número **sin enseñar el aviso de «demasiadas solicitudes»**, que es para lo que sí pulsó alguien. Salió al lanzar el E2E, no al diseñar.
+    - **Consecuencia que conviene saber: una pestaña a la vista mantiene la sesión viva.** El sondeo es una petición autenticada cada minuto; cuando el token de acceso caduca, el cliente lo renueva como con cualquier otra. Antes, una pestaña abierta y sin tocar dejaba de renovar; ahora no, mientras esté visible —en segundo plano el sondeo se pausa—. No hay un cierre de sesión por inactividad que esto rompa, pero si algún día se quiere uno, tendrá que contar con la campana.
+    - **Las fechas se insertan en UTC a propósito.** Los avisos se crean con SQL, y un `now()` a secas en una columna sin zona guarda la hora de la sesión de PostgreSQL: en Santo Domingo, cuatro horas menos. Tiene su test.
+  - **Fuera de alcance:** avisos para otros roles; elegir qué avisos recibe cada uno; abrir la orden concreta desde el aviso —las órdenes no tienen página propia: lleva al listado, y el título trae el número—; retirar el aviso cuando el problema se resuelve.
 
 ### Acceso
 
@@ -2114,6 +2132,7 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 
 | Fecha | Tarea | Verificación | Notas |
 |---|---|---|---|
+| 2026-10-01 | **T5-12** Notificaciones dentro de la aplicación — **completada** | **El criterio con tests:** una salida que deja un producto bajo mínimos crea un aviso para cada ADMIN activo con el correo desactivado —y ninguno para el administrador inactivo ni para los otros roles—; marcarlo lo quita del contador en la consulta siguiente de la misma sesión; los leídos hace 91 días se purgan y los de hace 89 y los no leídos se quedan. Además: el mismo producto reabre su aviso en vez de apilar otro; a quien intentó el envío no se le avisa; el día en que vence una compra aún no está atrasada, contado en la zona del negocio; el aviso de otro usuario responde 404. **Falsificado:** con `now()` a secas, sin el `userId` al marcar, con `DO UPDATE` en las atrasadas y con el aviso detrás del ajuste del correo fallan 1, 1, 1 y 3 tests. El cupo aparte del sondeo tiene los suyos, sobre los dos limitadores reales. `verify` ✅ backend **1052/1052** (96.34 %) y frontend **696 + 1 omitido** (77.21 %); **E2E 25/25 + 1 omitido** | **Decisiones:** en la ficha. **Lo que destapó el E2E:** con el backend de desarrollo levantado a mano —límite de 100 peticiones—, la pasada completa se quedó sin cupo, y de ahí salió mirar cuánto gastaba la campana por sí sola. **En el navegador:** con los datos del seed, la campana sale con las dos compras atrasadas; revisada a 1440 px y a 390 px, donde el panel se fija a la ventana porque la campana no está en el borde. El E2E hace la salida con la cuenta del almacén, abre el panel con el teclado, lo cierra con Escape, pulsa el aviso y comprueba en otra pestaña que ya sale leído |
 | 2026-10-01 | **T5-11** Resumen periódico por correo — **completada** | **El criterio con tests:** dos ejecuciones el mismo día envían un correo; con el ajuste apagado no sale nada y el comando devuelve 0; dos administradores reciben asunto, `lang` y cuerpo en su idioma. Además: dos ejecuciones **a la vez** envían una sola vez, un envío fallido se reintenta solo con ese destinatario, y los extremos de la semana son los de la zona del negocio —una venta del domingo a las 23:30 entra, la del lunes a las 00:30 no—. Sin la zona, o sin recordar a quién se envió, fallan 1 y 6 tests. `verify` ✅ backend **1012/1012** (96.35 %) y frontend **673 + 1 omitido** (76.72 %) | **Decisiones:** en la ficha. **Al ver el correo, y no en los tests:** la tarjeta de **todos** los correos medía 600 px fijos y en un móvil de 390 se salía (624); ahora encoge. No se ha enviado ningún correo real: el HTML se generó con los datos del seed y se revisó en capturas a 700 y 390 px. **De paso:** el formato de importe, copiado en el PDF y en las etiquetas, pasa a `shared/lib/moneda.ts`. |
 | 2026-09-30 | **T5-06** Clientes como entidad — **completada** | **El criterio con tests:** la ficha suma solo lo enviado —el test falla si se quita el filtro de estado—; editar el cliente deja intactas sus órdenes; la migración se prueba ejecutando **su propio SQL** sobre órdenes de prueba (correo con mayúsculas y espacios, dos «Juan Pérez» sin correo, un correo en blanco), y su recuento es una consulta de `operaciones.md` que el mismo test ejecuta. E2E: una venta con correo nuevo crea el cliente, la siguiente lo elige con el buscador y solo con el teclado, y enviar una suma su importe a la ficha, en escritorio y en móvil. `verify` ✅ backend **984/984** (96.35 %) y frontend **672 + 1 omitido** (76.59 %); **E2E 23/23 + 1 omitido** | **Decisiones:** en la ficha. **El E2E destapó dos defectos.** (1) El buscador de clientes enseñaba los resultados de la búsqueda anterior mientras llegaba la nueva, y en el móvil un Enter rápido elegía uno que no era lo escrito; ahora solo ofrece los de lo escrito. (2) **De T5-08:** la barra de selección del catálogo, con «Etiquetas», medía 508 px, y en un móvil de 393 el navegador ensanchaba la página entera; la ficha que se abría después quedaba descolocada. Ahora salta de línea y el E2E comprueba el ancho. Su test marcaba los productos antes de que se aplicara la búsqueda —que vacía la selección— y fallaba en un proyecto distinto en cada pasada: ahora espera a la respuesta. **De paso:** `axios` 1.20.0 en el frontend, por siete avisos altos publicados hoy; `Paginacion` pasa a `shared/components`; el formulario de cliente valida el correo con el mensaje de la aplicación, no con la burbuja del navegador. |
 | 2026-09-29 | **T5-08** Código de barras: búsqueda, escaneo y etiquetas — **completada** | **El criterio con tests:** el E2E imprime desde el catálogo las etiquetas de un producto con EAN-13 y de otro solo con SKU (Code 128), rasteriza el PDF y el escáner de la aplicación abre la ficha de cada uno, en escritorio y en móvil; un código desconocido se da de alta con el código puesto. En el backend, cada simbología se vuelve a leer con ZXing. `verify` ✅ backend **935/935** (96.28 %) y frontend **654 + 1 omitido** (76.57 %); **E2E 21/21 + 1 omitido** | **Decisiones:** `barcode-detector` —nativo donde sirve, ZXing en WebAssembly donde no, todo bajo demanda y el `.wasm` servido por la aplicación—; en el catálogo el escaneo abre la ficha; en el conteo lleva a la línea; etiquetas en A4 y en rollo. **El E2E destapó** que un SKU de 22 caracteres en la etiqueta de 50 mm salía con barras de 0,15 mm que no se leían: ahora hay un módulo mínimo de 0,2 mm y lo que no cabe se rechaza nombrando el producto. **El build destapó** que la librería viajaba en el primer arranque por la regla de trozos de Vite. **De paso:** un SKU repetido daba 500 y ahora es 409. |
@@ -2246,16 +2265,16 @@ Registrar aquí cada tarea completada con su fecha y una nota breve de verificac
 | **Tier 2** | **48** | **48** | **100 %** ✅ |
 | **Tier 3** | **15** | **15** | **100 %** ✅ |
 | **Tier 4** | **17** | **17** | **100 %** ✅ |
-| **Tier 5** | 12 | 15 | 80 % |
-| **Total** | **126** | **129** | **98 %** |
+| **Tier 5** | 13 | 15 | 87 % |
+| **Total** | **127** | **129** | **98 %** |
 
 *El denominador creció cinco veces con tareas que no venían de la auditoría —cuatro el 2026-08-08 (T2-42 a T2-45), tres el 2026-08-09 (T2-46 a T2-48), una el 2026-08-10 (T4-11) y cinco el 2026-08-11 (T4-12 a T4-16)—, así que ese 100 % es sobre 114, no sobre las 100 originales. **Y una de las 114 está descartada, no hecha** (T4-17).*
 
 ***Esta tabla se ha quedado atrás dos veces, y las dos por lo mismo:** se cierra una tarea, se marca la casilla y se actualiza la cabecera, y el resumen —que está 1 800 líneas más abajo— no se toca. La primera vez decía 102/109 con las casillas en 104/110 (cierres de T4-05 y T4-06, alta de T4-13); la segunda, 107/114 con las casillas en **112/114**, porque no llegaron aquí los cinco cierres del 2026-08-11 y 12 —T4-12, T4-13, T4-14, T4-10 y T4-17—. **Se cuentan las casillas, no se recuerdan**, y contarlas es un comando:*
 
 ```bash
-grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 126
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 3 (el Tier 5, abierto el 2026-09-13)
+grep -c '^- \[x\] \*\*\[T' docs/ROADMAP.md    # 127
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 2 (el Tier 5, abierto el 2026-09-13)
 ```
 
 *Al cerrar una tarea hay que tocar **la casilla, la cabecera, el índice, esta tabla y la de [CONTEXTO §3](CONTEXTO.md)**. Si los cinco números no coinciden, manda el `grep`.*
@@ -2268,14 +2287,14 @@ grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # 3 (el Tier 5, abierto el 2026-09
 
 | Métrica | Inicial (auditoría) | Actual (2026-08-12) | Objetivo |
 |---|---|---|---|
-| Tests backend | 198/198 ✅ | **1012/1012** ✅ *(2026-10-01, T5-11)* | mantener en verde |
-| Cobertura backend (sentencias) | 86.92 % | **96.35 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
-| Tests frontend | 181/181 ✅ | **673/673** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-10-01, T5-11)* | mantener en verde |
-| Cobertura frontend (sentencias) | 19.88 % | **76.72 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
+| Tests backend | 198/198 ✅ | **1052/1052** ✅ *(2026-10-01, T5-12)* | mantener en verde |
+| Cobertura backend (sentencias) | 86.92 % | **96.34 %** ✅ *(suelo en 85 %, T2-22)* | ≥ 88 % |
+| Tests frontend | 181/181 ✅ | **696/696** ✅ *(+1 omitido: una parte de la frescura del contrato; 2026-10-01, T5-12)* | mantener en verde |
+| Cobertura frontend (sentencias) | 19.88 % | **77.21 %** ✅ *(suelo subido a 45 % con T4-01)* | ≥ 45 % — **alcanzado** |
 | Idiomas de la interfaz | 1 *(español incrustado en los componentes)* | **2** ✅ *(español e inglés, con «auto» siguiendo al navegador, T4-04)* | 2 |
 | Idiomas de los correos | 1 *(español, con el texto dentro del HTML)* | **2** ✅ *(los cinco que envía la aplicación: T4-12, y el resumen semanal de T5-11)* | los mismos que la interfaz |
 | Textos de interfaz escritos a mano | 289 en 47 archivos *(medido con la guardia sobre el árbol anterior)* | **0** ✅ *(`literales.test.ts` los vigila)* | 0 |
-| Errores de la API con código estable | 0 *(solo `message`, siempre en español)* | **61 códigos** ✅ *(el cliente compone la frase en su idioma, T4-04; 2026-09-30, T5-06)* | que ningún mensaje de error dependa del idioma del servidor |
+| Errores de la API con código estable | 0 *(solo `message`, siempre en español)* | **62 códigos** ✅ *(el cliente compone la frase en su idioma, T4-04; 2026-10-01, T5-12)* | que ningún mensaje de error dependa del idioma del servidor |
 | Tipos de respuesta declarados por duplicado | 12 módulos, dos copias a mano | **0** ✅ *(fuente única + copia generada, T4-01)* | una sola fuente de verdad |
 | Divergencias de contrato que el compilador ve | 0 *(el tipo mentía y nada lo señalaba)* | **12 detectadas y corregidas** ✅ | que una divergencia no compile |
 | Esquemas del spec escritos a mano | 14 *(~180 líneas de objeto literal)* | **0** ✅ *(23 derivados; solo `ProductWrite.image` es manual, T4-02)* | que la documentación se derive de la validación |

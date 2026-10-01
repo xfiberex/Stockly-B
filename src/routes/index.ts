@@ -18,6 +18,7 @@ import { auditLogsRouter } from "@/modules/audit-logs";
 import { saleOrdersRouter } from "@/modules/sale-orders";
 import { customersRouter } from "@/modules/customers";
 import { inventoryCountsRouter } from "@/modules/inventory-counts";
+import { notificationsRouter } from "@/modules/notifications";
 
 export const router = Router();
 
@@ -116,6 +117,7 @@ export const MONTAJES = [
     ["/users", usersRouter],
     ["/settings", settingsRouter],
     ["/audit-logs", auditLogsRouter],
+    ["/notifications", notificationsRouter],
 ] as const;
 
 for (const [prefijo, modulo] of MONTAJES) router.use(prefijo, modulo);

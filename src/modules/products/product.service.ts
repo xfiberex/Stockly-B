@@ -440,7 +440,7 @@ export const productService = {
         }).catch(traducirUnicidad);
 
         if (hasStockChange && stockDelta < 0) {
-            dispararAlertaStock(updated.name, newStock!, updated.minStock);
+            dispararAlertaStock({ id: updated.id, name: updated.name, stock: newStock!, minStock: updated.minStock });
         }
 
         return updated;
@@ -738,7 +738,7 @@ export const productService = {
 
         // Solo alerta si el stock disminuyó respecto al valor previo.
         if (newStock < product.stock) {
-            dispararAlertaStock(product.name, newStock, product.minStock);
+            dispararAlertaStock({ id: productId, name: product.name, stock: newStock, minStock: product.minStock });
         }
 
         return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
@@ -772,7 +772,7 @@ export const productService = {
                     }
 
                     if (outcome.delta < 0) {
-                        dispararAlertaStock(outcome.name, stock, outcome.minStock);
+                        dispararAlertaStock({ id: productId, name: outcome.name, stock, minStock: outcome.minStock });
                     }
 
                     results.push({ productId, success: true });

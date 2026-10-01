@@ -40,6 +40,7 @@ monta una empresa con el código, es esa empresa.
 | Nombre, correo y teléfono del cliente de un pedido de venta | `sale_orders.customerName` / `customerEmail` / `customerPhone` | Opcionales. Pueden ser de una persona física. Es la instantánea de a quién se vendió: no cambia al editar ni al borrar el cliente |
 | Correo y teléfono de proveedores | `suppliers` | Suelen ser de empresas, pero pueden ser de una persona |
 | A qué administradores se envió cada resumen semanal | `weekly_digests.sentToUserIds` (T5-11) | Solo el identificador del usuario, no su correo. El resumen que reciben no lleva nombres de clientes |
+| Qué avisos tiene cada usuario y cuándo los leyó | `notifications` (T5-12) | Del usuario solo el identificador; del asunto, nombres de productos y proveedores, **no de clientes**: la venta se cita por su número. Los leídos se borran a los 90 días |
 | IP y cabeceras (entre ellas el *user-agent*) de cada petición | Registros de `pino-http` en producción | `authorization`, `cookie` y `set-cookie` se ocultan; la IP no. Dónde y cuánto tiempo se guarden depende de la plataforma de despliegue |
 | Todo lo anterior, en copia | Copias de seguridad, **14 días** y nunca menos de 3 | [operaciones.md](operaciones.md) |
 

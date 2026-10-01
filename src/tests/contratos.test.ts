@@ -52,6 +52,7 @@ describe("Contrato de la API (T4-01)", () => {
             ["AuditAction", contrato.accionAuditoriaSchema.options, $Enums.AuditAction],
             ["AuditEntity", contrato.entidadAuditoriaSchema.options, $Enums.AuditEntity],
             ["InventoryCountStatus", contrato.estadoConteoSchema.options, $Enums.InventoryCountStatus],
+            ["NotificationType", contrato.tipoDeAvisoSchema.options, $Enums.NotificationType],
         ];
 
         it.each(casos)("%s", (_nombre, delContrato, dePrisma) => {

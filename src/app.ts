@@ -2,13 +2,13 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { rateLimit } from "express-rate-limit";
 import { pinoHttp } from "pino-http";
 import { env } from "@/config/env";
 import { logger, generarRequestId } from "@/shared/lib/logger";
 import { router } from "@/routes";
 import { errorHandler } from "@/shared/middlewares/error.middleware";
 import { csrfProtection } from "@/shared/middlewares/csrf.middleware";
+import { crearLimitadorGlobal } from "@/shared/middlewares/rateLimiter.middleware";
 import { metricas } from "@/shared/middlewares/metricas.middleware";
 import { notFoundHandler } from "@/shared/middlewares/notFound.middleware";
 import { registerSwagger } from "@/swagger";
@@ -72,14 +72,10 @@ app.use(cookieParser());
 // Se omite en test para no bloquear ejecuciones repetidas del suite.
 // `RATE_LIMIT_MAX` existe por el E2E: una sola pasada del navegador supera con
 // holgura las 100 peticiones y el 429 hacía fallar pruebas que no iban de eso.
+// La consulta periódica de la campana queda fuera: lleva su propio cupo (T5-12, ver
+// `RUTA_DEL_SONDEO`).
 if (env.nodeEnv !== "test") {
-    app.use(rateLimit({
-        windowMs: 15 * 60 * 1000,
-        max: env.rateLimitMax,
-        standardHeaders: true,
-        legacyHeaders: false,
-        message: { success: false, message: "Demasiadas peticiones, intenta más tarde." },
-    }));
+    app.use(crearLimitadorGlobal(env.rateLimitMax));
 }
 
 // Protección CSRF (double-submit) antes de las rutas mutantes
