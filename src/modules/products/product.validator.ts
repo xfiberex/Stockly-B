@@ -115,6 +115,3 @@ export const bulkStockSchema = z.object({
         .min(1, "Se requiere al menos un producto"),
     reason: z.string().trim().max(200).optional(),
 });
-
-export type CreateProductInput = z.infer<typeof createProductSchema>;
-export type UpdateProductInput = z.infer<typeof updateProductSchema>;

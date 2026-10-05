@@ -121,7 +121,7 @@ dice qué se anunciaría, no cómo suena ni si el recorrido resulta comprensible
 >
 > **Esto no convierte lo de arriba en comprobado.** Sigue sin cubrirse que la secuencia se
 > entienda **de oído**: una tabla puede recitar sus cabeceras en cada celda, un aviso de
-> `react-hot-toast` puede no llegar a anunciarse nunca y un orden correcto en el DOM puede
+> `react-toastify` puede no llegar a anunciarse nunca y un orden correcto en el DOM puede
 > resultar incomprensible leído. **Ninguna guardia de `verify` mira eso**, y ninguna de las
 > tres que dejó T4-09 lo sustituye. Se reabre si aparece una máquina con lector.
 

@@ -79,22 +79,7 @@ export interface ImportProductDto {
     isActive?: boolean;
 }
 
-export interface ImportResult {
-    created: number;
-    errors: Array<{ row: number; error: string }>;
-}
-
 export type StockMovementType = "IN" | "OUT" | "ADJUSTMENT" | "IMPORT";
-
-export interface StockMovement {
-    id: string;
-    productId: string;
-    type: StockMovementType;
-    delta: number;
-    stockAfter: number;
-    note?: string | null;
-    createdAt: string;
-}
 
 export interface CreateManualMovementDto {
     type: "IN" | "OUT" | "ADJUSTMENT";

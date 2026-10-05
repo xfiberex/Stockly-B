@@ -1,204 +1,106 @@
 # Dependencias: vulnerabilidades y licencias
 
-Análisis de composición de los dos repositorios (T4-07). La auditoría del 2026-08-04 dejó
-esta zona sin cubrir: se revisó el código propio, no el ajeno, que es la mayor parte de lo
-que se despliega.
+Análisis de composición de los dos repositorios (T4-07): lo que se despliega y no es código propio.
 
-**Fecha del análisis:** 2026-08-11. Los recuentos envejecen con cada `pnpm install`; lo que
-no envejece es la puerta automática de la sección 5, que vuelve a comprobarlo en cada
-`pnpm verify`.
+**Recuentos del 2026-10-05.** Envejecen con cada `pnpm install`; lo que no envejece es la puerta
+del §4, que lo vuelve a comprobar en cada `pnpm verify`.
 
 ---
 
 ## 1. Qué se mira y qué no
 
 Solo **dependencias de producción** (`--prod`). Las de desarrollo no se despliegan: una
-vulnerabilidad en `eslint` no es alcanzable por nadie desde fuera, y meterlas en la puerta
-la llenaría de ruido que acabaría desactivándola.
+vulnerabilidad en `eslint` no es alcanzable desde fuera, y meterlas en la puerta la llenaría de un
+ruido que acabaría desactivándola.
 
 | | Stockly-B | Stockly-F |
 |---|---|---|
-| Dependencias directas de producción | 23 | 16 |
-| Árbol completo de producción | **296** paquetes | **118** paquetes |
-| Licencias distintas | 11 | 7 |
+| Dependencias directas de producción | 21 | 18 |
+| Árbol de producción (`pnpm licenses list --prod`) | **159** paquetes | **114** paquetes |
+| Licencias distintas | 8 | 8 |
+| Vulnerabilidades conocidas, en cualquier severidad | 0 | 0 |
 
-**Fuera del alcance de esta herramienta**, y conviene no confundirlo con «revisado»:
-
-- La **imagen base de Docker** (`node:22-alpine`) y el sistema que trae. `pnpm audit` mira
-  el registro de npm y nada más.
-- **PostgreSQL**, que corre como servicio aparte.
-- Las **acciones y binarios** del entorno de desarrollo.
+**Fuera del alcance de esta herramienta**, y conviene no confundirlo con «revisado»: la imagen
+base de Docker (`node:22-alpine`) y su sistema, PostgreSQL, y las acciones y binarios del entorno
+de desarrollo. `pnpm audit` mira el registro de npm y nada más.
 
 ---
 
-## 2. Vulnerabilidades
+## 2. Vulnerabilidades: qué hacer cuando la puerta se pone roja
 
-```
-Stockly-B  crítica 0, alta 0, moderada 0, baja 0, info 0   (296 paquetes)
-Stockly-F  crítica 0, alta 0, moderada 0, baja 0, info 0   (118 paquetes)
-```
+**Un árbol limpio no se queda limpio solo.** Sin tocar una dependencia, `verify` amaneció en rojo
+el 2026-09-13 —diez avisos altos, dos semanas— y otra vez el 2026-09-30, en los dos repositorios.
+El patrón que salió de ahí:
 
-Ninguna, en ninguna severidad. Ayuda que las dependencias se subieran hace poco: la propia
-`pnpm` pasó de 11.2.2 a 11.21.0 el 2026-08-09 precisamente por avisos de path traversal y de
-ejecución de *lifecycle scripts*.
+1. **Directa, y hay arreglo en la misma versión mayor:** se sube. Así se resolvieron `multer` y
+   `axios`.
+2. **Directa, y la rama actual no recibe el arreglo:** salto de mayor, leyendo antes qué rompe.
+   `nodemailer` pasó de la 9 a la 10 porque su única ruptura era exigir Node 20, y el proyecto usa
+   22; `smtp-tls.test.ts` ejercita el transporte real, sin mock.
+3. **Transitiva con un rango que ya admite la versión corregida:** `pnpm update <paquete>`. Fue el
+   caso de `ip-address`.
+4. **Transitiva que su dueño fija a versión exacta:** `overrides` en `pnpm-workspace.yaml`. Subir
+   al dueño no sirve si la versión nueva la sigue fijando.
+5. **No tomar una versión publicada hace horas.** Es justo lo que la cadena de suministro
+   aconseja dejar reposar: se toma la anterior que ya lleve el arreglo.
 
-**Un árbol limpio no se queda limpio solo (2026-09-28).** Sin tocar una sola dependencia, el
-backend amaneció el 2026-09-13 con **10 avisos altos** publicados después del último `verify` en
-verde, y la puerta estuvo en rojo dos semanas. Se resolvió así, y es el patrón para la próxima:
-
-- **Directas:** subir dentro de la misma versión mayor — `multer` 2.2.0 → 2.4.0, `nodemailer`
-  9.0.5 → 9.1.1 (no la 10), y de paso `morgan` 1.11.0 → 1.12.1 por un aviso moderado.
-- **Transitivas que su dueño fija a versión exacta:** `overrides` en `pnpm-workspace.yaml`.
-  `prisma` fija `mysql2@3.15.3` y `deepmerge-ts@7.1.5`, y Prisma 7.10 los sigue fijando, así que
-  subir Prisma no servía. Que el CLI se pode de la imagen (T4-14) no lo saca de `pnpm audit
-  --prod`: cuenta el árbol del lockfile, no el de la imagen. `deepmerge-ts` 7 → 8 es salto de
-  mayor, y se aceptó porque Prisma solo llama a `deepmerge()` como fusionador de `c12`, cuya firma
-  no cambia; `prisma generate` y `migrate deploy` dentro de `verify` lo ejercitan.
-- **Cada `override` es deuda:** el comentario del propio archivo dice cuándo retirarlo.
-
-**Y dos días después, otra vez (2026-09-30).** El commit de la licencia (ADR 0009) falló en la CI
-por un aviso alto nuevo en `nodemailer` (GHSA-v53p-9fqp-m79j, ≤10.0.5, corregido en 10.0.6), más
-siete moderados de `nodemailer` y de `ip-address`. Esta vez **sí hubo salto de mayor**:
-
-- **`nodemailer` 9.1.1 → 10.0.12.** La rama 9 no recibe el arreglo. La única ruptura de la 10 es
-  exigir Node 20, y la CI y los Dockerfiles usan Node 22; el resto es la migración del paquete a
-  TypeScript con compilación ESM y CommonJS, que conserva la exportación por defecto y la forma de
-  los tipos de `@types/nodemailer`. `smtp-tls.test.ts`, que usa `nodemailer` sin mock contra un
-  servidor SMTP falso, ejercita el transporte real. Se toma la 10.0.12 y no la 10.0.13, publicada
-  ese mismo día: una versión de horas es justo lo que la cadena de suministro aconseja dejar reposar.
-- **`ip-address` 10.4.0 → 10.7.2** sin `override`: `express-rate-limit` lo pide como `^10.2.0`, así
-  que bastó `pnpm update ip-address` para que el lockfile tomara la corregida.
-- Sale de `minimumReleaseAgeExclude` la entrada `nodemailer@9.0.1`, que ya no está en el árbol.
-
-**Y ese mismo día, el frontend.** Al cerrar T5-06, `pnpm auditoria` del frontend salió con **siete
-avisos altos y cinco moderados**, todos de `axios` < 1.20.0 y publicados ese día. Dependencia
-directa y dentro de la misma versión mayor: `axios` 1.19.0 → 1.20.0, que llevaba un mes publicada.
-El E2E completo, que pasa entero por `axios`, en verde después.
-
-En la misma pasada **pnpm pasó a 12.4.1 en los dos repositorios**, `packageManager` y Dockerfiles.
-El backend ya estaba en 12.4.1 desde el commit de T5-01, que se lo llevó sin querer, y el resto
-seguía en 11.21.0.
+**Cada `override` es deuda**, y el comentario del propio archivo dice cuándo retirarlo. Hoy hay
+cuatro: `mysql2`, `deepmerge-ts` y `fast-uri`, que cuelgan del CLI de Prisma, y `qs`, de express.
+El CLI se poda de la imagen (§5), pero `pnpm why <paquete> --prod` lo sigue alcanzando a través de
+`@prisma/client`, así que la auditoría lo cuenta. Al subir Prisma o express, se mira con ese
+comando si ya traen la versión corregida.
 
 ---
 
 ## 3. Licencias
 
-**No hay GPL, LGPL, AGPL ni SSPL en ninguno de los dos árboles.** Es el resultado que
-importa: ninguna dependencia de producción impone condiciones sobre la licencia del producto.
+**No hay GPL, LGPL, AGPL ni SSPL en ninguno de los dos árboles**: ninguna dependencia de
+producción impone condiciones sobre la licencia del producto. Todas son compatibles con la
+AGPL v3 de Stockly.
 
-### Stockly-B (296 paquetes)
+| Licencia | Stockly-B | Stockly-F |
+|---|---:|---:|
+| MIT | 133 | 94 |
+| ISC | 8 | 13 |
+| Apache-2.0 | 11 | 1 |
+| BSD-3-Clause | 3 | 2 |
+| BSD-2-Clause · MIT-0 · 0BSD · «(MIT AND Zlib)» | 1 cada una | — |
+| MPL-2.0 · OFL-1.1 · «MIT AND ISC» · «(MIT OR CC0-1.0)» | — | 1 cada una |
 
-| Licencia | Paquetes |
-|---|---:|
-| MIT | 230 |
-| ISC | 27 |
-| Apache-2.0 | 26 |
-| BSD-3-Clause | 5 |
-| Unlicense | 2 |
-| BSD-2-Clause, EPL-2.0, MIT-0, 0BSD, «MIT and ISC», «(MIT AND Zlib)» | 1 cada una |
+### Las que no son permisivas sin más
 
-### Stockly-F (118 paquetes)
+- **OFL-1.1 — `@fontsource/inter`** (frontend, directa). **Traía una obligación que no se estaba
+  cumpliendo**: los `.woff2` de Inter se copian a `dist/`, así que la aplicación distribuye la
+  tipografía y la OFL exige que el aviso de licencia la acompañe.
+- **MPL-2.0 — `lightningcss`** (frontend, transitiva). Copyleft por archivo, y además es una
+  herramienta de compilación: su código no viaja al navegador.
+- **«(MIT OR CC0-1.0)» — `type-fest`** (frontend, transitiva de `zxing-wasm`). Doble licencia a
+  elegir; se toma la MIT. Solo trae tipos.
+- **El `.wasm` del escáner es ZXing-C++, que es Apache-2.0**, aunque `zxing-wasm` declare MIT —la
+  de sus enlaces en JavaScript—. `pnpm licenses` no puede saberlo: `scripts/auditoria.js` lleva
+  una lista `EMBEBIDOS` con lo que viaja dentro de otro paquete.
 
-| Licencia | Paquetes |
-|---|---:|
-| MIT | 98 |
-| ISC | 13 |
-| BSD-3-Clause | 2 |
-| MPL-2.0 | 2 |
-| Apache-2.0, OFL-1.1, «MIT AND ISC» | 1 cada una |
+### El aviso de terceros
 
-### Las tres que no son permisivas sin más
-
-**EPL-2.0 — `elkjs`** (Stockly-B, transitiva). Copyleft **por archivo**: la obligación se
-dispara al modificar los archivos de la propia biblioteca, no al depender de ella. No se
-toca su código. Llega por una cadena que merece su propia nota, la sección 4.
-
-**MPL-2.0 — `lightningcss`** (Stockly-F, transitiva). Mismo tipo de copyleft por archivo, y
-además es una herramienta de compilación dentro de la cadena de Tailwind/Vite: su código no
-viaja en el paquete que se sirve al navegador.
-
-**OFL-1.1 — `@fontsource/inter`** (Stockly-F, directa). **Esta sí traía una obligación que
-no se estaba cumpliendo.** Los `.woff2` de Inter se copian a `dist/`, así que la aplicación
-distribuye la tipografía, y la OFL exige que el aviso de licencia la acompañe. Lo mismo vale,
-en menor grado, para la MIT: *«this permission notice shall be included in all copies or
-substantial portions of the Software»*, y el paquete de JavaScript es exactamente eso.
-
-Resuelto generando `Stockly-F/public/AVISOS-DE-TERCEROS.txt` —118 paquetes con el texto de
-su licencia, unos 290 KB— con:
+`Stockly-F/public/AVISOS-DE-TERCEROS.txt` recoge el texto de la licencia de cada paquete de
+producción, y `public/` se copia tal cual a `dist/`: el aviso queda servido junto a la aplicación.
 
 ```bash
 pnpm auditoria --informe          # en Stockly-F
 ```
 
-`public/` se copia tal cual a `dist/`, así que el aviso queda servido junto a la aplicación
-y no olvidado en el repositorio. **Hay que regenerarlo cuando cambien las dependencias:** no
-está atado al `build` a propósito, porque un `build` que escribe en el árbol de fuentes
-ensucia cualquier comprobación de que el repositorio está limpio.
-
-Cinco de los 118 paquetes no incluyen el texto de su licencia; el aviso lo dice en lugar de
-inventarlo.
+**Hay que regenerarlo cuando cambien las dependencias.** No está atado al `build` a propósito: un
+`build` que escribe en el árbol de fuentes ensucia cualquier comprobación de que el repositorio
+está limpio. Los paquetes que no incluyen el texto de su licencia se listan como tales, en lugar
+de inventarlo. El backend no genera un archivo equivalente: cada paquete lleva su licencia dentro
+de `node_modules`, que viaja en la imagen ([legal.md §2.5](legal.md)).
 
 ---
 
-## 4. Hallazgo: el CLI de Prisma viaja en la imagen de producción
-
-> **Resuelto en T4-14 (2026-08-12), y con la causa distinta de la que se escribió aquí.** Lo
-> que sigue es el hallazgo original; la corrección va debajo.
-
-`prisma` está en `dependencies`, no en `devDependencies`, y **está puesto ahí a propósito**:
-el contenedor arranca con `prisma migrate deploy && node dist/server.js`, así que el CLI
-tiene que estar en la imagen. Está documentado en el `Dockerfile`.
-
-Lo que no era evidente es el precio. `prisma` arrastra `@prisma/studio-core`, que es una
-interfaz gráfica, y con ella su árbol de gráficos y diagramas: `elkjs`, `@visx/vendor`,
-`robust-predicates`. **Ahí está la única EPL-2.0 del proyecto**, y buena parte de la
-diferencia entre 296 paquetes de producción y los ~100 que necesita el servidor para
-funcionar.
-
-### La corrección (T4-14)
-
-**No era por estar en `dependencies`.** `@prisma/client` declara `prisma` —y `typescript`—
-como **peers opcionales**, y pnpm los instala solos. Bajar `prisma` a `devDependencies` deja
-el árbol **exactamente igual**, y está medido: `pnpm install --prod` en un contenedor limpio
-da **313 paquetes con los dos manifiestos**. El remedio que proponía la ficha, por sí solo,
-no habría cambiado nada — y encima habría roto el `CMD`, porque el CLI deja de enlazarse.
-
-Lo que sí viajaba, medido dentro de la imagen:
-
-| Paquete | Tamaño | Qué es |
-|---|---:|---|
-| `@prisma/studio-core` | 42 MB | una interfaz gráfica, con React y sus diagramas (`elkjs` ← **la única EPL-2.0**) |
-| `effect` | 34 MB | vía `@prisma/config` |
-| `typescript` | 24 MB | peer de tipos; el servidor ejecuta JavaScript compilado |
-| `@electric-sql/pglite` | 23 MB | un PostgreSQL para el navegador, vía `@prisma/dev` |
-| `@prisma/dev` | 18 MB | se llama «dev» |
-
-**Cómo se quitó:** las migraciones salen del `CMD` a un servicio `migrate` que corre antes y
-termina, y el árbol se poda con
-[`scripts/podar-produccion.js`](../scripts/podar-produccion.js), que **corta los dos peers y
-barre lo que deja de ser alcanzable** desde los enlaces de la raíz. Resultado: **1.81 GB → 426
-MB** y **313 → 183 paquetes**.
-
-> **Por qué una regla y no una lista.** La primera versión enumeraba paquetes: recortaba
-> tamaño pero dejaba **292 de 313 entradas**, porque las transitivas del CLI no estaban en la
-> lista. Y una lista escrita a mano envejece con la siguiente versión de Prisma sin que nadie
-> se entere.
-
-### Lo que esto **no** cambia: la cifra de la puerta
-
-`pnpm auditoria` sigue diciendo **296 paquetes de producción**, y no es un descuido. Mide el
-grafo **declarado** —lo que `pnpm licenses list --prod` resuelve, peers incluidos—, que es un
-**superconjunto** de lo que acaba en la imagen. Para una puerta de vulnerabilidades y
-licencias eso es lo correcto: audita de más, nunca de menos. Los 183 de la imagen son otra
-medida, y se toma en el `build`.
-
----
-
-## 5. La puerta automática
+## 4. La puerta automática
 
 `pnpm verify` termina en `pnpm auditoria` en los dos repositorios
-([`Stockly-B/scripts/auditoria.js`](../scripts/auditoria.js),
-[`Stockly-F/scripts/auditoria.js`](../../Stockly-F/scripts/auditoria.js)).
+([backend](../scripts/auditoria.js), [frontend](../../Stockly-F/scripts/auditoria.js)).
 
 | Comprobación | Necesita red | ¿Rompe la compilación? |
 |---|---|---|
@@ -207,69 +109,60 @@ medida, y se toma en el `build`.
 | Licencia fuera de la lista permitida | No | **Sí** |
 | No se pudo auditar (sin red) | — | No, avisa. Con `--estricto`, sí |
 
-**El corte está en «alta» a propósito.** Una puerta que salta con cualquier aviso de
-severidad baja se acaba desactivando, y entonces no protege de nada.
+- **El corte está en «alta» a propósito.** Una puerta que salta con cualquier aviso de severidad
+  baja se acaba desactivando.
+- **Sin red avisa y deja pasar**, porque «no se puede saber» no es «hay un problema»: una puerta
+  que se pone roja sin conexión se acabaría esquivando. Antes de publicar,
+  `pnpm auditoria --estricto`.
+- **La comprobación de licencias es dura y no depende de la red**: sale del lockfile. Una
+  dependencia nueva con una licencia que no esté en la lista para la compilación hasta que
+  alguien la mire.
+- **La lista permitida es de cada repositorio** (`LICENCIAS_PERMITIDAS` en su
+  `scripts/auditoria.js`), y son distintas a propósito: una común sería la unión de las dos y
+  dejaría pasar en un repositorio lo que solo se revisó para el otro.
 
-**Sin red avisa y deja pasar,** porque «no se puede saber» no es «hay un problema». Este
-proyecto no tiene CI —decisión del 2026-08-06—, así que `verify` se ejecuta en portátiles;
-una puerta que se pone roja sin conexión se acabaría esquivando con `--no-verify`, que es
-peor que no tenerla. Antes de publicar, `pnpm auditoria --estricto` convierte ese aviso en
-fallo.
+**La trampa que hubo que esquivar:** `pnpm audit --json` con el registro caído puede imprimir un
+informe con las cinco severidades a cero. La auditoría que nunca se hizo se lee igual que la que
+salió limpia; lo que las separa es la clave `error` del JSON, no el código de salida.
 
-**La comprobación de licencias sí es dura y no depende de la red:** sale del lockfile. Es la
-que de verdad vigila el día a día — una dependencia nueva que llegue con una licencia que no
-esté en la lista para la compilación hasta que alguien la mire y decida.
-
-### La trampa que hizo falta esquivar
-
-`pnpm audit --json` **con el registro caído puede seguir imprimiendo un informe con las cinco
-severidades a cero**. Leer `metadata` sin más da un verde falso: la auditoría que nunca se
-hizo se lee exactamente igual que la que salió limpia. Lo que separa los dos casos es la
-clave `error` del JSON — no el código de salida, que varía según cómo falle.
-
-**Lo vigila:** [`src/tests/auditoria.test.ts`](../src/tests/auditoria.test.ts) en los dos
-repositorios, con informes fabricados. Hacen falta porque hoy el árbol está limpio: ejecutar
-el guion sale verde tanto si la puerta funciona como si no comprueba nada, así que la única
-forma de demostrar que se pone roja es darle una vulnerabilidad alta de mentira y una GPL.
-
-### Añadir una licencia a la lista
-
-En `LICENCIAS_PERMITIDAS` de `scripts/auditoria.js`, **del repositorio que la necesita**. Las
-dos listas son distintas a propósito: el navegador trae MPL-2.0 y OFL-1.1, el servidor trae
-EPL-2.0. Una lista común sería la unión de ambas y dejaría pasar en un repositorio lo que
-solo se revisó para el otro.
+**Lo vigila** `src/tests/auditoria.test.ts`, en los dos repositorios, con informes fabricados: con
+el árbol limpio, ejecutar el guion sale en verde tanto si la puerta funciona como si no comprueba
+nada, así que solo se demuestra dándole una vulnerabilidad alta de mentira y una GPL.
 
 ---
 
-### T5-08 — el escáner (2026-09-29)
+## 5. El CLI de Prisma y la imagen de producción (T4-14)
 
-`Stockly-F` añade dos dependencias de producción, las dos **MIT**: `barcode-detector`, la API
-`BarcodeDetector` para los navegadores que no la traen, y `zxing-wasm`, sobre la que se apoya. Dos
-cosas que el recuento por paquetes no ve y que hubo que resolver a mano:
+El hallazgo: la imagen del backend llevaba dentro una interfaz gráfica (`@prisma/studio-core`,
+42 MB, con la única EPL-2.0 del proyecto), `effect`, TypeScript y un PostgreSQL para navegador.
+Nada de eso lo ejecuta un servidor.
 
-- **`type-fest`**, que llega con `zxing-wasm`, declara `(MIT OR CC0-1.0)`: doble licencia a elegir.
-  La puerta la paró, como debía, y se añadió a la lista tomando la MIT. Solo trae tipos: no viaja.
-- **El `.wasm` es ZXing-C++ compilado, y ZXing-C++ es Apache-2.0**, aunque el paquete declare MIT
-  —la de sus enlaces en JavaScript—. La aplicación sirve ese binario, así que tiene que acompañarlo
-  del texto de la licencia. `pnpm licenses` no puede saberlo; `scripts/auditoria.js` lleva una lista
-  `EMBEBIDOS` con lo que viaja dentro de otro paquete, y el aviso de terceros lo incluye.
+**La causa no era que `prisma` estuviera en `dependencies`.** `@prisma/client` declara `prisma` y
+`typescript` como *peers* opcionales y pnpm los instala solos: bajarlo a `devDependencies` dejaba
+el árbol exactamente igual, medido en un contenedor limpio.
 
-En desarrollo, el backend añade `zxing-wasm` para que sus tests vuelvan a leer las barras que
-dibuja, y el frontend `pdfjs-dist` (Apache-2.0) y `@napi-rs/canvas` (MIT) para que el E2E convierta
-en imagen el PDF de etiquetas. Ninguna de las tres llega a producción.
+**Cómo se quitó:** las migraciones salen del `CMD` a un servicio `migrate`, que corre antes y
+termina, y el árbol se poda con [`scripts/podar-produccion.js`](../scripts/podar-produccion.js),
+que corta los dos *peers* y barre lo que deja de ser alcanzable desde los enlaces de la raíz.
+Resultado: **1.81 GB → 426 MB** y **313 → 183 paquetes**.
 
-## 6. Licencia declarada
+- **Es una regla, no una lista.** La primera versión enumeraba paquetes y dejaba 292 de las 313
+  entradas, porque las transitivas del CLI no estaban en ella; y una lista escrita a mano envejece
+  con la siguiente versión de Prisma.
+- **Podar en un `RUN` posterior al `install` no encoge la imagen**: la capa de abajo viaja igual.
+- **Lo que hay en la imagen y lo que cuenta la puerta son medidas distintas.** La puerta mira el
+  grafo declarado; los paquetes de la imagen se cuentan en el `build`. Auditar de más es lo
+  correcto.
 
-`Stockly-B/package.json` declaraba **ISC** mientras que su archivo `LICENSE` es **MIT**, que
-es lo que T4-07 anticipaba. Es la clase de incoherencia que no molesta hasta que alguien
-tiene que responder bajo qué licencia se distribuye esto.
+---
 
-Corregido: los dos repositorios declaran ahora `"license": "MIT"` y su autor, y los dos
-archivos `LICENSE` son el mismo texto MIT a nombre de Ricky Angel Jiménez Bueno.
+## 6. La licencia del proyecto
 
-**Desde el 2026-09-30 la licencia es la AGPL-3.0-only** ([ADR 0009](adr/0009-licencia-agpl.md)):
-`LICENSE` con el texto oficial y `"license": "AGPL-3.0-only"` en los dos `package.json`. Todas las
-licencias de la lista permitida son compatibles con ella, así que la puerta no cambia.
+Desde el 2026-09-30 es la **AGPL-3.0-only** ([ADR 0009](adr/0009-licencia-agpl.md)): `LICENSE`
+con el texto oficial y `"license": "AGPL-3.0-only"` en los dos `package.json`. Antes fue MIT, y
+antes de T4-07 el `package.json` del backend declaraba ISC con un archivo `LICENSE` que era MIT:
+la clase de incoherencia que no molesta hasta que alguien pregunta bajo qué licencia se
+distribuye esto. Lo que la licencia no cubre, en [legal.md](legal.md).
 
 ---
 

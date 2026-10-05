@@ -48,5 +48,3 @@ export const updateSettingsSchema = z
     .refine((body) => Object.keys(body).length > 0, {
         message: "Debe enviarse al menos un ajuste del catálogo",
     });
-
-export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

@@ -1,9 +1,12 @@
 # Operaciones — copia de seguridad, restauración, reversión y alertas
 
-> **T4-05** y **T4-06.** Este documento cubre lo que hay que hacer **cuando algo ya ha pasado**:
-> enterarse (§8), recuperar la base de datos y deshacer un despliegue. El arranque normal está en
+> Lo que hay que hacer **cuando algo ya ha pasado** —enterarse (§8), recuperar la base de datos
+> (§3–§5) y deshacer un despliegue (§6)—, más dos cosas que se mantienen desde fuera del código: la
+> versión de PostgreSQL (§9) y el resumen semanal (§10). El arranque normal está en
 > [README-proyecto.md](README-proyecto.md); la puerta de calidad, en
 > [CONTRIBUTING.md](../CONTRIBUTING.md).
+>
+> **Los números de sección no se cambian**: los citan el código, el workflow y el compose.
 
 El valor de Stockly no es el código —se vuelve a compilar en dos minutos— sino el **histórico de
 inventario**: `stock_movements` es un libro de asientos, y una fila perdida ahí no se deduce de
@@ -168,8 +171,7 @@ git checkout <tag-o-commit-anterior>
 docker compose up -d --build backend frontend
 ```
 
-Con `pnpm verify` en verde antes de desplegar (`prisma generate → migrate deploy → check →
-test:coverage → build → smoke`), el escenario que queda es el de la migración.
+Con `pnpm verify` en verde antes de desplegar, el escenario que queda es el de la migración.
 
 ### De la base: **solo hacia adelante**
 
@@ -339,8 +341,6 @@ T2-10 los logs de producción ya salen en **JSON por línea** con nivel, `reques
 credenciales censuradas, que es lo que cualquier recolector espera. Basta apuntar el que se
 use (Loki, Vector, el agente del proveedor) a la salida estándar del contenedor. El campo
 sobre el que alertar sin depender de Prometheus es `alerta: "pico_5xx"`.
-
----
 
 ---
 

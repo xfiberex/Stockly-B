@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-08-04
 **Auditores:** revisión senior (arquitectura, seguridad, QA, accesibilidad, documentación)
-**Revisión previa:** revisión del 2026-07-15 (documento retirado el 2026-08-05 al quedar absorbido por este informe; sus mediciones de navegador se conservan en [ROADMAP.md → Línea base de navegador](ROADMAP.md#línea-base-de-navegador-2026-07-15))
+**Revisión previa:** revisión del 2026-07-15 (documento retirado el 2026-08-05 al quedar absorbido por este informe; sus mediciones de navegador se conservan en [ROADMAP histórico → Línea base de navegador](ROADMAP-2026-10-05.md#línea-base-de-navegador-2026-07-15))
 
 ---
 
@@ -20,9 +20,9 @@
 >
 > | Para saber… | Mira |
 > |---|---|
-> | Qué está hecho y qué falta | [ROADMAP.md](ROADMAP.md) — casillas, Progreso y Métricas |
-> | Qué hallazgo produjo qué tarea | [ROADMAP.md → Trazabilidad](ROADMAP.md#trazabilidad-hallazgo--tarea) |
-> | En qué estado está el proyecto hoy | [CONTEXTO.md](CONTEXTO.md) |
+> | Qué está hecho y qué falta | [ROADMAP.md](../ROADMAP.md); las fichas y el Progreso, en el [histórico](ROADMAP-2026-10-05.md) |
+> | Qué hallazgo produjo qué tarea | [ROADMAP histórico → Trazabilidad](ROADMAP-2026-10-05.md#trazabilidad-hallazgo--tarea) |
+> | En qué estado está el proyecto hoy | [CONTEXTO.md](../CONTEXTO.md) |
 >
 > Lo que sigue vigente de este informe son las [zonas no cubiertas](#6-zonas-no-cubiertas) —lo que
 > nunca se llegó a medir— y los [puntos fuertes](#5-puntos-fuertes), que son lo que **no** hay que
@@ -1792,4 +1792,4 @@ Lo que **no** se pudo revisar en esta pasada, y qué haría falta para hacerlo:
 
 ---
 
-*Todos los hallazgos de este informe tienen su tarea correspondiente en [ROADMAP.md](ROADMAP.md).*
+*Todos los hallazgos de este informe tienen su tarea correspondiente en el [ROADMAP histórico](ROADMAP-2026-10-05.md).*

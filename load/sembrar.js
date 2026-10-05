@@ -39,7 +39,7 @@ const AUDITORIA = Math.round(MOVIMIENTOS * 0.2);
 // El histórico de la referencia más movida. Dos años de un producto que entra y sale a
 // diario dan este orden de magnitud, y es el caso que castiga al endpoint sin paginar.
 const CALIENTE = Number(argumento("caliente", 100_000));
-// T5-09 — las órdenes. 330 000 ventas son las de la medición de T5-02 (§7 bis de
+// T5-09 — las órdenes. 330 000 ventas son las de la medición de T5-02 (§8 de
 // rendimiento.md); 30 000 compras de tres líneas dan ~100 000 recepciones en un año.
 const VENTAS = Number(argumento("ventas", 330_000));
 const COMPRAS = Number(argumento("compras", 30_000));
@@ -235,7 +235,7 @@ paso(`producto caliente (${CALIENTE.toLocaleString("es")} movimientos)`, () => {
 //
 // Hasta T5-09 el generador no tenía ni una orden, y las mediciones de T5-02 y T5-05 se
 // hicieron con un guion a mano que no se versionó: rehacer la base las borraba. Ahora están
-// aquí, con las proporciones que describe rendimiento.md §7 bis.
+// aquí, con las proporciones que describe rendimiento.md §8.
 //
 // **El producto de cada línea se sortea en la lista de columnas, nunca en la condición de
 // un `JOIN`.** La siembra a mano de T5-02 lo hizo al revés, el planificador evaluó el

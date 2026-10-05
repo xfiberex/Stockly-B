@@ -1,159 +1,82 @@
-# Contexto de trabajo — al 2026-08-12
+# Contexto de trabajo — al 2026-10-05
 
-Arranque en frío para continuar en otro equipo. El detalle de cada tarea está en
-[ROADMAP.md](ROADMAP.md); esto es lo que ese documento no cuenta.
+Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
+trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
+por reflejo. El trabajo pendiente está en [ROADMAP.md](ROADMAP.md) y el mapa del resto de
+documentos, en [README-proyecto.md](README-proyecto.md).
 
 ---
 
-## 1. Arrancar en la máquina nueva
+## 1. Arrancar en una máquina nueva
 
-```bash
-git pull                                  # en Stockly-B y en Stockly-F
-cd Stockly-B && cp .env.example .env      # bastan 4 variables (ver abajo)
-cd ../Stockly-F && cp .env.example .env   # solo VITE_API_URL
-```
+Los pasos están en [README-proyecto.md](README-proyecto.md). Lo que esos pasos no dicen:
 
-Los `.env` **no están en git** y no deben estarlo: sus valores (JWT_SECRET, Cloudinary,
-SMTP) se pasan a mano. Desde **T1-26** solo son imprescindibles cuatro: `DATABASE_URL`,
-`JWT_SECRET`, `JWT_EXPIRES_IN` y `FRONTEND_URL`. Sin las de Cloudinary o SMTP el servidor
-arranca igual y solo esa función responde **503** con un mensaje que dice qué falta.
-
-**Base de datos.** Sirve cualquier PostgreSQL con la base creada; solo tiene que
-coincidir `DATABASE_URL`. **El proyecto se trabaja desde dos equipos y el puerto no es el
-mismo en los dos** —anda entre **5432** y **5433**—; como el `.env` no viaja en git, cada
-máquina tiene el suyo. Si `verify` falla al conectar, eso es lo primero que hay que mirar,
-y el valor bueno es el que diga el `.env` local, no el que ponga aquí ningún documento.
-Con Docker: `docker compose up db -d` **desde `Stockly-B/`**, que es donde vive ahora el
-`docker-compose.yml`.
-
-**Dependencias.** Si `node_modules` viene de otro equipo, pnpm quiere purgarlo y aborta
-sin TTY (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`). Con `CI=true` en el entorno,
-`pnpm install --frozen-lockfile` lo recrea sin preguntar.
-
-Tras el seed, el admin es `admin@stockly.app` / `Admin1234!`.
+- **Los `.env` no viajan en git** y sus valores se pasan a mano. Bastan cuatro variables en el
+  backend (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `FRONTEND_URL`) y una en el frontend.
+- **El puerto de PostgreSQL no es el mismo en todos los equipos** —anda entre 5432 y 5433—. Si
+  `verify` falla al conectar, es lo primero que hay que mirar, y el valor bueno es el del `.env`
+  local, no el de ningún documento.
+- **La base de tests nace vacía** y la suite entera falla por eso, con mensajes que hablan del
+  esquema y no de la lógica. Ver §4.
+- **Si `node_modules` viene de otro equipo**, pnpm quiere purgarlo y aborta sin TTY
+  (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`). Con `CI=true` en el entorno,
+  `pnpm install --frozen-lockfile` lo recrea sin preguntar.
+- **El alias `git buscar` hay que activarlo en cada clon** (§5), y los navegadores de Playwright se
+  instalan aparte, una vez: `pnpm exec playwright install chromium`.
 
 ---
 
 ## 2. Tres decisiones que gobiernan el trabajo
 
-**`pnpm verify`, en local y en la CI.** Es la puerta de calidad de cada repositorio y se ejecuta
-en local antes de dar por cerrada una tarea. Desde el 2026-09-28, con los repositorios públicos,
-GitHub Actions la repite en cada push y pull request ([ADR 0008](adr/0008-integracion-continua.md),
-que sustituye a la 0005 «sin CI»); en el frontend, además del E2E. El workflow llama al mismo
-script: no añadirle pasos propios, o la CI y el portátil pedirán cosas distintas.
+**`pnpm verify`, en local y en la CI.** Es la puerta de calidad de cada repositorio. Se ejecuta en
+local antes de cada push y GitHub Actions la repite ([ADR 0008](adr/0008-integracion-continua.md));
+en el frontend, además con el E2E. El workflow llama al mismo script: si se le añade un paso
+propio, la CI y el portátil empiezan a pedir cosas distintas. El detalle, en
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
-**Los docs viven en `Stockly-B/docs/`** aunque cubran los dos repositorios: la carpeta que
-los contiene no está bajo control de versiones, así que alojarlos en el backend es lo que
-hace que viajen entre equipos. Las rutas `Stockly-F/src/...` que aparecen en ellos se
-refieren al repositorio hermano.
+**Los docs viven en `Stockly-B/docs/`** aunque cubran los dos repositorios: la carpeta que los
+contiene no está bajo control de versiones, y alojarlos en el backend es lo que hace que viajen.
+Las rutas `Stockly-F/src/...` que aparecen en ellos se refieren al repositorio hermano.
 
-**Toda tarea cerrada se anota en el ROADMAP**: casilla marcada, fila en Progreso, métricas
-al día, y una línea de «Verificado localmente» con cifras reales. Si algo del criterio de
-aceptación no se pudo comprobar, se dice explícitamente en lugar de darlo por bueno.
+**Toda tarea cerrada se anota en el ROADMAP**, con cifras reales. Si algo del criterio de
+aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ---
 
-## 3. Estado a fecha de hoy
+## 3. Estado
+
+Medido el 2026-10-05 en este equipo, con `pnpm verify` y el E2E:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **935/935** | **654/654** *(+1 omitido)* |
-| Cobertura (sentencias) | 96.28 % *(suelo 85 %)* | 76.57 % *(suelo 45 %)* |
-| Lint | — | **0 errores, 0 avisos** |
+| Tests | **1052** en 58 archivos | **696** en 68 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.34 % *(suelo 85 %)* | 77.19 % *(suelo 45 %)* |
+| Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
+| Dependencias de producción | 159, sin avisos | 114, sin avisos |
+| E2E (Playwright) | — | **25 pasados**, 1 omitido, en `chromium` y `Mobile Chrome` |
 
-**E2E:** `pnpm test:e2e:full` desde `Stockly-F`, sin levantar nada a mano —arranca solo la base
-de datos, el backend y el frontend—. En este equipo (2026-09-29, T5-08): **21 pasados,
-1 omitido, 0 fallos**, en verde en `chromium` **y** en `Mobile Chrome` desde T2-45. Ojo con el
-puerto 5173: ver §4, que aquí costó tres pasadas.
+**Tareas: 127 de 129.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
+`T5-15` (lotes y caducidad), que solo se abren con un caso de uso real.
 
-**Ojo antes de lanzar el E2E: resiembra la base de desarrollo.** `e2e/global-setup.ts` ejecuta
-`pnpm db:seed` contra la `DATABASE_URL` de `Stockly-B/.env`, que es la base con la que se trabaja,
-y el seed **la vacía** antes de sembrar. Además `reuseExistingServer` reutiliza los servidores que
-estén levantados. Con el proyecto en uso y datos que se quieran conservar, se hace copia antes
-(`pnpm db:backup`). El usuario autorizó resembrar cuando haga falta (2026-09-13).
+Cuatro cosas que conviene saber antes de tocar nada:
 
-**Y con los servidores levantados a mano, el E2E cae por 429.** `reuseExistingServer` reutiliza el
-backend tal como se arrancó, con el límite por defecto (100 peticiones cada 15 min); el
-`RATE_LIMIT_MAX` de `playwright.config.ts` solo se aplica si lo arranca Playwright. Si están en uso
-y no se pueden parar, se levanta otro par: backend con `PORT=3100 FRONTEND_URL=http://localhost:5174
-RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000` y un Vite en el 5174 con el proxy a `localhost:3100`
-(el de `vite.config.ts` está fijo al 3000), y se lanza con `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
+- **Cerrada no es comprobada del todo.** `T4-17`, el recorrido con lector de pantalla, se descartó
+  sin ejecutarse. El listón verificado es teclado más árbol de accesibilidad
+  ([accesibilidad.md](accesibilidad.md)).
+- **Las fichas son pistas, no descripciones verificadas.** Siete describían mal su propio problema
+  —la causa, el alcance o el remedio— y están marcadas en el índice del ROADMAP. Medir antes de
+  arreglar, y medir otra vez después.
+- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay nueve
+  [ADR](adr/). Antes de simplificar algo que parezca complicado de más, se lee la suya.
+- **Un árbol de dependencias limpio no se queda limpio solo.** `verify` ya amaneció en rojo dos
+  veces por avisos publicados sin que nadie tocara nada; el patrón para resolverlo está en
+  [dependencias.md §2](dependencias.md).
 
-**Tier 0: 8/8** ✅ · **Tier 1: 26/26** ✅ · **Tier 2: 48/48** ✅ · **Tier 3: 15/15** ✅ ·
-**Tier 4: 17/17** ✅ · **Tier 5: 13/15** *(abierto el 2026-09-13; T5-01 a T5-13 cerradas)* · Total **127/129**.
-
-**`verify` vuelve a estar entero en verde en los dos repositorios desde el 2026-09-28.** Estuvo en
-rojo dos semanas por **10 avisos altos** publicados después del último verde, sin que nadie tocara
-una dependencia. Se cerró subiendo `multer`, `nodemailer` y `morgan` y con `overrides` en
-`pnpm-workspace.yaml` para las transitivas que el CLI de Prisma fija a versión exacta; cada una dice
-cuándo retirarla. Ese mismo día **pnpm pasó a 12.4.1** en los dos repositorios y sus Dockerfiles.
-El 2026-09-30 volvió a pasar con un aviso alto en `nodemailer`, y esa vez hubo que saltar a su
-versión 10. Detalle en [dependencias.md §2](dependencias.md).
-
-**Ese 114/114 no significa «todo comprobado».** Una de las tareas, **T4-17** —el recorrido con
-lector de pantalla—, está **descartada y no hecha**: se cerró por decisión de alcance porque no hay
-NVDA ni VoiceOver en las máquinas del proyecto. Lo que sí es el listón verificado de accesibilidad
-está en [accesibilidad.md](accesibilidad.md).
-
-**La crónica tarea a tarea no vive aquí, vive en la tabla de
-[Progreso del ROADMAP](ROADMAP.md#progreso)**, con lo verificado y lo aprendido en cada una — y
-duplicarla aquí solo garantizaba que las dos se separasen. Este documento se queda con lo que esa
-tabla no cuenta. De todo el recorrido, cuatro cosas conviene saberlas antes de tocar nada:
-
-- **La aplicación arrancó rota en sitios que no se veían.** El guardado de configuración no
-  guardaba, las etiquetas de producto eran inertes, una cuenta desactivada conservaba 15 minutos de
-  acceso, cinco listados reventaban con un `page` no numérico, la base no tenía ni un índice,
-  `logout` estaba expuesto a CSRF y el correo salía en claro. Todo eso está corregido, medido y con
-  tests; la pila entera se levanta con `docker compose up -d --build` y el login funciona contra
-  `http://localhost:8080`.
-- **Medir cambió el plan más de una vez.** T4-08 fue la primera medición bajo carga del proyecto y
-  abrió sola dos tareas; T4-16 acabó **no tocando `work_mem`**, que era justo lo que pedía su
-  ficha, porque reescribir la consulta daba seis veces más; y T4-14 descubrió que la causa que le
-  atribuían era falsa. Los números están en [rendimiento.md](rendimiento.md) y
-  [dependencias.md](dependencias.md).
-- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay ocho
-  [ADR](adr/). La 0005 —**no hay CI**— se deshizo el 2026-09-28, y no por reflejo: la sustituye
-  la 0008, que dice qué cambió.
-- **Lo que se decidió no hacer está escrito**, no omitido: T4-17 aquí arriba, y los tres cabos
-  sueltos del §6.
-
-**Las fichas son pistas, no descripciones verificadas — y esto es lo más útil de todo el
-documento.** Siete se comprobaron equivocadas al abordarlas, y de siete maneras distintas:
-
-| Ficha | En qué fallaba |
-|---|---|
-| `T3-03` | Contaba mal: decía un módulo divergente y eran **cinco** |
-| `T3-05` | El enunciado no describía el código — el botón nunca tuvo dos rutas |
-| `T3-08` | La **premisa era falsa**: Heroicons ya emitía `aria-hidden`, y el fallo real era el opuesto |
-| `T3-09` | Se quedaba corta: el botón flotante no «probablemente solapaba» la paginación, la dejaba **sin poder pulsarse**, y no solo en móvil |
-| `T4-14` | **La causa era otra**: no la arrastraba `dependencies`, sino un *peer opcional* de `@prisma/client` |
-| `T4-15` | **El alcance era mayor**: daba por resuelta una exportación que no lo estaba |
-| `T4-16` | **El remedio era el equivocado** (`work_mem`), y nombraba una consulta cuando eran dos |
-
-Medir antes de arreglar, y medir otra vez después. La corrección de cada una está en su fila de
-[Progreso](ROADMAP.md#progreso).
-
-### La documentación del proyecto
-
-| Documento | Para qué |
-|---|---|
-| [ROADMAP.md](ROADMAP.md) | Las 129 tareas con su progreso y las métricas. La fuente de verdad del trabajo |
-| [operaciones.md](operaciones.md) | Copia de seguridad, restauración, reversión y **alertas**. Incluye la política de migraciones **solo hacia adelante**: una migración desplegada no se edita ni se borra |
-| [dependencias.md](dependencias.md) | Vulnerabilidades y licencias del árbol de producción de los dos repos, y cómo funciona la puerta de `pnpm auditoria` — incluida **la lista de lo que no cubre** |
-| [rendimiento.md](rendimiento.md) | Lo que pasa con 100 000 productos: índices medidos antes y después, latencias bajo carga y los dos cuellos que salieron |
-| [accesibilidad.md](accesibilidad.md) | Lighthouse y recorrido de teclado sobre la pila desplegada, y **la mitad del criterio que no se pudo comprobar** |
-| [legal.md](legal.md) | Qué cubre la licencia AGPL y **qué no**: los datos personales que guarda la aplicación y lo pendiente antes de tener usuarios reales o de cobrar |
-| [INFORME-AUDITORIA.md](INFORME-AUDITORIA.md) | El informe del 2026-08-04. **Congelado**: está escrito en presente y describe un estado que ya no existe |
-| [adr/](adr/) | **Nueve decisiones de arquitectura.** Léelas antes de simplificar algo que parezca complicado de más: están ahí porque la opción evidente es la equivocada. La 0008 explica por qué **hay CI** desde el 2026-09-28 y la 0005, ya sustituida, por qué no la hubo antes; la 0009, por qué la licencia es la AGPL v3 |
-| [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md) | Lectura previa a tocar cualquier pantalla |
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, convención de commits y qué anotar al cerrar una tarea |
-| [CHANGELOG.md](../CHANGELOG.md) | Registro de cambios de los dos repositorios |
-| [README-proyecto.md](README-proyecto.md) | Arranque desde cero de los dos repositorios |
-
-**Una decisión del propietario que conviene no revertir:** `.agents/` y `.claude/` **se versionan a
-propósito**, porque el proyecto se trabaja desde varias máquinas. Como son la mayoría de los
-archivos rastreados, para buscar en el código está el alias `git buscar` — ver §5.
+**El suelo de cobertura se ha quedado muy por debajo de lo real** (85/72/87/87 en `jest.config.js`
+y 45/50/33/46 en `vite.config.ts`, contra 96/85/97/97 y 77/81/66/79). Es lo único que impide que la
+cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subir el umbral.
 
 ---
 
@@ -161,575 +84,293 @@ archivos rastreados, para buscar en el código está el alias `git buscar` — v
 
 *Cada una costó un fallo antes de entenderse. No hace falta redescubrirlas.*
 
-**`pnpm audit --json` sin registro puede informar de cero vulnerabilidades (2026-08-11).**
-No falla de forma visible: imprime un informe con las cinco severidades a cero, así que
-**la auditoría que nunca se hizo se lee exactamente igual que la que salió limpia**. Y el
-código de salida no sirve para distinguirlas, porque varía según cómo falle —con el registro
-inalcanzable por variable de entorno salió 255 y con `--registry` salió 1—. Lo que sí
-distingue los dos casos es la clave `error` del JSON, que es lo que mira
-[`scripts/auditoria.js`](../scripts/auditoria.js). Si alguna vez se reescribe esa
-comprobación, no leer `metadata` sin comprobar antes `error`.
+### La base de tests (`Stockly_test`)
 
-**Un servidor huérfano en el 3000 rompe el E2E siguiente, y la culpa es del rate limiter (2026-08-10).**
-Si una pasada de `pnpm test:e2e:full` se interrumpe, el backend puede quedarse escuchando.
-`playwright.config.ts` usa `reuseExistingServer: true`, así que la siguiente pasada **no
-arranca uno nuevo: reutiliza ese**, y el huérfano no lleva el `RATE_LIMIT_MAX: 100000` que
-el E2E inyecta a los servidores que él mismo levanta. El resultado depende de cuántas
-peticiones llevara acumuladas:
+- **`verify` no la migra.** `jest.setup.js` deriva su nombre de `DATABASE_URL`, pero `verify` solo
+  migra la de desarrollo. Tras **cada** migración nueva hay que llevarla ahí:
+  `DATABASE_URL=<la de Stockly_test> pnpm exec prisma db push`.
+- **`migrate deploy` no sirve para ella**: falla con P3005 o por una migración antigua marcada
+  como fallida. Se sincroniza con `db push`.
+- **El desfase no avisa: se disfraza de fallo del cambio recién hecho.** Cientos de tests en rojo
+  con «la tabla X no existe» o «no existe el tipo `public.Role`». Antes de investigar un fallo
+  masivo, mirar si el mensaje habla del esquema. Para ver qué falta:
+  `DATABASE_URL=<…> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
+  (en Prisma 7 ya no existe `--from-url`).
+- **`db push` no ejecuta el SQL de las migraciones**, solo lleva el esquema. Lo que viva únicamente
+  en un archivo de migración no llega: `pg_trgm` hay que crearla a mano, una vez
+  (`CREATE EXTENSION IF NOT EXISTS pg_trgm` en esa base), o el push falla con «no existe la clase
+  de operadores gin_trgm_ops».
+- **Un índice único nuevo hace que `db push` pida `--accept-data-loss`** aunque la columna esté
+  vacía. Si la migración es aditiva, se aplica su propio SQL:
+  `DATABASE_URL=<…> pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`.
+- **Prisma 7 pide consentimiento explícito si quien lo invoca es un agente**: hay que pasarle
+  `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` con el texto literal de la autorización.
+- **Cada archivo de Jest crea su propio pool.** Por eso en `test` las conexiones inactivas se
+  cierran al segundo (`shared/lib/prisma.ts`): con 30 s se agotaba el `max_connections`.
 
-- **Aún por debajo del techo:** Playwright lo reutiliza, y los tests agotan las 100
-  peticiones/15 min a mitad de recorrido. Fallan por 429 unas cuantas pruebas, con síntomas
-  que no mencionan el límite —esperas agotadas al rellenar un formulario, listas vacías—.
-- **Ya por encima:** `/api/v1/health` responde **429**, Playwright no lo da por listo,
-  intenta arrancar el suyo sobre un puerto ocupado y muere con **`Timed out waiting
-  120000ms from config.webServer`**.
+### Los tests del backend
 
-Comprobado: con el huérfano en marcha, `fetch("http://localhost:3000/api/v1/health")`
-devolvía `429 {"message":"Demasiadas peticiones…"}`. La primera vez lo achaqué a que la
-base se resembraba y el proceso viejo se quedaba con datos antiguos; **eso era falso**, y
-la explicación correcta es esta. Antes de investigar un fallo de E2E, comprobar el puerto —
-y si hay algo escuchando, mirar qué devuelve `/health` antes de matarlo:
+- **Los listados paginados responden `res.body.data.data`**, con `meta` al lado.
+- **En `NODE_ENV=test` no se comprueba el CSRF.** Contra un servidor de verdad, un `POST` o un
+  `PATCH` a mano necesita la cabecera `x-csrf-token` con el valor de la cookie `csrfToken`.
+- **No borrar productos**: los de otros bloques tienen movimientos y la clave foránea lo impide.
+  Se limpia lo propio.
+- **El formato multipart no se puede probar por HTTP**: `upload.middleware` está mockeado, así que
+  multer nunca corre. La normalización de `tagIds` se valida contra el esquema.
+- **Zod 4:** `z.ZodRawShape` es de solo lectura. Un esquema dinámico se construye con
+  `Record<string, z.ZodTypeAny>` y un bucle.
+- **Un `return` en el nivel superior de un `.js` rompe la cobertura, no los tests**: Node lo
+  admite, babel no al instrumentar. Síntoma: `pnpm test` en verde y `test:coverage` en rojo,
+  señalando el `require` del test. El cuerpo va dentro de una función.
+- **Un test no escribe en el árbol.** El primer guardián de frescura del contrato regeneraba el
+  archivo que vigilaba: fallaba una vez, se arreglaba solo y parecía un fallo intermitente.
+- **`pnpm audit --json` sin registro puede informar de cero vulnerabilidades.** Lo que distingue
+  la auditoría que no se hizo de la que salió limpia es la clave `error` del JSON, no el código de
+  salida ([dependencias.md §4](dependencias.md)).
 
-```powershell
-Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }
-```
+### El E2E
 
-**Y el 5173 puede tenerlo otro proyecto, no un huérfano de este (2026-08-11).** Es la otra
-cara de lo anterior y despista más, porque el síntoma no dice nada de puertos: nueve pruebas
-en rojo buscando textos que «no existen» —«Correo electrónico», «Productos»—, como si la
-interfaz hubiera cambiado de idioma. Lo que había en el 5173 era el `vite` de **otro
-repositorio del disco**, y `reuseExistingServer: true` no comprueba *qué* responde, solo que
-algo responda. Se ve en un segundo pidiendo la página y mirando el `<title>`:
+- **Resiembra la base de desarrollo.** `e2e/global-setup.ts` ejecuta `pnpm db:seed` contra la
+  `DATABASE_URL` de `Stockly-B/.env`, y el seed la vacía antes de sembrar. Con datos que se quieran
+  conservar, antes `pnpm db:backup`. El propietario autorizó resembrar cuando haga falta.
+- **Un servidor huérfano en el 3000 lo rompe, y la culpa es del limitador.** `reuseExistingServer`
+  reutiliza lo que escuche, y solo los servidores que arranca Playwright llevan
+  `RATE_LIMIT_MAX`. Síntomas: 429 a mitad de pasada —esperas agotadas, listas vacías— o
+  `Timed out waiting 120000ms from config.webServer`. Lo mismo pasa con los servidores levantados
+  a mano. Antes de investigar un fallo, mirar el puerto:
+  `Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }`.
+- **El 5173 puede tenerlo otro proyecto.** Síntoma: pruebas buscando textos «que no existen».
+  Se ve mirando el `<title>` de `http://localhost:5173`. Sin matar el ajeno, se pasa en otro
+  puerto, moviendo las dos variables: `E2E_BASE_URL` y `FRONTEND_URL` (o el backend rechaza por
+  CORS y parece la API caída).
+- **Si los servidores están en uso y no se pueden parar**, otro par: backend con `PORT=3100`,
+  `FRONTEND_URL=http://localhost:5174`, `RATE_LIMIT_MAX=100000` y `AUTH_RATE_LIMIT_MAX=1000`; un
+  Vite en el 5174 con el proxy a `localhost:3100`; y `E2E_BASE_URL`/`E2E_API_URL` apuntando a ellos.
+- **Los dos proyectos corren en paralelo contra la misma base.** Un test que pulse «el primero de
+  la lista» opera sobre lo que creó el otro. La cura es nombrar, no serializar: **si un test
+  necesita `.first()`, casi siempre falta un nombre accesible.** Una pasada interrumpida deja
+  órdenes y productos `E2E-*` a medias.
+- **Tras un clic de navegación la página no ha cambiado todavía.** React Router navega en un
+  `startTransition` y las rutas son `lazy()`: medir el título o el foco justo después da el estado
+  anterior. Se espera a que la página esté pintada (`getByRole("heading", …)`).
+- **Un fallo de Playwright puede nombrar un elemento que no tiene nada que ver**: solo es lo que
+  había bajo las coordenadas. Se mide la geometría antes de creerse el mensaje.
+- **Medir un color justo después de un clic da el de antes**: `transition-colors` dura
+  150–200 ms. Se espera o se mira una captura. Y se mide con `locator.evaluate()`, no con un
+  `querySelectorAll` que puede caer en la navegación duplicada.
+- **Un *transport* de pino cuesta caro con el E2E delante**: subió la pasada de 36 a 66 s. Por eso
+  `logger.ts` solo usa `pino-pretty` si `process.stdout.isTTY`.
+- **Antes de acusar al código de una tarea, comparar con `git stash` en la misma máquina.** Evitó
+  dos diagnósticos equivocados y destapó un `pnpm dev` olvidado que falseaba la medición.
 
-```powershell
-(Invoke-WebRequest http://localhost:5173 -UseBasicParsing).Content -match "<title>(.*)</title>"
-```
+### Tests de componentes (Vitest y jsdom)
 
-Sin matar el servidor ajeno, la pasada se hace en otro puerto: `E2E_BASE_URL` se lo dice a
-Playwright y Vite se corre solo al siguiente libre. **Y hay que mover con él `FRONTEND_URL`**,
-o el backend rechaza por CORS al recién llegado y el síntoma cambia de sitio sin mejorar: el
-login se queda en la página con «No se pudo conectar con el servidor», que parece la API
-caída. Playwright pasa el entorno del proceso a los servidores que arranca, así que basta
-con exportarlas las dos:
+- **jsdom no aplica las clases de Tailwind**: la navegación de escritorio y la de móvil están las
+  dos en el DOM y los enlaces salen duplicados. Se acota con `within` (`#mobile-menu`).
+- **Un `Proxy` como mock de módulo cuelga la suite** sin un solo error: responde a `then` y el
+  `import()` no resuelve nunca. Los componentes se enumeran.
+- **Tailwind solo genera las utilidades escritas en el código.** Una contraprueba con una clase
+  que no aparece en ningún archivo no mide nada.
 
-```powershell
-$env:E2E_BASE_URL="http://localhost:5174"; $env:FRONTEND_URL="http://localhost:5174"
-pnpm test:e2e:full
-```
+### CSS y navegador
 
-Con eso: **9 pasados, 1 omitido, 0 fallos**, los mismos de siempre.
+- **Un `overflow-x-auto` ensancha el viewport de diseño en Chrome de Android**, y todo lo
+  `position: fixed` se dimensiona contra él: un `fixed inset-0` medía 663 px en una pantalla de
+  393. La cura es `contain: paint` en el contenedor (`desbordes.test.ts` lo vigila). No funcionan
+  `body{overflow:hidden}`, `html{overflow-x:hidden}` ni quitar el ancho mínimo de la tabla.
+- **Tailwind incrusta el color de las sombras**: redefinir `--shadow-overlay` en otro bloque no
+  hace nada y no se nota. Los dos valores van dentro del token, con `light-dark()`.
+- **`ring-offset-2` rellena el hueco de blanco**, no lo deja transparente: un halo en tema oscuro.
+  Va con `ring-offset-surface` (`tokens.test.ts`).
+- **El tema no se puede aplicar desde `main.tsx`**: un módulo es diferido y el navegador ya pintó.
+  Va en un script en línea y bloqueante en `<head>`.
 
-**El formato multipart no se puede probar por HTTP en la suite del backend.**
-`upload.middleware` está mockeado en `products.test.ts`, así que multer —que es quien
-parsea ese cuerpo— nunca corre y un `.field()` acaba en 422 con `req.body` sin parsear. La
-normalización de `tagIds` se valida contra el esquema directamente.
+### Docker
 
-**`process.exit()` en Windows aborta libuv** si hay un proceso hijo aún cerrándose
-(`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`) y devuelve un código de salida
-sin sentido *aunque la comprobación haya pasado*. Por eso `scripts/smoke.js` espera el
-evento `exit` del hijo y usa `process.exitCode`. Usa `SMOKE_PORT` (3100) para no chocar
-con el `dev`.
+- **Dos procesos pueden atarse al mismo puerto en Windows** y las conexiones van al que no es: con
+  un PostgreSQL local en el 5432, el del compose se publica ahí sin error y `localhost:5432` sigue
+  llegando al local. Síntoma: `AuthenticationFailed` contra una base que Docker da por sana. Para
+  eso está `POSTGRES_HOST_PORT`.
+- **La pila del compose no se siembra sola.** El servicio `migrate` aplica las migraciones, pero
+  nadie ejecuta el seed: el login responde 401 y parece un fallo de credenciales.
+- **Docker crea como directorio vacío el origen de un *bind mount* que no existe**, y la pila de
+  observabilidad levanta con el objetivo caído ([operaciones.md §8](operaciones.md)).
 
-**jsdom no aplica las clases de Tailwind**, así que la navegación de escritorio y la móvil
-están ambas en el DOM y los enlaces salen duplicados. Hay que acotar con `within` al
-contenedor (`#mobile-menu`).
+### Windows y la consola
 
-**Los listados paginados responden `res.body.data.data`**, con la lista dentro de `data`
-junto a `meta`.
-
-**Zod 4:** `z.ZodRawShape` es de solo lectura y `Object.fromEntries` infiere un tipo
-demasiado estrecho para castear. Para construir un esquema dinámico, `Record<string,
-z.ZodTypeAny>` y un bucle.
-
-**No borrar productos en los tests del backend**: los de otros bloques tienen movimientos
-de stock asociados y la FK lo impide. Basta con limpiar lo propio.
-
-**En un equipo nuevo, la base de tests está vacía y la suite entera falla por eso (2026-08-11).**
-Pasó al retomar el proyecto en la otra máquina: 260 de 402 tests en rojo con
-`no existe el tipo «public.Role»`. No es el código, es que `Stockly_test` nunca se sincronizó
-aquí. La cura es la de siempre —`prisma db push` apuntando a esa base, más `pg_trgm` una vez—,
-y **Prisma 7 pide consentimiento explícito** si detecta que quien lo invoca es un agente: hay que
-pasarle `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` con el texto literal de la autorización.
-Antes de investigar un fallo masivo de la suite, mirar si el mensaje habla del **esquema** y no
-de la lógica.
-
-**Un índice único nuevo hace que `db push` pida consentimiento aunque la columna esté vacía
-(2026-09-29, T5-08).** Avisa de «posible pérdida de datos» y exige `--accept-data-loss`, y Prisma 7
-no deja que un agente lo acepte sin la autorización literal. Si la migración es aditiva, se aplica
-su propio SQL a la base de tests y el push queda en sincronía:
-`DATABASE_URL=<la de Stockly_test> pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`.
-
-**La base de tests `Stockly_test` no se migra con `migrate deploy`.** En un equipo falla con
-**P3005** («the database schema is not empty»); en el de 5433, desde el 2026-08-12, se niega por una
-migración **marcada como fallida** (`20260807215703_add_missing_indexes`) en una
-`_prisma_migrations` a medias. Las dos cosas llevan al mismo sitio. Se sincroniza con
-`prisma db push` apuntando `DATABASE_URL` a `Stockly_test` — y hay que hacerlo cada vez que
-se añade una migración, porque `pnpm verify` solo migra la base de desarrollo.
-
-**Y el desfase no avisa: se disfraza de fallo del cambio recién hecho.** El 2026-09-14 la base iba
-cuatro migraciones por detrás y cayeron 354 tests con «la tabla `cost_history` no existe»; el
-2026-09-29, al traer T5-05 y T5-09 de la otra máquina, volvía a ir dos por detrás. Antes del push,
-comprobar que el cambio es aditivo. En Prisma 7 ya no existe `--from-url`: se sobrescribe
-`DATABASE_URL` en el entorno —`prisma.config.ts` carga el `.env` con `dotenv`, que no pisa lo ya
-definido— y se usa el datasource de la configuración:
-
-```bash
-DATABASE_URL=<la de Stockly_test> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
-```
-
-**Las descargas de la API van por axios, nunca por un enlace (resuelto el 2026-09-29).** En un
-equipo, el `.env` del frontend tenía `http://localhost:3000/api/v1` y no el `/api/v1` de
-`.env.example`, y el E2E del CSV de T5-09 fallaba: el enlace apuntaba a otro origen y el navegador
-**ignora `download`** entre orígenes. No era el `.env`, era el enlace: todas las descargas pasan
-ahora por `descargarDeLaApi` (`shared/api/descargar.ts`), y el E2E pasa con los dos valores. Una
-descarga nueva va por ahí, no por `<a href={api.defaults.baseURL + …}>`.
-
-**Una ventana con `EXCLUDE` en el marco es cuadrática.** `SUM() OVER (… EXCLUDE GROUP)` obliga a
-PostgreSQL a recalcular la suma para cada fila en vez de acumularla: con cinco productos en los
-tests no se nota, y con los ~100 000 del conjunto de carga la clasificación ABC pasó de cinco
-minutos sin terminar (T5-10, 2026-09-29; [rendimiento.md §7 quinquies](rendimiento.md)). Y **cortar
-el cliente no para la consulta**: sigue en el servidor hasta `pg_cancel_backend`.
-
-**`prisma db push` no ejecuta el SQL de las migraciones.** Solo lleva el *esquema* a la
-base, así que todo lo que viva únicamente en un archivo de migración —un `CREATE
-EXTENSION`, un índice parcial, un trigger— no llega a `Stockly_test`. Desde T2-09 esto
-importa: el push falla con «no existe la clase de operadores gin_trgm_ops» hasta que se
-crea `pg_trgm` a mano en esa base, una sola vez:
-
-```bash
-node -e "const {Client}=require('pg');(async()=>{const c=new Client({connectionString:'…/Stockly_test'});await c.connect();await c.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');await c.end();})()"
-```
-
-**Dos procesos pueden atarse al mismo puerto en Windows, y las conexiones van al que no
-es.** Con un PostgreSQL local escuchando en 5432, `docker compose up` publica el suyo
-**también en 5432 sin dar ningún error** —`docker compose ps` lo muestra tan feliz—, pero
-`localhost:5432` sigue llegando al local. El síntoma es desconcertante: `AuthenticationFailed`
-contra una base que, según Docker, está sana. Por eso el compose acepta
-`POSTGRES_HOST_PORT`; para trabajar contra el contenedor:
-
-```bash
-POSTGRES_HOST_PORT=5442 docker compose up -d
-DATABASE_URL="postgresql://postgres:postgres@localhost:5442/Stockly" pnpm exec prisma db seed
-```
-
-**La pila del compose no se siembra sola.** Desde T4-14 las migraciones las aplica el
-servicio `migrate` —un contenedor que corre, termina y bloquea el arranque del backend si
-falla—, pero **nadie ejecuta el seed**: la base queda con el esquema y sin usuarios, el login
-responde **401** y parece un fallo de credenciales.
-
-**CSRF** (double-submit): para un PATCH/POST manual contra el servidor hay que leer la
-cookie `csrfToken` y reenviarla en la cabecera `x-csrf-token`. En `NODE_ENV=test` se
-omite. Desde **T1-19** solo quedan exentas siete rutas públicas de `/auth`: `logout`,
-`PUT /me` y `PATCH /me/password` **exigen token**.
-
-**El rate limit se agota con el E2E.** Cien peticiones por IP cada 15 minutos es poco para una
-pasada de navegador: el 429 hace fallar pruebas que no van de eso. `RATE_LIMIT_MAX` y
-`AUTH_RATE_LIMIT_MAX` suben el techo y ya vienen puestas en `playwright.config.ts`; el limitador y
-CSRF siguen activos. Es la otra mitad de la trampa del servidor huérfano, al principio de esta
-sección.
-
-**Un *transport* de pino cuesta caro con el E2E delante.** `pino-pretty` no formatea en
-proceso: levanta un hilo de trabajo y le pasa cada línea por un canal. Con cuatro
-navegadores, Vite compilando y el servidor en `tsx`, eso subió la pasada de **36 s a 66 s**
-y puso a dos pruebas a agotar su tiempo, de forma reproducible. Por eso `logger.ts`
-condiciona el formato legible a `process.stdout.isTTY`: si nadie está mirando la terminal,
-JSON directo y sin hilo. Vale la regla general: **antes de acusar al código de una tarea,
-comparar contra el estado anterior con `git stash` en la misma máquina** — aquí evitó dos
-diagnósticos equivocados, y también demostró que un `pnpm dev` olvidado ocupando un puerto
-falsea toda la medición.
-
-**Tras un clic de navegación, la página no ha cambiado todavía.** React Router navega dentro
-de un `startTransition`: la URL se actualiza antes de que React confirme el render nuevo, y con
-las rutas en `lazy()` esa confirmación espera al *chunk*. Medir el `document.title`, el foco o
-una región viva justo después del clic —o justo después de un `waitForURL`— da el estado
-**anterior**, y parece un fallo del código. Hay que esperar a que la página esté pintada
-(`getByRole("heading", …)`). Pasó al verificar T2-18 y costó una medición en falso.
-
-**Un `Proxy` como mock de módulo cuelga la suite.** Al mockear Recharts con un `Proxy` que
-devuelve un componente para cualquier propiedad, también responde a `then`: el módulo pasa a
-ser «thenable», el `import()` que lo espera **no resuelve nunca** y vitest se queda parado sin
-dar un solo error. Y aunque se excluya `then`, vitest comprueba que el mock exporte lo que el
-módulo real exporta, y un `Proxy` no pasa esa comprobación. Hay que enumerar los componentes.
-
-**La cobertura tiene suelo desde T2-22** (`jest.config.js` y `vite.config.ts`): backend
-85/72/87/87 y frontend 42/50/33/43, unos puntos por debajo de lo real. Ese umbral —ahora
-también en la CI— es lo único que impide que la cobertura se erosione. **Al subirla, hay que subir el umbral**, o
-deja de significar nada.
-
-**React Router no restablece el desplazamiento al cambiar de ruta.** Se conserva el del
-documento anterior y se aterriza a media página, con el `<h1>` por encima del borde superior:
-había que subir a mano para ver en qué sección se estaba. Lo enmascaraba a medias el `focus()`
-de T2-18 —al enfocar un elemento más alto que la ventana, el navegador desplaza *lo mínimo*, y
-desde abajo eso alinea el **final** de `<main>` con el borde inferior, nunca su principio—, así
-que parecía un desplazamiento caprichoso en vez de uno ausente. Medido: desde 800 px en
-Reportes, ir a Dashboard dejaba la página en 202 px y el título en −113. Ahora `AnuncioDeRuta`
-manda `window.scrollTo(0, 0)` y enfoca con `preventScroll`, para que no haya dos mecanismos
-decidiendo dónde queda la página. **En `POP` no se toca**: atrás y adelante restauran la
-posición guardada, y forzar el principio borraría justo lo que se espera recuperar.
-
-**Medir un color justo después de un clic o un `hover` da el color de antes.** Los controles llevan
-`transition-colors`, que dura 150–200 ms: `getComputedStyle` leído inmediatamente devuelve el
-fotograma inicial —`rgba(0,0,0,0)` en un fondo que va a ser azul— y parece que la clase no se
-aplica. Con `waitForTimeout(400)` sale el valor real. Costó media hora y dos hipótesis falsas al
-ajustar los menús: llegué a creer que Tailwind no generaba las utilidades. **Regla:** para un
-estado con transición, o se espera a que termine, o se mira una captura.
-
-**Y al medir, hacerlo sobre el elemento que se tocó.** Un `document.querySelectorAll(...).find(...)`
-dentro de `page.evaluate` puede caer en otro nodo con el mismo texto —la interfaz duplica la
-navegación en escritorio y móvil—. `locator.evaluate()` mide justo el que Playwright pulsó.
-
-**Tailwind solo genera las utilidades que aparecen escritas en el código.** Una contraprueba con
-una clase que no está en ningún archivo no mide nada, porque esa clase no existe en el CSS
-compilado: hay que tocar la propiedad por JS (`style.fontVariantNumeric`). Pasó al verificar las
-cifras tabulares de T2-39.
-
-**Los dos proyectos del E2E corren en paralelo contra la misma base**, así que un test que pulse «el
-primero de la lista» puede operar sobre lo que acaba de crear el otro proyecto. Pasó con el
-escenario de la venta cancelada: `chromium` enviaba la orden de `Mobile Chrome` y el stock nunca
-bajaba. La cura no fue serializar, sino **nombrar**: las acciones de fila llevan el número de orden
-en su `aria-label` y el test localiza la suya. Vale como regla: **si un test necesita `.first()`,
-casi siempre falta un nombre accesible.** Y si una pasada se interrumpe, deja órdenes y productos
-`E2E-*` a medias en la base de desarrollo, que ensucian la siguiente.
-
-**Un `overflow-x-auto` ensancha el viewport de diseño en Chrome de Android** con el ancho de su
-contenido, aunque lo recorte visualmente, y todo lo `position: fixed` se dimensiona contra ese
-viewport: con la tabla de productos en pantalla, un `fixed inset-0` medía **663 px sobre una
-pantalla de 393**, así que el modal se centraba en 663 y su botón primario quedaba fuera del borde.
-La cura es `contain: paint` en el scroller, y `desbordes.test.ts` falla si falta. Los tres
-candidatos evidentes **no funcionan**, comprobado uno a uno: `body{overflow:hidden}` no influye
-—el viewport ya estaba ensanchado sin ningún modal—, `html{overflow-x:hidden}` no cambia nada, y
-quitar el `min-w-160` de la tabla tampoco, porque el ancho mínimo intrínseco de las celdas ya supera
-la pantalla.
-
-**Un fallo de Playwright puede nombrar un elemento que no tiene nada que ver.** El de arriba decía
-«el `<label>` de *Stock mínimo* intercepta el clic», que era solo lo que había bajo las coordenadas.
-Medir la geometría —una sonda `position: fixed` y los rectángulos reales— costó cuatro pasadas y
-descartó tres hipótesis; hacer caso al mensaje habría llevado a arreglar el formulario. Vale la
-regla general: **antes de acusar al código de una tarea, comparar contra el estado anterior con
-`git stash` en la misma máquina.** Ahí evitó dos diagnósticos equivocados, y también demostró que un
-`pnpm dev` olvidado ocupando un puerto falsea toda la medición.
-
-**Tailwind incrusta el color de las sombras, así que sus tokens no se pueden redefinir desde
-fuera.** Las utilidades de color compilan a `var(--color-…)` y cambian solas con el tema; las
-de sombra no: `.shadow-overlay` sale como `--tw-shadow: 0 8px 24px
-var(--tw-shadow-color, #0f172a1f)`, con el literal dentro. Redefinir `--shadow-overlay` en
-otro bloque **no hace nada y no se nota** — el token queda escrito y un test que lea el CSS lo
-da por bueno. Se descubrió midiendo el modal en el navegador, que devolvía
-`rgba(15, 23, 42, 0.12)` en tema oscuro. La salida es meter los dos valores **dentro** del
-token con `light-dark()`, porque el literal que Tailwind incrusta es justamente ese.
-
-**`ring-offset-2` no deja un hueco transparente: lo rellena de blanco.** Tailwind registra
-`--tw-ring-offset-color` con `initial-value: #fff`, así que el anillo de foco dibuja 2 px
-blancos entre el control y el borde — invisible en tema claro, un halo en oscuro. Medido sobre
-el interruptor de Configuración: `rgb(255, 255, 255)` sin token y `rgb(21, 29, 44)` con
-`ring-offset-surface`. No lo veía ninguna guardia de color, porque no es una utilidad cruda de
-la paleta ni un hexadecimal escrito en el código; ahora lo vigila `tokens.test.ts`.
-
-**El tema no se puede aplicar desde `main.tsx`.** Un `<script type="module">` es diferido por
-definición, así que cuando corre el navegador ya pintó: quien elija un tema distinto al de su
-sistema ve un fogonazo del otro en cada carga. Va en un script en línea y bloqueante dentro de
-`<head>`. Se comprueba midiendo el fondo en el **primer `requestAnimationFrame`** sobre el
-build de producción, con la CPU a 1/20 y la red a «Slow 3G» para que React no haya montado —y
-falsificándolo: sin el script, ese mismo frame sale del color contrario.
-
-**Un test que repara lo que vigila se queda mudo para siempre, y parece un fallo intermitente.**
-El primer guardián de frescura del contrato tenía debajo otro caso que llamaba a `generar()` para
-ganar cobertura — y con eso **reescribía el archivo**. Con la copia desfasada, la primera pasada
-daba dos tests en rojo y de paso la arreglaba, así que la segunda salía verde y el aviso
-desaparecía. El síntoma es de los peores: un fallo que no se reproduce y que uno acaba achacando a
-la base de datos o al orden de los tests. **Regla: un test no escribe en el árbol.** Si hace falta
-ejercitar algo que escribe, se ejercita con su comando, no dentro de la suite.
-
-**Un `return` en el nivel superior de un `.js` rompe la cobertura, no los tests.** Node envuelve
-cada módulo CommonJS en una función, así que ahí es legal y el archivo funciona; babel lo parsea
-como módulo ES al instrumentar para cobertura y falla con «'return' outside of function». El
-síntoma despista mucho: `pnpm test` en verde y `pnpm test:coverage` en rojo, señalando el `require`
-del test en vez del archivo requerido. Pasó con `scripts/generar-contratos.js` (T4-01); la cura es
-meter el cuerpo en una función y llamarla.
-
-**Los archivos del frontend tienen finales de línea CRLF.** Un reemplazo de varias líneas
-escrito con `\n` no encuentra nada y **falla en silencio**: el script dice que terminó, el
-archivo sigue igual. Para cambios multilínea hay que usar las herramientas de edición, no
-`String.replace` desde consola. Es hermana de la trampa de PowerShell, y se nota tarde.
-
-**PowerShell 5.1 destroza el UTF-8.** `Get-Content -Raw | ... | Set-Content` lee con la
-página de códigos ANSI y reescribe en UTF-8, dejando doble codificación (`—` → `â€"`), y
-la conversión inversa no siempre es reversible. Para editar archivos hay que usar las
-herramientas de edición, no reemplazos por consola. Ha pasado dos veces: con el README
-(restaurado desde git) y con `index.css` (reescrito a mano, porque sus cambios aún no
-estaban commiteados y `git checkout` los habría perdido).
+- **PowerShell 5.1 destroza el UTF-8**: `Get-Content | … | Set-Content` lee en ANSI y reescribe
+  con doble codificación (`—` → `â€"`). Los archivos se editan con las herramientas de edición.
+- **Los finales de línea no son uniformes**: hay archivos en CRLF y archivos en LF. Un reemplazo
+  de varias líneas escrito con `\n` no encuentra nada en los primeros y **falla en silencio**.
+- **`process.exit()` aborta libuv** si hay un proceso hijo cerrándose, y devuelve un código sin
+  sentido aunque la comprobación haya pasado. `scripts/smoke.js` espera el `exit` del hijo y usa
+  `process.exitCode`.
+- **La contraseña de `DATABASE_URL` lleva una `@` sin codificar**: Prisma la admite y libpq no.
+  Los guiones de copia lo resuelven; a mano, va como `%40` ([operaciones.md §7](operaciones.md)).
 
 ---
 
 ## 5. Cosas que dependen de ti, no del código
 
-**Activar el alias de búsqueda en cada máquina nueva.** Vive en `.git/config`, que no se
-versiona, así que un clon recién hecho no lo tiene. Una vez por repositorio:
-
-```bash
-git config --local include.path ../.gitconfig-stockly
-```
-
-Sin él, buscar en el código devuelve sobre todo documentación de tooling: `.agents/` y
-`.claude/` se versionan a propósito (T3-06) y son la mayoría de los archivos rastreados.
-Con él, `git buscar` y `git buscar-archivos` filtran a código de aplicación. Comprobado en
-esta máquina: en `Stockly-F`, `z.object` pasa de **61 archivos a 8**; en `Stockly-B`, de
-**57 a 14**. Está activado aquí; falta en el otro equipo.
-
-**En un despliegue nuevo nadie es administrador hasta ejecutar `pnpm db:seed`.** Desde
-T1-22 el registro público crea siempre usuarios `USER`. Para promover a alguien:
-`PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN.
-
-### Resueltas
-
-**La credencial filtrada está rotada (2026-08-10).** Apareció en un conflicto de merge sin
-resolver commiteado y pusheado en `Stockly-F/main` desde el 2026-08-05 (merge `4254582`),
-dentro de `e2e/smoke.spec.ts`, y devolvió al repositorio la misma contraseña que T0-06
-había purgado reescribiendo el historial. El conflicto se resolvió a favor de la credencial
-del seed y **la contraseña ya se cambió**, así que el valor que quedó en el historial de ese
-merge está muerto.
-
-De paso se **retiró del árbol actual**: estaba escrita en claro en `docs/CONTEXTO.md` y dos
-veces en `docs/ROADMAP.md`, que son archivos versionados. Ahora esos textos dicen «la
-credencial filtrada» y el registro conserva el sentido sin llevar el valor. `git grep` sobre
-los dos repositorios devuelve **cero** coincidencias. En el historial sigue estando, y con el
-valor ya rotado eso no es un riesgo, pero conviene saberlo si algún día se pasa un escáner
-de secretos: **avisará, y será un falso positivo**.
-
-Queda de la ficha T0-06 una gestión externa: abrir ticket a GitHub Support para recolectar el
-commit huérfano `55efe3b`. No es urgente con la contraseña ya cambiada.
-
-**T1-21 verificado (2026-08-09).** `docker exec stockly_backend id` devuelve
-`uid=1000(node)`, y las migraciones se aplican al arrancar sin privilegios de root,
-incluida la extensión `pg_trgm` de T2-09.
+- **Activar el alias de búsqueda en cada clon.** `.agents/` y `.claude/` se versionan a propósito
+  y son la mayoría de los archivos rastreados; sin el alias, buscar en el código devuelve sobre
+  todo documentación de tooling. Una vez por repositorio:
+  `git config --local include.path ../.gitconfig-stockly`. Después, `git buscar X` y
+  `git buscar-archivos X`.
+- **En un despliegue nuevo nadie es administrador hasta ejecutar `pnpm db:seed`.** El registro
+  público crea siempre usuarios `USER`. Para promover a alguien, `PATCH /api/v1/users/:id/role`
+  desde una cuenta que ya sea ADMIN.
+- **El ensayo de restauración es mensual y lleva sin anotarse desde el 2026-08-12**
+  ([operaciones.md §5](operaciones.md)). Una copia que no se ha restaurado no es una copia.
+- **No hay ninguna versión publicada.** Los repositorios están sin etiquetar y sus `package.json`
+  no coinciden (`1.0.0` y `0.0.0`); al cortar la primera hay que reconciliarlos y fechar el
+  [CHANGELOG](../CHANGELOG.md).
+- **Antes de tener usuarios reales o de cobrar**, lo pendiente de [legal.md §2](legal.md).
+- **Un escáner de secretos avisará de la credencial filtrada, y será un falso positivo.** Está en
+  el historial de `Stockly-F` (merge `4254582`), se rotó el 2026-08-10 y no queda en el árbol.
+  Sigue pendiente, sin urgencia, pedir a GitHub Support que recolecte el commit huérfano `55efe3b`.
 
 ---
 
 ## 6. Decisiones vivas: lo que no conviene deshacer
 
-**Por dónde seguir (2026-09-29): la ruta sugerida del [Tier 5](ROADMAP.md#tier-5--funcionalidad-de-negocio)
-está hecha** —T5-01 a T5-05, las que corregían cifras que se leían mal—, y también T5-07, T5-08,
-T5-09, T5-10 y T5-13, y después T5-06, T5-11 y T5-12. Quedan T5-14 y T5-15, solo
-con un caso de uso real.
-
-**Los avisos (T5-12) no tienen planificador detrás:** las compras atrasadas y la purga de los
-leídos se hacen al consultar el contador de la campana, como mucho cada cinco minutos por proceso
-(`notificationsService.mantenerSiToca`). Si nadie abre la aplicación, no se generan —y nadie los
-echa de menos—. Un aviso nuevo se añade en tres sitios: el enum `NotificationType`, su forma en
-`avisoSchema` (contrato) y su frase en `presentar()` de `CampanaDeAvisos.tsx`. La clase ABC (T5-10) podría ser un filtro al abrir un conteo;
-hoy solo lo es la categoría. El resumen semanal (T5-11) y los avisos (T5-12) deciden qué compra está **atrasada** con el mismo
-criterio, escrito dos veces —`reunirDatosDelResumen` y `notificationsService.mantener`—: si cambia, cambia en los dos. Lo que
-sigue se escribió al cerrar los Tiers 0 a 4. De las dos decisiones de producto que menciona, **el
-cubo parcial se tomó en T5-09** (meses naturales en la zona del negocio), y **la búsqueda exacta por
-SKU existe desde T5-08** —`GET /products/lookup`, la del escáner—; el buscador de texto del catálogo
-sigue sin mirar el SKU, y cambiarlo es otra decisión.
-
-**Un código de barras tiene una regla y un tamaño mínimo (T5-08).** Qué código es válido lo decide
-`motivoCodigoDeBarrasInvalido`, en el contrato: la aplican el validador y el formulario, y un GTIN
-con el dígito de control mal no se guarda. Las etiquetas no dibujan barras de menos de **0,2 mm**:
-con 0,15 el escáner no leyó la del E2E y el PDF salió igual. Lo que no cabe se rechaza nombrando
-el producto. **Si cambias el tamaño de una etiqueta o el mínimo, el E2E imprime un SKU de 17
-caracteres —el máximo de la de rollo— y lo vuelve a leer**: es la prueba de que el límite se lee.
-
-**Una dependencia que se carga bajo demanda necesita su regla en `manualChunks` (T5-08).** La regla
-de `vite.config.ts` manda a `vendor` todo lo que no nombra, y `vendor` se descarga siempre: un
-`import()` dinámico no basta. `barcode-detector` viajó así en el primer arranque hasta que tuvo
-`vendor-escaner`. Tras añadir una librería pesada, mirar en `dist/index.html` qué trozos se precargan.
-
-**Un modal puede abrirse encima de otro (T5-08).** El escáner se abre sobre el formulario de producto.
-`Modal` lleva una pila de los abiertos: solo el de arriba atiende a Escape y al tabulador, y el
-scroll de la página se libera al cerrar el último. Un modal nuevo no necesita hacer nada.
-
-**La licencia es la AGPL-3.0-only desde el 2026-09-30 ([ADR 0009](adr/0009-licencia-agpl.md)).**
-Dos cosas que no conviene romper: el enlace al código en «Acerca de Stockly» del perfil —la
-cláusula 13 pide ofrecerlo a quien usa la aplicación por la red— y, **si algún día se quiere vender
-una licencia comercial**, no aceptar contribuciones externas sin un acuerdo de cesión antes.
-
-**Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA` (T5-07).** Su ancho mínimo
-de 640 px deja las columnas de la derecha detrás de un desplazamiento horizontal **sin barra**, y en
-la captura del conteo eso era el campo donde se escribe. Ni jsdom ni el E2E lo ven solos: Playwright
-desplaza hasta el elemento antes de actuar. Si una pantalla es de trabajo en el almacén, se revisa a
-393 px y, si el campo importa, el E2E mide que quede dentro del ancho.
-
-**Quién puede qué se decide en una sola tabla: `PERMISOS`, en el contrato (T5-13).** Una ruta
-nueva se protege con `permitir("<MÉTODO> <ruta>")` y lleva su fila; un botón nuevo se enseña con
-`usePuede()` sobre esa misma ruta, no con `role === "ADMIN"`. `permisos.test.ts` recorre las rutas
-montadas y falla si una no tiene fila, si usa la de otra o si algún rol recibe 403 donde su fila no
-lo dice. **No escribas una lista de roles al lado de una ruta**: es exactamente lo que el test
-detecta, y lo que dejó `WAREHOUSE` sin poderse asignar mientras la ruta de cambiar rol validaba
-contra `["ADMIN", "USER"]`.
-
-**Al cierre del 2026-08-12 el ROADMAP estaba en 114/114 y no quedaba nada asignado.** Eso no quería
-decir que no quedara nada que hacer; quería decir que **lo siguiente hay que decidirlo, no consultarlo**. Tres
-cosas quedan escritas y sin dueño, y ninguna es una tarea pendiente disfrazada:
-
-- **T4-17 se descartó, no se hizo.** El recorrido con lector de pantalla sigue sin ejecutarse. Si
-  aparece una máquina con NVDA o VoiceOver, es lo primero que vuelve a la lista.
-- ~~**El primer cubo del gráfico de movimientos por mes es parcial**~~, porque la ventana rodaba desde
-  hoy. Se conservó al reescribir la consulta en T4-16 y **se decidió en T5-09**: meses naturales.
-- **El buscador del catálogo ignora el SKU** (§7 de [rendimiento.md](rendimiento.md)). Lo mismo:
-  cambiar lo que busca una pantalla no es una tarea de rendimiento.
-
-Y una advertencia de método, que es lo que este tramo ha ido repitiendo: **cinco de las últimas
-seis fichas describían mal su propio problema** —T4-14 la causa, T4-15 el alcance, T4-16 el remedio
-y una consulta de dos—. Las fichas cuentan lo que se vio en la auditoría del 2026-08-04, no lo que
-resultó ser. Medir antes de arreglar, y medir otra vez después.
-
-### Los textos de la interfaz
-
-**Ningún texto se escribe en un componente** (T4-04). Todo sale de `Stockly-F/src/shared/i18n/es.ts`,
-que es el catálogo de referencia, y se pinta con `t()` / `tn()` de `useT()`. Dos cosas lo sostienen y
-conviene no deshacerlas:
-
-- **`en.ts` es un `Record` sobre las claves de `es.ts`**, así que una traducción que falte no compila.
-  No hace falta ninguna herramienta de sincronización; es la misma idea que el contrato de T4-01.
-- **`literales.test.ts` recorre `src/`** y falla si aparece una cadena escrita a mano en un nodo JSX,
-  en una prop visible o en un `toast`. Esa guardia —ahora también en la CI— es lo único que impide que la traducción
-  se erosione pantalla a pantalla — y encontró dos textos que llevaban meses sin traducir.
-
-Tres decisiones que parecen descuidos y no lo son: las **exportaciones** salen siempre en español
-—un CSV es formato de intercambio, y sus columnas están emparejadas con las del backend por el test
-de T3-05—; los **motivos de un movimiento** se guardan en la base, así que el valor es dato y solo se
-traduce la etiqueta; y los **importes** no cambian de formato, porque `es-MX` y `en-US` agrupan igual
-y lo único que cambiaría es el símbolo. Las **fechas** sí siguen al idioma, y para eso está
-`shared/lib/fechas.ts`. El porqué del motor propio, en
-[ADR 0007](adr/0007-i18n-propio.md).
-
-**En el backend, un error que se lance lleva código**: `new HttpError(status, "mensaje", "CODIGO", params)`,
-con el código dado de alta en `CODIGOS_DE_ERROR`. El `message` en español se queda —es lo que ve quien
-llama a la API sin interfaz— pero deja de ser lo que se pinta. Un código nuevo sin traducción rompe la
-suite del frontend en cuanto se regenera el contrato.
-
-*Lo que sigue son las decisiones que costaron una medición y que una sesión nueva podría revertir
-por reflejo, agrupadas por tema. El relato tarea a tarea vive en las filas de
-[Progreso](ROADMAP.md#progreso); aquí solo está el poso.*
-
-### Diseño
-
-La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md): color,
-tipografía, radios, elevación, densidad, estados, iconos y movimiento, cada sección con el test que
-la vigila. **Es lectura previa a tocar una pantalla**, y no es opcional: media docena de esas
-reglas ponen `pnpm verify` en rojo si se incumplen.
-
-**El modo oscuro es capa semántica, no clases `dark:`** (T4-03). Sigue la preferencia del
-sistema, no hay conmutador, y no se tocó ni una pantalla: las utilidades de color compilan a
-`var(--color-…)`, así que redefinir los tokens bajo `prefers-color-scheme` cambia la
-aplicación entera. Si algún día se añade un selector manual, la capa ya está: lo que falta es
-persistencia y un tercer estado «auto». Tres cosas que no conviene deshacer:
-
-- **No inviertas la paleta.** Los estados se aclaran y desaturan; un `#b91c1c` sobre fondo
-  oscuro es casi negro. Los ratios están medidos y `theme.test.ts` los recalcula **en los dos
-  temas**.
-- **Los rellenos se pintan `bg-primary text-surface`, nunca `text-white`.** Es lo que hace que
-  el botón primario se invierta solo al cambiar de tema. Escribir `text-white` en un botón
-  rompe el modo oscuro sin que ningún test de color lo vea.
-- **Los colores de los gráficos son `var(--color-chart-N)` en las props de Recharts.** Funciona
-  porque un atributo de presentación de SVG se parsea como valor CSS, y reacciona al tema sin
-  volver a renderizar. Lo que sea un **estado** —entradas, salidas, stock mínimo— va con su
-  token de estado, no con la paleta categórica.
-
-Lo que ese documento no recoge:
-
-- **Los ítems de menú son cajas delimitadas** (T2-46, a petición de diseño). Salen todos de
-  `clasesDeItemDeMenu()` en `Stockly-F/src/shared/lib/`: borde transparente en reposo —para que el
-  texto no baile un píxel al señalar— que se pinta en `hover` y en `focus-visible`, nunca en `focus`
-  a secas, o se quedaría pegado tras un clic de ratón. Al añadir un desplegable, usar ese helper y
-  `CLASES_PANEL_DE_MENU`. La separación entre ítems (`gap-1`) **no es estética**: sin ella, dos
-  recuadros contiguos comparten línea y parecen solaparse — un defecto que no existía antes de
-  delimitarlos.
-- **La fila de la tabla de productos se quedó en 48 px**, no en los 36 del perfil denso de T2-40.
-  No es un descuido: relleno 6+6, nombre 20 y SKU 16 ya suman 48, y la celda de la miniatura, 44.
-  Bajar a 36 exige quitar el SKU de la tabla o encoger la miniatura a 24 px, y eso es una decisión
-  de producto.
-- **Pendiente:** las paletas de los gráficos de Recharts siguen como hexadecimales dentro de los
-  componentes. No son utilidades —`fill` y `stroke` son props—, así que ningún test las detecta;
-  llevarlas a los tokens exige leer las variables CSS desde JS.
+*El poso de las tareas cerradas: lo que costó una medición y una sesión nueva podría revertir por
+reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-10-05.md).*
 
 ### El contrato de la API
 
-**La forma de las respuestas se declara en un solo sitio: `src/contratos/api.ts`** (T4-01). El
-frontend no escribe la suya, recibe una copia literal generada con `pnpm contratos:generar` y
-versionada allí. Para cambiar una respuesta: se edita **aquí**, se genera, y se commitea en los
-**dos** repositorios — el generador lo recuerda al terminar.
+- **La forma de las respuestas se declara una sola vez**, en `src/contratos/api.ts`. El frontend
+  compila contra una copia literal (`pnpm contratos:generar`), que se commitea en los dos
+  repositorios. Por qué se copia y no se publica como paquete: [ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md).
+- **Ese archivo solo puede importar `zod`**: es lo que permite copiarlo. Sus enums se repiten a
+  propósito y `contratos.test.ts` los compara con `$Enums`.
+- **`price` y los `unitPrice` son `Importe`, o sea `string | number`**: los `Decimal` de Prisma se
+  serializan como cadena, y `/reports` es la excepción. Para convertir, `aNumero()`. Estrecharlo a
+  `number` es volver a la mentira que costó la tarea.
+- **El spec de OpenAPI se deriva de ahí**: `components.schemas` lo genera `swagger.esquemas.ts`
+  con `z.toJSONSchema()` de Zod 4 —no hace falta `zod-to-openapi`—, y las peticiones con
+  `io: "input"`, porque los validadores usan `z.coerce` y lo que aceptan no es lo que producen.
+  Las **rutas** de `swagger.paths.ts` sí se escriben a mano.
+- **Quién puede llamar a cada ruta está en una sola tabla, `PERMISOS`**, en el contrato. El backend
+  protege con `permitir("<MÉTODO> <ruta>")` y el frontend enseña botones con `usePuede()`.
+  `permisos.test.ts` recorre las rutas montadas y falla si una no tiene fila, usa la de otra o
+  responde distinto de lo que dice. **Una lista de roles escrita junto a una ruta** es justo lo que
+  detecta, y lo que dejó `WAREHOUSE` sin poderse asignar.
+- **Un error que se lance lleva código**: `new HttpError(status, "mensaje", "CODIGO", { params })`,
+  dado de alta en `CODIGOS_DE_ERROR`. El `message` en español es para quien llama a la API sin
+  interfaz; lo que se pinta sale del código. Uno nuevo sin traducción rompe la suite del frontend.
 
-Tres reglas que no conviene deshacer:
+### Datos y consultas
 
-- **Ese archivo solo puede importar `zod`.** Es lo que permite copiarlo en vez de transformarlo.
-  Meterle un `import` de Prisma o de `@/…` rompe la compilación del otro lado.
-- **Los enums se repiten ahí a propósito**, por lo mismo. La duplicación no queda suelta:
-  `src/tests/contratos.test.ts` los compara con `$Enums` y falla si divergen.
-- **`price` y los `unitPrice` son `Importe`, o sea `string | number`.** No es indecisión: los
-  `Decimal` de Prisma se serializan como cadena y `/reports` es la excepción, porque su servicio
-  convierte con `Number(...)` antes de responder. Para pasar a número está `aNumero()`. Estrecharlo
-  a `number` «para simplificar» es volver a la mentira que costó esta tarea.
+- **Ningún listado se devuelve entero.** Todo `findMany` de lectura lleva `parsePagination` y
+  `meta`, y **sus filtros van en el `where`**: filtrar en el navegador filtra solo la página
+  traída, sin error y sin aviso. En pantalla, los recuentos salen de `meta.total`, cambiar un
+  filtro vuelve a la página 1 y un gráfico que dibuja una página lo dice.
+- **Las exportaciones van por lotes** (`enviarExportacion`) aunque parezcan pequeñas: el histórico
+  de un solo producto puede pesar más que el catálogo entero. `buildCsv` ya no lo llama ningún
+  endpoint; se conserva como oráculo del test que compara las dos rutas byte a byte.
+- **Las descargas van por axios** (`descargarDeLaApi`), nunca por un enlace: el navegador ignora
+  `download` entre orígenes y con la sesión caducada se guardaría el error.
+- **Antes de subir `work_mem`, reescribir la consulta**: en la de rotación el ajuste daba ×3.3 y
+  la reescritura ×20 con el valor de fábrica. Y cuidado con `GROUP BY` sobre una expresión
+  —PostgreSQL no tiene estadísticas de ella y ordena la tabla entera— y con una ventana con
+  `EXCLUDE`, que es cuadrática. Cortar el cliente no para la consulta: hace falta
+  `pg_cancel_backend` ([rendimiento.md](rendimiento.md) §5 y §11).
+- **El seed es un libro mayor, no un montón de `create`**: construye los movimientos de todos los
+  orígenes con la regla de producción y cierra exactamente en el stock del catálogo. Una tabla
+  nueva se añade **también a `limpiar()`** —olvidarla no da error, deja huérfanos—, y `pnpm check`
+  lo comprueba con `tsconfig.seed.json`.
+- **Migraciones solo hacia adelante**: una desplegada no se edita ni se borra
+  ([operaciones.md §6](operaciones.md)).
 
-El porqué de copiar en vez de publicar un paquete, con las tres alternativas descartadas y su
-coste, está en [ADR 0006](adr/0006-contrato-copiado-entre-repositorios.md).
+### Textos, correos y avisos
 
-**Y el spec de OpenAPI se deriva de ahí** (T4-02). `components.schemas` no se escribe: lo genera
-`swagger.esquemas.ts` desde el contrato —las respuestas— y desde los `*.validator.ts` —las
-peticiones—, con `z.toJSONSchema()` de Zod 4 y `target: "openapi-3.0"`. Dos cosas que conviene no
-deshacer:
+- **Ningún texto de interfaz se escribe en un componente.** Sale de `shared/i18n/es.ts` con `t()`
+  y `tn()`; `en.ts` es un `Record` sobre sus claves, así que una traducción que falte no compila.
+  `literales.test.ts` falla ante una cadena escrita a mano y `catalogo.test.ts` ante una clave que
+  ya no lee nadie. Las familias dinámicas (`error.*`, `auditoria.*`, `ajuste.*`) están exentas
+  **una a una**. El porqué del motor propio: [ADR 0007](adr/0007-i18n-propio.md).
+- **Tres cosas que parecen descuidos y no lo son:** las exportaciones salen siempre en español
+  —un CSV es formato de intercambio—; los motivos de un movimiento son dato y solo se traduce la
+  etiqueta; y los importes no cambian de formato. Las fechas sí siguen al idioma
+  (`shared/lib/fechas.ts`).
+- **Ningún texto de correo se escribe en `nodemailer.ts`**: sale de `shared/i18n/correos.es.ts`.
+  Cada función de envío recibe un `idioma` **obligatorio y sin valor por defecto** —con uno, un
+  envío que lo olvide compilaría y saldría en español—. El registro lo toma de `Accept-Language`;
+  el resto, de `users.idioma`, que el frontend sincroniza con `useSincronizarIdioma`.
+- **Los avisos no tienen planificador**: las compras atrasadas y la purga de leídos se resuelven
+  al consultar el contador de la campana, como mucho cada cinco minutos por proceso
+  (`mantenerSiToca`). Un aviso nuevo se añade en tres sitios: el enum `NotificationType`, su forma
+  en `avisoSchema` y su frase en `presentar()` de `CampanaDeAvisos.tsx`.
+- **Qué compra está «atrasada» se decide igual en dos sitios**, `reunirDatosDelResumen` y
+  `notificationsService.mantener`: si cambia, cambia en los dos.
+- **El backend tampoco tiene planificador para el resumen semanal**: lo envía un comando que se
+  programa desde fuera ([operaciones.md §10](operaciones.md)).
+- **Las alertas por correo no bloquean la respuesta**: se disparan sin esperar, y
+  `esperarAlertasEnVuelo()` existe para que los tests puedan esperarlas.
 
-- **No hace falta `zod-to-openapi`.** Zod 4.4 lo hace solo y en el dialecto exacto del spec. Añadir
-  esa dependencia —que es lo que pedía la ficha, escrita cuando Zod no sabía— sería tenerla por
-  costumbre.
-- **Las peticiones se generan con `io: "input"`.** Los validadores usan `z.coerce.number()`: lo que
-  aceptan no es lo que producen. Con la salida, el spec diría que `price` solo admite números y el
-  «Try it out» mentiría con los formularios.
+### Diseño
 
-Las **rutas** siguen escritas a mano en `swagger.paths.ts` y así se quedan: qué endpoints hay, con
-qué resumen y qué códigos devuelven no se deduce de un esquema.
+La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design-system.md), y es
+**lectura previa a tocar una pantalla**: varias de sus reglas ponen `pnpm verify` en rojo.
+
+- **El modo oscuro es capa semántica, no clases `dark:`.** Cada token declara sus dos valores con
+  `light-dark()`. No se invierte la paleta —los estados se aclaran y desaturan—, los rellenos son
+  `bg-primary text-surface` y **nunca `text-white`**, y los gráficos usan `var(--color-chart-N)`.
+- **Los ítems de menú son cajas delimitadas** y salen de `clasesDeItemDeMenu()` y
+  `CLASES_PANEL_DE_MENU`. El borde se pinta en `focus-visible`, nunca en `focus` a secas, y el
+  `gap-1` entre ítems no es estético: sin él los recuadros parecen solaparse.
+- **La fila de la tabla de productos mide 48 px**, no los 36 del perfil denso: relleno, nombre y
+  SKU ya los suman. Bajar es una decisión de producto.
+- **Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA`**: su ancho mínimo deja
+  columnas tras un desplazamiento sin barra. Una pantalla de almacén se revisa a 393 px.
+- **Un modal puede abrirse encima de otro.** `Modal` lleva una pila: solo el de arriba atiende a
+  Escape y al tabulador. Uno nuevo no necesita hacer nada.
 
 ### Accesibilidad
 
-- **`<main id="contenido" tabIndex={-1}>` es un destino, no un adorno.** Sin ese `tabIndex` el foco
-  no viaja y el enlace de saltar al contenido (T2-11) queda en decoración: el navegador desplaza,
-  pero el siguiente Tab vuelve al principio del menú. **T2-18 usa el mismo destino** — en cada
-  cambio de ruta, `AnuncioDeRuta` mueve allí el foco y cambia el texto de una región `aria-live`.
-- **Un desplegable de navegación no es un `menu`.** La ficha de T2-16 pedía `role="menu"` y
-  `role="menuitem"` en `NavDropdown`, y **no se aplicó a propósito**: ese rol es para comandos de
-  aplicación; con él, los enlaces de Catálogo/Órdenes/Admin dejan de anunciarse como enlaces y
-  desaparecen de la lista de enlaces del lector de pantalla. Se quedó en *disclosure*
-  (`aria-haspopup` + `aria-expanded` + `aria-controls` + Escape). `UserMenu` sí conserva
-  `role="menu"`, que ya tenía: ahí dentro hay un comando de verdad («Cerrar sesión»). **Lo destapó
-  el E2E**, que dejó de encontrar «Productos» por rol de enlace: una prueba ajena señalando un
-  problema real, no un selector viejo.
-  **T4-10 retiró `NavDropdown`** —los destinos viven desplegados en la barra lateral—, así que hoy
-  la regla no tiene a quién aplicarse; se conserva escrita porque **la conclusión sigue viva**: si
-  alguna vez vuelve a haber un desplegable de navegación, no es un `menu`. Lo que sí quedó del
-  cierre de T2-16 es `useMenuDesplegable`, con un solo usuario (`UserMenu`) y el comportamiento de
-  teclado que costó la tarea.
-- **Al añadir una ruta hay que darle título** en `Stockly-F/src/shared/lib/titulos.ts`, o
-  `titulos.test.ts` falla — a propósito: sin entrada, al llegar a esa sección se anunciaría «Página
-  no encontrada», que es peor que el silencio. No se leen del `<h1>` porque, con las rutas en
-  `lazy()`, al cambiar de ruta todavía no hay `<h1>` que leer. Ese archivo pone además el
-  `document.title` de cada pestaña.
+- **`<main id="contenido" tabIndex={-1}>` es un destino**: sin el `tabIndex` el enlace de saltar
+  al contenido no mueve el foco. `AnuncioDeRuta` lo usa en cada cambio de ruta, manda
+  `scrollTo(0, 0)` y enfoca con `preventScroll`; en `POP` no toca nada, para que atrás y adelante
+  recuperen su posición.
+- **Un desplegable de navegación no es un `menu`**: con ese rol los enlaces dejan de anunciarse
+  como enlaces. `UserMenu` sí lo lleva, porque dentro hay un comando.
+- **Al añadir una ruta hay que darle título** en `shared/lib/titulos.ts`, o `titulos.test.ts`
+  falla: sin entrada se anunciaría «Página no encontrada».
 
-### Backend
+### Compilación y despliegue
 
-- **Hay observabilidad** (T2-10): `pino` + `pino-http` con `requestId` por petición, devuelto en
-  `x-request-id` y presente en cada línea; en producción, JSON. Al depurar un fallo, pedir ese
-  identificador es lo primero. Las cabeceras van redactadas (`cookie`, `authorization`): sin eso,
-  pino-http registra la sesión completa en cada llamada.
-- **Las alertas de bajo stock no bloquean la respuesta** (T2-07). Se disparan sin esperar y sus
-  fallos se registran; `esperarAlertasEnVuelo()` existe para que los tests puedan esperarlas de
-  verdad. Si añades otro aviso por correo, sigue ese patrón.
-- **La asimetría al cancelar una venta es intencionada** (T2-42). Cancelar una orden *pendiente* es
-  un clic directo, porque no toca inventario; cancelar una *enviada* abre un diálogo que dice
-  cuántas unidades vuelven y de qué productos. Lo que se confirma es el movimiento de stock, no el
-  cambio de estado. El recuento **excluye los ítems sin `productId`**, porque el backend repone con
-  `where: { productId: { not: null } }` y prometer esas unidades sería mentir. Si algún día se añade
-  otra transición que mueva inventario, ese es el patrón a repetir.
+- **`smoke` no es redundante con `build`**: `tsc` no reescribe los alias `@/`, así que un build
+  que compila puede no arrancar.
+- **La imagen de producción se poda con una regla, no con una lista**
+  (`scripts/podar-produccion.js`): corta los *peers* opcionales de `@prisma/client` y barre lo
+  inalcanzable. Podar en un `RUN` posterior al `install` no encoge la imagen. Las migraciones las
+  aplica el servicio `migrate` del compose, no el `CMD`.
+- **La imagen de PostgreSQL del compose nunca va por debajo del servidor más nuevo que se use**:
+  `pg_restore` solo va hacia adelante ([operaciones.md §9](operaciones.md)).
+- **Una dependencia que se carga bajo demanda necesita su regla en `manualChunks`**: lo que no se
+  nombra cae en `vendor`, que se descarga siempre. Tras añadir una librería pesada, mirar en
+  `dist/index.html` qué trozos se precargan.
+- **Hay observabilidad**: `pino` con `requestId` por petición, devuelto en `x-request-id`. Al
+  depurar un fallo, ese identificador es lo primero que se pide.
+
+### Negocio
+
+- **Un código de barras tiene una regla y un tamaño mínimo.** Qué código es válido lo decide
+  `motivoCodigoDeBarrasInvalido`, en el contrato. Las etiquetas no dibujan barras de menos de
+  0,2 mm: con 0,15 el escáner no las leyó. El E2E imprime un SKU de 17 caracteres y lo vuelve a
+  leer; es la prueba de que el límite se lee.
+- **La asimetría al cancelar una venta es intencionada.** Una pendiente se cancela con un clic;
+  una enviada abre un diálogo que dice cuántas unidades vuelven. Lo que se confirma es el
+  movimiento de stock, y el recuento excluye los ítems sin `productId`.
+- **La licencia es la AGPL-3.0-only** ([ADR 0009](adr/0009-licencia-agpl.md)). No hay que romper
+  el enlace al código en «Acerca de Stockly», que es lo que pide su cláusula 13, ni aceptar una
+  contribución externa sin acuerdo de cesión si se quiere conservar la doble licencia.
 
 ### Verificar un cambio de interfaz en el navegador
 
 `pnpm dev` en los dos repositorios y entrar con `admin@stockly.app`. Si hace falta un estado que la
-base de desarrollo no tiene —un producto agotado, una venta pendiente o enviada—, crearlo por la API
-con el token CSRF de la cookie **y borrarlo después**. Ojo: una venta ya enviada no se puede borrar
-por la API, así que la limpieza pide un script con el cliente de Prisma (`pnpm exec tsx`, importando
-`./src/shared/lib/prisma`, que es quien tiene el adaptador configurado; construir un `PrismaClient`
-a pelo falla).
-
-Los navegadores de Playwright se instalan aparte, una sola vez:
-`pnpm exec playwright install chromium` (113 MB).
+base no tiene —un producto agotado, una venta enviada—, se crea por la API con el token CSRF de la
+cookie (`csrfToken` → cabecera `x-csrf-token`) **y se borra después**. Una venta ya enviada no se
+puede borrar por la API: la limpieza pide un guion con el cliente de Prisma
+(`pnpm exec tsx`, importando `./src/shared/lib/prisma`, que es quien tiene el adaptador).

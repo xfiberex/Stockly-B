@@ -22,7 +22,7 @@ import { Prisma } from "@/generated/prisma/client";
  * único que cambia un mes cerrado es cancelar una venta enviada.
  *
  * **Y ese listado no la espera.** Con el conjunto de carga, reescribirla cuesta ~5 s (medido en
- * rendimiento.md §7 quinquies); el catálogo sirve la anterior y el recálculo sigue detrás. Solo
+ * rendimiento.md §11); el catálogo sirve la anterior y el recálculo sigue detrás. Solo
  * se espera cuando no hay ninguna todavía: sin ella, todos los productos saldrían C.
  */
 
@@ -225,5 +225,3 @@ export const abcService = {
         };
     },
 };
-
-export type ResumenAbc = Awaited<ReturnType<typeof abcService.resumen>>;

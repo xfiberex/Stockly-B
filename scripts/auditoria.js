@@ -6,9 +6,9 @@
 //
 //   1. **Vulnerabilidades** (`pnpm audit`). Necesita red: consulta la base de avisos. Si no
 //      hay red no se puede saber, y «no se puede saber» no es lo mismo que «hay un
-//      problema»: avisa y deja pasar. Este proyecto no tiene CI (decisión del 2026-08-06),
-//      así que `verify` se ejecuta en portátiles y en trenes; una puerta que se pone roja
-//      sin conexión se acabaría saltando con `--no-verify`, que es peor que no tenerla.
+//      problema»: avisa y deja pasar. `verify` se ejecuta antes que nada en portátiles y en
+//      trenes —la CI lo repite después—; una puerta que se pone roja sin conexión se
+//      acabaría saltando con `--no-verify`, que es peor que no tenerla.
 //      Para el momento en que sí importa —antes de publicar— está `--estricto`, que
 //      convierte «no pude auditar» en fallo.
 //   2. **Licencias**. Se resuelven del lockfile y del almacén, sin red. Esa sí es una

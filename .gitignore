@@ -51,3 +51,7 @@ Thumbs.db
 .idea/
 *.suo
 *.sw?
+
+# Caché de Python de los guiones de las skills (.claude/skills/*/scripts)
+__pycache__/
+*.pyc

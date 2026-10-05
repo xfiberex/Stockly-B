@@ -1,38 +1,24 @@
 # Cómo contribuir a Stockly
 
-Stockly son **dos repositorios** que se clonan uno al lado del otro:
-
-```
-01-Stockly/
-├── Stockly-B/   ← API + documentación viva de los dos
-└── Stockly-F/
-```
-
-Esta guía vale para ambos. Vive aquí por lo mismo que `docs/`: la carpeta que los contiene
-no está bajo control de versiones.
+Stockly son **dos repositorios** que se clonan uno al lado del otro, `Stockly-B` (API y
+documentación) y `Stockly-F` (SPA). Esta guía vale para ambos y vive aquí por lo mismo que
+`docs/`: la carpeta que los contiene no está bajo control de versiones.
 
 ---
 
 ## Antes de escribir código
 
-1. **Lee [`docs/CONTEXTO.md`](docs/CONTEXTO.md).** Es el estado actual, las decisiones vivas
-   y las trampas del entorno ya pagadas. Ahorra repetir errores que ya costaron una sesión.
-2. **Mira [`docs/ROADMAP.md`](docs/ROADMAP.md).** Es la fuente de verdad del trabajo
-   pendiente: 129 tareas con dependencias, criterios de aceptación y progreso.
-3. Si tocas la interfaz, lee antes
-   [`Stockly-F/docs/design-system.md`](../Stockly-F/docs/design-system.md).
-4. Si una decisión te parece innecesariamente complicada, busca en
-   [`docs/adr/`](docs/adr/) antes de simplificarla. Las que están ahí lo están porque la
-   opción evidente es la equivocada.
+1. **[`docs/CONTEXTO.md`](docs/CONTEXTO.md)**: el estado, las trampas del entorno ya pagadas y las
+   decisiones que no conviene deshacer.
+2. **[`docs/ROADMAP.md`](docs/ROADMAP.md)**: la fuente de verdad del trabajo pendiente.
+3. Si tocas la interfaz, **[`design-system.md`](../Stockly-F/docs/design-system.md)**.
+4. Si algo te parece complicado de más, **[`docs/adr/`](docs/adr/)** antes de simplificarlo.
 
 ---
 
 ## La puerta de calidad: `pnpm verify`
 
-La misma puerta corre en local y en GitHub Actions, en cada push a `main` y en cada pull
-request ([ADR 0008](docs/adr/0008-integracion-continua.md)). **La CI no te exime de ejecutarla
-antes**: repite la comprobación, no la adelanta, y un push en rojo deja `main` en rojo para todos.
-Antes de cada push, en el repositorio que hayas tocado:
+Antes de cada push, en el repositorio que hayas tocado —y en los dos si el cambio los cruza—:
 
 ```bash
 pnpm verify
@@ -43,27 +29,30 @@ pnpm verify
 | `Stockly-B` | `prisma generate` → `prisma migrate deploy` → `check` → `test:coverage` → `build` → `smoke` → `auditoria` |
 | `Stockly-F` | `check` → `lint` → `test:coverage` → `build` → `auditoria` |
 
-Debe terminar con **exit 0** en el repositorio que tocaste, y en los dos si el cambio los
-cruza (por ejemplo, la forma de una respuesta de la API).
+Debe terminar con **exit 0**. Lo que conviene saber de sus pasos:
 
-Dos asimetrías que conviene conocer para no buscar comandos que no existen:
+- **El backend no tiene `pnpm lint`**: su comprobación estática es `pnpm check` (`tsc --noEmit`,
+  también sobre `prisma/seed.ts`). En el frontend `lint` debe dar **0 errores y 0 avisos**: un
+  aviso nuevo es una regresión, no ruido de fondo.
+- **`smoke` arranca `dist/server.js` de verdad** y consulta `/api/v1/health`, porque `tsc` puede
+  compilar un build que no arranca. Usa `SMOKE_PORT` (3100) para no chocar con el `dev`.
+- **`auditoria` rompe la compilación** ante una vulnerabilidad alta o crítica en producción o una
+  licencia fuera de la lista permitida. Sin red avisa y deja pasar; `--estricto` lo convierte en
+  fallo ([docs/dependencias.md](docs/dependencias.md)).
+- **La cobertura tiene suelo** (`jest.config.js`, `vite.config.ts`). Al subirla, se sube el suelo.
+- **La prueba de carga (`load/`) no está en `verify`** y no debe estarlo: tarda minutos, necesita
+  Docker y sus números dependen de la máquina ([docs/rendimiento.md](docs/rendimiento.md)).
 
-- **El backend no tiene `pnpm lint`.** Su comprobación estática es `pnpm check` (`tsc
-  --noEmit`). El `lint` con ESLint solo existe en el frontend, y ahí debe terminar con **0
-  errores y 0 avisos**: cualquier aviso nuevo es una regresión, no ruido de fondo.
-- **El backend tiene `pnpm smoke`** y el frontend no. Arranca `dist/server.js` de verdad y
-  consulta `/api/v1/health`, porque `tsc` puede compilar un build que no arranca — es el
-  fallo exacto que costó la tarea T0-01.
+### Qué necesita el backend para pasar
 
-### Requisitos para que `verify` pase en el backend
-
-- **PostgreSQL accesible** y `DATABASE_URL` apuntando a él. Sirve Docker
-  (`docker compose up db -d`) o un PostgreSQL instalado. **El puerto varía según la
-  máquina**: ajústalo en tu `.env`, no en la documentación.
-- Las cuatro variables imprescindibles en `.env`: `DATABASE_URL`, `JWT_SECRET`,
-  `JWT_EXPIRES_IN` y `FRONTEND_URL`. Cloudinary y SMTP son opcionales de verdad.
-- `jest.setup.js` reescribe el nombre de la base a `Stockly_test`: los tests **nunca** tocan
-  la base de desarrollo.
+- **PostgreSQL accesible** y `DATABASE_URL` apuntando a él. El puerto varía según la máquina: se
+  ajusta en el `.env`, no en la documentación.
+- **Las cuatro variables imprescindibles**: `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN` y
+  `FRONTEND_URL`. Sin las de Cloudinary o SMTP el servidor arranca y solo esa función responde 503.
+- **La base `Stockly_test` al día.** Los tests nunca tocan la de desarrollo, pero `verify` tampoco
+  migra la de tests: tras cada migración nueva,
+  `DATABASE_URL=<la de Stockly_test> pnpm exec prisma db push`
+  ([docs/CONTEXTO.md §4](docs/CONTEXTO.md)).
 
 ### El E2E
 
@@ -71,20 +60,15 @@ Dos asimetrías que conviene conocer para no buscar comandos que no existen:
 cd Stockly-F && pnpm test:e2e:full
 ```
 
-No hay que levantar nada a mano: `e2e/global-setup.ts` prepara la base y el `webServer`
-arranca backend y frontend. Se ejecuta en `chromium` y en `Mobile Chrome`.
-
-**Si falla de forma rara, mira primero el puerto 3000.** Playwright usa
-`reuseExistingServer: true`, así que un backend huérfano de una pasada anterior se reutiliza
-—y no lleva el `RATE_LIMIT_MAX` que el E2E inyecta—, lo que produce fallos por 429 que no
-mencionan el límite. Está documentado en `docs/CONTEXTO.md`.
-
----
+No hay que levantar nada: `e2e/global-setup.ts` prepara la base y Playwright arranca backend y
+frontend. Corre en `chromium` y en `Mobile Chrome`, **sin reintentos**: sus fallos intermitentes
+han sido siempre defectos reales. **Resiembra la base de desarrollo**, y si falla de forma rara lo
+primero es mirar los puertos 3000 y 5173 ([docs/CONTEXTO.md §4](docs/CONTEXTO.md)).
 
 ### Si tocas la forma de una respuesta de la API
 
-La declara **un solo archivo**, `Stockly-B/src/contratos/api.ts`, y `Stockly-F` compila contra
-una copia literal suya (T4-01, [ADR 0006](docs/adr/0006-contrato-copiado-entre-repositorios.md)):
+La declara **un solo archivo**, `Stockly-B/src/contratos/api.ts`, y `Stockly-F` compila contra una
+copia literal ([ADR 0006](docs/adr/0006-contrato-copiado-entre-repositorios.md)):
 
 ```bash
 # 1. editar Stockly-B/src/contratos/api.ts
@@ -92,71 +76,64 @@ cd Stockly-B && pnpm contratos:generar   # 2. copiar al frontend
 # 3. commitear en LOS DOS repositorios
 ```
 
-Ese archivo **solo puede importar `zod`**: cualquier otro import haría que la copia no compile
-del otro lado. Olvidar el paso 2 pone `pnpm verify` en rojo en ambos repos, con el comando en el
-mensaje de error.
+Ese archivo **solo puede importar `zod`**. Olvidar el paso 2 pone `verify` en rojo en los dos
+repositorios, con el comando en el mensaje.
 
 ---
 
-## Herramientas
+## Integración continua
 
-- **Gestor de paquetes: pnpm 12.4.1**, fijado en `packageManager` de ambos repositorios y
-  en el `Dockerfile`. No usar npm ni yarn.
-- **Comentarios y documentación en español**, como el resto del código. Los comentarios
-  explican *por qué*, no *qué*: el qué ya está en la línea de abajo.
+GitHub Actions repite **la misma puerta**, no otra
+([ADR 0008](docs/adr/0008-integracion-continua.md)): en cada push a `main`, en cada pull request
+y a mano. **No exime de ejecutarla antes**: cuando la CI avisa, el commit ya está en `main`.
+
+| Repositorio | Jobs | Con qué |
+|---|---|---|
+| `Stockly-B` | `verify` | Node 22, pnpm de `packageManager` y un `postgres:17-alpine`. Crea `Stockly_test` y la migra antes |
+| `Stockly-F` | `verify` y `e2e` | Clona **el `main` de `Stockly-B` al lado**, así la frescura del contrato se comprueba de verdad. El E2E sube `test-results` y `playwright-report` si falla |
+
+**Endurecida porque los repositorios son públicos:** permisos de solo lectura, sin credenciales
+persistidas, `pull_request` y nunca `pull_request_target`, y **acciones fijadas por SHA**. No se
+actualizan solas: se resuelve la etiqueta con `gh api repos/<acción>/commits/<etiqueta> --jq .sha`
+y se cambian el SHA y el comentario.
+
+**Si falla en la CI y no en local**, casi siempre es algo que el portátil pone y la CI no: un
+`.env`, una base ya migrada, el repositorio hermano al lado.
+
+### Orden de subida: primero el backend, en verde; después el frontend
+
+La CI del frontend clona el `main` del backend **tal como esté en ese momento**, para comprobar el
+contrato y para arrancar la API en el E2E. Si el frontend llega antes que el backend del que
+depende, o con el backend en rojo, falla aunque su código esté bien.
+
+1. `pnpm verify` en local en los dos repositorios.
+2. **Push de `Stockly-B`** y esperar a que su workflow termine en verde (`gh run watch`).
+3. **Solo entonces, push de `Stockly-F`.**
+
+Si el frontend falló por subirse antes, no hace falta otro commit: con el backend ya en verde, se
+relanza (`gh run rerun <id>`).
 
 ---
 
-## Flujo de ramas
+## Convenciones
 
-Hoy el proyecto lo lleva una persona desde varias máquinas, y el historial es lineal sobre
-`main`. Eso está bien mientras siga siendo así, con una condición: **`pnpm verify` en verde
-en la máquina desde la que se hace el push**. La CI lo repite, pero después: cuando avisa, el
-commit ya está en `main`.
+- **pnpm 12.4.1**, fijado en `packageManager` y en los `Dockerfile`. No usar npm ni yarn.
+- **Comentarios y documentación en español.** Los comentarios explican *por qué*, no *qué*.
+- **`.agents/` y `.claude/` se versionan a propósito**: el proyecto se trabaja desde varias
+  máquinas y el tooling viaja con él. Para buscar solo en el código, `git buscar`
+  ([docs/CONTEXTO.md §5](docs/CONTEXTO.md)).
 
-**Primero el backend, y con su CI en verde; después el frontend.** La CI del frontend clona el
-`main` del backend tal como esté —para comprobar la copia del contrato y para arrancar la API en
-el E2E—, así que si el frontend llega antes que el backend del que depende, o con el backend en
-rojo, falla aunque su código esté bien. Los pasos, en el [README](README.md#orden-de-subida-primero-el-backend-en-verde-después-el-frontend).
+### Ramas
 
-En cuanto haya más de una persona, o un cambio que quieras poder revertir de una pieza:
+El proyecto lo lleva una persona desde varias máquinas y el historial es lineal sobre `main`, con
+una condición: `pnpm verify` en verde en la máquina desde la que se hace el push. En cuanto haya
+más de una persona, o un cambio que se quiera poder revertir de una pieza, rama
+(`git switch -c feat/…`) y pull request.
 
-```bash
-git switch -c feat/exportacion-por-lotes
-# … trabajo …
-pnpm verify            # en cada repositorio tocado
-git push -u origin feat/exportacion-por-lotes
-```
+### Commits
 
-y se integra por PR. La rama por defecto es `main` en ambos repositorios.
-
----
-
-## Convención de commits
-
-[Conventional Commits](https://www.conventionalcommits.org/), con la descripción **en
-español**:
-
-```
-<tipo>(<ámbito opcional>): <descripción en imperativo>
-```
-
-| Tipo | Cuándo |
-|---|---|
-| `feat` | Funcionalidad nueva |
-| `fix` | Corrección de un defecto |
-| `refactor` | Cambio interno sin efecto observable |
-| `test` | Solo tests |
-| `docs` | Solo documentación |
-| `chore` | Dependencias, configuración, tareas de mantenimiento |
-| `perf` | Cambio cuyo objetivo es el rendimiento, con la medida en el cuerpo |
-
-**El historial actual no cumple esto del todo, y conviene saberlo**: en `Stockly-B`, de 52
-commits solo 41 llevan un prefijo convencional, y **35 de esos 41 son `feat`** — incluidos
-los que solo actualizan documentación (`feat(docs):`) o añaden tests. La tabla de arriba es
-hacia dónde vamos, no una descripción de lo que hay.
-
-Referencia la tarea del roadmap en el cuerpo cuando exista:
+[Conventional Commits](https://www.conventionalcommits.org/), con la descripción en español y la
+tarea en el cuerpo cuando exista:
 
 ```
 feat(products): exportar el catálogo por lotes en vez de en memoria
@@ -165,23 +142,36 @@ Cierra T2-05. Medido con 50 000 productos y el heap limitado a 48 MB:
 el camino anterior agota la memoria, este completa.
 ```
 
+| Tipo | Cuándo |
+|---|---|
+| `feat` | Funcionalidad nueva |
+| `fix` | Corrección de un defecto |
+| `refactor` | Cambio interno sin efecto observable |
+| `test` · `docs` | Solo tests · solo documentación |
+| `chore` | Dependencias, configuración, mantenimiento |
+| `perf` | Rendimiento, con la medida en el cuerpo |
+
+**El historial no lo cumple del todo**: casi nueve de cada diez commits con prefijo son `feat`,
+incluidos los que solo tocan documentación o dependencias. La tabla es hacia dónde vamos.
+
 ---
 
 ## Al cerrar una tarea del roadmap
 
-Esto no es opcional: **es lo que sobrevive entre sesiones y entre máquinas.**
+Es lo que sobrevive entre sesiones y entre máquinas.
 
-1. Marca la casilla en `docs/ROADMAP.md` con la fecha.
-2. Añade una fila en la tabla de **Progreso** con las cifras reales.
-3. Actualiza las métricas (tests, cobertura) y el resumen por tier.
-4. En la ficha, anota **qué se verificó y cómo**, con números.
-5. **Di explícitamente lo que no se pudo verificar**, en lugar de darlo por bueno. Un
-   criterio de aceptación que no se cumplió y se documenta vale más que uno que se da por
-   cumplido sin medir.
+1. En [`docs/ROADMAP.md`](docs/ROADMAP.md), quita la ficha de «Tareas abiertas» y añade su fila al
+   índice de cerradas, con la fecha.
+2. Actualiza la cabecera y la tabla de resumen, y **comprueba el recuento** con los dos `grep` de
+   ese documento.
+3. En la nota de la fila y en el commit, **qué se verificó y cómo, con números**.
+4. **Di lo que no se pudo verificar**, en lugar de darlo por bueno.
+5. Si cambia el estado, las cifras de [`docs/CONTEXTO.md §3`](docs/CONTEXTO.md); si deja una
+   decisión que no conviene deshacer, su línea en el §6; y su entrada en el
+   [CHANGELOG](CHANGELOG.md).
 
-Si al hacer la tarea descubres que la ficha describía mal el problema —ha pasado varias
-veces—, corrígela ahí mismo. Las fichas vienen de una auditoría, no de una lectura línea a
-línea del código.
+Si al hacerla descubres que la ficha describía mal el problema —ha pasado siete veces—, dilo en la
+nota: las fichas son pistas, no descripciones verificadas.
 
 ---
 
@@ -189,13 +179,14 @@ línea del código.
 
 Stockly se distribuye con la **GNU AGPL v3** ([ADR 0009](docs/adr/0009-licencia-agpl.md)), y lo
 que se aporte se publica con esa misma licencia. **Si el proyecto llega a ofrecer una licencia
-comercial además de la AGPL**, hará falta un acuerdo de cesión (CLA) **antes** de aceptar la primera
-contribución externa: sin él, lo aportado es de quien lo escribió y no se puede relicenciar.
+comercial además de la AGPL**, hará falta un acuerdo de cesión (CLA) **antes** de aceptar la
+primera contribución externa: sin él, lo aportado es de quien lo escribió y no se puede
+relicenciar.
 
 ## Seguridad
 
-- **Nunca versionar credenciales reales.** El `.env` está ignorado y debe seguir así: una
-  fuga de este tipo ya obligó a reescribir el historial del repositorio (T0-06).
-- **Nunca poner una contraseña real en `e2e/`**, que sí está versionado. Las credenciales
-  del E2E salen del seed y son sobreescribibles por variables de entorno.
+- **Nunca versionar credenciales reales.** El `.env` está ignorado y debe seguir así: una fuga de
+  este tipo ya obligó a reescribir el historial (T0-06).
+- **Nunca poner una contraseña real en `e2e/`**, que sí está versionado. Sus credenciales salen
+  del seed y son sobreescribibles por variables de entorno.
 - Los avisos de `pnpm audit` se atienden, no se silencian.

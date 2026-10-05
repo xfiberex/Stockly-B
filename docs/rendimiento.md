@@ -4,7 +4,7 @@ Pruebas de carga y medición de consultas sobre un conjunto de datos representat
 La auditoría del 2026-08-04 **no midió nada**: sus hallazgos de base de datos salían de leer
 el esquema. Esto es lo que pasa al ejecutarlos.
 
-**Fechas:** 2026-08-11 (§1–§4, T4-08) y **2026-08-12** (§5–§6, T4-15 y T4-16). **Máquina:** Windows 11, PostgreSQL 17.10 local (puerto 5433), backend
+**Fechas:** 2026-08-11 (§1–§4, T4-08), 2026-08-12 (§5–§6, T4-15 y T4-16) y del 2026-09-13 al 2026-09-29 (§8–§11, las consultas del Tier 5). **Máquina:** Windows 11, PostgreSQL 17.10 local (puerto 5433), backend
 compilado (`dist/`) contra esa base. Los números absolutos son de este equipo; lo que viaja
 entre máquinas son las proporciones y los planes.
 
@@ -296,7 +296,9 @@ no es rendimiento, y cambiar lo que busca una pantalla es una decisión de produ
 `GET /products/lookup`: dos consultas por índice único, sin `ILIKE`. Es la que usa el escáner, y
 la que escribe un código a mano en su campo. El buscador de texto del catálogo sigue igual.
 
-## 7 bis. T5-02 — el valor a coste y el margen, sobre el conjunto de carga
+---
+
+## 8. T5-02 — el valor a coste y el margen, sobre el conjunto de carga
 
 El criterio de T5-02 pedía que las consultas nuevas no ordenaran en disco con este conjunto,
 y **el conjunto no tenía ventas**: `load/sembrar.js` genera productos, movimientos y
@@ -329,12 +331,12 @@ que el p(95) de 337 ms del §6 no está medido de nuevo con estas consultas.
 
 **Salvedad, resuelta en T5-09:** `load/sembrar.js` no generaba ventas, así que rehacer
 `Stockly_carga` las borraba y estas cuatro filas no se podían repetir. Desde el 2026-09-28 el
-generador siembra costes, ventas y compras con recepciones con las proporciones de arriba (§7
-quater). **Estas cuatro filas no se han vuelto a medir** con él.
+generador siembra costes, ventas y compras con recepciones con las proporciones de arriba (§10).
+**Estas cuatro filas no se han vuelto a medir** con él.
 
 ---
 
-## 7 ter. T5-05 — las sugerencias de reposición, sobre el conjunto de carga
+## 9. T5-05 — las sugerencias de reposición, sobre el conjunto de carga
 
 Medido el 2026-09-28 sobre `Stockly_carga` —100 000 productos, 1.1 M movimientos y 660 000 líneas
 de venta—, mejor de cinco pasadas con `EXPLAIN (ANALYZE, BUFFERS)`:
@@ -356,7 +358,9 @@ T5-09 sí, pero esto no se ha repetido—, así que el `LATERAL` del
 el `LATERAL` se hace solo para las 50 filas de la página y usa el índice de
 `purchase_order_items(productId)`.
 
-## 7 quater. T5-09 — ventas y compras por periodo, sobre el conjunto de carga
+---
+
+## 10. T5-09 — ventas y compras por periodo, sobre el conjunto de carga
 
 Medido el 2026-09-28 sobre `Stockly_carga` rehecha con el generador versionado: 100 000
 productos, 1.2 M movimientos, **660 000 líneas de venta** (330 000 órdenes en un año) y **90 000
@@ -414,9 +418,11 @@ comprobó con `current_setting('work_mem')` antes de cada `EXPLAIN`.
 T4-16, las dos aisladas y sobre la misma base, **77.6 → 76.3 ms**. Dentro del resumen del
 dashboard sale en ~180 ms porque corre a la vez que las otras diez consultas.
 
-## 7 quinquies. T5-10 — la clasificación ABC, sobre el conjunto de carga
+---
 
-Medido el 2026-09-29 sobre `Stockly_carga` recién sembrada (el mismo generador que §7 quater:
+## 11. T5-10 — la clasificación ABC, sobre el conjunto de carga
+
+Medido el 2026-09-29 sobre `Stockly_carga` recién sembrada (el mismo generador que §10:
 100 000 productos, 660 000 líneas de venta en un año). Periodo `2025-09-01`–`2026-08-31` en
 `America/Santo_Domingo`: **99 624 productos con ventas**. `work_mem` de fábrica. El guion de
 medición repite a mano el SQL de `reports.abc.ts`.
@@ -445,8 +451,8 @@ las dos formas.
 
 **Por qué el recálculo no se persigue más.** Corre como mucho una vez al día y **nadie lo
 espera**: el catálogo sirve la clasificación anterior y lo lanza en segundo plano. Solo lo espera
-el primer listado de una base que no tiene ninguna. El agregado en disco es el mismo que §7
-quater dejó a sabiendas con un año de datos.
+el primer listado de una base que no tiene ninguna. El agregado en disco es el mismo que §10
+dejó a sabiendas con un año de datos.
 
 **El reparto de este conjunto no es el de un negocio real**: 50 085 A, 24 984 B y 24 555 C. Las
 ventas del generador se sortean con la misma probabilidad para todos los productos, así que no
@@ -456,7 +462,9 @@ cifras sirven para medir el coste, no para juzgar la clasificación.
 **Los recuentos de los filtros** se midieron con SQL escrito a mano equivalente al que genera
 Prisma (`EXISTS` para A y B, `LEFT JOIN … IS NULL OR` para C), no capturando el suyo.
 
-## 8. Repetir las mediciones
+---
+
+## 12. Repetir las mediciones
 
 ```bash
 pnpm carga:sembrar                    # ~3 min 20 s; recrea Stockly_carga desde cero, con órdenes

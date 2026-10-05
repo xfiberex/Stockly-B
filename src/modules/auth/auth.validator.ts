@@ -54,9 +54,3 @@ export const updatePasswordSchema = z.object({
     currentPassword: z.string().min(1, "La contraseña actual es obligatoria"),
     password: passwordField("La nueva contraseña"),
 });
-
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
-export type IdiomaInput = z.infer<typeof idiomaSchema>;
-export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
