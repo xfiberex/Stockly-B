@@ -484,3 +484,39 @@ versiona es este documento.
 **k6 se ejecuta en Docker a propósito.** No está instalado en la máquina de desarrollo y no
 hace falta que lo esté: `grafana/k6` en un contenedor deja la prueba reproducible sin añadir
 una herramienta más al PATH.
+
+---
+
+## 13. T6-01 — el listado de ventas, sobre el conjunto de carga
+
+Medido el 2026-10-05 sobre `Stockly_carga`: 330 000 órdenes de venta de un año (300 000 enviadas,
+20 000 pendientes, 10 000 canceladas). Mediana de cinco `EXPLAIN ANALYZE` de SQL escrito a mano
+equivalente al `findMany` y al `count` de `saleOrderService.getAll`, no capturando el de Prisma.
+
+La pregunta era si el filtro por fecha de creación necesitaba un índice. **Lo necesitaba, y el
+listado sin filtro más que el filtro:** los tres índices de `sale_orders` empiezan por `status` o
+por `customerId`, así que la pantalla de ventas, que al abrirse lista por `createdAt` sin filtrar
+por nada, recorría y ordenaba la tabla entera. Era así desde antes de `T6-01`.
+
+| Consulta | Sin el índice | Con `sale_orders_createdAt_idx` |
+|---|---:|---:|
+| Página 1, sin filtro | 33,40 ms *(recorrido secuencial + ordenación)* | 0,01 ms |
+| Página 1000, sin filtro (`OFFSET 9990`) | 40,47 ms | 2,37 ms |
+| Página 1, un día | 27,98 ms | 0,02 ms |
+| Recuento, un día | 27,27 ms | 0,09 ms |
+| Página 1, un mes | 27,63 ms | 0,01 ms |
+| Recuento, un mes | 28,75 ms | 2,05 ms |
+| Página 1, pendientes de un mes | 0,01 ms | 0,01 ms *(usa `status, createdAt`)* |
+| Recuento, enviadas de un mes | 2,14 ms | 2,01 ms *(usa `status, createdAt`)* |
+| **Recuento, sin filtro** | 28,80 ms | **28,97 ms** |
+| **Recuento, todas las enviadas** | 31,72 ms | **27,89 ms** |
+
+**Lo que el índice no arregla** son las dos últimas filas: contar las 330 000 órdenes, o las
+300 000 enviadas, sigue siendo un recorrido de la tabla, y es lo que cuesta ahora abrir la
+pantalla —unos 29 ms, donde antes eran 62—. No se ha tocado: es el precio de enseñar el total
+exacto, y a este tamaño no se nota.
+
+La columna «con» se midió creando el índice **dentro de una transacción que se deshizo**: la
+base de carga quedó como estaba, sin él. `pnpm carga:sembrar` la recrea con las migraciones, así
+que la próxima vez que se siembre lo tendrá.
+

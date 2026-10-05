@@ -446,6 +446,10 @@ model SaleOrder {
   @@index([status, shippedAt])
   // La ficha del cliente lista sus órdenes de la más reciente a la más antigua.
   @@index([customerId, createdAt])
+  // T6-01 — la pantalla de ventas lista por fecha de creación sin filtrar por estado, y los
+  // tres índices de arriba empiezan por otra columna: sobre 330 000 órdenes era un recorrido
+  // secuencial con ordenación (33 ms) y con este son 0,01 ms (rendimiento.md §13).
+  @@index([createdAt])
   @@map("sale_orders")
 }
 

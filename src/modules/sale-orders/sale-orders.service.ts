@@ -7,6 +7,8 @@ import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 import { normalizarCorreo } from "@/shared/lib/correo";
+import { rangoDeDias } from "@/shared/lib/diasDelNegocio";
+import { settingsService } from "@/modules/settings/settings.service";
 import { Prisma } from "@/generated/prisma/client";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
@@ -57,16 +59,21 @@ async function clienteDeLaVenta(tx: Prisma.TransactionClient, dto: CreateSaleOrd
 }
 
 export const saleOrderService = {
-    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown }) {
+    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; from?: unknown; to?: unknown }) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
         // T5-06 — el historial de la ficha del cliente. Un `customerId` repetido llega como array
         // y se ignora, como el `search` de clientes.
         const customerId = typeof query.customerId === "string" && query.customerId ? query.customerId : undefined;
+        // T6-01 — `from` y `to` son días del negocio, por la fecha de creación. La zona solo se
+        // lee si hay rango: el listado sin filtro sigue costando las dos consultas de siempre.
+        const hayRango = Boolean(query.from) || Boolean(query.to);
+        const creadas = hayRango ? await rangoDeDias(query, await settingsService.zonaHoraria()) : undefined;
         const where = {
             ...(statusFilter && { status: statusFilter }),
             ...(customerId && { customerId }),
+            ...(creadas && { createdAt: creadas }),
         };
 
         const [orders, total] = await prisma.$transaction([

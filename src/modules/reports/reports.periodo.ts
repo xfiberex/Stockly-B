@@ -1,4 +1,5 @@
 import { HttpError } from "@/shared/lib/httpError";
+import { fechaValida } from "@/shared/lib/diasDelNegocio";
 
 /**
  * T5-09 — qué días abarca un informe por periodo.
@@ -26,13 +27,6 @@ export interface Periodo {
     preset: AtajoDePeriodo | null;
 }
 
-const FECHA = /^\d{4}-\d{2}-\d{2}$/;
-
-function aFecha(texto: string): Date {
-    const [y, m, d] = texto.split("-").map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
-}
-
 function aTexto(fecha: Date): string {
     return fecha.toISOString().slice(0, 10);
 }
@@ -40,18 +34,6 @@ function aTexto(fecha: Date): string {
 /** Último día del mes `mes` (1–12) de `anio`: el día 0 del mes siguiente. */
 function finDeMes(anio: number, mes: number): Date {
     return new Date(Date.UTC(anio, mes, 0));
-}
-
-/** `2026-02-30` casa con el patrón y no existe; `Date.UTC` lo pasaría a marzo sin avisar. */
-function fechaValida(campo: string, valor: unknown): string {
-    if (typeof valor !== "string" || !FECHA.test(valor) || aTexto(aFecha(valor)) !== valor) {
-        throw new HttpError(
-            400,
-            `El filtro «${campo}» no es una fecha válida: «${String(valor)}». Formato esperado: AAAA-MM-DD.`,
-            "INVALID_FILTER_VALUE",
-        );
-    }
-    return valor;
 }
 
 /** Los días del atajo, contados desde `hoy`, que es «hoy» **en la zona del negocio**. */

@@ -377,8 +377,14 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 ...PARAMS_PAGINA,
                 { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] } },
                 { name: "customerId", in: "query", schema: { type: "string", format: "uuid" }, description: "Solo las de un cliente (T5-06)" },
+                { name: "from", in: "query", schema: { type: "string", format: "date" }, description: "Creadas desde este día, incluido. Un día **del negocio**: empieza en la zona horaria de Configuración, no en UTC (T6-01)" },
+                { name: "to", in: "query", schema: { type: "string", format: "date" }, description: "Creadas hasta este día, incluido, en la misma zona (T6-01)" },
             ],
-            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/SaleOrder"), "Listado paginado"), "401": ERROR("No autenticado") },
+            responses: {
+                "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/SaleOrder"), "Listado paginado"),
+                "400": ERROR("INVALID_FILTER_VALUE: un estado que no existe, una fecha que no existe o un rango al revés"),
+                "401": ERROR("No autenticado"),
+            },
         },
         post: {
             tags: ["Sale Orders"], summary: "Crear orden de venta",

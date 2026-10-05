@@ -115,6 +115,9 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- La pantalla de ventas solo enseñaba las diez órdenes más recientes, sin forma de llegar a las
+  demás. Ahora pagina, cuenta todas y filtra por estado y por fecha de creación
+  (`GET /sale-orders?from=&to=`, en días de la zona horaria del negocio) (`T6-01`).
 - Los correos se salían de la pantalla en el móvil, y los interruptores de Configuración no
   tenían nombre para un lector de pantalla (`T5-11`).
 - La barra de selección del catálogo ensanchaba la página en el móvil (`T5-06`).

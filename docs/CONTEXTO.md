@@ -50,15 +50,18 @@ Medido el 2026-10-05 en este equipo, con `pnpm verify` y el E2E:
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1052** en 58 archivos | **696** en 68 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.34 % *(suelo 85 %)* | 77.19 % *(suelo 45 %)* |
+| Tests | **1062** en 58 archivos | **703** en 69 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.33 % *(suelo 85 %)* | 77.34 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **25 pasados**, 1 omitido, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 127 de 129.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 128 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
-`T5-15` (lotes y caducidad), que solo se abren con un caso de uso real.
+`T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
+documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
+de las que está cerrada `T6-01`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
 

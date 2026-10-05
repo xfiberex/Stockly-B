@@ -359,4 +359,100 @@ describe("Sale Orders API", () => {
         });
     });
 
+    // -----------------------------------------------------------------------
+    /**
+     * T6-01 — la pantalla solo enseñaba las diez más recientes. Aquí se vigila lo que la pantalla
+     * necesita de la API para dejar de hacerlo: que se llegue a la última página, que `meta.total`
+     * cuente lo filtrado y que un día del filtro sea un día **del negocio**. Los instantes se
+     * escriben en UTC con su hora de Santo Domingo (UTC−4) al lado.
+     */
+    describe("Paginación y filtro por fecha de creación (T6-01)", () => {
+        const creadaEl = (createdAt: string, extra: { status?: "PENDING" | "SHIPPED" | "CANCELLED"; customerName?: string } = {}) =>
+            prisma.saleOrder.create({ data: { createdAt: new Date(createdAt), ...extra } });
+
+        const listar = (query: string) => request(app).get(`${BASE}?${query}`).set("Cookie", adminCookie);
+        const nombres = (res: { body: { data: { data: Array<{ customerName: string | null }> } } }) =>
+            res.body.data.data.map((o) => o.customerName);
+
+        afterEach(async () => {
+            await prisma.appSetting.deleteMany();
+        });
+
+        it("con 25 órdenes se llega a la más antigua y el total dice 25", async () => {
+            for (let dia = 1; dia <= 25; dia++) {
+                await creadaEl(`2026-03-${String(dia).padStart(2, "0")}T15:00:00.000Z`, { customerName: `Día ${dia}` });
+            }
+
+            const primera = await listar("page=1&limit=10");
+            const ultima = await listar("page=3&limit=10");
+
+            expect(primera.body.data.meta).toMatchObject({ total: 25, page: 1, totalPages: 3 });
+            expect(primera.body.data.data).toHaveLength(10);
+            expect(nombres(primera)[0]).toBe("Día 25");
+            expect(ultima.body.data.data).toHaveLength(5);
+            expect(nombres(ultima).at(-1)).toBe("Día 1");
+        });
+
+        it("una orden de las 23:30 del día 5 en el negocio sale al filtrar por el 5 y no por el 6", async () => {
+            await creadaEl("2026-03-06T03:30:00.000Z", { customerName: "23:30 del 5" }); // 5 mar, 23:30 local
+            await creadaEl("2026-03-06T04:00:00.000Z", { customerName: "00:00 del 6" }); // 6 mar, 00:00 local
+            await creadaEl("2026-03-05T03:59:59.000Z", { customerName: "23:59 del 4" }); // 4 mar, 23:59 local
+
+            const dia5 = await listar("from=2026-03-05&to=2026-03-05");
+            const dia6 = await listar("from=2026-03-06&to=2026-03-06");
+
+            expect(dia5.status).toBe(200);
+            expect(nombres(dia5)).toEqual(["23:30 del 5"]);
+            expect(dia5.body.data.meta.total).toBe(1);
+            expect(nombres(dia6)).toEqual(["00:00 del 6"]);
+        });
+
+        it("el día lo decide el ajuste de zona horaria: en UTC la misma orden es del 6", async () => {
+            await creadaEl("2026-03-06T03:30:00.000Z", { customerName: "03:30 UTC del 6" });
+            await request(app).patch("/api/v1/settings").set("Cookie", adminCookie).send({ timezone: "UTC" });
+
+            expect(nombres(await listar("from=2026-03-05&to=2026-03-05"))).toEqual([]);
+            expect(nombres(await listar("from=2026-03-06&to=2026-03-06"))).toEqual(["03:30 UTC del 6"]);
+        });
+
+        it("basta un extremo: solo `from` o solo `to`", async () => {
+            await creadaEl("2026-03-02T15:00:00.000Z", { customerName: "día 2" });
+            await creadaEl("2026-03-10T15:00:00.000Z", { customerName: "día 10" });
+
+            expect(nombres(await listar("from=2026-03-05"))).toEqual(["día 10"]);
+            expect(nombres(await listar("to=2026-03-05"))).toEqual(["día 2"]);
+        });
+
+        it("el rango y el estado se combinan, y el total cuenta lo filtrado", async () => {
+            await creadaEl("2026-03-05T15:00:00.000Z", { customerName: "enviada del 5", status: "SHIPPED" });
+            await creadaEl("2026-03-05T16:00:00.000Z", { customerName: "pendiente del 5" });
+            await creadaEl("2026-03-09T15:00:00.000Z", { customerName: "enviada del 9", status: "SHIPPED" });
+
+            const res = await listar("status=SHIPPED&from=2026-03-01&to=2026-03-07");
+
+            expect(nombres(res)).toEqual(["enviada del 5"]);
+            expect(res.body.data.meta).toMatchObject({ total: 1, totalPages: 1 });
+        });
+
+        it("un filtro vacío es un filtro que no se puso", async () => {
+            await creadaEl("2026-03-05T15:00:00.000Z");
+
+            const res = await listar("from=&to=&status=");
+
+            expect(res.status).toBe(200);
+            expect(res.body.data.meta.total).toBe(1);
+        });
+
+        it.each([
+            ["una fecha que no existe", "from=2026-02-30"],
+            ["otro formato", "to=05/03/2026"],
+            ["un rango al revés", "from=2026-03-06&to=2026-03-05"],
+            ["un filtro repetido", "from=2026-03-05&from=2026-03-06"],
+        ])("400: %s", async (_caso, query) => {
+            const res = await listar(query);
+
+            expect(res.status).toBe(400);
+            expect(res.body.code).toBe("INVALID_FILTER_VALUE");
+        });
+    });
 });

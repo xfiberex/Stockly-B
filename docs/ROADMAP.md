@@ -4,8 +4,8 @@ La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tare
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
 `fix(T0-01): resolver alias de rutas en el build de producción`.
 
-> **Estado al 2026-10-05: 127 de 129 cerradas.** Quedan `T5-14` y `T5-15`, que solo se abren con
-> un caso de uso real.
+> **Estado al 2026-10-05: 128 de 139 cerradas.** Quedan nueve del Tier 6, abierto ese mismo día,
+> y `T5-14` y `T5-15`, que solo se abren con un caso de uso real.
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
 > se **descartó sin ejecutarse**: el listón de accesibilidad del proyecto es teclado más árbol de
@@ -30,25 +30,166 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 | **3** | Pulido y mantenimiento | 15 / 15 |
 | **4** | Lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 / 17 |
 | **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 13 / 15 |
-| | **Total** | **127 / 129** |
+| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 1 / 10 |
+| | **Total** | **128 / 139** |
 
 Los Tiers 0 a 4 son la remediación de la auditoría del 2026-08-04: 100 tareas salieron de sus
 hallazgos y de la consultoría de diseño del día siguiente, y otras 14 las abrió el cierre de una
 anterior, casi siempre al medir. El Tier 5 se abrió el 2026-09-13 y no corrige nada: es
 funcionalidad nueva.
 
+El Tier 6 se abrió el 2026-10-05, al comparar Stockly con SistemaVenta, un punto de venta en
+ASP.NET Core MVC. De sus diez tareas, ocho son funcionalidad nueva —el mostrador y el documento de
+venta— y dos, `T6-01` y `T6-02`, corrigen defectos de Stockly que salieron al comparar.
+
 **Los contadores se cuentan, no se recuerdan.** Este documento ya se desfasó más de una vez por
 actualizar un número y olvidar otro. Al cerrar o abrir una tarea cambian la casilla, la cabecera,
 esta tabla y la fila del índice; si no coinciden, manda el recuento:
 
 ```bash
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 2
-grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 127
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 11
+grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 128
 ```
 
 ---
 
 ## Tareas abiertas
+
+### Tier 6 — Venta de mostrador y documento de venta
+
+*Sale de comparar Stockly, el 2026-10-05, con SistemaVenta (`xfiberex/SistemaVenta_ASP.NET_CORE_MVC`),
+un punto de venta en ASP.NET Core MVC. **No es una fusión**: los dos llevan inventario y el de
+Stockly ya cubre el del otro, así que solo se trae lo que aquel hace y este no. SistemaVenta es la
+especificación, no el código —allí los totales los calcula el navegador y el servidor los guarda
+como llegan, y el menú por rol solo oculta enlaces—: aquí se reescribe con las reglas de «Una tarea
+nueva».*
+
+**Decidido el 2026-10-05, antes de escribir las fichas:**
+
+- **El comprobante es interno, por ahora.** No tiene valor fiscal y lo dice. Es temporal: si un día
+  lo tiene, el número fiscal será **otro campo**, con su propia serie y emitido al enviar; el
+  correlativo de `T6-04` no se reutiliza para eso. Hasta entonces, la palabra «factura» no aparece
+  ni en la interfaz ni en el PDF.
+- **Una tasa de impuesto global, guardada en cada línea** de la orden: si después hay productos
+  exentos, solo cambia de dónde sale el valor.
+- **Un rol nuevo de vendedor** para el mostrador, como se hizo con `WAREHOUSE` en `T5-13`.
+
+**Lo que se dejó fuera, a propósito:** la exportación a `.xlsx` —el CSV ya abre en Excel, y sería
+una dependencia más que auditar—; la foto de usuario —manda una cara a Cloudinary, que hoy solo
+recibe imágenes de producto ([legal.md §2.1](legal.md))—; las tablas de roles y menús —la matriz
+`PERMISOS` es más fuerte—; el tipo de documento «Boleta / Factura» —sin valor fiscal es solo una
+etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión».
+
+**Orden.** `T6-01` —cerrada— y `T6-02` corrigen defectos y van primero. De `T6-03` a `T6-06` no dependen
+entre sí. `T6-07` necesita esas cuatro, y `T6-08` necesita `T6-02` y `T6-07`. `T6-09` y `T6-10` son
+independientes del resto.
+
+- [ ] **[T6-02] El formulario de venta solo deja elegir los cien productos más recientes**
+  - **Área:** Ventas / Compras
+  - **Ubicación:** `Stockly-F/src/modules/sale-orders/components/SaleOrdersPage.tsx` y `Stockly-F/src/modules/purchase-orders/components/PurchaseOrdersPage.tsx` (los dos `OrderFormModal`), `src/shared/lib/pagination.ts` (`maxLimit`)
+  - **Qué hacer:** el desplegable de productos de una venta se llena con `useProducts({ limit: 200, isActive: true })`, pero `parsePagination` recorta cualquier `limit` a 100 y el listado ordena por fecha de alta: solo se pueden elegir los cien productos activos más nuevos. Uno que no esté ahí solo se puede **escribir a mano**, y una línea sin `productId` no mueve stock al enviar. El de compras pide 100 y tiene el mismo techo. Con los ~50 productos del seed no se ve. Sustituir el desplegable por un buscador que consulte al servidor mientras se escribe (`GET /products?search=&isActive=true`), con el patrón de `BuscadorDeCliente` —que ya resolvió el combobox accesible y la carrera entre lo tecleado y lo que llega—, y añadir un botón de escáner que resuelva el código con `GET /products/lookup`, como hacen el catálogo y el conteo (`EscanerModal`, `useBuscarPorCodigo`). Subir el techo de `limit` **no** es el arreglo: es la misma lista entera, un poco más tarde.
+  - **Atención:** `GET /products/lookup` devuelve **también los inactivos** —la ficha del catálogo los enseña como tales—, y el desplegable de hoy solo ofrece los activos: un inactivo escaneado se rechaza con su mensaje, no se añade. Sí trae `availableStock`, que es lo que el formulario necesita para avisar mientras se escribe la cantidad (`T5-03`). El buscador de texto no mira el SKU ([rendimiento.md §7](rendimiento.md)): aquí el código entra por el escáner, y esa otra cuestión sigue sin tarea.
+  - **Criterio de aceptación:** con 150 productos activos, el más antiguo se encuentra por su nombre, se añade a una venta y al enviarla su stock baja; escanear un código de barras añade la línea con su precio y su disponible; escanear el de un producto inactivo no la añade; lo mismo en una orden de compra, con el coste. Lleva escenario E2E.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+- [ ] **[T6-03] Datos del negocio y moneda configurable**
+  - **Área:** Configuración
+  - **Ubicación:** `src/modules/settings/` (`SETTINGS_CATALOG`), `src/shared/lib/moneda.ts`, `Stockly-F/src/shared/lib/moneda.ts`, `Stockly-F/src/modules/settings/components/SettingsPage.tsx`, `src/contratos/api.ts` (`PERMISOS`)
+  - **Qué hacer:** Stockly no sabe cómo se llama el negocio que lo usa: `/settings` guarda cuatro ajustes operativos y nada de quién vende. Y la moneda está escrita en el código —`es-MX` y `MXN` en el frontend, un `$` pegado delante en el backend—, aunque la zona horaria por defecto sea `America/Santo_Domingo`. Añadir al catálogo de ajustes la razón social, el documento fiscal, la dirección, el teléfono, el correo y la moneda del negocio, y un logo que se sube a Cloudinary por una ruta propia (`upload.middleware` ya valida la imagen por sus bytes). Su primer consumidor es el comprobante de `T6-07`.
+  - **Atención:**
+    - **`GET /settings` es solo de `ADMIN`** y la moneda la pinta cualquier rol en cualquier pantalla: hace falta una lectura para todos los roles, con su fila en `PERMISOS`, que devuelva solo lo que se enseña y no los ajustes de administración.
+    - **`formatearImporte` es una función pura** que llaman doce componentes: el símbolo le tiene que llegar sin convertir cada llamada en un hook, y el primer pintado no puede salir con la moneda equivocada.
+    - **Cuatro importes no pasan por ella** y llevan un `$` literal: los ejes de los gráficos de `DashboardPage.tsx`, `ReportsPage.tsx` y `StockMovementsPage.tsx`, y `moneyShort` en `reports.pdf.ts`. En el backend la usan el PDF de informes, las etiquetas y el resumen semanal.
+    - **El formato no sigue al idioma de la interfaz** —los importes no cambian con él ([CONTEXTO.md §6](CONTEXTO.md))—: sigue al negocio.
+  - **Decisión previa:** símbolo libre o código ISO. Medido el 2026-10-05 en Node 24: `Intl.NumberFormat("es-MX", { style: "currency", currency: "DOP" })` escribe `DOP 14,999.00`; con `currencyDisplay: "narrowSymbol"`, `$14,999.00`, igual que un peso mexicano; solo con la configuración regional `es-DO` sale `RD$14,999.00`. Un código ISO a solas no basta: habría que guardar también la configuración regional. **Recomendado:** un símbolo libre de hasta cinco caracteres, que es lo que hace SistemaVenta, y el formato numérico fijo.
+  - **Criterio de aceptación:** cambiar el símbolo a `RD$` cambia todos los importes de la interfaz, del PDF de informes, de las etiquetas y del resumen semanal, y no queda ningún `$` escrito a mano junto a un importe; un `USER` ve la moneda y sigue recibiendo 403 en `GET /settings`; sin logo ni datos del negocio, todo funciona como hoy.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+- [ ] **[T6-04] Número correlativo de venta**
+  - **Área:** Ventas
+  - **Ubicación:** `prisma/schema.prisma` (`SaleOrder` y un modelo nuevo para el contador), `src/modules/sale-orders/sale-orders.service.ts` (`create`, las notas de los movimientos y la exportación), `src/contratos/api.ts`, `src/shared/lib/nodemailer.ts` (resumen semanal), `Stockly-F/src/modules/sale-orders/`, `CustomerDetailPage.tsx`, `CampanaDeAvisos.tsx`
+  - **Qué hacer:** una venta se identifica por los ocho primeros caracteres de su UUID (`#3F9A01BC`): no se puede dictar por teléfono, no dice cuál fue antes y no sirve para un comprobante. Darle a cada orden un entero consecutivo, que se enseña con ceros a la izquierda (`#000123`) en la lista, la ficha del cliente, la nota de los movimientos de stock, el aviso de venta sin stock, el resumen semanal y la exportación, y por el que la pantalla de ventas puede buscar. El número sale de **una fila contador que se incrementa dentro de la transacción que crea la orden**: una secuencia de PostgreSQL deja un hueco cada vez que una transacción se deshace, y una venta rechazada por falta de disponible (409) no debe gastar número. SistemaVenta lee el contador y lo escribe después, sin bloquearlo: leído en su código —no reproducido—, dos ventas simultáneas pueden leer el mismo.
+  - **Migración de lo que ya existe:** las órdenes actuales se numeran por `createdAt` y, a igualdad, por `id`, y el contador arranca en la última. La columna nace anulable, se rellena en la misma migración y lleva índice único. Las notas de movimientos y los avisos ya escritos **no se reescriben**: son dato, y conservan el identificador corto. El modelo nuevo va también a `limpiar()` del seed, que numera sus órdenes y deja el contador donde toca.
+  - **Atención:** el número es **interno**. Borrar una orden pendiente deja un hueco en la serie, y se acepta porque la serie no tiene valor fiscal. Si un día lo tiene, el número fiscal será otro campo, emitido al enviar —que es cuando la orden ya no se puede borrar—. Las órdenes de compra y los conteos siguen con su identificador corto.
+  - **Criterio de aceptación:** veinte ventas creadas a la vez reciben veinte números consecutivos y distintos; una venta rechazada con 409 no consume número: la siguiente recibe el que le tocaba; tras la migración, el orden de los números es el de `createdAt`; buscar `123` en la pantalla de ventas encuentra la `#000123`.
+  - **Esfuerzo:** bajo
+  - **Depende de:** T6-01 (cerrada), solo para la búsqueda por número en pantalla
+
+- [ ] **[T6-05] Impuesto en la venta**
+  - **Área:** Ventas / Negocio
+  - **Ubicación:** `prisma/schema.prisma` (`SaleOrderItem`), `src/modules/settings/settings.service.ts`, `src/modules/sale-orders/`, `src/contratos/api.ts`, `Stockly-F/src/modules/sale-orders/`
+  - **Qué hacer:** el total de una venta es cantidad × precio y lo suma el navegador (`orderTotal`, en `SaleOrdersPage.tsx`); el impuesto no existe. Añadir un ajuste con la tasa —un porcentaje entre 0 y 100, **0 por defecto**, que deja todo como está— y otro con su nombre («ITBIS», «IVA»; vacío, el genérico del catálogo de textos). Al crear la orden, la tasa vigente **se congela en cada línea**, como `unitPrice`: cambiar el ajuste no toca las órdenes ya creadas. El servidor calcula subtotal, impuesto y total y los devuelve en la orden, y la interfaz deja de sumar. En SistemaVenta los tres los calcula el navegador y el servidor los guarda como llegan: eso es lo que no se copia.
+  - **Decidido (2026-10-05):** una tasa global, guardada por línea. Que un producto tenga la suya o esté exento sería después un campo en `Product`, sin migrar las órdenes.
+  - **Atención:**
+    - **`unitPrice` sigue siendo sin impuesto.** Los informes calculan ingresos, margen y clase ABC con `quantity * "unitPrice"` (`reports.service.ts`, `reports.abc.ts`): si el precio pasara a incluirlo, los tres saldrían inflados. El impuesto aparece en la orden, en el comprobante y en la exportación; **los informes, la ficha del cliente y el resumen semanal siguen en neto**.
+    - **El redondeo se decide una vez y se prueba:** por línea, a dos decimales, y el impuesto de la orden es la suma del de sus líneas. Con `Decimal`, no con `number`.
+    - Los importes nuevos son `Importe` en el contrato, como `unitPrice`. Las órdenes anteriores no tienen tasa: `null` se lee como «sin impuesto».
+    - Las compras no llevan impuesto: el coste medio se promedia con lo que se escribe en la orden, y eso no cambia.
+  - **Criterio de aceptación:** con la tasa al 18 %, una venta de 3 × 100,00 devuelve subtotal 300,00, impuesto 54,00 y total 354,00; el margen de esa venta en `/reports` es el mismo que con la tasa a 0; subir después la tasa al 20 % no altera esa orden; una petición que mande sus propios totales no consigue que se guarden; con la tasa a 0 no cambia ninguna pantalla.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+- [ ] **[T6-06] Vendedor y documento del cliente en la venta**
+  - **Área:** Ventas / Clientes
+  - **Ubicación:** `prisma/schema.prisma` (`SaleOrder`, `Customer`), `src/modules/sale-orders/`, `src/modules/customers/`, `src/contratos/api.ts`, `Stockly-F/src/modules/sale-orders/`, `Stockly-F/src/modules/customers/`, `docs/legal.md`
+  - **Qué hacer:** dos datos que un comprobante lleva y la orden no tiene. **Quién la registró:** hoy solo consta en la auditoría (`CREATE` sobre `SaleOrder`), que solo lee `ADMIN`; la orden debe decirlo ella misma, con el correo y no con una clave foránea —como la auditoría y los conteos (`createdByEmail`)—, para que sobreviva a la cuenta. **El documento del cliente** (cédula, RNC, NIF): un campo en `Customer` y su instantánea en la orden, junto a `customerName`, `customerEmail` y `customerPhone` y por la misma razón que ellos.
+  - **Migración de lo que ya existe:** el vendedor de las órdenes actuales se recupera de `audit_logs` (`action = CREATE`, `entity = SaleOrder`, por `entityId`); las que no tengan fila ahí se quedan sin él, y la migración cuenta cuántas.
+  - **Atención:** el documento es un **dato personal nuevo**, y el correo del vendedor en la orden, una copia más de uno que ya se guarda: los dos van a la tabla de [legal.md §2.1](legal.md). **El documento no agrupa clientes:** la regla de `T5-06` sigue siendo una sola —el correo normalizado—, y una venta con documento y sin correo no se vincula a nadie. Si el mostrador de `T6-08` lo pide, cambiar esa regla es una decisión aparte, con su ficha.
+  - **Criterio de aceptación:** una venta dice quién la registró aunque después se desactive esa cuenta; elegir un cliente con documento lo copia a la venta, y editar el cliente después no cambia la orden; borrar el cliente deja el documento en la instantánea, y `legal.md` lo recoge.
+  - **Esfuerzo:** bajo
+  - **Depende de:** —
+
+- [ ] **[T6-07] Comprobante de venta en PDF**
+  - **Área:** Ventas
+  - **Ubicación:** `src/modules/sale-orders/` (ruta y generador nuevos), `src/contratos/api.ts` (`PERMISOS`), `Stockly-F/src/modules/sale-orders/`, `Stockly-F/src/modules/customers/components/CustomerDetailPage.tsx`
+  - **Qué hacer:** no hay ningún papel que darle a quien compra: los únicos PDF son los informes y las etiquetas. Añadir `GET /sale-orders/:id/receipt`, que devuelve el comprobante de una venta enviada, hecho con PDFKit como los otros dos: logo y datos del negocio (`T6-03`), número (`T6-04`), fecha en la zona del negocio, cliente con su documento y quién la registró (`T6-06`), las líneas, y subtotal, impuesto y total (`T6-05`). Se descarga desde el detalle de la orden y desde la ficha del cliente, con `descargarDeLaApi` y no con un enlace.
+  - **Decidido (2026-10-05):** es un **comprobante interno**, temporalmente. Se titula «Comprobante de venta» y lleva la leyenda «Documento sin valor fiscal»; la palabra «factura» no aparece ni en el PDF ni en la interfaz. Darle valor fiscal es otra tarea, y empieza por saber qué exige la autoridad tributaria del país donde se use.
+  - **Atención:**
+    - **PDFKit solo incrusta JPEG y PNG**, y `upload.middleware` admite también WebP: el logo hay que pedírselo a Cloudinary ya convertido. Traerlo es una llamada de red dentro de la petición: lleva tope de tiempo y, si falla, el comprobante sale sin logo, no con un 500.
+    - **Qué órdenes lo tienen:** las enviadas. Una pendiente todavía no es una venta y responde 409 con su código; una cancelada después de enviarse lo conserva, marcado como «Anulada».
+    - Sale en español, como el resto de exportaciones ([CONTEXTO.md §6](CONTEXTO.md)), y en A4, como en SistemaVenta. Un rollo térmico de 80 mm es otro formato y se decide con la impresora delante, como pasó con el ancho de las barras de las etiquetas.
+  - **Criterio de aceptación:** el PDF de una venta de dos líneas con la tasa al 18 % lleva el número, los datos del negocio, las dos líneas y los tres importes de `T6-05`; un `USER` lo descarga; el de una orden pendiente responde 409; con Cloudinary caído sale sin logo; sin datos del negocio sale igualmente, sin huecos vacíos.
+  - **Esfuerzo:** medio
+  - **Depende de:** T6-03, T6-04, T6-05, T6-06
+
+- [ ] **[T6-08] Venta de mostrador y rol de vendedor**
+  - **Área:** Ventas / Autorización
+  - **Ubicación:** `prisma/schema.prisma` (`Role`, `AuditAction`), `src/contratos/api.ts` (`rolSchema`, `PERMISOS`), `src/modules/sale-orders/` (ruta nueva), `Stockly-F/src/modules/sale-orders/` (pantalla nueva), `Stockly-F/src/modules/users/components/UsersPage.tsx`, `Stockly-F/src/routes/index.tsx`, `Stockly-F/e2e/flows.spec.ts`
+  - **Qué hacer:** vender en Stockly son dos pasos —crear la orden, que solo puede `ADMIN`, y enviarla, que puede el almacén—, y ninguno de los tres roles es el de quien atiende un mostrador. Dos piezas:
+    - **Una venta de un paso**, `POST /sale-orders/counter`: comprueba lo disponible como `create` y descuenta el stock, congela el coste, escribe los movimientos y deja la orden enviada como el envío, **todo en una transacción**. Esa segunda mitad vive hoy dentro de `update` (`sale-orders.service.ts`): se extrae y la comparten las dos rutas, no se copia. Todas las líneas llevan `productId`, y **el precio sale del producto, no de la petición**. El aviso de stock bajo sale después del `commit`, como ahora, y la venta deja rastro con un valor propio en `AuditAction`.
+    - **Un rol `SELLER`**, con su pantalla: el buscador y el escáner de `T6-02`, las cantidades con su disponible, un cliente opcional, los totales de `T6-05` y, al terminar, el número de `T6-04` y el comprobante de `T6-07`.
+  - **Primero, la matriz**, como en `T5-13`. Propuesta: `SELLER` entra en `TODOS` —lee lo mismo que `USER`— y en un grupo nuevo, con `ADMIN`, para `POST /sale-orders/counter`. **No** crea ni edita órdenes pendientes —fijan un precio—, no envía las de otros —eso es de `ALMACEN`—, no cancela una venta hecha —devolver stock es una decisión comercial— y no ve usuarios, ajustes, auditoría ni exportaciones.
+  - **Atención:** `ProtectedRoute` solo sabe exigir **un** rol y esta pantalla la abren dos: se guarda por permiso (`usePuede`), no por rol. El mapa `ROL` de `UsersPage.tsx` no compila hasta tener la entrada nueva, que es para lo que se escribió así. La ruta necesita su título (`titulos.ts`). Es una pantalla para usar de pie y con el móvil: se revisa a 393 px y no lleva `CLASES_TABLA` ([design-system.md](../../Stockly-F/docs/design-system.md)). Tras la migración del enum, `Stockly_test` se sincroniza con `db push` ([CONTEXTO.md §4](CONTEXTO.md)).
+  - **Criterio de aceptación:** un `SELLER` registra una venta de dos productos y, sin más pasos, el stock ha bajado, hay dos movimientos `OUT`, la orden está enviada con su coste congelado y el comprobante se descarga; recibe **403** al crear una orden pendiente, al cancelar una venta y al cambiar un precio, y la interfaz no le ofrece ninguno de los tres botones; mandar un precio distinto del catálogo no cambia el de la línea; pedir más de lo disponible responde 409 y no mueve nada; dos ventas simultáneas de la última unidad dejan una hecha y otra rechazada. `permisos.test.ts` recorre el rol nuevo y hay escenario E2E.
+  - **Esfuerzo:** alto
+  - **Depende de:** T6-02, T6-07
+
+- [ ] **[T6-09] Ventas por día y productos más vendidos en el panel**
+  - **Área:** Informes
+  - **Ubicación:** `src/modules/reports/reports.service.ts` (`getSummary`), `src/shared/lib/resumenSemanal.ts`, `src/contratos/api.ts` (`resumenReporteSchema`), `Stockly-F/src/modules/dashboard/components/DashboardPage.tsx`
+  - **Qué hacer:** el panel es de inventario: productos, stock bajo, valor a coste. Las ventas están en Informes y **por mes**; no hay ninguna cifra de ventas por día. Añadir al panel las ventas enviadas de los últimos siete días del negocio —cuántas y por qué importe cada día, con los días sin ventas **a cero**, no ausentes— y los cinco productos más vendidos por unidades en esa ventana. La consulta de «lo más vendido» ya existe para el resumen semanal (`reunirDatosDelResumen`): se comparte, no se escribe otra.
+  - **Atención:** agrupar por día es un `GROUP BY` sobre una expresión, justo lo que [rendimiento.md §5](rendimiento.md) pide mirar dos veces. La ventana son siete días y la acota el índice `(status, shippedAt)`, pero se comprueba con `EXPLAIN` sobre `Stockly_carga`, no se supone: lo que se añada a `getSummary` lo paga cada visita al panel. Los días son los de la zona del negocio (`hoyEn`) y los importes van en neto, como el resto de informes (`T6-05`). Los colores, de `var(--color-chart-N)`.
+  - **Criterio de aceptación:** con ventas enviadas hoy y hace tres días, el gráfico tiene siete barras, dos con valor y cinco a cero; una venta enviada a las 23:30 del negocio cuenta en ese día y no en el siguiente; una venta pendiente o cancelada no cuenta; el `EXPLAIN` de las dos consultas sobre el conjunto de carga queda anotado en [rendimiento.md](rendimiento.md).
+  - **Esfuerzo:** bajo
+  - **Depende de:** —
+
+- [ ] **[T6-10] Alta de usuarios por invitación**
+  - **Área:** Usuarios / Autenticación
+  - **Ubicación:** `src/modules/users/` (ruta nueva), `src/modules/auth/auth.service.ts` (`resetPassword`), `src/shared/lib/nodemailer.ts`, `src/shared/i18n/correos.es.ts` y `correos.en.ts`, `src/contratos/api.ts` (`PERMISOS`), `Stockly-F/src/modules/users/components/UsersPage.tsx`
+  - **Qué hacer:** un administrador no puede dar de alta a nadie: la persona se registra sola en la página pública, confirma su correo y después alguien le cambia el rol. Añadir `POST /users`, solo de `ADMIN`, con nombre, correo y rol, que crea la cuenta y manda una **invitación con enlace** para que la persona ponga su contraseña. SistemaVenta genera una contraseña y la manda por correo; aquí ninguna contraseña viaja por correo. El enlace reutiliza el token de restablecimiento (`resetToken`, que ya se guarda hasheado) y la página de `reset-password`, con una caducidad propia: la hora de «olvidé mi contraseña» es poco para una invitación.
+  - **Atención:**
+    - **`login` exige `isVerified`** y `resetPassword` no lo toca: una cuenta invitada que pusiera su contraseña seguiría sin poder entrar. Quien abre el enlace ha demostrado que el buzón es suyo, que es lo mismo que demuestra el correo de verificación: poner la contraseña con un token válido debe verificar la cuenta. Eso cambia también el caso de quien se registró, no confirmó y restablece la contraseña: se decide a sabiendas y se cubre con un test.
+    - `User.password` es obligatorio: la cuenta nace con el hash de un secreto aleatorio que nadie conoce, no con una cadena vacía.
+    - El correo necesita **idioma** y de la persona invitada no se conoce ninguno: va el de la petición del administrador (`idiomaDePeticion`), que se corrige solo en su primer inicio de sesión.
+    - El correo sale **fuera de la transacción** ([ADR 0004](adr/0004-correo-fuera-de-la-transaccion.md)). Sin SMTP la ruta responde 503, como las demás que envían, y lo comprueba **antes** de crear la cuenta: creada y sin correo, no se la podría volver a invitar. Si la invitación caduca, «olvidé mi contraseña» hace el mismo papel, así que no hace falta una ruta para reenviarla.
+    - Sin ruta pública nueva, ni la lista de exenciones de CSRF ni los límites de `/auth` cambian. Deja rastro en la auditoría: `CREATE` sobre `User`, con el rol.
+  - **Criterio de aceptación:** un `ADMIN` invita a una persona como `WAREHOUSE`; con el enlace del correo pone su contraseña y entra con ese rol, sin pasar por la verificación; el enlace no sirve dos veces ni después de caducar; invitar un correo ya registrado responde 409; un `USER` recibe 403; el registro público sigue creando solo `USER`.
+  - **Esfuerzo:** medio
+  - **Depende de:** —
+
+### Tier 5 — las dos que quedan
 
 *Las dos cambian dónde vive el stock, así que tocan casi todos los módulos, las pruebas de carga y
 los informes. Se listan para que no hacerlas sea una decisión consciente. **Ninguna empieza sin un
@@ -92,7 +233,7 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 ## Una tarea nueva
 
 Una ficha lleva **área, ubicación, qué hacer, criterio de aceptación, esfuerzo y dependencias**,
-como las dos de arriba, y va en «Tareas abiertas». Si depende de una decisión de producto, la
+como las de arriba, y va en «Tareas abiertas». Si depende de una decisión de producto, la
 ficha la nombra («Decisión previa») y la tarea no empieza hasta que esté tomada y anotada.
 
 **Una ficha es una pista, no una descripción verificada.** Siete de las cerradas describían mal su
@@ -274,3 +415,9 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 | T5-11 | Resumen periódico por correo | 2026-10-01 |  |
 | T5-12 | Notificaciones dentro de la aplicación | 2026-10-01 |  |
 | T5-13 | Rol de almacén | 2026-09-29 |  |
+
+### Tier 6
+
+| ID | Tarea | Cerrada | Nota |
+|---|---|---|---|
+| T6-01 | La pantalla de ventas solo enseñaba las diez órdenes más recientes | 2026-10-05 | Índice nuevo por `createdAt`, decidido midiendo: sobre 330 000 órdenes el listado sin filtro pasa de 33 ms a 0,01 ms ([rendimiento.md §13](rendimiento.md)). El criterio de aceptación, comprobado en tests de los dos repositorios —falsificados: diez roturas, diez caídas— y en navegador con 26 órdenes, en escritorio y móvil. **La ficha se quedaba corta en una cosa:** el filtro nuevo metió un «Cancelado» oculto en la página y rompió un selector del E2E de `T0-03`, que ahora mira la insignia de su orden |
