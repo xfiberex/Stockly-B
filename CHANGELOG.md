@@ -115,6 +115,9 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- Los formularios de venta y de compra solo dejaban elegir los cien productos activos más
+  recientes; uno más antiguo había que escribirlo a mano, y así la orden no movía stock. El
+  producto de cada línea se busca ahora en el servidor mientras se escribe, o se escanea (`T6-02`).
 - La pantalla de ventas solo enseñaba las diez órdenes más recientes, sin forma de llegar a las
   demás. Ahora pagina, cuenta todas y filtra por estado y por fecha de creación
   (`GET /sale-orders?from=&to=`, en días de la zona horaria del negocio) (`T6-01`).
@@ -156,7 +159,8 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 - **Dependencias al día ante avisos publicados** (2026-09-28 y 2026-09-30): `axios` 1.20,
   `nodemailer` 10, `multer` 2.4 y `overrides` para cuatro transitivas. pnpm pasa a 12.4.1. El
-  patrón, en [docs/dependencias.md §2](docs/dependencias.md).
+  patrón, en [docs/dependencias.md §2](docs/dependencias.md). El 2026-10-06, `proxy-addr` 2.0.8
+  en el backend y `source-map-js` 1.2.2 en el frontend, las dos transitivas y con `pnpm update`.
 - Una cuenta desactivada conservaba el acceso hasta 15 minutos (`T1-11`, `T1-12`).
 - `logout` quedaba expuesto a CSRF (`T1-19`) y el correo salía sin cifrar (`T1-20`).
 - Restablecer la contraseña no revocaba las sesiones (`T0-07`).

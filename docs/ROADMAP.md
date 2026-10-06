@@ -4,7 +4,7 @@ La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tare
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
 `fix(T0-01): resolver alias de rutas en el build de producción`.
 
-> **Estado al 2026-10-05: 128 de 139 cerradas.** Quedan nueve del Tier 6, abierto ese mismo día,
+> **Estado al 2026-10-06: 129 de 139 cerradas.** Quedan ocho del Tier 6, abierto el 2026-10-05,
 > y `T5-14` y `T5-15`, que solo se abren con un caso de uso real.
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
@@ -30,8 +30,8 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 | **3** | Pulido y mantenimiento | 15 / 15 |
 | **4** | Lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 / 17 |
 | **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 13 / 15 |
-| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 1 / 10 |
-| | **Total** | **128 / 139** |
+| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 2 / 10 |
+| | **Total** | **129 / 139** |
 
 Los Tiers 0 a 4 son la remediación de la auditoría del 2026-08-04: 100 tareas salieron de sus
 hallazgos y de la consultoría de diseño del día siguiente, y otras 14 las abrió el cierre de una
@@ -47,8 +47,8 @@ actualizar un número y olvidar otro. Al cerrar o abrir una tarea cambian la cas
 esta tabla y la fila del índice; si no coinciden, manda el recuento:
 
 ```bash
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 11
-grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 128
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 10
+grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 129
 ```
 
 ---
@@ -80,18 +80,9 @@ recibe imágenes de producto ([legal.md §2.1](legal.md))—; las tablas de role
 `PERMISOS` es más fuerte—; el tipo de documento «Boleta / Factura» —sin valor fiscal es solo una
 etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión».
 
-**Orden.** `T6-01` —cerrada— y `T6-02` corrigen defectos y van primero. De `T6-03` a `T6-06` no dependen
-entre sí. `T6-07` necesita esas cuatro, y `T6-08` necesita `T6-02` y `T6-07`. `T6-09` y `T6-10` son
+**Orden.** `T6-01` y `T6-02` corregían defectos, iban primero y están cerradas. De `T6-03` a `T6-06` no dependen
+entre sí. `T6-07` necesita esas cuatro, y `T6-08` necesita `T6-07` y el buscador y el escáner de `T6-02`. `T6-09` y `T6-10` son
 independientes del resto.
-
-- [ ] **[T6-02] El formulario de venta solo deja elegir los cien productos más recientes**
-  - **Área:** Ventas / Compras
-  - **Ubicación:** `Stockly-F/src/modules/sale-orders/components/SaleOrdersPage.tsx` y `Stockly-F/src/modules/purchase-orders/components/PurchaseOrdersPage.tsx` (los dos `OrderFormModal`), `src/shared/lib/pagination.ts` (`maxLimit`)
-  - **Qué hacer:** el desplegable de productos de una venta se llena con `useProducts({ limit: 200, isActive: true })`, pero `parsePagination` recorta cualquier `limit` a 100 y el listado ordena por fecha de alta: solo se pueden elegir los cien productos activos más nuevos. Uno que no esté ahí solo se puede **escribir a mano**, y una línea sin `productId` no mueve stock al enviar. El de compras pide 100 y tiene el mismo techo. Con los ~50 productos del seed no se ve. Sustituir el desplegable por un buscador que consulte al servidor mientras se escribe (`GET /products?search=&isActive=true`), con el patrón de `BuscadorDeCliente` —que ya resolvió el combobox accesible y la carrera entre lo tecleado y lo que llega—, y añadir un botón de escáner que resuelva el código con `GET /products/lookup`, como hacen el catálogo y el conteo (`EscanerModal`, `useBuscarPorCodigo`). Subir el techo de `limit` **no** es el arreglo: es la misma lista entera, un poco más tarde.
-  - **Atención:** `GET /products/lookup` devuelve **también los inactivos** —la ficha del catálogo los enseña como tales—, y el desplegable de hoy solo ofrece los activos: un inactivo escaneado se rechaza con su mensaje, no se añade. Sí trae `availableStock`, que es lo que el formulario necesita para avisar mientras se escribe la cantidad (`T5-03`). El buscador de texto no mira el SKU ([rendimiento.md §7](rendimiento.md)): aquí el código entra por el escáner, y esa otra cuestión sigue sin tarea.
-  - **Criterio de aceptación:** con 150 productos activos, el más antiguo se encuentra por su nombre, se añade a una venta y al enviarla su stock baja; escanear un código de barras añade la línea con su precio y su disponible; escanear el de un producto inactivo no la añade; lo mismo en una orden de compra, con el coste. Lleva escenario E2E.
-  - **Esfuerzo:** medio
-  - **Depende de:** —
 
 - [ ] **[T6-03] Datos del negocio y moneda configurable**
   - **Área:** Configuración
@@ -164,7 +155,7 @@ independientes del resto.
   - **Atención:** `ProtectedRoute` solo sabe exigir **un** rol y esta pantalla la abren dos: se guarda por permiso (`usePuede`), no por rol. El mapa `ROL` de `UsersPage.tsx` no compila hasta tener la entrada nueva, que es para lo que se escribió así. La ruta necesita su título (`titulos.ts`). Es una pantalla para usar de pie y con el móvil: se revisa a 393 px y no lleva `CLASES_TABLA` ([design-system.md](../../Stockly-F/docs/design-system.md)). Tras la migración del enum, `Stockly_test` se sincroniza con `db push` ([CONTEXTO.md §4](CONTEXTO.md)).
   - **Criterio de aceptación:** un `SELLER` registra una venta de dos productos y, sin más pasos, el stock ha bajado, hay dos movimientos `OUT`, la orden está enviada con su coste congelado y el comprobante se descarga; recibe **403** al crear una orden pendiente, al cancelar una venta y al cambiar un precio, y la interfaz no le ofrece ninguno de los tres botones; mandar un precio distinto del catálogo no cambia el de la línea; pedir más de lo disponible responde 409 y no mueve nada; dos ventas simultáneas de la última unidad dejan una hecha y otra rechazada. `permisos.test.ts` recorre el rol nuevo y hay escenario E2E.
   - **Esfuerzo:** alto
-  - **Depende de:** T6-02, T6-07
+  - **Depende de:** T6-02 (cerrada), T6-07
 
 - [ ] **[T6-09] Ventas por día y productos más vendidos en el panel**
   - **Área:** Informes
@@ -421,3 +412,4 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 | ID | Tarea | Cerrada | Nota |
 |---|---|---|---|
 | T6-01 | La pantalla de ventas solo enseñaba las diez órdenes más recientes | 2026-10-05 | Índice nuevo por `createdAt`, decidido midiendo: sobre 330 000 órdenes el listado sin filtro pasa de 33 ms a 0,01 ms ([rendimiento.md §13](rendimiento.md)). El criterio de aceptación, comprobado en tests de los dos repositorios —falsificados: diez roturas, diez caídas— y en navegador con 26 órdenes, en escritorio y móvil. **La ficha se quedaba corta en una cosa:** el filtro nuevo metió un «Cancelado» oculto en la página y rompió un selector del E2E de `T0-03`, que ahora mira la insignia de su orden |
+| T6-02 | El formulario de venta solo dejaba elegir los cien productos más recientes | 2026-10-06 | El desplegable se sustituye por `BuscadorDeProducto`, que consulta `GET /products?search=&isActive=true&limit=8` mientras se escribe, y un botón de escáner en los dos formularios; **el backend no se tocó**. El defecto, medido contra el servidor con 197 productos activos: `?limit=200&isActive=true` devuelve 100 y **no** trae el más antiguo; el buscador lo encuentra por su nombre, se vende y su stock baja de 10 a 7, en escritorio y a 393 px. El resto del criterio, en el escenario E2E nuevo (27 pasados en los dos proyectos) y en 14 tests de componente, falsificados: catorce roturas, catorce caídas. **La ficha no decía tres cosas:** que repetir un código suma una unidad a su línea en vez de abrir otra —decidido al hacerlo—; que la lista, dentro de un diálogo con scroll propio, quedaba cortada en la última línea con una sola opción a la vista —visto en una captura, no en un test: ahora se desplaza a la vista—; y que volver a «Escribir manualmente» no soltaba el `productId` del producto elegido antes —leído en el código, no reproducido—. Al cerrar, las dos puertas estaban en rojo por avisos ajenos (`proxy-addr`, `source-map-js`): [dependencias.md §2](dependencias.md) |

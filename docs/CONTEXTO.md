@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-10-05
+# Contexto de trabajo — al 2026-10-06
 
 Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
 trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
@@ -45,22 +45,22 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-10-05 en este equipo, con `pnpm verify` y el E2E:
+Medido el 2026-10-06 en este equipo, con `pnpm verify` y el E2E:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1062** en 58 archivos | **703** en 69 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.33 % *(suelo 85 %)* | 77.34 % *(suelo 45 %)* |
+| Tests | **1062** en 58 archivos | **717** en 70 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.33 % *(suelo 85 %)* | 78.01 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **25 pasados**, 1 omitido, en `chromium` y `Mobile Chrome` |
+| E2E (Playwright) | — | **27 pasados**, 1 omitido, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 128 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 129 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
 `T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
-de las que está cerrada `T6-01`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+de las que están cerradas `T6-01` y `T6-02`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
 el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
@@ -78,7 +78,7 @@ Cuatro cosas que conviene saber antes de tocar nada:
   [dependencias.md §2](dependencias.md).
 
 **El suelo de cobertura se ha quedado muy por debajo de lo real** (85/72/87/87 en `jest.config.js`
-y 45/50/33/46 en `vite.config.ts`, contra 96/85/97/97 y 77/81/66/79). Es lo único que impide que la
+y 45/50/33/46 en `vite.config.ts`, contra 96/85/97/97 y 78/81/67/80). Es lo único que impide que la
 cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subir el umbral.
 
 ---
@@ -269,6 +269,10 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   `meta`, y **sus filtros van en el `where`**: filtrar en el navegador filtra solo la página
   traída, sin error y sin aviso. En pantalla, los recuentos salen de `meta.total`, cambiar un
   filtro vuelve a la página 1 y un gráfico que dibuja una página lo dice.
+- **Un selector tampoco se llena con «todos»**: el servidor recorta cualquier `limit` a 100 y el
+  resto deja de poder elegirse, sin error. Elegir un producto o un cliente es buscar en el servidor
+  (`BuscadorDeProducto`, `BuscadorDeCliente`), y solo se ofrece lo recién traído: de la opción
+  sale el disponible con el que la venta valida la cantidad.
 - **Las exportaciones van por lotes** (`enviarExportacion`) aunque parezcan pequeñas: el histórico
   de un solo producto puede pesar más que el catálogo entero. `buildCsv` ya no lo llama ningún
   endpoint; se conserva como oráculo del test que compara las dos rutas byte a byte.
@@ -328,7 +332,10 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
 - **Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA`**: su ancho mínimo deja
   columnas tras un desplazamiento sin barra. Una pantalla de almacén se revisa a 393 px.
 - **Un modal puede abrirse encima de otro.** `Modal` lleva una pila: solo el de arriba atiende a
-  Escape y al tabulador. Uno nuevo no necesita hacer nada.
+  Escape y al tabulador. Uno nuevo no necesita hacer nada, salvo **quedar fuera del `<form>`** del
+  de abajo si lleva el suyo: el portal no corta los eventos de React, y su envío subiría.
+- **Lo que se despliega dentro de un diálogo se trae a la vista** (`scrollIntoView`): el cuerpo
+  del `Modal` tiene scroll propio y recorta lo que cuelgue de una fila baja.
 
 ### Accesibilidad
 
