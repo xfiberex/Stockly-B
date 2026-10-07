@@ -10,6 +10,7 @@ import { normalizarCorreo } from "@/shared/lib/correo";
 import { rangoDeDias } from "@/shared/lib/diasDelNegocio";
 import { numeroDeVentaDelFiltro, siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
 import { escribirNumeroDeVenta } from "@/contratos/api";
+import { conTotales, totalesDeLinea } from "@/shared/lib/totalesDeVenta";
 import { settingsService } from "@/modules/settings/settings.service";
 import { Prisma } from "@/generated/prisma/client";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
@@ -87,13 +88,13 @@ export const saleOrderService = {
             prisma.saleOrder.count({ where }),
         ]);
 
-        return { data: orders, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+        return { data: orders.map(conTotales), meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     },
 
     async getById(id: string) {
         const order = await prisma.saleOrder.findUnique({ where: { id }, include: ORDER_INCLUDE });
         if (!order) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
-        return order;
+        return conTotales(order);
     },
 
     /**
@@ -112,7 +113,11 @@ export const saleOrderService = {
         }
         const ids = [...pedido.keys()].sort();
 
-        return prisma.$transaction(async (tx) => {
+        // T6-05 — la tasa vigente **ahora**, que se congela en cada línea como `unitPrice`. Los
+        // importes no vienen en `dto`: se calculan al responder, de lo que queda guardado.
+        const taxRate = await settingsService.tasaDeImpuesto();
+
+        const orden = await prisma.$transaction(async (tx) => {
             if (ids.length > 0) {
                 // Se bloquean las filas de los productos **antes** de contar lo comprometido.
                 // Sin el bloqueo, dos ventas simultáneas de las mismas unidades leerían el
@@ -162,12 +167,15 @@ export const saleOrderService = {
                             productName: item.productName,
                             quantity: item.quantity,
                             unitPrice: item.unitPrice,
+                            taxRate,
                         })),
                     },
                 },
                 include: ORDER_INCLUDE,
             });
         });
+
+        return conTotales(orden);
     },
 
     /** `actorId` es quien hace el cambio: si el envío falla por stock, es a quien **no** se avisa (T5-12). */
@@ -199,17 +207,17 @@ export const saleOrderService = {
 
         // Sin envío ni cancelación de un envío: actualización simple de campos / estado.
         if (!beingShipped && !beingCancelled) {
-            return prisma.saleOrder.update({
+            return conTotales(await prisma.saleOrder.update({
                 where: { id },
                 data: { ...customerData, ...(dto.status !== undefined && { status: dto.status }) },
                 include: ORDER_INCLUDE,
-            });
+            }));
         }
 
         // Cancelación de una orden enviada: reposición de stock, movimientos compensatorios
         // y cambio de estado en UNA sola transacción, simétrica al envío.
         if (beingCancelled) {
-            return prisma.$transaction(async (tx) => {
+            const cancelada = await prisma.$transaction(async (tx) => {
                 const items = await tx.saleOrderItem.findMany({
                     where: { saleOrderId: id, productId: { not: null } },
                 });
@@ -239,6 +247,7 @@ export const saleOrderService = {
                     include: ORDER_INCLUDE,
                 });
             });
+            return conTotales(cancelada);
         }
 
         // Envío: verificación de stock, descuento, movimientos y cambio de estado ocurren
@@ -320,7 +329,7 @@ export const saleOrderService = {
         // tantas idas y vueltas al SMTP como productos bajaran de mínimo.
         for (const target of lowStockTargets) dispararAlertaStock(target);
 
-        return updated;
+        return conTotales(updated);
     },
 
     async delete(id: string) {
@@ -358,20 +367,29 @@ export const saleOrderService = {
             if (pagina.length === 0) return;
 
             yield pagina.flatMap((o) =>
-                o.items.map((item) => ({
-                    // T6-04 — con sus ceros, como en pantalla. `orderId` se conserva: es lo que
-                    // identifica la orden en la API.
-                    orderNumber: escribirNumeroDeVenta(o.number),
-                    orderId: o.id,
-                    status: o.status,
-                    customerName: o.customerName ?? "",
-                    customerEmail: o.customerEmail ?? "",
-                    createdAt: o.createdAt.toISOString(),
-                    productName: item.productName,
-                    quantity: item.quantity,
-                    unitPrice: Number(item.unitPrice),
-                    totalLine: item.quantity * Number(item.unitPrice),
-                })),
+                o.items.map((item) => {
+                    const linea = totalesDeLinea(item);
+                    return {
+                        // T6-04 — con sus ceros, como en pantalla. `orderId` se conserva: es lo que
+                        // identifica la orden en la API.
+                        orderNumber: escribirNumeroDeVenta(o.number),
+                        orderId: o.id,
+                        status: o.status,
+                        customerName: o.customerName ?? "",
+                        customerEmail: o.customerEmail ?? "",
+                        createdAt: o.createdAt.toISOString(),
+                        productName: item.productName,
+                        quantity: item.quantity,
+                        unitPrice: Number(item.unitPrice),
+                        // `totalLine` sigue siendo cantidad × precio, **sin impuesto**: es la columna
+                        // que ya había y quien la suma espera lo mismo que sumaba. T6-05 añade las
+                        // tres de detrás; en las líneas sin tasa, la tasa va vacía y el impuesto es 0.
+                        totalLine: linea.subtotal.toNumber(),
+                        taxRate: item.taxRate === null ? "" : item.taxRate.toNumber(),
+                        taxLine: linea.tax.toNumber(),
+                        totalLineWithTax: linea.total.toNumber(),
+                    };
+                }),
             );
 
             if (pagina.length < TAM_LOTE_EXPORTACION) return;

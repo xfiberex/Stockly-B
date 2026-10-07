@@ -389,7 +389,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
         post: {
             tags: ["Sale Orders"], summary: "Crear orden de venta",
-            description: "T6-04 — la respuesta trae `number`, el correlativo de la venta: lo asigna el servidor dentro de la transacción que la crea, y una venta rechazada no lo gasta. T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
+            description: "T6-05 — `subtotal`, `tax` y `total` los calcula el servidor con la tasa de Configuración vigente, que queda congelada en cada línea (`taxRate`); los que vengan en el cuerpo se descartan, y `unitPrice` es siempre sin impuesto. T6-04 — la respuesta trae `number`, el correlativo de la venta: lo asigna el servidor dentro de la transacción que la crea, y una venta rechazada no lo gasta. T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
             requestBody: { required: true, content: { "application/json": { schema: {
                 type: "object", required: ["items"],
                 properties: {

@@ -4,7 +4,7 @@ La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tare
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
 `fix(T0-01): resolver alias de rutas en el build de producción`.
 
-> **Estado al 2026-10-07: 131 de 139 cerradas.** Quedan seis del Tier 6, abierto el 2026-10-05,
+> **Estado al 2026-10-07: 132 de 139 cerradas.** Quedan cinco del Tier 6, abierto el 2026-10-05,
 > y `T5-14` y `T5-15`, que solo se abren con un caso de uso real.
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
@@ -30,8 +30,8 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 | **3** | Pulido y mantenimiento | 15 / 15 |
 | **4** | Lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 / 17 |
 | **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 13 / 15 |
-| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 4 / 10 |
-| | **Total** | **131 / 139** |
+| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 5 / 10 |
+| | **Total** | **132 / 139** |
 
 Los Tiers 0 a 4 son la remediación de la auditoría del 2026-08-04: 100 tareas salieron de sus
 hallazgos y de la consultoría de diseño del día siguiente, y otras 14 las abrió el cierre de una
@@ -47,8 +47,8 @@ actualizar un número y olvidar otro. Al cerrar o abrir una tarea cambian la cas
 esta tabla y la fila del índice; si no coinciden, manda el recuento:
 
 ```bash
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 8
-grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 131
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 7
+grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 132
 ```
 
 ---
@@ -80,23 +80,8 @@ recibe imágenes de producto ([legal.md §2.1](legal.md))—; las tablas de role
 `PERMISOS` es más fuerte—; el tipo de documento «Boleta / Factura» —sin valor fiscal es solo una
 etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión».
 
-**Orden.** `T6-01` y `T6-02` corregían defectos, iban primero y están cerradas, como `T6-03` y `T6-04`. `T6-05` y `T6-06` no dependen
-entre sí. `T6-07` necesita esas cuatro, y `T6-08` necesita `T6-07` y el buscador y el escáner de `T6-02`. `T6-09` y `T6-10` son
+**Orden.** `T6-01` y `T6-02` corregían defectos, iban primero y están cerradas, como `T6-03`, `T6-04` y `T6-05`. `T6-07` necesita esas tres y `T6-06`, y `T6-08` necesita `T6-07` y el buscador y el escáner de `T6-02`. `T6-09` y `T6-10` son
 independientes del resto.
-
-- [ ] **[T6-05] Impuesto en la venta**
-  - **Área:** Ventas / Negocio
-  - **Ubicación:** `prisma/schema.prisma` (`SaleOrderItem`), `src/modules/settings/settings.service.ts`, `src/modules/sale-orders/`, `src/contratos/api.ts`, `Stockly-F/src/modules/sale-orders/`
-  - **Qué hacer:** el total de una venta es cantidad × precio y lo suma el navegador (`orderTotal`, en `SaleOrdersPage.tsx`); el impuesto no existe. Añadir un ajuste con la tasa —un porcentaje entre 0 y 100, **0 por defecto**, que deja todo como está— y otro con su nombre («ITBIS», «IVA»; vacío, el genérico del catálogo de textos). Al crear la orden, la tasa vigente **se congela en cada línea**, como `unitPrice`: cambiar el ajuste no toca las órdenes ya creadas. El servidor calcula subtotal, impuesto y total y los devuelve en la orden, y la interfaz deja de sumar. En SistemaVenta los tres los calcula el navegador y el servidor los guarda como llegan: eso es lo que no se copia.
-  - **Decidido (2026-10-05):** una tasa global, guardada por línea. Que un producto tenga la suya o esté exento sería después un campo en `Product`, sin migrar las órdenes.
-  - **Atención:**
-    - **`unitPrice` sigue siendo sin impuesto.** Los informes calculan ingresos, margen y clase ABC con `quantity * "unitPrice"` (`reports.service.ts`, `reports.abc.ts`): si el precio pasara a incluirlo, los tres saldrían inflados. El impuesto aparece en la orden, en el comprobante y en la exportación; **los informes, la ficha del cliente y el resumen semanal siguen en neto**.
-    - **El redondeo se decide una vez y se prueba:** por línea, a dos decimales, y el impuesto de la orden es la suma del de sus líneas. Con `Decimal`, no con `number`.
-    - Los importes nuevos son `Importe` en el contrato, como `unitPrice`. Las órdenes anteriores no tienen tasa: `null` se lee como «sin impuesto».
-    - Las compras no llevan impuesto: el coste medio se promedia con lo que se escribe en la orden, y eso no cambia.
-  - **Criterio de aceptación:** con la tasa al 18 %, una venta de 3 × 100,00 devuelve subtotal 300,00, impuesto 54,00 y total 354,00; el margen de esa venta en `/reports` es el mismo que con la tasa a 0; subir después la tasa al 20 % no altera esa orden; una petición que mande sus propios totales no consigue que se guarden; con la tasa a 0 no cambia ninguna pantalla.
-  - **Esfuerzo:** medio
-  - **Depende de:** —
 
 - [ ] **[T6-06] Vendedor y documento del cliente en la venta**
   - **Área:** Ventas / Clientes
@@ -119,7 +104,7 @@ independientes del resto.
     - Sale en español, como el resto de exportaciones ([CONTEXTO.md §6](CONTEXTO.md)), y en A4, como en SistemaVenta. Un rollo térmico de 80 mm es otro formato y se decide con la impresora delante, como pasó con el ancho de las barras de las etiquetas.
   - **Criterio de aceptación:** el PDF de una venta de dos líneas con la tasa al 18 % lleva el número, los datos del negocio, las dos líneas y los tres importes de `T6-05`; un `USER` lo descarga; el de una orden pendiente responde 409; con Cloudinary caído sale sin logo; sin datos del negocio sale igualmente, sin huecos vacíos.
   - **Esfuerzo:** medio
-  - **Depende de:** T6-03 y T6-04 (cerradas), T6-05, T6-06
+  - **Depende de:** T6-03, T6-04 y T6-05 (cerradas), T6-06
 
 - [ ] **[T6-08] Venta de mostrador y rol de vendedor**
   - **Área:** Ventas / Autorización
@@ -391,3 +376,4 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 | T6-02 | El formulario de venta solo dejaba elegir los cien productos más recientes | 2026-10-06 | El desplegable se sustituye por `BuscadorDeProducto`, que consulta `GET /products?search=&isActive=true&limit=8` mientras se escribe, y un botón de escáner en los dos formularios; **el backend no se tocó**. El defecto, medido contra el servidor con 197 productos activos: `?limit=200&isActive=true` devuelve 100 y **no** trae el más antiguo; el buscador lo encuentra por su nombre, se vende y su stock baja de 10 a 7, en escritorio y a 393 px. El resto del criterio, en el escenario E2E nuevo (27 pasados en los dos proyectos) y en 14 tests de componente, falsificados: catorce roturas, catorce caídas. **La ficha no decía tres cosas:** que repetir un código suma una unidad a su línea en vez de abrir otra —decidido al hacerlo—; que la lista, dentro de un diálogo con scroll propio, quedaba cortada en la última línea con una sola opción a la vista —visto en una captura, no en un test: ahora se desplaza a la vista—; y que volver a «Escribir manualmente» no soltaba el `productId` del producto elegido antes —leído en el código, no reproducido—. Al cerrar, las dos puertas estaban en rojo por avisos ajenos (`proxy-addr`, `source-map-js`): [dependencias.md §2](dependencias.md) |
 | T6-03 | Datos del negocio y moneda configurable | 2026-10-07 | **Decisión previa, tomada el 2026-10-07:** símbolo libre de 1 a 5 caracteres y formato numérico fijo, como recomendaba la ficha. Seis ajustes nuevos, `GET /settings/business` para cualquier rol y `PUT`/`DELETE /settings/logo`; sin migración. El formato pasa a ser uno solo, `escribirImporte`, en el contrato. El criterio, de punta a punta en `moneda.test.ts` —el ajuste en la base, la petición y lo que PDFKit escribe—: con `RD$`, los dos PDF de informes, las etiquetas y el resumen semanal no dejan ni un `$` suelto; un `USER` lee la moneda y recibe 403 en `GET /settings`; sin nada guardado todo sale como antes. En el frontend, el símbolo se espera en `ProtectedRoute`: el primer importe de una pantalla ya sale con la moneda buena (`monedaDelNegocio.test.tsx`). En navegador, a 1280 px, Reportes entero en `RD$`, ejes incluidos; y un logo de 800×400 subido de verdad a Cloudinary volvió como PNG de 600×300. **La ficha no decía cuatro cosas:** que «libre» tiene un límite que pone el PDF —la Helvetica de PDFKit dibuja `₡ ₲ ₱ ₹ ₩ ₺ ₽` con ancho 0, medido—, así que el validador solo admite lo que se imprime y un test mide cada carácter contra la fuente; que los dos formateadores no coincidían —un negativo salía `$-1,234.50` en el PDF y `-$1,234.50` en pantalla—; que la URL del logo no puede ser un ajuste del catálogo, porque `T6-07` la va a pedir desde el servidor y un `PATCH` la apuntaría a cualquier sitio; y que convertir el logo a PNG al subirlo le quita a `T6-07` la mitad de su «Atención». Y una quinta, que salió al repasar lo que quedaba sin comprobar: **multer respondía 500** a una imagen de más de 2 MB, a un tipo no admitido y a un archivo en otro campo, también en productos; ahora son 413 `IMAGE_TOO_LARGE`, 422 y 400, con código. Tests falsificados en total: 63 roturas, 63 caídas. Escenario E2E nuevo, en los dos proyectos (29 pasados, 1 omitido): la tarjeta cabe a 393 px, el nombre se guarda y lo lee el almacén, y con `RD$` Reportes no deja un `$`. **En ese escenario la moneda no se guarda de verdad:** se cambia lo que la página recibe de `GET /settings/business`, porque el símbolo es de toda la instalación y los escenarios de al lado comprueban importes en `$`; la mitad del servidor la prueba `moneda.test.ts`. El logo quitado desapareció de la cuenta (404 por la API de administración); la CDN lo siguió sirviendo unos minutos |
 | T6-04 | Número correlativo de venta | 2026-10-07 | Cada venta lleva `number`, un entero consecutivo que se enseña con seis cifras (`#000123`): en la lista, la ficha del cliente, la nota de los movimientos, el aviso de venta sin stock, el resumen semanal y la exportación (columna `orderNumber`, además de `orderId`). Sale de **una fila de `counters`** —tabla nueva, por clave, para que un número fiscal sea otra fila— que se incrementa con un `INSERT … ON CONFLICT DO UPDATE` dentro de la transacción que crea la orden (`siguienteNumeroDeVenta`); no es una secuencia. Si la fila falta —la base de tests, que se levanta sin migraciones— arranca en la última orden. `GET /sale-orders?number=` busca exacto (`123` y `000123` son la misma) y responde 400 a lo que no son dígitos; la pantalla lo pide al dejar de teclear y acepta el número pegado con su `#`. La migración numera por `createdAt` e `id` y deja el contador en la última; las notas y los avisos ya escritos no se tocan, y un aviso sin `orderNumber` se sigue leyendo por el principio de su id. **El criterio, comprobado:** veinte ventas a la vez, veinte números consecutivos —también cuando compiten por crear el contador—; un 409 no gasta número, y tampoco uno tomado en una transacción que se deshace después; la migración, ejecutando su propio SQL en un test y sobre la base de desarrollo real (16 órdenes: 1 a 16 en orden de fecha, contador en 16); buscar `12` trae solo la `#000012`. Falsificado: 29 roturas, 29 caídas —entre ellas tomar el número fuera de la transacción y el «leer el último y sumar uno» de SistemaVenta—. E2E: la venta se busca por su número en los dos proyectos, y el seed numera sus órdenes por fecha. Vista la pantalla a 1280 y a 393 px. **Sin comprobar:** el resumen semanal y la exportación solo en tests, no abriendo el correo ni el CSV en Excel —que quitará los ceros de `orderNumber` al leerlo como número—. **A saber:** las ventas se crean de una en una mientras dura la transacción de cada una; es el precio de una serie sin huecos por rechazo. |
+| T6-05 | Impuesto en la venta | 2026-10-07 | Dos ajustes nuevos en los datos del negocio: `taxRate` —de 0 a 100, dos decimales como mucho, **0 por defecto**— y `taxName`, que viaja en `GET /settings/business`. Al crear la orden la tasa se congela en cada línea (`sale_order_items.taxRate`, anulable: las líneas anteriores se quedan en `NULL`, que se lee «sin impuesto»). `subtotal`, `tax` y `total` —de la orden y de cada línea— **no se guardan**: los calcula `conTotales` al responder, con `Decimal`, y la interfaz deja de sumar. **El redondeo, decidido una vez** (`totalesDeLinea`): por línea, a dos decimales, medio céntimo hacia arriba; el impuesto de la orden es la suma del de sus líneas. `unitPrice` sigue sin impuesto, así que informes, ficha del cliente —que enseña el subtotal— y resumen semanal siguen en neto sin tocarlos. La exportación conserva `totalLine` sin impuesto y añade `taxRate`, `taxLine` y `totalLineWithTax`. **El criterio, comprobado:** 3 × 100,00 al 18 % da 300,00 / 54,00 / 354,00; el margen de `/reports` es idéntico con la tasa a 0 y al 18 %; subir al 20 % no altera la orden; totales o tasa enviados en el cuerpo se descartan; con la tasa a 0 el pie de la venta es el de siempre. Falsificado: 32 roturas, 31 caídas; la que pasa —leer la tasa del cuerpo— es equivalente, porque el validador ya la descarta antes. Un test se reforzó al falsificar: el de coma flotante no distinguía `number` de `Decimal`. E2E, solo en `chromium` porque la tasa es global: la venta nace al 18 %, la tasa pasa por el 20 % y vuelve a 0, y la pantalla sigue diciendo «ITBIS (18 %)». Vista la venta y el ajuste a 1280 y a 393 px. **Sin comprobar:** el CSV abierto en Excel. **A saber:** en el móvil el pie de importes queda dentro del desplazamiento horizontal de la tabla de líneas, como ya quedaba el total; el nombre del impuesto no se congela con la orden —si se renombra, las ventas antiguas enseñan el nombre nuevo con su tasa de entonces—; y el formulario de nueva venta no enseña el impuesto antes de guardar, porque calcularlo ahí sería volver a sumar en el navegador: lo necesitará el mostrador de `T6-08`. |

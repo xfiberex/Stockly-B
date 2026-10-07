@@ -204,6 +204,8 @@ qué botones enseñar.
 | `weeklyDigestEnabled` | boolean | `false` | Resumen semanal por correo; lo envía `pnpm resumen:enviar`, programado desde fuera |
 | `defaultLeadTimeDays` | number | `7` | Plazo de las sugerencias de reposición para un proveedor sin plazo propio |
 | `timezone` | string | `America/Santo_Domingo` | Zona horaria IANA del negocio: dónde empiezan y terminan los días de los informes |
+| `taxRate` | number | `0` | Porcentaje de impuesto de las ventas nuevas, de 0 a 100; cada orden lo congela en sus líneas |
+| `taxName` | string | *(vacío)* | Cómo se llama el impuesto en la venta: ITBIS, IVA |
 
 ### Operación
 

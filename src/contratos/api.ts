@@ -675,9 +675,33 @@ export const itemOrdenVentaSchema = z.object({
     product: productoDeItemSchema,
     productName: z.string(),
     quantity: z.number(),
+    /** **Sin impuesto**, siempre: de él salen los ingresos y el margen de los informes. */
     unitPrice: importeSchema,
+    /**
+     * T6-05 — el porcentaje de impuesto congelado al crear la orden (`18`, `7.5`). `null` en
+     * las líneas anteriores a él: sin impuesto.
+     */
+    taxRate: z.number().nullable(),
+    /** T6-05 — cantidad × precio, sin impuesto. Lo calcula el servidor, como los dos de abajo. */
+    subtotal: importeSchema,
+    /** El impuesto de la línea, redondeado a dos decimales. */
+    tax: importeSchema,
+    total: importeSchema,
     createdAt: fechaSchema,
 });
+
+/** T6-05 — el tope de la tasa de impuesto: es un porcentaje. */
+export const TASA_DE_IMPUESTO_MAXIMA = 100;
+
+/**
+ * T6-05 — si `tasa` vale como tasa de impuesto: un porcentaje entre 0 y 100 con dos decimales
+ * como mucho, que son los que guarda la columna (`18`, `7.5`, `10.25`). **Es la regla de los dos
+ * lados**: la aplica el `PATCH /settings` y la dice el formulario antes de enviar.
+ */
+export function esTasaDeImpuestoValida(tasa: number): boolean {
+    if (!Number.isFinite(tasa) || tasa < 0 || tasa > TASA_DE_IMPUESTO_MAXIMA) return false;
+    return Math.abs(tasa * 100 - Math.round(tasa * 100)) < 1e-9;
+}
 
 /** T6-04 — con cuántas cifras se enseña el número de una venta. Es un mínimo, no un tope. */
 export const CIFRAS_DEL_NUMERO_DE_VENTA = 6;
@@ -712,6 +736,14 @@ export const ordenVentaSchema = z.object({
     customerPhone: z.string().nullable(),
     notes: z.string().nullable(),
     items: z.array(itemOrdenVentaSchema),
+    /**
+     * T6-05 — los importes de la orden, **calculados por el servidor** y no guardados: la suma
+     * de los de sus líneas. `tax` es la suma del impuesto de cada línea, ya redondeado, no el
+     * porcentaje de `subtotal`. Con la tasa a 0, `tax` es `0.00` y `total` es `subtotal`.
+     */
+    subtotal: importeSchema,
+    tax: importeSchema,
+    total: importeSchema,
     createdAt: fechaSchema,
     updatedAt: fechaSchema,
 });
@@ -1017,6 +1049,12 @@ export const negocioSchema = z.object({
     phone: z.string(),
     email: z.string(),
     currencySymbol: z.string(),
+    /**
+     * T6-05 — cómo se llama el impuesto en este negocio («ITBIS», «IVA»). Vacío, la interfaz
+     * pone el genérico de su catálogo de textos. La tasa no viene aquí: la que cuenta es la que
+     * cada orden lleva congelada en sus líneas.
+     */
+    taxName: z.string(),
     logoUrl: z.string().nullable(),
 });
 

@@ -483,6 +483,11 @@ model SaleOrderItem {
   // actual da un número, y está mal. `null` si el producto no tenía coste, si el ítem no
   // está ligado a uno o si la venta se envió antes de que existiera este campo.
   unitCost    Decimal?  @db.Decimal(12, 4)
+  // T6-05 — el porcentaje de impuesto **vigente al crear la orden**, congelado como
+  // `unitPrice`: cambiar el ajuste después no toca las órdenes que ya existen. `unitPrice`
+  // sigue siendo sin impuesto, que es de lo que salen los ingresos y el margen de los
+  // informes. `null` en las líneas anteriores a este campo: se lee como «sin impuesto».
+  taxRate     Decimal?  @db.Decimal(5, 2)
   createdAt   DateTime  @default(now())
 
   @@index([saleOrderId])

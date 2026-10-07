@@ -5,6 +5,7 @@ import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/u
 import {
     LARGO_MAXIMO_SIMBOLO_DE_MONEDA,
     SIMBOLO_DE_MONEDA_POR_DEFECTO,
+    esTasaDeImpuestoValida,
     motivoSimboloDeMonedaInvalido,
     type Negocio,
 } from "@/contratos/api";
@@ -70,6 +71,26 @@ export const SETTINGS_CATALOG = [
         group: "business" as const,
         maxLength: LARGO_MAXIMO_SIMBOLO_DE_MONEDA,
         simboloDeMoneda: true,
+    },
+    {
+        // T6-05 — una tasa global, que cada orden congela en sus líneas al crearse. En 0 —el
+        // valor por defecto— no hay impuesto y ninguna pantalla cambia.
+        key: "taxRate",
+        label: "Impuesto sobre las ventas (%)",
+        description: "El porcentaje que se añade a cada venta nueva. En 0 no se cobra impuesto. Cambiarlo no altera las ventas ya creadas.",
+        type: "number" as const,
+        defaultValue: "0",
+        group: "business" as const,
+        tasaDeImpuesto: true,
+    },
+    {
+        key: "taxName",
+        label: "Nombre del impuesto",
+        description: "Cómo se llama en la venta y en el comprobante: ITBIS, IVA, IGV. Vacío, se lee «Impuesto».",
+        type: "string" as const,
+        defaultValue: "",
+        group: "business" as const,
+        maxLength: 20,
     },
     {
         key: "lowStockAlertEnabled",
@@ -180,11 +201,20 @@ export const settingsService = {
         return simboloValido(String(await settingsService.get("currencySymbol"))) ?? SIMBOLO_DE_MONEDA_POR_DEFECTO;
     },
 
+    /**
+     * T6-05 — la tasa con la que nace una venta, siempre un porcentaje válido. Una fila editada
+     * a mano con `abc` o con `250` no puede acabar multiplicando una venta: se lee como 0.
+     */
+    async tasaDeImpuesto(): Promise<number> {
+        const tasa = Number(await settingsService.get("taxRate"));
+        return esTasaDeImpuestoValida(tasa) ? tasa : 0;
+    },
+
     /** T6-03 — quién vende y en qué moneda, en una sola consulta. Lo lee cualquier rol. */
     async negocio(): Promise<Negocio> {
         const campos = Object.entries(AJUSTE_DE_CAMPO) as Array<[keyof typeof AJUSTE_DE_CAMPO, SettingKey]>;
         const guardados = await prisma.appSetting.findMany({
-            where: { key: { in: [...campos.map(([, clave]) => clave), "currencySymbol", CLAVE_LOGO_URL] } },
+            where: { key: { in: [...campos.map(([, clave]) => clave), "currencySymbol", "taxName", CLAVE_LOGO_URL] } },
         });
         const valorDe = new Map(guardados.map((s) => [s.key, s.value]));
 
@@ -194,6 +224,7 @@ export const settingsService = {
                 string
             >),
             currencySymbol: simboloValido(valorDe.get("currencySymbol") ?? "") ?? SIMBOLO_DE_MONEDA_POR_DEFECTO,
+            taxName: valorDe.get("taxName") ?? "",
             logoUrl: valorDe.get(CLAVE_LOGO_URL) ?? null,
         };
     },

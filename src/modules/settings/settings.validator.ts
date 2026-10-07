@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { SETTINGS_CATALOG } from "./settings.service";
 import { zonaHorariaCanonica } from "@/shared/lib/zonaHoraria";
-import { motivoSimboloDeMonedaInvalido } from "@/contratos/api";
+import { TASA_DE_IMPUESTO_MAXIMA, esTasaDeImpuestoValida, motivoSimboloDeMonedaInvalido } from "@/contratos/api";
 
 // El esquema se genera desde el catálogo: añadir un ajuste nuevo a
 // SETTINGS_CATALOG lo valida automáticamente, sin tocar este archivo.
@@ -35,6 +35,12 @@ function validadorDe(def: (typeof SETTINGS_CATALOG)[number]): z.ZodTypeAny {
     if ("simboloDeMoneda" in def) {
         return z.string().refine((valor) => motivoSimboloDeMonedaInvalido(valor) === null, {
             message: "De 1 a 5 caracteres: letras sin acento, $ / . y los signos € £ ¥ ¢ ƒ (por ejemplo, RD$)",
+        });
+    }
+    // T6-05 — la misma función que usa el formulario: de 0 a 100 y con dos decimales como mucho.
+    if ("tasaDeImpuesto" in def) {
+        return z.number().refine(esTasaDeImpuestoValida, {
+            message: `Un porcentaje entre 0 y ${TASA_DE_IMPUESTO_MAXIMA}, con dos decimales como mucho`,
         });
     }
     if (def.type === "string" && "maxLength" in def) return textoDeUnaLinea(def.maxLength, "correo" in def);

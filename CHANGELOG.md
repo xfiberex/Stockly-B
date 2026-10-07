@@ -17,6 +17,12 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Impuesto en la venta** (`T6-05`): en Configuración, la tasa de impuesto sobre las ventas —un
+  porcentaje, **0 por defecto**, que deja todo como estaba— y su nombre («ITBIS», «IVA»). Cada
+  venta nueva congela la tasa vigente en sus líneas, y la orden trae `subtotal`, `tax` y `total`
+  calculados por el servidor; cambiar la tasa después no altera las ventas ya creadas. Los
+  precios, los informes, la ficha del cliente y el resumen semanal siguen sin impuesto. La
+  exportación añade `taxRate`, `taxLine` y `totalLineWithTax`. **Requiere migración.**
 - **Número correlativo de venta** (`T6-04`): cada venta tiene un número consecutivo, `#000123`, en
   lugar del principio de su identificador. Sale en la lista, la ficha del cliente, la nota de los
   movimientos de stock, el aviso de venta sin stock, el resumen semanal y la exportación —columna
