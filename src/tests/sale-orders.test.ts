@@ -2,7 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { productService } from "@/modules/products/product.service";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -339,7 +339,7 @@ describe("Sale Orders API", () => {
             // que es justo lo que decide si el tope de la exportación se queda corto.
             const lineas = res.text.replace(/^﻿/, "").trim().split("\n");
             expect(lineas).toHaveLength(3);
-            expect(lineas[0]).toBe("orderId,status,customerName,customerEmail,createdAt,productName,quantity,unitPrice,totalLine");
+            expect(lineas[0]).toBe("orderNumber,orderId,status,customerName,customerEmail,createdAt,productName,quantity,unitPrice,totalLine");
             expect(res.text).toContain("Servicio de instalación");
         });
 
@@ -367,8 +367,8 @@ describe("Sale Orders API", () => {
      * escriben en UTC con su hora de Santo Domingo (UTC−4) al lado.
      */
     describe("Paginación y filtro por fecha de creación (T6-01)", () => {
-        const creadaEl = (createdAt: string, extra: { status?: "PENDING" | "SHIPPED" | "CANCELLED"; customerName?: string } = {}) =>
-            prisma.saleOrder.create({ data: { createdAt: new Date(createdAt), ...extra } });
+        const creadaEl = async (createdAt: string, extra: { status?: "PENDING" | "SHIPPED" | "CANCELLED"; customerName?: string } = {}) =>
+            prisma.saleOrder.create({ data: { number: await numeroDeVenta(), createdAt: new Date(createdAt), ...extra } });
 
         const listar = (query: string) => request(app).get(`${BASE}?${query}`).set("Cookie", adminCookie);
         const nombres = (res: { body: { data: { data: Array<{ customerName: string | null }> } } }) =>

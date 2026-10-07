@@ -419,8 +419,24 @@ model Customer {
   @@map("customers")
 }
 
+// T6-04 — de dónde salen los números correlativos. **No es una secuencia de PostgreSQL**, y a
+// propósito: una secuencia no se deshace con la transacción, así que cada venta rechazada por
+// falta de disponible (409) dejaría un hueco en la serie. Esta fila se incrementa **dentro** de
+// la transacción que crea la orden: si la orden no llega a existir, el número tampoco se gastó.
+// `key` y no una tabla por serie: el día que haya un número fiscal será otra fila, no este
+// correlativo (ROADMAP, Tier 6).
+model Counter {
+  key   String @id
+  value Int
+
+  @@map("counters")
+}
+
 model SaleOrder {
   id            String          @id @default(uuid())
+  // T6-04 — el número con el que se nombra la venta (`#000123`). Lo da `siguienteNumeroDeVenta`,
+  // nunca quien llama. Es interno: borrar una orden pendiente deja un hueco, y se acepta.
+  number        Int             @unique
   status        SaleOrderStatus @default(PENDING)
   // T5-06 — opcional: una venta sin correo no se vincula a nadie, y borrar el cliente deja
   // sus órdenes sin él, no las borra.

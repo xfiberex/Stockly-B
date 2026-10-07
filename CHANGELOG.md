@@ -17,6 +17,13 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Número correlativo de venta** (`T6-04`): cada venta tiene un número consecutivo, `#000123`, en
+  lugar del principio de su identificador. Sale en la lista, la ficha del cliente, la nota de los
+  movimientos de stock, el aviso de venta sin stock, el resumen semanal y la exportación —columna
+  nueva `orderNumber`—, y la pantalla de ventas busca por él (`GET /sale-orders?number=`). Una
+  venta rechazada por falta de disponible no gasta número. Las órdenes que ya existían se numeran
+  por fecha de creación; las notas y los avisos anteriores conservan el identificador corto.
+  **Requiere migración.**
 - **Datos del negocio y moneda configurable** (`T6-03`): en Configuración, el nombre, el documento
   fiscal, la dirección, el teléfono, el correo y el logo del negocio, y el símbolo de su moneda,
   que pasa a ir delante de todos los importes: en pantalla, en los PDF de informes, en las

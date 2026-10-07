@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -132,7 +132,7 @@ describe("Stock comprometido y disponible (T5-03)", () => {
                 async (tx) => {
                     await tx.$queryRaw`SELECT id FROM products WHERE id = ${p.id} FOR UPDATE`;
                     await tx.saleOrder.create({
-                        data: { items: { create: [{ productId: p.id, productName: "Monitor", quantity: 5, unitPrice: 10 }] } },
+                        data: { number: await numeroDeVenta(), items: { create: [{ productId: p.id, productName: "Monitor", quantity: 5, unitPrice: 10 }] } },
                     });
                     await retenida;
                 },
@@ -200,7 +200,7 @@ describe("Stock comprometido y disponible (T5-03)", () => {
             const p = await producto("Sobrevendido", 2);
             // Así pudo quedar antes de T5-03: una pendiente mayor que el stock, escrita directamente.
             await prisma.saleOrder.create({
-                data: { items: { create: [{ productId: p.id, productName: "Sobrevendido", quantity: 5, unitPrice: 10 }] } },
+                data: { number: await numeroDeVenta(), items: { create: [{ productId: p.id, productName: "Sobrevendido", quantity: 5, unitPrice: 10 }] } },
             });
 
             expect(await disponibleDe(p.id)).toEqual({ comprometido: 5, disponible: -3 });

@@ -1,11 +1,14 @@
 import { prisma } from "@/shared/lib/prisma";
 import { signToken } from "@/shared/lib/jwt";
 import { hashPassword } from "@/shared/lib/hash";
+import { siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
 import type { $Enums } from "@/generated/prisma/client";
 
 export async function cleanDb() {
     await prisma.saleOrderItem.deleteMany();
     await prisma.saleOrder.deleteMany();
+    // T6-04 — con las ventas borradas, la serie vuelve a empezar en el 1.
+    await prisma.counter.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
@@ -28,6 +31,13 @@ export async function cleanDb() {
     await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany();
 }
+
+/**
+ * T6-04 — el número para una venta que el test crea **directamente** con Prisma. Sale del mismo
+ * contador que usa el servicio: uno propio del test chocaría con el de una venta creada después
+ * por la API.
+ */
+export const numeroDeVenta = () => siguienteNumeroDeVenta(prisma);
 
 interface CreateUserOptions {
     name?: string;

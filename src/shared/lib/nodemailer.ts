@@ -11,6 +11,7 @@ import {
     emailTable,
 } from "@/shared/lib/emailTemplates";
 import { formatearImporte } from "@/shared/lib/moneda";
+import { escribirNumeroDeVenta } from "@/contratos/api";
 import type { DatosDelResumen } from "@/shared/lib/resumenSemanal";
 import {
     traducirCorreo,
@@ -258,6 +259,8 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
     requireSmtp();
     const t = traductorDeCorreo(idioma);
     const periodo = rangoDeDias(idioma, datos.from, datos.to);
+    // T6-04 — las ventas se nombran por su correlativo; las compras siguen con el principio
+    // de su identificador.
     const numero = (id: string) => id.slice(0, 8).toUpperCase();
     const dia = new Intl.DateTimeFormat(localeDe(idioma), { day: "numeric", month: "short", timeZone: datos.zona });
     // T6-03 — el símbolo viene de `settingsService.moneda()`, que solo devuelve lo que pasa la
@@ -302,7 +305,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
               emailTable(
                   [t("resumen.col.orden"), t("resumen.col.fecha"), t("resumen.col.importe")],
                   datos.pendientes.ordenes.map((o) => [
-                      t("resumen.venta", { numero: numero(o.id) }),
+                      t("resumen.venta", { numero: escribirNumeroDeVenta(o.numero) }),
                       dia.format(o.fecha),
                       importe(o.importe),
                   ]),

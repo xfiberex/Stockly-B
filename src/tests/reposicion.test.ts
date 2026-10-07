@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -181,11 +181,11 @@ describe("Sugerencias de reposición (T5-05)", () => {
             const prov = await proveedor("Norte", 7);
             const p = await producto("Tuerca", { stock: 10, minStock: 10, supplierId: prov.id });
             await prisma.saleOrder.create({
-                data: { status: "PENDING", items: { create: { productId: p.id, productName: "Tuerca", quantity: 4, unitPrice: 50 } } },
+                data: { number: await numeroDeVenta(), status: "PENDING", items: { create: { productId: p.id, productName: "Tuerca", quantity: 4, unitPrice: 50 } } },
             });
             // Una venta enviada ya salió del stock: no compromete nada más.
             await prisma.saleOrder.create({
-                data: { status: "SHIPPED", items: { create: { productId: p.id, productName: "Tuerca", quantity: 99, unitPrice: 50 } } },
+                data: { number: await numeroDeVenta(), status: "SHIPPED", items: { create: { productId: p.id, productName: "Tuerca", quantity: 99, unitPrice: 50 } } },
             });
 
             const s = await sugerenciaDe(p.id);

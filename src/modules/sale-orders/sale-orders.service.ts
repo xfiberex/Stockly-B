@@ -8,6 +8,8 @@ import { filtroDeEnum } from "@/shared/lib/enums";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 import { normalizarCorreo } from "@/shared/lib/correo";
 import { rangoDeDias } from "@/shared/lib/diasDelNegocio";
+import { numeroDeVentaDelFiltro, siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
+import { escribirNumeroDeVenta } from "@/contratos/api";
 import { settingsService } from "@/modules/settings/settings.service";
 import { Prisma } from "@/generated/prisma/client";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
@@ -59,7 +61,7 @@ async function clienteDeLaVenta(tx: Prisma.TransactionClient, dto: CreateSaleOrd
 }
 
 export const saleOrderService = {
-    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; from?: unknown; to?: unknown }) {
+    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; number?: unknown; from?: unknown; to?: unknown }) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
@@ -68,11 +70,15 @@ export const saleOrderService = {
         const customerId = typeof query.customerId === "string" && query.customerId ? query.customerId : undefined;
         // T6-01 — `from` y `to` son días del negocio, por la fecha de creación. La zona solo se
         // lee si hay rango: el listado sin filtro sigue costando las dos consultas de siempre.
+        // T6-04 — por número, exacto: `123` y `000123` son la misma venta. Se suma a los demás
+        // filtros en vez de anularlos, así que en la ficha de un cliente solo encuentra las suyas.
+        const number = numeroDeVentaDelFiltro(query.number);
         const hayRango = Boolean(query.from) || Boolean(query.to);
         const creadas = hayRango ? await rangoDeDias(query, await settingsService.zonaHoraria()) : undefined;
         const where = {
             ...(statusFilter && { status: statusFilter }),
             ...(customerId && { customerId }),
+            ...(number !== undefined && { number }),
             ...(creadas && { createdAt: creadas }),
         };
 
@@ -137,8 +143,13 @@ export const saleOrderService = {
 
             const cliente = await clienteDeLaVenta(tx, dto);
 
+            // T6-04 — lo último antes de crear, y dentro de la transacción: un 409 de más arriba
+            // no llega aquí, y si algo falla después el incremento se deshace con todo lo demás.
+            const number = await siguienteNumeroDeVenta(tx);
+
             return tx.saleOrder.create({
                 data: {
+                    number,
                     customerId: cliente?.id ?? null,
                     // La instantánea: lo que diga la venta y, si calla, lo que diga el cliente.
                     customerName: dto.customerName ?? cliente?.name,
@@ -217,7 +228,7 @@ export const saleOrderService = {
                             type: "IN",
                             delta: item.quantity,
                             stockAfter: product.stock,
-                            note: `Cancelación de orden de venta #${id.slice(0, 8)}`,
+                            note: `Cancelación de orden de venta #${escribirNumeroDeVenta(existing.number)}`,
                         },
                     });
                 }
@@ -271,7 +282,7 @@ export const saleOrderService = {
                         type: "OUT",
                         delta: -item.quantity,
                         stockAfter: refreshed.stock,
-                        note: `Orden de venta #${id.slice(0, 8)}`,
+                        note: `Orden de venta #${escribirNumeroDeVenta(existing.number)}`,
                     },
                 });
 
@@ -295,6 +306,7 @@ export const saleOrderService = {
             // se habría ido con ella. El error sigue su camino tal cual.
             if (error instanceof HttpError && error.code === "INSUFFICIENT_STOCK" && error.params) {
                 dispararAvisoDeVentaSinStock(id, {
+                    orderNumber: existing.number,
                     productName: String(error.params.producto),
                     available: Number(error.params.disponible),
                     required: Number(error.params.requerido),
@@ -347,6 +359,9 @@ export const saleOrderService = {
 
             yield pagina.flatMap((o) =>
                 o.items.map((item) => ({
+                    // T6-04 — con sus ceros, como en pantalla. `orderId` se conserva: es lo que
+                    // identifica la orden en la API.
+                    orderNumber: escribirNumeroDeVenta(o.number),
                     orderId: o.id,
                     status: o.status,
                     customerName: o.customerName ?? "",

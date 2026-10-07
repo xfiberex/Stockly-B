@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
 import { avisosSchema, avisosSinLeerSchema } from "@/contratos/api";
 import { notificationsService } from "@/modules/notifications/notifications.service";
 
@@ -146,7 +146,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         async function ventaSinStock() {
             const producto = await prisma.product.create({ data: { name: "Teclado", price: 30, stock: 3, minStock: 0 } });
             const orden = await prisma.saleOrder.create({
-                data: { items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
+                data: { number: await numeroDeVenta(), items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
             });
             return { producto, orden };
         }
@@ -164,7 +164,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
                     expect.objectContaining({
                         type: "SALE_UNSHIPPABLE",
                         entityId: orden.id,
-                        data: { productName: "Teclado", available: 3, required: 5 },
+                        data: { orderNumber: orden.number, productName: "Teclado", available: 3, required: 5 },
                     }),
                 ]);
             }
@@ -186,7 +186,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         it("una venta que sí se envía no deja este aviso", async () => {
             const producto = await prisma.product.create({ data: { name: "Teclado", price: 30, stock: 9, minStock: 0 } });
             const orden = await prisma.saleOrder.create({
-                data: { items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
+                data: { number: await numeroDeVenta(), items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
             });
 
             await request(app).post(`/api/v1/sale-orders/${orden.id}/ship`).set("Cookie", almacen.cookie).expect(200);

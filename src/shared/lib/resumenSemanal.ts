@@ -42,7 +42,7 @@ export interface DatosDelResumen extends Semana {
     masVendido: Array<{ nombre: string; unidades: number; importe: number }>;
     /** Estos tres son **de hoy**, no de la semana: es lo que sigue pidiendo que alguien haga algo. */
     stockBajo: { total: number; productos: Array<{ nombre: string; stock: number; minimo: number }> };
-    pendientes: { total: number; ordenes: Array<{ id: string; fecha: Date; importe: number }> };
+    pendientes: { total: number; ordenes: Array<{ id: string; numero: number; fecha: Date; importe: number }> };
     comprasAtrasadas: { total: number; ordenes: Array<{ id: string; proveedor: string | null; diasDeRetraso: number }> };
 }
 
@@ -119,7 +119,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
             where: { status: "PENDING" },
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             take: MOSTRADOS.pendientes,
-            select: { id: true, createdAt: true, items: { select: { quantity: true, unitPrice: true } } },
+            select: { id: true, number: true, createdAt: true, items: { select: { quantity: true, unitPrice: true } } },
         }),
         // Fuera de plazo: abierta, y pasado el plazo de entrega de su proveedor —o el de
         // Configuración si no tiene— desde el día en que se pidió, contado en días del negocio.
@@ -158,6 +158,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
             total: totalPendientes,
             ordenes: pendientes.map((o) => ({
                 id: o.id,
+                numero: o.number,
                 fecha: o.createdAt,
                 importe: o.items.reduce((suma, i) => suma + i.quantity * Number(i.unitPrice), 0),
             })),

@@ -81,7 +81,7 @@ export function dispararAlertaStock(producto: ProductoEnAlerta): void {
  */
 export function dispararAvisoDeVentaSinStock(
     saleOrderId: string,
-    falta: { productName: string; available: number; required: number },
+    falta: { orderNumber: number; productName: string; available: number; required: number },
     actorId?: string,
 ): void {
     enSegundoPlano(notificationsService.avisarVentaSinStock(saleOrderId, falta, actorId), (err) => {

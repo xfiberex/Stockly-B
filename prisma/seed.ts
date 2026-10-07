@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "../src/shared/lib/prisma";
 import { hashPassword } from "../src/shared/lib/hash";
 import { digitoDeControlGtin } from "../src/contratos/api";
+import { CONTADOR_DE_VENTAS } from "../src/shared/lib/numeroDeVenta";
 import { categoriesData } from "./data/categories";
 import { brandsData } from "./data/brands";
 import { suppliersData } from "./data/suppliers";
@@ -56,6 +57,8 @@ function hace(dias: number, hora = 10): Date {
 async function limpiar(): Promise<void> {
     await prisma.saleOrderItem.deleteMany();
     await prisma.saleOrder.deleteMany();
+    // T6-04 — el contador de las ventas: sin borrarlo, sembrar de nuevo seguiría la serie anterior.
+    await prisma.counter.deleteMany();
     await prisma.customer.deleteMany();
     await prisma.purchaseOrderItem.deleteMany();
     await prisma.purchaseOrder.deleteMany();
@@ -690,7 +693,12 @@ async function sembrarOrdenesDeVenta(
 ): Promise<number> {
     let items = 0;
 
-    for (const orden of ordenesDeVenta) {
+    // T6-04 — numeradas por fecha, de la más antigua a la más reciente, como hizo la migración
+    // con las que ya existían: el número dice cuál fue antes. `sort` es estable, así que dos
+    // órdenes del mismo día conservan el orden en que están escritas.
+    const porFecha = [...ordenesDeVenta].sort((a, b) => b.dias - a.dias);
+
+    for (const [indice, orden] of porFecha.entries()) {
         const fecha = hace(orden.dias);
         const lineas = orden.items.map((i) => {
             const producto = exigirProducto(porSku, i.sku);
@@ -723,6 +731,7 @@ async function sembrarOrdenesDeVenta(
 
         await prisma.saleOrder.create({
             data: {
+                number: indice + 1,
                 status: orden.status,
                 ...(email && {
                     customer: {
@@ -743,6 +752,9 @@ async function sembrarOrdenesDeVenta(
         });
         items += lineas.length;
     }
+
+    // El contador se queda en la última: la siguiente venta, ya desde la aplicación, es la que sigue.
+    await prisma.counter.create({ data: { key: CONTADOR_DE_VENTAS, value: porFecha.length } });
 
     console.log(`  - ${ordenesDeVenta.length} órdenes de venta creadas (${items} ítems), ${await prisma.customer.count()} clientes`);
     return items;

@@ -1,6 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 import { env } from "@/config/env";
-import { cleanDb, createUser } from "./helpers";
+import { cleanDb, createUser, numeroDeVenta } from "./helpers";
 
 /**
  * T5-11 — el resumen semanal por correo.
@@ -52,7 +52,7 @@ const admin = (email: string, idioma: "ES" | "EN" = "ES") => createUser({ email,
 
 async function venta(status: "PENDING" | "SHIPPED" | "CANCELLED", shippedAt: string | null, items: Array<[string, number, number]>, createdAt = "2026-09-15T12:00:00Z") {
     return prisma.saleOrder.create({
-        data: {
+        data: { number: await numeroDeVenta(),
             status,
             customerName: "Cliente Confidencial",
             shippedAt: shippedAt ? new Date(shippedAt) : null,
@@ -289,7 +289,7 @@ describe("Lo que cuenta el resumen", () => {
         const datos = await reunirDatosDelResumen(SEMANA, ZONA, "2026-09-30");
 
         expect(datos.pendientes.total).toBe(2);
-        expect(datos.pendientes.ordenes[0]).toMatchObject({ id: antigua.id, importe: 15 });
+        expect(datos.pendientes.ordenes[0]).toMatchObject({ id: antigua.id, numero: antigua.number, importe: 15 });
         expect(datos.stockBajo).toEqual({
             total: 2,
             productos: [
@@ -310,7 +310,7 @@ describe("Lo que cuenta el resumen", () => {
         await activar();
         await admin("ana@stockly.test");
         await venta("SHIPPED", "2026-09-24T12:00:00Z", [["<script>alert(1)</script>", 2, 1234.5]]);
-        await venta("PENDING", null, [["Cable", 1, 10]]);
+        const pendiente = await venta("PENDING", null, [["Cable", 1, 10]]);
         await prisma.product.createMany({
             data: Array.from({ length: 12 }, (_, i) => ({ name: `Bajo ${String(i).padStart(2, "0")}`, price: 1, stock: 0, minStock: 1 })),
         });
@@ -322,6 +322,10 @@ describe("Lo que cuenta el resumen", () => {
         expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
         expect(html).not.toContain("<script>");
         expect(html).not.toContain("Cliente Confidencial");
+        // T6-04 — la venta pendiente se nombra por su correlativo, no por el principio de su id.
+        expect(pendiente.number).toBe(2);
+        expect(html).toContain("Venta #000002");
+        expect(html).not.toContain(pendiente.id.slice(0, 8).toUpperCase());
         // Doce en stock bajo, y la tabla enseña diez.
         expect(html).toContain("Se muestran 10 de 12.");
         expect(html).toContain("Bajo 09");

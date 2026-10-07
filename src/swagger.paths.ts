@@ -377,18 +377,19 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 ...PARAMS_PAGINA,
                 { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] } },
                 { name: "customerId", in: "query", schema: { type: "string", format: "uuid" }, description: "Solo las de un cliente (T5-06)" },
+                { name: "number", in: "query", schema: { type: "string", pattern: "^[0-9]+$" }, description: "La venta con ese número correlativo, exacto: `123` y `000123` son la misma (T6-04)" },
                 { name: "from", in: "query", schema: { type: "string", format: "date" }, description: "Creadas desde este día, incluido. Un día **del negocio**: empieza en la zona horaria de Configuración, no en UTC (T6-01)" },
                 { name: "to", in: "query", schema: { type: "string", format: "date" }, description: "Creadas hasta este día, incluido, en la misma zona (T6-01)" },
             ],
             responses: {
                 "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/SaleOrder"), "Listado paginado"),
-                "400": ERROR("INVALID_FILTER_VALUE: un estado que no existe, una fecha que no existe o un rango al revés"),
+                "400": ERROR("INVALID_FILTER_VALUE: un estado que no existe, una fecha que no existe, un rango al revés o un `number` que no son solo dígitos"),
                 "401": ERROR("No autenticado"),
             },
         },
         post: {
             tags: ["Sale Orders"], summary: "Crear orden de venta",
-            description: "T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
+            description: "T6-04 — la respuesta trae `number`, el correlativo de la venta: lo asigna el servidor dentro de la transacción que la crea, y una venta rechazada no lo gasta. T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
             requestBody: { required: true, content: { "application/json": { schema: {
                 type: "object", required: ["items"],
                 properties: {

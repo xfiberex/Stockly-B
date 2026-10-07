@@ -3,7 +3,7 @@ import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
 import { mesesDe, periodoDeAtajo, resolverPeriodo } from "@/modules/reports/reports.periodo";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -60,9 +60,9 @@ describe("Informes por periodo (T5-09)", () => {
         prisma.product.create({ data: { name, price: 20, stock: 100, ...extra } });
 
     /** Una venta enviada en `shippedAt`, directamente en la base para fijar el instante exacto. */
-    function venta(shippedAt: string, items: Array<{ productId?: string; productName: string; quantity: number; unitPrice: number }>, status: "SHIPPED" | "CANCELLED" | "PENDING" = "SHIPPED") {
+    async function venta(shippedAt: string, items: Array<{ productId?: string; productName: string; quantity: number; unitPrice: number }>, status: "SHIPPED" | "CANCELLED" | "PENDING" = "SHIPPED") {
         return prisma.saleOrder.create({
-            data: { status, shippedAt: status === "PENDING" ? null : new Date(shippedAt), items: { create: items } },
+            data: { number: await numeroDeVenta(), status, shippedAt: status === "PENDING" ? null : new Date(shippedAt), items: { create: items } },
         });
     }
 

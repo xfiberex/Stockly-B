@@ -679,8 +679,27 @@ export const itemOrdenVentaSchema = z.object({
     createdAt: fechaSchema,
 });
 
+/** T6-04 — con cuántas cifras se enseña el número de una venta. Es un mínimo, no un tope. */
+export const CIFRAS_DEL_NUMERO_DE_VENTA = 6;
+
+/**
+ * T6-04 — el número de una venta como se lee en todas partes: `123` → `000123`. Sin la `#`,
+ * que la pone el texto de cada sitio («Venta #000123», «Orden de venta #000123»).
+ *
+ * Vive aquí para que el servidor —las notas de los movimientos, el resumen semanal, la
+ * exportación— y la interfaz no puedan escribirlo de dos maneras.
+ */
+export function escribirNumeroDeVenta(numero: number): string {
+    return String(numero).padStart(CIFRAS_DEL_NUMERO_DE_VENTA, "0");
+}
+
 export const ordenVentaSchema = z.object({
     id: z.string(),
+    /**
+     * T6-04 — el correlativo: un entero que crece de uno en uno con cada venta creada. Es
+     * **interno**, sin valor fiscal, y puede tener huecos: los de las órdenes borradas.
+     */
+    number: z.number(),
     status: estadoOrdenVentaSchema,
     /**
      * T5-06 — el cliente vinculado, o `null`: la venta no tenía correo, o su cliente se borró.
@@ -762,8 +781,18 @@ export const avisoSchema = z.discriminatedUnion("type", [
     z.object({
         ...camposDeAviso,
         type: z.literal("SALE_UNSHIPPABLE"),
-        /** El primer producto que no alcanzó: cuánto había y cuánto pedía la orden. */
-        data: z.object({ productName: z.string(), available: z.number(), required: z.number() }),
+        /**
+         * El primer producto que no alcanzó: cuánto había y cuánto pedía la orden.
+         *
+         * T6-04 — `orderNumber` es el correlativo de la venta. Falta en los avisos anteriores,
+         * que no se reescriben: esos se siguen nombrando por el principio de `entityId`.
+         */
+        data: z.object({
+            orderNumber: z.number().optional(),
+            productName: z.string(),
+            available: z.number(),
+            required: z.number(),
+        }),
     }),
     z.object({
         ...camposDeAviso,

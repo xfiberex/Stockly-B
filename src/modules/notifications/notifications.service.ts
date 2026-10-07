@@ -109,7 +109,7 @@ export const notificationsService = {
      */
     async avisarVentaSinStock(
         saleOrderId: string,
-        falta: { productName: string; available: number; required: number },
+        falta: { orderNumber: number; productName: string; available: number; required: number },
         actorId?: string,
     ): Promise<void> {
         await avisarAAdministradores("SALE_UNSHIPPABLE", saleOrderId, falta, actorId);

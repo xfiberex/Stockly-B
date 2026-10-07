@@ -66,7 +66,8 @@ Stockly-B/
 **Modelos** (`prisma/schema.prisma`): `Product` con su `Category`, `Brand`, `Supplier` y `Tag`;
 `StockMovement`, `PriceHistory` y `CostHistory` como históricos; `PurchaseOrder` y `SaleOrder`
 con sus líneas, y `Customer`; `InventoryCount` con sus líneas; `ProductAbc` y `AbcCalculation`;
-`User`, `AppSetting`, `AuditLog`, `Notification` y `WeeklyDigest`.
+`User`, `AppSetting`, `AuditLog`, `Notification` y `WeeklyDigest`; y `Counter`, de donde sale el
+número correlativo de cada venta.
 
 ---
 

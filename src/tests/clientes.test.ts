@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
 import { clienteEnListadoSchema, fichaClienteSchema, ordenVentaSchema } from "@/contratos/api";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
@@ -21,7 +21,7 @@ const ITEM = { productName: "Servicio de instalación", quantity: 2, unitPrice: 
 
 async function ordenDe(customerId: string | null, status: "PENDING" | "SHIPPED" | "CANCELLED", importe: number, dias = 0) {
     return prisma.saleOrder.create({
-        data: {
+        data: { number: await numeroDeVenta(),
             customerId,
             status,
             customerName: "Instantánea",
