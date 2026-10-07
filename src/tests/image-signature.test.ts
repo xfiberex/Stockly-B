@@ -89,13 +89,17 @@ describe("Firma real de las imágenes — está enchufada (T2-32)", () => {
     it("toda ruta con `upload.single` lleva detrás la comprobación de firma", () => {
         // El middleware más correcto del mundo no sirve de nada si una ruta nueva se
         // olvida de él, y eso no lo caza ningún test de comportamiento.
-        const rutas = fs.readFileSync(
-            path.join(__dirname, "../modules/products/product.routes.ts"),
-            "utf8",
-        );
-        const conSubida = rutas.split("\n").filter((l) => l.includes("upload.single("));
+        // T6-03 — se recorren todos los módulos, no solo el de productos: el logo del negocio
+        // estrenó la tercera ruta con subida, y un archivo escrito a mano no la habría visto.
+        const modulos = path.join(__dirname, "../modules");
+        const conSubida = fs
+            .readdirSync(modulos)
+            .flatMap((modulo) => fs.readdirSync(path.join(modulos, modulo)).map((archivo) => path.join(modulos, modulo, archivo)))
+            .filter((archivo) => archivo.endsWith(".routes.ts"))
+            .flatMap((archivo) => fs.readFileSync(archivo, "utf8").split("\n"))
+            .filter((l) => l.includes("upload.single("));
 
-        expect(conSubida.length).toBeGreaterThan(0);
+        expect(conSubida.length).toBe(3);
         for (const linea of conSubida) {
             expect(linea).toContain("verificarFirmaDeImagen");
         }

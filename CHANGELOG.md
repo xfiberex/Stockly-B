@@ -15,6 +15,14 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Añadido
 
+**Venta de mostrador y documento de venta (Tier 6)**
+
+- **Datos del negocio y moneda configurable** (`T6-03`): en Configuración, el nombre, el documento
+  fiscal, la dirección, el teléfono, el correo y el logo del negocio, y el símbolo de su moneda,
+  que pasa a ir delante de todos los importes: en pantalla, en los PDF de informes, en las
+  etiquetas y en el resumen semanal. Sin tocar nada, todo sigue en `$`. Rutas nuevas
+  `GET /settings/business` —para cualquier rol—, `PUT` y `DELETE /settings/logo`.
+
 **Funcionalidad de negocio (Tier 5)**
 
 - **Avisos dentro de la aplicación** (`T5-12`): una campana con los avisos de cada usuario —stock
@@ -115,6 +123,11 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- Subir una imagen de más de 2 MB, de un tipo no admitido o en un campo equivocado respondía 500,
+  en el logo y en la foto de un producto. Ahora responde 413, 422 o 400, con un código que la
+  interfaz traduce (`T6-03`).
+- Un importe negativo salía `$-1,234.50` en los PDF y `-$1,234.50` en pantalla: había un
+  formateador por repositorio. Ahora es uno solo, en el contrato (`T6-03`).
 - Los formularios de venta y de compra solo dejaban elegir los cien productos activos más
   recientes; uno más antiguo había que escribirlo a mano, y así la orden no movía stock. El
   producto de cada línea se busca ahora en el servidor mientras se escribe, o se escanea (`T6-02`).

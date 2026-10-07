@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-10-06
+# Contexto de trabajo — al 2026-10-07
 
 Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
 trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
@@ -45,22 +45,22 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-10-06 en este equipo, con `pnpm verify` y el E2E:
+Medido el 2026-10-07 en este equipo, con `pnpm verify` y el E2E:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1062** en 58 archivos | **717** en 70 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.33 % *(suelo 85 %)* | 78.01 % *(suelo 45 %)* |
+| Tests | **1170** en 59 archivos | **750** en 71 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.46 % *(suelo 85 %)* | 77.76 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **27 pasados**, 1 omitido, en `chromium` y `Mobile Chrome` |
+| E2E (Playwright) | — | **29 pasados**, 1 omitido, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 129 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 130 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
 `T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
-de las que están cerradas `T6-01` y `T6-02`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+de las que están cerradas `T6-01`, `T6-02` y `T6-03`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
 el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
@@ -140,7 +140,9 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   reutiliza lo que escuche, y solo los servidores que arranca Playwright llevan
   `RATE_LIMIT_MAX`. Síntomas: 429 a mitad de pasada —esperas agotadas, listas vacías— o
   `Timed out waiting 120000ms from config.webServer`. Lo mismo pasa con los servidores levantados
-  a mano. Antes de investigar un fallo, mirar el puerto:
+  a mano, **y con una pasada parcial de Playwright cortada o lanzada desde un guion**
+  (`playwright test -g …`): el 2026-10-07 dejó los dos servidores vivos y la pasada completa
+  siguiente dio 27 fallos de 30. Antes de investigar un fallo, mirar el puerto:
   `Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }`.
 - **El 5173 puede tenerlo otro proyecto.** Síntoma: pruebas buscando textos «que no existen».
   Se ve mirando el `<title>` de `http://localhost:5173`. Sin matar el ajeno, se pasa en otro
@@ -289,6 +291,19 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   lo comprueba con `tsconfig.seed.json`.
 - **Migraciones solo hacia adelante**: una desplegada no se edita ni se borra
   ([operaciones.md §6](operaciones.md)).
+- **El símbolo de la moneda es un ajuste, y nunca se escribe a mano.** En el servidor,
+  `formatearImporte(n, simbolo)` lo exige sin valor por defecto, como el `idioma` de los correos, y
+  lo da `settingsService.moneda()`. En la interfaz `formatearImporte` sigue siendo una función pura:
+  el símbolo vive en `shared/lib/moneda.ts`, lo fija `useNegocio` y `ProtectedRoute` no pinta hasta
+  tenerlo. Los ejes de los gráficos usan `conSimboloDeMoneda`. Un test en cada repositorio busca
+  un `$` pegado a una interpolación.
+- **El símbolo es libre, pero solo lo que el PDF sabe imprimir.** La Helvetica de PDFKit dibuja
+  `₡` o `₱` con ancho cero y sin error. La regla está en el contrato
+  (`motivoSimboloDeMonedaInvalido`) y `moneda.test.ts` la mide contra la fuente: ampliarla sin
+  incrustar otra fuente deja importes sin moneda.
+- **El logo del negocio vive en `app_settings`, fuera de `SETTINGS_CATALOG`**, y por eso el `PATCH`
+  no puede escribir su URL: solo la pone `PUT /settings/logo`, con lo que devuelve Cloudinary. Meterla
+  en el catálogo «por simetría» abre la puerta a que el servidor pida cualquier dirección (`T6-07`).
 
 ### Textos, correos y avisos
 

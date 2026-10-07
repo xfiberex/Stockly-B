@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { productService } from "@/modules/products/product.service";
 import { auditService } from "@/modules/audit-logs";
 import { enviarExportacion } from "@/shared/lib/exportacion";
+import { settingsService } from "@/modules/settings/settings.service";
 import { nuevoDocumentoDeEtiquetas, renderEtiquetas } from "@/modules/products/product.etiquetas";
 import type { CreateProductDto, UpdateProductDto, ProductQuery, MovementsQuery, CostHistoryQuery, LabelsQuery, ImportProductDto, CreateManualMovementDto, BulkStockDto } from "@/modules/products/product.types";
 
@@ -54,11 +55,12 @@ export const productController = {
             // Se valida y se lee todo **antes** de escribir la cabecera: un error después de
             // empezar el PDF ya no puede ser una respuesta JSON.
             const { etiquetas, formato } = await productService.prepararEtiquetas(req.query);
+            const moneda = await settingsService.moneda();
             const doc = nuevoDocumentoDeEtiquetas();
             res.setHeader("Content-Type", "application/pdf");
             res.setHeader("Content-Disposition", "attachment; filename=etiquetas-stockly.pdf");
             doc.pipe(res);
-            renderEtiquetas(doc, etiquetas, formato);
+            renderEtiquetas(doc, etiquetas, formato, moneda);
             doc.end();
         } catch (error) {
             next(error);

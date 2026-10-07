@@ -35,6 +35,8 @@ export interface Semana {
 export interface DatosDelResumen extends Semana {
     /** La zona del negocio, para fechar en ella las órdenes que se listan. */
     zona: string;
+    /** T6-03 — el símbolo de la moneda del negocio, para los importes del correo. */
+    moneda: string;
     /** Lo **enviado** en la semana, por fecha de envío: el mismo criterio que los informes (T5-09). */
     ventas: { ordenes: number; unidades: number; importe: number };
     masVendido: Array<{ nombre: string; unidades: number; importe: number }>;
@@ -84,6 +86,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
     const enviadasEnLaSemana = Prisma.sql`so."status" = 'SHIPPED' AND so."shippedAt" >= ${desde} AND so."shippedAt" < ${hasta}`;
 
     const plazoPorDefecto = Number(await settingsService.get("defaultLeadTimeDays"));
+    const moneda = await settingsService.moneda();
 
     const [totales, masVendido, stockBajo, totalPendientes, pendientes, compras] = await Promise.all([
         prisma.$queryRaw<Array<{ ordenes: bigint; unidades: bigint | null; importe: Prisma.Decimal | null }>>`
@@ -140,6 +143,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
     return {
         ...semana,
         zona,
+        moneda,
         ventas: {
             ordenes: Number(totales[0]?.ordenes ?? 0),
             unidades: Number(totales[0]?.unidades ?? 0),

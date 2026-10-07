@@ -1,9 +1,10 @@
 import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
+import { v2 as cloudinary, type UploadApiOptions } from "cloudinary";
 import "@/shared/lib/cloudinary";
 import { Request, Response, NextFunction } from "express";
 import { env } from "@/config/env";
 import { HttpError } from "@/shared/lib/httpError";
+import { PESO_MAXIMO_DE_IMAGEN_MB } from "@/contratos/api";
 
 // Sin credenciales de Cloudinary el servidor arranca igual (T1-26); es aquí, en el
 // punto de uso, donde la falta se convierte en un error legible en vez de un 500.
@@ -18,11 +19,21 @@ function requireCloudinary(): void {
 }
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE_MB = 2;
+
+/** El 422 de un archivo que no es una imagen admitida, por su cabecera o por sus bytes. */
+const noEsUnaImagen = () =>
+    new HttpError(
+        422,
+        `El archivo no es una imagen válida. Se admiten: ${ALLOWED_TYPES.join(", ")}.`,
+        "INVALID_IMAGE_FILE",
+        { formatos: ALLOWED_TYPES.join(", ") },
+    );
 
 export const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: MAX_SIZE_MB * 1024 * 1024 },
+    // Pasarse del tope lo corta multer con un `MulterError`; quien lo convierte en un 413
+    // con código es `error.middleware` (T6-03).
+    limits: { fileSize: PESO_MAXIMO_DE_IMAGEN_MB * 1024 * 1024 },
     // Primer filtro, por lo que **dice** el cliente. Se conserva porque descarta lo
     // evidente antes de leer nada, pero no es una comprobación de seguridad: la
     // cabecera la escribe quien envía. Quien decide de verdad es `verificarFirmaDeImagen`.
@@ -30,7 +41,8 @@ export const upload = multer({
         if (ALLOWED_TYPES.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error(`Tipo de archivo no permitido. Usa: ${ALLOWED_TYPES.join(", ")}`));
+            // T6-03 — un `HttpError`, no un `Error` a secas: ese salía como 500.
+            cb(noEsUnaImagen());
         }
     },
 });
@@ -84,27 +96,24 @@ export function verificarFirmaDeImagen(req: Request, _res: Response, next: NextF
     if (!req.file) return next();
 
     const real = formatoReal(req.file.buffer);
-    if (!real) {
-        throw new HttpError(
-            422,
-            `El archivo no es una imagen válida. Se admiten: ${ALLOWED_TYPES.join(", ")}.`,
-            "INVALID_IMAGE_FILE",
-            { formatos: ALLOWED_TYPES.join(", ") },
-        );
-    }
+    if (!real) throw noEsUnaImagen();
 
     req.file.mimetype = real;
     next();
 }
 
+/** T6-03 — cómo guarda Cloudinary lo subido: en qué formato y con qué tope de tamaño. */
+type OpcionesDeSubida = Pick<UploadApiOptions, "format" | "transformation">;
+
 export async function uploadToCloudinary(
     buffer: Buffer,
     folder: string,
+    opciones: OpcionesDeSubida = {},
 ): Promise<{ url: string; publicId: string }> {
     requireCloudinary();
     return new Promise((resolve, reject) => {
         cloudinary.uploader
-            .upload_stream({ folder, resource_type: "image" }, (error, result) => {
+            .upload_stream({ folder, resource_type: "image", ...opciones }, (error, result) => {
                 // Cloudinary puede llamar de vuelta sin error y sin resultado; el mensaje
                 // llega al usuario a través del manejador de errores, así que va en español.
                 if (error || !result) return reject(error ?? new Error("No se pudo subir la imagen"));

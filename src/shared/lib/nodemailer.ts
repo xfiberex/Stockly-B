@@ -260,6 +260,9 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
     const periodo = rangoDeDias(idioma, datos.from, datos.to);
     const numero = (id: string) => id.slice(0, 8).toUpperCase();
     const dia = new Intl.DateTimeFormat(localeDe(idioma), { day: "numeric", month: "short", timeZone: datos.zona });
+    // T6-03 — el símbolo viene de `settingsService.moneda()`, que solo devuelve lo que pasa la
+    // regla del contrato: ni `<` ni `&`, así que va al HTML sin escapar.
+    const importe = (n: number) => formatearImporte(n, datos.moneda);
 
     /** «Se muestran 10 de 37», solo cuando la tabla no los trae todos. */
     const recorte = (mostrados: number, total: number) =>
@@ -268,7 +271,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
     const cifras = emailTable(null, [
         [t("resumen.cifra.ordenes"), String(datos.ventas.ordenes)],
         [t("resumen.cifra.unidades"), String(datos.ventas.unidades)],
-        [t("resumen.cifra.importe"), formatearImporte(datos.ventas.importe)],
+        [t("resumen.cifra.importe"), importe(datos.ventas.importe)],
         [t("resumen.cifra.pendientes"), String(datos.pendientes.total)],
         [t("resumen.cifra.stockBajo"), String(datos.stockBajo.total)],
         [t("resumen.cifra.comprasAtrasadas"), String(datos.comprasAtrasadas.total)],
@@ -279,7 +282,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
         (datos.masVendido.length > 0
             ? emailTable(
                 [t("resumen.col.producto"), t("resumen.col.unidades"), t("resumen.col.importe")],
-                datos.masVendido.map((p) => [escapeHtml(p.nombre), String(p.unidades), formatearImporte(p.importe)]),
+                datos.masVendido.map((p) => [escapeHtml(p.nombre), String(p.unidades), importe(p.importe)]),
             )
             : emailParagraph(t("resumen.masVendido.vacio")));
 
@@ -301,7 +304,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
                   datos.pendientes.ordenes.map((o) => [
                       t("resumen.venta", { numero: numero(o.id) }),
                       dia.format(o.fecha),
-                      formatearImporte(o.importe),
+                      importe(o.importe),
                   ]),
               ) +
               recorte(datos.pendientes.ordenes.length, datos.pendientes.total)
@@ -339,7 +342,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
         html: renderEmail({
             preheader: t("resumen.preencabezado", {
                 ordenes: datos.ventas.ordenes,
-                importe: formatearImporte(datos.ventas.importe),
+                importe: importe(datos.ventas.importe),
                 pendientes: datos.pendientes.total,
                 stockBajo: datos.stockBajo.total,
             }),

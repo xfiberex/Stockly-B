@@ -139,6 +139,11 @@ export const PERMISOS = {
     "PATCH /users/:id/deactivate": SOLO_ADMIN,
     "GET /settings": SOLO_ADMIN,
     "PATCH /settings": SOLO_ADMIN,
+    // T6-03 — la moneda la pinta cualquier rol en cualquier pantalla, y los datos del negocio van
+    // en el comprobante que cualquiera descarga: se leen aparte, sin los ajustes de administración.
+    "GET /settings/business": TODOS,
+    "PUT /settings/logo": SOLO_ADMIN,
+    "DELETE /settings/logo": SOLO_ADMIN,
     "GET /audit-logs": SOLO_ADMIN,
     // Avisos (T5-12): cada cual lee y marca **los suyos**; no hay ruta que enseñe los de otro.
     "GET /notifications": TODOS,
@@ -255,6 +260,62 @@ export function aNumero(importe: z.infer<typeof importeSchema>): number {
     return typeof importe === "number" ? importe : Number(importe);
 }
 
+/**
+ * T6-03 — lo que puede pesar una imagen que se sube: la de un producto o el logo del negocio.
+ * Aquí, y no en `upload.middleware`, porque lo leen tres sitios: multer, el error que explica
+ * por qué la cortó y el formulario, que lo comprueba antes de enviar.
+ */
+export const PESO_MAXIMO_DE_IMAGEN_MB = 2;
+
+// ─────────────────────── Moneda (T6-03) ───────────────────────
+
+/** El símbolo con el que nace una instalación, y al que se vuelve si el guardado no vale. */
+export const SIMBOLO_DE_MONEDA_POR_DEFECTO = "$";
+
+export const LARGO_MAXIMO_SIMBOLO_DE_MONEDA = 5;
+
+/**
+ * Por qué `simbolo` no vale como símbolo de moneda, o `null` si vale. **Es la regla de los dos
+ * lados**, como la del código de barras.
+ *
+ * Es un texto libre y no un código ISO porque `Intl` no escribe `RD$` sin la configuración
+ * regional `es-DO`: con `es-MX`, un peso dominicano sale `DOP 14,999.00`. Pero «libre» tiene un
+ * límite, y lo pone el PDF: la Helvetica estándar de PDFKit solo conoce WinAnsi, y `₡`, `₲`,
+ * `₱`, `₹` o `₽` salen con **ancho cero**, o sea, un importe sin moneda y sin aviso. Se admite
+ * lo que se imprime: letras sin acento, `$`, `/`, `.` y los signos `€ £ ¥ ¢ ƒ`. Quien cobra en
+ * colones escribe `CRC`. `moneda.test.ts`, en el backend, mide cada carácter contra la fuente.
+ *
+ * Ni cifras ni signos: pegado a un importe, `1` o `-` cambian lo que dice.
+ */
+export function motivoSimboloDeMonedaInvalido(simbolo: string): "largo" | "caracteres" | null {
+    if (simbolo.length === 0 || simbolo.length > LARGO_MAXIMO_SIMBOLO_DE_MONEDA) return "largo";
+    if (!/^[A-Za-z$/.€£¥¢ƒ]+$/.test(simbolo)) return "caracteres";
+    return null;
+}
+
+/**
+ * Un importe como lo escribe Stockly en todas partes: `RD$14,999.00`, `-RD$1,234.50`.
+ *
+ * Vive aquí porque había dos copias, una por repositorio, y no coincidían: el PDF escribía
+ * `$-1,234.50` y la pantalla `-$1,234.50`. El formato numérico es fijo —coma de millares, punto
+ * decimal— y **no sigue al idioma de la interfaz**: solo el símbolo es del negocio.
+ */
+export function escribirImporte(
+    valor: number,
+    simbolo: string,
+    opciones: { decimales?: number; signo?: boolean } = {},
+): string {
+    const { decimales = 2, signo = false } = opciones;
+    const cifras = Math.abs(valor).toLocaleString("es-MX", {
+        minimumFractionDigits: decimales,
+        maximumFractionDigits: decimales,
+    });
+    // Lo que redondea a cero no lleva signo: `-$0.00` no es ni una deuda ni una bajada.
+    const esCero = !/[1-9]/.test(cifras);
+    const prefijo = esCero ? "" : valor < 0 ? "-" : signo ? "+" : "";
+    return `${prefijo}${simbolo}${cifras}`;
+}
+
 // ─────────────────────── Sobres de respuesta ───────────────────────
 
 export const metaPaginacionSchema = z.object({
@@ -361,6 +422,12 @@ export const CODIGOS_DE_ERROR = [
     "PRODUCTS_IN_OPEN_COUNT",
     // 413 / 422 — el cuerpo o el archivo
     "EXPORT_TOO_LARGE",
+    // T6-03 — `PUT /settings/logo` sin archivo: en un producto la imagen es opcional; aquí es la petición.
+    "IMAGE_REQUIRED",
+    // T6-03 — lo que corta multer antes de que nadie mire el archivo: pesa más de
+    // `PESO_MAXIMO_DE_IMAGEN_MB`, o llegó en un campo que la ruta no espera. Los dos salían 500.
+    "IMAGE_TOO_LARGE",
+    "UNEXPECTED_FILE_FIELD",
     "INVALID_IMAGE_FILE",
     /**
      * El cuerpo no pasa el validador (T4-04). Lo pone `validate.middleware`, que es el otro
@@ -869,10 +936,17 @@ export const idiomaGuardadoSchema = z.object({ idioma: idiomaSchema });
 
 // ─────────────────────── Ajustes ───────────────────────
 
+/**
+ * T6-03 — a qué tarjeta de Configuración pertenece un ajuste: los datos del negocio —quién vende
+ * y en qué moneda— o el funcionamiento de la aplicación.
+ */
+export const grupoDeAjusteSchema = z.enum(["general", "business"]);
+
 const camposDeAjuste = {
     key: z.string(),
     label: z.string(),
     description: z.string(),
+    group: grupoDeAjusteSchema,
 };
 
 /**
@@ -888,13 +962,33 @@ const camposDeAjuste = {
 export const ajusteSchema = z.discriminatedUnion("type", [
     z.object({ ...camposDeAjuste, type: z.literal("boolean"), value: z.boolean() }),
     z.object({ ...camposDeAjuste, type: z.literal("number"), value: z.number() }),
-    z.object({ ...camposDeAjuste, type: z.literal("string"), value: z.string() }),
+    // `maxLength` (T6-03) solo lo traen los textos con tope: el campo lo aplica al teclear.
+    z.object({ ...camposDeAjuste, type: z.literal("string"), value: z.string(), maxLength: z.number().optional() }),
 ]);
 
 /** Lo que devuelve `PATCH /settings`: solo la clave y su valor ya convertido. */
 export const ajusteGuardadoSchema = z.object({
     key: z.string(),
     value: z.union([z.boolean(), z.number(), z.string()]),
+});
+
+/**
+ * T6-03 — quién vende y en qué moneda: lo que devuelve `GET /settings/business` **a cualquier
+ * rol**. `GET /settings` es solo de `ADMIN`, pero el símbolo lo pinta toda pantalla con un
+ * importe y estos datos encabezan el comprobante de venta.
+ *
+ * Un dato sin rellenar llega como cadena vacía, no como `null`: son ajustes, y un ajuste siempre
+ * tiene valor. `logoUrl` sí es `null` sin logo, porque no es un ajuste: no lo escribe el `PATCH`,
+ * solo `PUT /settings/logo`, que es quien sabe que la URL es de una imagen que subió él.
+ */
+export const negocioSchema = z.object({
+    name: z.string(),
+    taxId: z.string(),
+    address: z.string(),
+    phone: z.string(),
+    email: z.string(),
+    currencySymbol: z.string(),
+    logoUrl: z.string().nullable(),
 });
 
 // ─────────────────────── Auditoría ───────────────────────
@@ -1144,6 +1238,8 @@ export type Perfil = z.infer<typeof perfilSchema>;
 export type IdiomaGuardado = z.infer<typeof idiomaGuardadoSchema>;
 export type Ajuste = z.infer<typeof ajusteSchema>;
 export type AjusteGuardado = z.infer<typeof ajusteGuardadoSchema>;
+export type GrupoDeAjuste = z.infer<typeof grupoDeAjusteSchema>;
+export type Negocio = z.infer<typeof negocioSchema>;
 export type RegistroAuditoria = z.infer<typeof registroAuditoriaSchema>;
 
 export type TotalesReporte = z.infer<typeof totalesReporteSchema>;

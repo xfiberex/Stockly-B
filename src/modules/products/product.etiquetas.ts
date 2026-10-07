@@ -96,8 +96,6 @@ export function cabeEnEtiqueta(codigo: string, formato: FormatoEtiqueta): boolea
     return anchoDeModulo(GEOMETRIAS[formato], barrasDe(codigo)) >= MODULO_MINIMO;
 }
 
-const precioDe = formatearImporte;
-
 // Igual que en `reports.pdf.ts`: en pdfkit 0.18 `lineBreak: false` no evita el ajuste de línea.
 function recortar(doc: Doc, texto: string, ancho: number): string {
     if (doc.widthOfString(texto) <= ancho) return texto;
@@ -106,14 +104,14 @@ function recortar(doc: Doc, texto: string, ancho: number): string {
     return t.trimEnd() + "…";
 }
 
-function dibujarEtiqueta(doc: Doc, g: Geometria, x0: number, y0: number, etiqueta: Etiqueta) {
+function dibujarEtiqueta(doc: Doc, g: Geometria, x0: number, y0: number, etiqueta: Etiqueta, moneda: string) {
     const x = x0 + g.relleno;
     const ancho = g.ancho - g.relleno * 2;
     let y = y0 + g.relleno;
 
     // Nombre a la izquierda y precio a la derecha, en una línea.
     doc.font("Helvetica-Bold").fontSize(g.letraNombre).fillColor("#000000");
-    const precio = precioDe(etiqueta.precio);
+    const precio = formatearImporte(etiqueta.precio, moneda);
     const anchoPrecio = doc.widthOfString(precio);
     doc.text(precio, x + ancho - anchoPrecio, y, { lineBreak: false });
     doc.font("Helvetica").fontSize(g.letraNombre);
@@ -136,8 +134,11 @@ function dibujarEtiqueta(doc: Doc, g: Geometria, x0: number, y0: number, etiquet
     doc.text(etiqueta.codigo, x, y + altoBarras + 2, { width: ancho, align: "center", lineBreak: false });
 }
 
-/** Escribe las etiquetas en `doc`, en orden, llenando cada hoja por filas. */
-export function renderEtiquetas(doc: Doc, etiquetas: Etiqueta[], formato: FormatoEtiqueta) {
+/**
+ * Escribe las etiquetas en `doc`, en orden, llenando cada hoja por filas. `moneda` es el símbolo
+ * del negocio (T6-03), que va delante de cada precio.
+ */
+export function renderEtiquetas(doc: Doc, etiquetas: Etiqueta[], formato: FormatoEtiqueta, moneda: string) {
     const g = GEOMETRIAS[formato];
     const porPagina = ETIQUETAS_POR_PAGINA[formato];
 
@@ -146,7 +147,7 @@ export function renderEtiquetas(doc: Doc, etiquetas: Etiqueta[], formato: Format
         if (enPagina === 0) doc.addPage({ size: g.pagina, margin: 0 });
         const columna = enPagina % g.columnas;
         const fila = Math.floor(enPagina / g.columnas);
-        dibujarEtiqueta(doc, g, columna * g.ancho, fila * g.alto, etiqueta);
+        dibujarEtiqueta(doc, g, columna * g.ancho, fila * g.alto, etiqueta, moneda);
     });
 }
 

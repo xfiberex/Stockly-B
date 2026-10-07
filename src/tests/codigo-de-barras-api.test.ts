@@ -213,7 +213,7 @@ describe("Código de barras en la API (T5-08)", () => {
             const doc = nuevoDocumentoDeEtiquetas();
             const rect = jest.spyOn(doc, "rect");
 
-            renderEtiquetas(doc, [{ nombre: "X", codigo: "PER-LOG-MX3", precio: 1 }], "label");
+            renderEtiquetas(doc, [{ nombre: "X", codigo: "PER-LOG-MX3", precio: 1 }], "label", "$");
             doc.end();
 
             // Se reconstruye la cadena de módulos a partir de dónde cayó cada rectángulo.

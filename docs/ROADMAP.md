@@ -4,7 +4,7 @@ La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tare
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
 `fix(T0-01): resolver alias de rutas en el build de producción`.
 
-> **Estado al 2026-10-06: 129 de 139 cerradas.** Quedan ocho del Tier 6, abierto el 2026-10-05,
+> **Estado al 2026-10-07: 130 de 139 cerradas.** Quedan siete del Tier 6, abierto el 2026-10-05,
 > y `T5-14` y `T5-15`, que solo se abren con un caso de uso real.
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
@@ -30,8 +30,8 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 | **3** | Pulido y mantenimiento | 15 / 15 |
 | **4** | Lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 / 17 |
 | **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 13 / 15 |
-| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 2 / 10 |
-| | **Total** | **129 / 139** |
+| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 3 / 10 |
+| | **Total** | **130 / 139** |
 
 Los Tiers 0 a 4 son la remediación de la auditoría del 2026-08-04: 100 tareas salieron de sus
 hallazgos y de la consultoría de diseño del día siguiente, y otras 14 las abrió el cierre de una
@@ -47,8 +47,8 @@ actualizar un número y olvidar otro. Al cerrar o abrir una tarea cambian la cas
 esta tabla y la fila del índice; si no coinciden, manda el recuento:
 
 ```bash
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 10
-grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 129
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 9
+grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 130
 ```
 
 ---
@@ -80,23 +80,9 @@ recibe imágenes de producto ([legal.md §2.1](legal.md))—; las tablas de role
 `PERMISOS` es más fuerte—; el tipo de documento «Boleta / Factura» —sin valor fiscal es solo una
 etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión».
 
-**Orden.** `T6-01` y `T6-02` corregían defectos, iban primero y están cerradas. De `T6-03` a `T6-06` no dependen
-entre sí. `T6-07` necesita esas cuatro, y `T6-08` necesita `T6-07` y el buscador y el escáner de `T6-02`. `T6-09` y `T6-10` son
+**Orden.** `T6-01` y `T6-02` corregían defectos, iban primero y están cerradas, como `T6-03`. De `T6-04` a `T6-06` no dependen
+entre sí. `T6-07` necesita las cuatro, y `T6-08` necesita `T6-07` y el buscador y el escáner de `T6-02`. `T6-09` y `T6-10` son
 independientes del resto.
-
-- [ ] **[T6-03] Datos del negocio y moneda configurable**
-  - **Área:** Configuración
-  - **Ubicación:** `src/modules/settings/` (`SETTINGS_CATALOG`), `src/shared/lib/moneda.ts`, `Stockly-F/src/shared/lib/moneda.ts`, `Stockly-F/src/modules/settings/components/SettingsPage.tsx`, `src/contratos/api.ts` (`PERMISOS`)
-  - **Qué hacer:** Stockly no sabe cómo se llama el negocio que lo usa: `/settings` guarda cuatro ajustes operativos y nada de quién vende. Y la moneda está escrita en el código —`es-MX` y `MXN` en el frontend, un `$` pegado delante en el backend—, aunque la zona horaria por defecto sea `America/Santo_Domingo`. Añadir al catálogo de ajustes la razón social, el documento fiscal, la dirección, el teléfono, el correo y la moneda del negocio, y un logo que se sube a Cloudinary por una ruta propia (`upload.middleware` ya valida la imagen por sus bytes). Su primer consumidor es el comprobante de `T6-07`.
-  - **Atención:**
-    - **`GET /settings` es solo de `ADMIN`** y la moneda la pinta cualquier rol en cualquier pantalla: hace falta una lectura para todos los roles, con su fila en `PERMISOS`, que devuelva solo lo que se enseña y no los ajustes de administración.
-    - **`formatearImporte` es una función pura** que llaman doce componentes: el símbolo le tiene que llegar sin convertir cada llamada en un hook, y el primer pintado no puede salir con la moneda equivocada.
-    - **Cuatro importes no pasan por ella** y llevan un `$` literal: los ejes de los gráficos de `DashboardPage.tsx`, `ReportsPage.tsx` y `StockMovementsPage.tsx`, y `moneyShort` en `reports.pdf.ts`. En el backend la usan el PDF de informes, las etiquetas y el resumen semanal.
-    - **El formato no sigue al idioma de la interfaz** —los importes no cambian con él ([CONTEXTO.md §6](CONTEXTO.md))—: sigue al negocio.
-  - **Decisión previa:** símbolo libre o código ISO. Medido el 2026-10-05 en Node 24: `Intl.NumberFormat("es-MX", { style: "currency", currency: "DOP" })` escribe `DOP 14,999.00`; con `currencyDisplay: "narrowSymbol"`, `$14,999.00`, igual que un peso mexicano; solo con la configuración regional `es-DO` sale `RD$14,999.00`. Un código ISO a solas no basta: habría que guardar también la configuración regional. **Recomendado:** un símbolo libre de hasta cinco caracteres, que es lo que hace SistemaVenta, y el formato numérico fijo.
-  - **Criterio de aceptación:** cambiar el símbolo a `RD$` cambia todos los importes de la interfaz, del PDF de informes, de las etiquetas y del resumen semanal, y no queda ningún `$` escrito a mano junto a un importe; un `USER` ve la moneda y sigue recibiendo 403 en `GET /settings`; sin logo ni datos del negocio, todo funciona como hoy.
-  - **Esfuerzo:** medio
-  - **Depende de:** —
 
 - [ ] **[T6-04] Número correlativo de venta**
   - **Área:** Ventas
@@ -138,12 +124,12 @@ independientes del resto.
   - **Qué hacer:** no hay ningún papel que darle a quien compra: los únicos PDF son los informes y las etiquetas. Añadir `GET /sale-orders/:id/receipt`, que devuelve el comprobante de una venta enviada, hecho con PDFKit como los otros dos: logo y datos del negocio (`T6-03`), número (`T6-04`), fecha en la zona del negocio, cliente con su documento y quién la registró (`T6-06`), las líneas, y subtotal, impuesto y total (`T6-05`). Se descarga desde el detalle de la orden y desde la ficha del cliente, con `descargarDeLaApi` y no con un enlace.
   - **Decidido (2026-10-05):** es un **comprobante interno**, temporalmente. Se titula «Comprobante de venta» y lleva la leyenda «Documento sin valor fiscal»; la palabra «factura» no aparece ni en el PDF ni en la interfaz. Darle valor fiscal es otra tarea, y empieza por saber qué exige la autoridad tributaria del país donde se use.
   - **Atención:**
-    - **PDFKit solo incrusta JPEG y PNG**, y `upload.middleware` admite también WebP: el logo hay que pedírselo a Cloudinary ya convertido. Traerlo es una llamada de red dentro de la petición: lleva tope de tiempo y, si falla, el comprobante sale sin logo, no con un 500.
+    - **PDFKit solo incrusta JPEG y PNG**, y `upload.middleware` admite también WebP: `T6-03` ya lo resolvió al subirlo —el logo se guarda siempre como PNG de 600 px como mucho—, así que basta con traer `logoUrl` tal cual. Traerlo es una llamada de red dentro de la petición: lleva tope de tiempo y, si falla, el comprobante sale sin logo, no con un 500.
     - **Qué órdenes lo tienen:** las enviadas. Una pendiente todavía no es una venta y responde 409 con su código; una cancelada después de enviarse lo conserva, marcado como «Anulada».
     - Sale en español, como el resto de exportaciones ([CONTEXTO.md §6](CONTEXTO.md)), y en A4, como en SistemaVenta. Un rollo térmico de 80 mm es otro formato y se decide con la impresora delante, como pasó con el ancho de las barras de las etiquetas.
   - **Criterio de aceptación:** el PDF de una venta de dos líneas con la tasa al 18 % lleva el número, los datos del negocio, las dos líneas y los tres importes de `T6-05`; un `USER` lo descarga; el de una orden pendiente responde 409; con Cloudinary caído sale sin logo; sin datos del negocio sale igualmente, sin huecos vacíos.
   - **Esfuerzo:** medio
-  - **Depende de:** T6-03, T6-04, T6-05, T6-06
+  - **Depende de:** T6-03 (cerrada), T6-04, T6-05, T6-06
 
 - [ ] **[T6-08] Venta de mostrador y rol de vendedor**
   - **Área:** Ventas / Autorización
@@ -413,3 +399,4 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 |---|---|---|---|
 | T6-01 | La pantalla de ventas solo enseñaba las diez órdenes más recientes | 2026-10-05 | Índice nuevo por `createdAt`, decidido midiendo: sobre 330 000 órdenes el listado sin filtro pasa de 33 ms a 0,01 ms ([rendimiento.md §13](rendimiento.md)). El criterio de aceptación, comprobado en tests de los dos repositorios —falsificados: diez roturas, diez caídas— y en navegador con 26 órdenes, en escritorio y móvil. **La ficha se quedaba corta en una cosa:** el filtro nuevo metió un «Cancelado» oculto en la página y rompió un selector del E2E de `T0-03`, que ahora mira la insignia de su orden |
 | T6-02 | El formulario de venta solo dejaba elegir los cien productos más recientes | 2026-10-06 | El desplegable se sustituye por `BuscadorDeProducto`, que consulta `GET /products?search=&isActive=true&limit=8` mientras se escribe, y un botón de escáner en los dos formularios; **el backend no se tocó**. El defecto, medido contra el servidor con 197 productos activos: `?limit=200&isActive=true` devuelve 100 y **no** trae el más antiguo; el buscador lo encuentra por su nombre, se vende y su stock baja de 10 a 7, en escritorio y a 393 px. El resto del criterio, en el escenario E2E nuevo (27 pasados en los dos proyectos) y en 14 tests de componente, falsificados: catorce roturas, catorce caídas. **La ficha no decía tres cosas:** que repetir un código suma una unidad a su línea en vez de abrir otra —decidido al hacerlo—; que la lista, dentro de un diálogo con scroll propio, quedaba cortada en la última línea con una sola opción a la vista —visto en una captura, no en un test: ahora se desplaza a la vista—; y que volver a «Escribir manualmente» no soltaba el `productId` del producto elegido antes —leído en el código, no reproducido—. Al cerrar, las dos puertas estaban en rojo por avisos ajenos (`proxy-addr`, `source-map-js`): [dependencias.md §2](dependencias.md) |
+| T6-03 | Datos del negocio y moneda configurable | 2026-10-07 | **Decisión previa, tomada el 2026-10-07:** símbolo libre de 1 a 5 caracteres y formato numérico fijo, como recomendaba la ficha. Seis ajustes nuevos, `GET /settings/business` para cualquier rol y `PUT`/`DELETE /settings/logo`; sin migración. El formato pasa a ser uno solo, `escribirImporte`, en el contrato. El criterio, de punta a punta en `moneda.test.ts` —el ajuste en la base, la petición y lo que PDFKit escribe—: con `RD$`, los dos PDF de informes, las etiquetas y el resumen semanal no dejan ni un `$` suelto; un `USER` lee la moneda y recibe 403 en `GET /settings`; sin nada guardado todo sale como antes. En el frontend, el símbolo se espera en `ProtectedRoute`: el primer importe de una pantalla ya sale con la moneda buena (`monedaDelNegocio.test.tsx`). En navegador, a 1280 px, Reportes entero en `RD$`, ejes incluidos; y un logo de 800×400 subido de verdad a Cloudinary volvió como PNG de 600×300. **La ficha no decía cuatro cosas:** que «libre» tiene un límite que pone el PDF —la Helvetica de PDFKit dibuja `₡ ₲ ₱ ₹ ₩ ₺ ₽` con ancho 0, medido—, así que el validador solo admite lo que se imprime y un test mide cada carácter contra la fuente; que los dos formateadores no coincidían —un negativo salía `$-1,234.50` en el PDF y `-$1,234.50` en pantalla—; que la URL del logo no puede ser un ajuste del catálogo, porque `T6-07` la va a pedir desde el servidor y un `PATCH` la apuntaría a cualquier sitio; y que convertir el logo a PNG al subirlo le quita a `T6-07` la mitad de su «Atención». Y una quinta, que salió al repasar lo que quedaba sin comprobar: **multer respondía 500** a una imagen de más de 2 MB, a un tipo no admitido y a un archivo en otro campo, también en productos; ahora son 413 `IMAGE_TOO_LARGE`, 422 y 400, con código. Tests falsificados en total: 63 roturas, 63 caídas. Escenario E2E nuevo, en los dos proyectos (29 pasados, 1 omitido): la tarjeta cabe a 393 px, el nombre se guarda y lo lee el almacén, y con `RD$` Reportes no deja un `$`. **En ese escenario la moneda no se guarda de verdad:** se cambia lo que la página recibe de `GET /settings/business`, porque el símbolo es de toda la instalación y los escenarios de al lado comprueban importes en `$`; la mitad del servidor la prueba `moneda.test.ts`. El logo quitado desapareció de la cuenta (404 por la API de administración); la CDN lo siguió sirviendo unos minutos |

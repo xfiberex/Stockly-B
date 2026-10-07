@@ -684,6 +684,43 @@ export const rutasAdicionales: Record<string, Ruta> = {
             },
         },
     },
+    // T6-03 — lo único de la configuración que lee cualquier rol.
+    "/settings/business": {
+        get: {
+            tags: ["Settings"], summary: "Datos del negocio y símbolo de la moneda",
+            description: "Para cualquier rol: el símbolo lo pinta toda pantalla con un importe. Un dato sin rellenar llega como cadena vacía; `logoUrl` es `null` sin logo.",
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Business" }, "Datos del negocio"),
+                "401": ERROR("No autenticado"),
+            },
+        },
+    },
+    "/settings/logo": {
+        put: {
+            tags: ["Settings"], summary: "Subir o sustituir el logo del negocio (ADMIN)",
+            description: "JPEG, PNG o WebP de hasta 2 MB, validado por sus bytes. Se guarda como PNG de 600 px como mucho.",
+            requestBody: {
+                required: true,
+                content: { "multipart/form-data": { schema: {
+                    type: "object", required: ["logo"],
+                    properties: { logo: { type: "string", format: "binary" } },
+                } } },
+            },
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Business" }, "Logo actualizado"),
+                "403": ERROR("Requiere rol ADMIN"), "422": ERROR("Falta el archivo o no es una imagen admitida"),
+                "503": ERROR("Cloudinary no está configurado"),
+            },
+        },
+        delete: {
+            tags: ["Settings"], summary: "Quitar el logo del negocio (ADMIN)",
+            description: "Sin logo no hace nada y responde igual.",
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Business" }, "Logo eliminado"),
+                "403": ERROR("Requiere rol ADMIN"),
+            },
+        },
+    },
 
     // ── Auditoría ────────────────────────────────────────────────────────────
     "/audit-logs": {

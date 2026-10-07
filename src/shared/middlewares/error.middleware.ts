@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { env } from "@/config/env";
 import { HttpError } from "@/shared/lib/httpError";
 import { logger } from "@/shared/lib/logger";
+import { PESO_MAXIMO_DE_IMAGEN_MB } from "@/contratos/api";
 
 /**
  * Errores de terceros que ya traen su código y un mensaje pensado para el cliente.
@@ -23,6 +24,33 @@ function errorExpuestoDeTercero(err: Error): { statusCode: number; message: stri
         return { statusCode: codigo, message: err.message };
     }
     return null;
+}
+
+/**
+ * T6-03 — los errores con los que multer corta una subida, convertidos en lo que son: una
+ * petición mal hecha. Salían como **500** —«Error interno del servidor» en producción—
+ * porque un `MulterError` ni es un `HttpError` ni lleva `expose`. Reproducido con una imagen
+ * de 2 MB y un byte, tanto en el logo del negocio como en la foto de un producto.
+ *
+ * Se reconoce por el nombre y no con `instanceof`: así este archivo no importa multer, y el
+ * mensaje —que multer escribe en inglés— no llega al cliente.
+ */
+function errorDeSubida(err: Error): HttpError | null {
+    if (err.name !== "MulterError") return null;
+    const { code, field } = err as Error & { code?: string; field?: string };
+
+    if (code === "LIMIT_FILE_SIZE") {
+        return new HttpError(
+            413,
+            `La imagen no puede pesar más de ${PESO_MAXIMO_DE_IMAGEN_MB} MB`,
+            "IMAGE_TOO_LARGE",
+            { megas: PESO_MAXIMO_DE_IMAGEN_MB },
+        );
+    }
+    // El resto son variantes de lo mismo: un archivo donde la ruta no lo espera.
+    return new HttpError(400, "La petición trae un archivo en un campo que no se esperaba", "UNEXPECTED_FILE_FIELD", {
+        campo: field ?? "",
+    });
 }
 
 /**
@@ -51,6 +79,8 @@ export function sinRutasDeArchivo(mensaje: string): string {
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
     try {
+        err = errorDeSubida(err) ?? err;
+
         if (err instanceof HttpError) {
             // `code` y `params` solo salen si los hay (T4-04): un error sin código deja el
             // sobre exactamente como estaba antes, y el cliente enseña el `message`.

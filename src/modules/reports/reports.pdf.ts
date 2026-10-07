@@ -19,8 +19,17 @@ const PAGE_W = 595.28; // A4
 const CONTENT_W = PAGE_W - MARGIN * 2; // 515.28
 
 // ─── Formato ──────────────────────────────────────────────────────────────
-const money = formatearImporte;
-const moneyShort = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
+/**
+ * T6-03 — los dos formatos de importe de un informe, con la moneda del negocio ya puesta. Se
+ * crean una vez por documento: el símbolo es un ajuste, no una constante del módulo.
+ */
+function formatosDeImporte(moneda: string) {
+    return {
+        money: (n: number) => formatearImporte(n, moneda),
+        /** Sin céntimos, para un KPI. */
+        moneyShort: (n: number) => formatearImporte(n, moneda, { decimales: 0 }),
+    };
+}
 const int = (n: number) => n.toLocaleString("es-MX");
 /** T5-02 — sin ventas no hay porcentaje: se dice «—», no «0.0%». */
 const pct = (n: number | null) => (n === null ? "—" : `${n.toFixed(1)}%`);
@@ -208,7 +217,8 @@ function drawFooters(doc: Doc, pie = "Stockly · Reporte de Inventario") {
 }
 
 // ─── Punto de entrada ───────────────────────────────────────────────────────
-export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: string) {
+export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: string, moneda: string) {
+    const { money, moneyShort } = formatosDeImporte(moneda);
     let y = drawHeader(doc, generatedAt);
 
     // Resumen general
@@ -471,7 +481,7 @@ const COLUMNAS_DE_CIFRAS: Column[] = [
     { header: "Compras", width: 95, align: "right" },
 ];
 
-function celdasDeCifras(f: FilaDePeriodo, total = false): Cell[] {
+function celdasDeCifras(f: FilaDePeriodo, money: (n: number) => string, total = false): Cell[] {
     return [
         { text: int(f.salesUnits), align: "right", color: total ? INK : MUTED, bold: total },
         { text: money(f.salesRevenue), align: "right", color: INK, bold: total },
@@ -480,7 +490,8 @@ function celdasDeCifras(f: FilaDePeriodo, total = false): Cell[] {
     ];
 }
 
-export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generatedAt: string) {
+export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generatedAt: string, moneda: string) {
+    const { money, moneyShort } = formatosDeImporte(moneda);
     const rango = `Del ${fechaLarga(informe.from)} al ${fechaLarga(informe.to)}`;
     let y = drawHeader(doc, generatedAt, "Ventas y compras por periodo", `${rango} · zona horaria ${informe.timezone}`);
 
@@ -510,13 +521,14 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
     // Por mes. Una fila por mes también sin actividad: un hueco se leería como un mes que falta.
     y = ensureSpace(doc, y, 90);
     y = sectionHeading(doc, "Por mes", y);
-    const filasDeMes: Row[] = informe.byMonth.map((m) => ({ cells: [{ text: mesLargo(m.month), color: INK }, ...celdasDeCifras(m)] }));
+    const filasDeMes: Row[] = informe.byMonth.map((m) => ({ cells: [{ text: mesLargo(m.month), color: INK }, ...celdasDeCifras(m, money)] }));
     filasDeMes.push({
         topRule: true,
         cells: [
             { text: "Total", bold: true, color: INK },
             ...celdasDeCifras(
                 { salesUnits: totals.salesUnits, salesRevenue: totals.salesRevenue, purchaseUnits: totals.purchaseUnits, purchaseAmount: totals.purchaseAmount },
+                money,
                 true,
             ),
         ],
@@ -528,7 +540,7 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
         y = ensureSpace(doc, y, 90);
         y = sectionHeading(doc, "Por categoría", y, "Por la categoría actual de cada producto");
         const filas: Row[] = informe.byCategory.map((c) => ({
-            cells: [{ text: c.name ?? "Sin categoría", color: c.name ? INK : MUTED }, ...celdasDeCifras(c)],
+            cells: [{ text: c.name ?? "Sin categoría", color: c.name ? INK : MUTED }, ...celdasDeCifras(c, money)],
         }));
         y = drawTable(doc, [{ header: "Categoría", width: 160 }, ...COLUMNAS_DE_CIFRAS], filas, y, 22);
         y += 22;
@@ -541,7 +553,7 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
             : "Ordenados por ventas";
         y = sectionHeading(doc, "Por producto", y, sub);
         const filas: Row[] = informe.byProduct.map((p) => ({
-            cells: [{ text: p.name, sub: p.sku ?? undefined, color: INK }, ...celdasDeCifras(p)],
+            cells: [{ text: p.name, sub: p.sku ?? undefined, color: INK }, ...celdasDeCifras(p, money)],
         }));
         drawTable(doc, [{ header: "Producto", width: 160 }, ...COLUMNAS_DE_CIFRAS], filas, y, 30);
     }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SETTINGS_CATALOG } from "./settings.service";
 import { zonaHorariaCanonica } from "@/shared/lib/zonaHoraria";
+import { motivoSimboloDeMonedaInvalido } from "@/contratos/api";
 
 // El esquema se genera desde el catálogo: añadir un ajuste nuevo a
 // SETTINGS_CATALOG lo valida automáticamente, sin tocar este archivo.
@@ -29,12 +30,37 @@ function validadorDe(def: (typeof SETTINGS_CATALOG)[number]): z.ZodTypeAny {
             return canonica;
         });
     }
+    // T6-03 — sin recortar: un espacio dentro del símbolo es un símbolo que no vale, no uno
+    // que haya que arreglar en silencio.
+    if ("simboloDeMoneda" in def) {
+        return z.string().refine((valor) => motivoSimboloDeMonedaInvalido(valor) === null, {
+            message: "De 1 a 5 caracteres: letras sin acento, $ / . y los signos € £ ¥ ¢ ƒ (por ejemplo, RD$)",
+        });
+    }
+    if (def.type === "string" && "maxLength" in def) return textoDeUnaLinea(def.maxLength, "correo" in def);
     if (def.type !== "number") return validadorPorTipo[def.type];
     let numero = z.number();
     if ("entero" in def && def.entero) numero = numero.int();
     if ("min" in def) numero = numero.min(def.min);
     if ("max" in def) numero = numero.max(def.max);
     return numero;
+}
+
+/**
+ * T6-03 — un dato del negocio: una línea de texto, recortada y con tope. Vacía vale, que es
+ * como se borra. **Sin caracteres de control**: acaba en la cabecera de un PDF, donde un salto
+ * de línea descoloca todo lo que viene debajo.
+ */
+function textoDeUnaLinea(maximo: number, correo: boolean): z.ZodTypeAny {
+    const texto = z
+        .string()
+        .trim()
+        .max(maximo, `No puede tener más de ${maximo} caracteres`)
+        .regex(/^\P{Cc}*$/u, "No puede llevar saltos de línea ni caracteres de control");
+    if (!correo) return texto;
+    return texto.refine((valor) => valor === "" || z.email().safeParse(valor).success, {
+        message: "No es un correo electrónico válido",
+    });
 }
 
 // `.strict()` en lugar del `.strip()` por defecto: una clave desconocida debe ser

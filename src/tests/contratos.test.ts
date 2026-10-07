@@ -318,6 +318,13 @@ describe("Contrato de la API (T4-01)", () => {
             expect(typeof booleano.value).toBe("boolean");
         });
 
+        it("GET /settings/business — sin nada guardado, cadenas vacías y `logoUrl` nulo", async () => {
+            const res = await request(app).get("/api/v1/settings/business").set("Cookie", cookieAdmin);
+
+            expect(res.status).toBe(200);
+            conforme(contrato.negocioSchema, res.body.data, "GET /settings/business");
+        });
+
         it("GET /audit-logs", async () => {
             const res = await request(app).get("/api/v1/audit-logs").set("Cookie", cookieAdmin);
 

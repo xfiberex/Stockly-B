@@ -72,6 +72,7 @@ const RESPUESTAS = {
     User: contrato.usuarioSchema,
     Profile: contrato.perfilSchema,
     Setting: contrato.ajusteSchema,
+    Business: contrato.negocioSchema,
     AuditLog: contrato.registroAuditoriaSchema,
     ReportSummary: contrato.resumenReporteSchema,
     PeriodReport: contrato.informePorPeriodoSchema,

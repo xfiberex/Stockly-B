@@ -39,6 +39,7 @@ monta una empresa con el código, es esa empresa.
 | Nombre, correo, teléfono y notas de cada cliente | `customers` (T5-06) | Se crea al darlo de alta o al vender con un correo nuevo. **Se puede borrar**, pero sus órdenes conservan la instantánea de la fila siguiente |
 | Nombre, correo y teléfono del cliente de un pedido de venta | `sale_orders.customerName` / `customerEmail` / `customerPhone` | Opcionales. Pueden ser de una persona física. Es la instantánea de a quién se vendió: no cambia al editar ni al borrar el cliente |
 | Correo y teléfono de proveedores | `suppliers` | Suelen ser de empresas, pero pueden ser de una persona |
+| Nombre, documento fiscal, dirección, teléfono y correo **del negocio** | `app_settings`, claves `business*` (T6-03) | Son de una empresa, salvo que el negocio sea de un autónomo: entonces su nombre, su documento y su domicilio son datos personales suyos. Los lee **cualquier usuario con sesión** (`GET /settings/business`), porque encabezan el comprobante de venta. Se borran vaciando el campo |
 | A qué administradores se envió cada resumen semanal | `weekly_digests.sentToUserIds` (T5-11) | Solo el identificador del usuario, no su correo. El resumen que reciben no lleva nombres de clientes |
 | Qué avisos tiene cada usuario y cuándo los leyó | `notifications` (T5-12) | Del usuario solo el identificador; del asunto, nombres de productos y proveedores, **no de clientes**: la venta se cita por su número. Los leídos se borran a los 90 días |
 | IP y cabeceras (entre ellas el *user-agent*) de cada petición | Registros de `pino-http` en producción | `authorization`, `cookie` y `set-cookie` se ocultan; la IP no. Dónde y cuánto tiempo se guarden depende de la plataforma de despliegue |
@@ -47,8 +48,9 @@ monta una empresa con el código, es esa empresa.
 **Terceros que reciben datos** (encargados del tratamiento), según lo que se configure:
 
 - **Proveedor SMTP:** recibe el nombre y el correo de los destinatarios de cada correo.
-- **Cloudinary:** recibe las imágenes de producto. En principio no son datos personales, salvo
-  que alguien suba una foto con personas.
+- **Cloudinary:** recibe las imágenes de producto y, desde T6-03, el logo del negocio. En
+  principio no son datos personales, salvo que alguien suba una foto con personas. Quitar el
+  logo lo borra también de allí.
 - **El alojamiento** de la base de datos, el servidor y los registros.
 
 **Cookies.** La aplicación pone tres: `token`, `refreshToken` y la de CSRF, todas de sesión y

@@ -4,6 +4,7 @@ import { reportsService } from "./reports.service";
 import { abcService } from "./reports.abc";
 import { renderPeriodReportPdf, renderReportPdf } from "./reports.pdf";
 import { enviarExportacion } from "@/shared/lib/exportacion";
+import { settingsService } from "@/modules/settings/settings.service";
 
 export const reportsController = {
     async getSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -13,13 +14,16 @@ export const reportsController = {
 
             if (format === "pdf") {
                 const generatedAt = new Date().toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
+                // Antes de escribir la cabecera: un error después de empezar el PDF ya no
+                // puede ser una respuesta JSON.
+                const moneda = await settingsService.moneda();
 
                 const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
                 res.setHeader("Content-Type", "application/pdf");
                 res.setHeader("Content-Disposition", "attachment; filename=reporte-stockly.pdf");
                 doc.pipe(res);
 
-                renderReportPdf(doc, summary, generatedAt);
+                renderReportPdf(doc, summary, generatedAt, moneda);
 
                 doc.end();
                 return;
@@ -69,13 +73,14 @@ export const reportsController = {
                     timeStyle: "short",
                     timeZone: informe.timezone,
                 });
+                const moneda = await settingsService.moneda();
 
                 const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
                 res.setHeader("Content-Type", "application/pdf");
                 res.setHeader("Content-Disposition", `attachment; filename=informe-${informe.from}-${informe.to}.pdf`);
                 doc.pipe(res);
 
-                renderPeriodReportPdf(doc, informe, generatedAt);
+                renderPeriodReportPdf(doc, informe, generatedAt, moneda);
 
                 doc.end();
                 return;
