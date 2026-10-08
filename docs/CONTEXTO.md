@@ -50,17 +50,17 @@ Medido el 2026-10-08 en este equipo, con `pnpm verify` y el E2E:
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1251** en 62 archivos | **774** en 72 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.49 % *(suelo 85 %)* | 78.11 % *(suelo 45 %)* |
+| Tests | **1305** en 63 archivos | **786** en 73 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.65 % *(suelo 85 %)* | 78.23 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **30 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
+| E2E (Playwright) | — | **32 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 133 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 134 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
 `T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
-de las que están cerradas de `T6-01` a `T6-06`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+de las que están cerradas de `T6-01` a `T6-07`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
 el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
@@ -144,12 +144,22 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   (`playwright test -g …`): el 2026-10-07 dejó los dos servidores vivos y la pasada completa
   siguiente dio 27 fallos de 30. Antes de investigar un fallo, mirar el puerto:
   `Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }`.
-- **Entre dos pasadas completas, unos segundos.** El 2026-10-08, relanzar el E2E nada más terminar
-  otra pasada dio siete esperas agotadas una vez y un `ECONNRESET` otra, en escenarios distintos y
-  sin relación con lo que se había tocado; con cinco segundos de pausa pasó limpio dos veces
-  seguidas. La explicación más probable —**no demostrada**— es la de arriba: `reuseExistingServer`
-  encuentra el puerto todavía respondiendo y reutiliza un servidor que se está cerrando. Si un
-  fallo no se repite tras esperar, no es del cambio.
+- **El `ECONNRESET` suelto era de las conexiones reutilizadas, y está arreglado.** `page.request`
+  reutiliza la conexión, y Node cierra las que llevan paradas unos 6 s —5 de `keepAliveTimeout` y 1
+  de margen—: la llamada que salía justo entonces moría con `read ECONNRESET`, en el escenario
+  que tocara. Medido el 2026-10-08 contra un servidor aparte: 1 de 180 llamadas tras ~6 s de
+  espera, y 0 de 60 con `Connection: close`, que es lo que lleva ahora `apiCruda`
+  (`e2e/helpers.ts`). La nota anterior lo achacaba a relanzar sin pausa: **era una suposición y no
+  era eso** —volvió a pasar con seis segundos de pausa—. Las siete esperas agotadas de aquel día
+  siguen sin explicación; no se han repetido en nueve pasadas completas.
+- **Una lista que se está cargando por primera vez no se entera de una mutación.** Es un defecto
+  de la aplicación, **sin arreglar**, y un E2E puede tropezar con él. `invalidateQueries` no
+  cancela una consulta en vuelo que todavía no tiene datos: reutiliza su promesa, y pinta lo
+  que leyó **antes** de la mutación. Reproducido el 2026-10-08: filtrar las ventas por número y
+  pulsar «enviar» dentro de los 300 ms del retardo deja la fila en «Pendiente», con el aviso
+  «Orden actualizada» a la vista y sin segunda petición. Falló una pasada completa de cinco. En una prueba,
+  esperar a la respuesta de la lista filtrada antes de mutar (`waitForResponse`); en la aplicación
+  el arreglo es `cancelQueries` antes de invalidar, y es de todos los módulos, no de ventas.
 - **Si el 3000 es un `pnpm dev` abierto a propósito, no hace falta cerrarlo.** Se levanta otra pareja
   en otros puertos y Playwright la reutiliza: el backend con
   `PORT=3100 FRONTEND_URL=http://localhost:5174 RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000`,
@@ -317,6 +327,21 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
 - **El logo del negocio vive en `app_settings`, fuera de `SETTINGS_CATALOG`**, y por eso el `PATCH`
   no puede escribir su URL: solo la pone `PUT /settings/logo`, con lo que devuelve Cloudinary. Meterla
   en el catálogo «por simetría» abre la puerta a que el servidor pida cualquier dirección (`T6-07`).
+
+- **El comprobante de venta no calcula y no se llama como el documento fiscal** (`T6-07`). Pinta
+  los importes de `conTotales`; qué órdenes lo tienen lo dice `tieneComprobante`, en el contrato,
+  y el servidor y la interfaz preguntan ahí. Es interno —«Documento sin valor fiscal»— por la
+  decisión del 2026-10-05, y dos tests vigilan que la palabra vetada no vuelva al PDF ni al
+  catálogo de textos. Darle valor fiscal es otra tarea, con otro número.
+- **El servidor solo va a buscar una URL: la del logo, y solo a Cloudinary** (`T6-07`).
+  `traerLogoDelNegocio` exige `https://res.cloudinary.com`, no sigue redirecciones, corta a los
+  3 s y nunca rechaza. Relajar cualquiera de las cuatro cosas convierte una fila de `app_settings`
+  en una petición desde dentro de la red.
+- **Los PDF solo imprimen Latin-1.** La Helvetica de PDFKit mide con ancho cero lo que no tiene
+  —«株式会社», la `Ł`, la `Ω`— y no avisa. El símbolo de la moneda tiene su regla por eso
+  (`T6-03`); los nombres de cliente y de producto no la tienen, y en el comprobante salen
+  incompletos. Arreglarlo es incrustar una fuente, con su licencia y su peso: una decisión, no un
+  retoque.
 
 - **El número de venta sale de una fila de `counters`, no de una secuencia** (`T6-04`). Una
   secuencia no se deshace con la transacción y gastaría un número en cada venta rechazada con 409.

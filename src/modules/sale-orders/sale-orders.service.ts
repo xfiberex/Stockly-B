@@ -9,7 +9,7 @@ import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 import { normalizarCorreo } from "@/shared/lib/correo";
 import { rangoDeDias } from "@/shared/lib/diasDelNegocio";
 import { numeroDeVentaDelFiltro, siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
-import { escribirNumeroDeVenta } from "@/contratos/api";
+import { escribirNumeroDeVenta, tieneComprobante } from "@/contratos/api";
 import { conTotales, totalesDeLinea } from "@/shared/lib/totalesDeVenta";
 import { settingsService } from "@/modules/settings/settings.service";
 import { Prisma } from "@/generated/prisma/client";
@@ -101,6 +101,19 @@ export const saleOrderService = {
         const order = await prisma.saleOrder.findUnique({ where: { id }, include: ORDER_INCLUDE });
         if (!order) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
         return conTotales(order);
+    },
+
+    /**
+     * T6-07 — la orden de la que se va a hacer el comprobante. Solo las enviadas lo tienen
+     * (`tieneComprobante`, en el contrato): pedir el de una pendiente es 409, no 404 —la orden
+     * existe, lo que no hay todavía es una venta—.
+     */
+    async paraComprobante(id: string) {
+        const orden = await saleOrderService.getById(id);
+        if (!tieneComprobante(orden)) {
+            throw new HttpError(409, "La orden no se ha enviado: todavía no tiene comprobante", "SALE_ORDER_NOT_SHIPPED");
+        }
+        return orden;
     },
 
     /**

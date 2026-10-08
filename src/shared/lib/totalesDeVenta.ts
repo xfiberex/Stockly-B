@@ -39,14 +39,16 @@ export function totalesDeLinea(linea: LineaDeVenta) {
  *
  * `taxRate` sale como número (`18`, `7.5`) porque es un porcentaje, no un importe.
  */
-export function conTotales<L extends LineaDeVenta, O extends { items: L[] }>(orden: O) {
+export function conTotales<O extends { items: LineaDeVenta[] }>(orden: O) {
     let subtotal = CERO;
     let tax = CERO;
 
     // Se separan las líneas del resto para que el tipo de vuelta diga la verdad: con
     // `{ ...orden, items }` TypeScript cruzaba las líneas nuevas con las de entrada.
+    // El tipo de cada línea se saca de `O`: con un segundo parámetro genérico TypeScript lo
+    // dejaba en su restricción, y la línea de vuelta perdía `productName` (T6-07).
     const { items: lineas, ...resto } = orden;
-    const items = lineas.map((item) => {
+    const items = (lineas as Array<O["items"][number]>).map((item) => {
         const linea = totalesDeLinea(item);
         subtotal = subtotal.add(linea.subtotal);
         tax = tax.add(linea.tax);

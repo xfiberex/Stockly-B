@@ -115,6 +115,8 @@ export const PERMISOS = {
     "GET /sale-orders": TODOS,
     "GET /sale-orders/export": SOLO_ADMIN,
     "GET /sale-orders/:id": TODOS,
+    // T6-07 — el comprobante lo descarga quien lee la venta: no dice nada que la orden no diga ya.
+    "GET /sale-orders/:id/receipt": TODOS,
     "POST /sale-orders": SOLO_ADMIN,
     "POST /sale-orders/:id/ship": ALMACEN,
     "PATCH /sale-orders/:id": SOLO_ADMIN,
@@ -420,6 +422,8 @@ export const CODIGOS_DE_ERROR = [
     // T5-07 — cerrar dejaría un producto en negativo, o un producto ya está en otro conteo abierto.
     "COUNT_ADJUSTMENT_NEGATIVE",
     "PRODUCTS_IN_OPEN_COUNT",
+    // T6-07 — se pidió el comprobante de una orden que no se ha enviado: todavía no es una venta.
+    "SALE_ORDER_NOT_SHIPPED",
     // 413 / 422 — el cuerpo o el archivo
     "EXPORT_TOO_LARGE",
     // T6-03 — `PUT /settings/logo` sin archivo: en un producto la imagen es opcional; aquí es la petición.
@@ -717,6 +721,19 @@ export function escribirNumeroDeVenta(numero: number): string {
     return String(numero).padStart(CIFRAS_DEL_NUMERO_DE_VENTA, "0");
 }
 
+/**
+ * T6-07 — si una orden tiene comprobante: **las enviadas**. Una pendiente todavía no es una
+ * venta, y una cancelada sin enviar nunca lo fue. La que se canceló después de enviarse lo
+ * conserva —el papel ya se entregó—, marcado como anulada: `shippedAt` sobrevive a la
+ * cancelación, y es lo que las distingue.
+ *
+ * **Es la regla de los dos lados**: el servidor responde 409 donde esto dice que no, y la
+ * interfaz no ofrece el botón.
+ */
+export function tieneComprobante(orden: { status: EstadoOrdenVenta; shippedAt: unknown }): boolean {
+    return orden.status === "SHIPPED" || (orden.status === "CANCELLED" && orden.shippedAt !== null);
+}
+
 export const ordenVentaSchema = z.object({
     id: z.string(),
     /**
@@ -752,6 +769,11 @@ export const ordenVentaSchema = z.object({
     subtotal: importeSchema,
     tax: importeSchema,
     total: importeSchema,
+    /**
+     * Cuándo salió la mercancía, o `null` si no ha salido. **Se conserva al cancelar**: una
+     * orden cancelada con fecha de envío es una venta anulada, y tiene comprobante (T6-07).
+     */
+    shippedAt: fechaSchema.nullable(),
     createdAt: fechaSchema,
     updatedAt: fechaSchema,
 });

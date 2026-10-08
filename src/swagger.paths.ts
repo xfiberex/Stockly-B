@@ -430,6 +430,18 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
     },
 
+    "/sale-orders/{id}/receipt": {
+        get: {
+            tags: ["Sale Orders"], summary: "Comprobante de la venta, en PDF",
+            description: "T6-07 — el comprobante de una venta **enviada**: datos y logo del negocio, número, fecha en la zona del negocio, cliente con su documento, quién la registró, las líneas y subtotal, impuesto y total. Es un **comprobante interno**: lleva la leyenda «Documento sin valor fiscal». Una orden cancelada después de enviarse lo conserva, marcado como «ANULADA». Sale en español y en A4. Si el logo no se puede traer, sale sin él.",
+            parameters: [PARAM_ID],
+            responses: {
+                "200": { description: "El PDF", content: { "application/pdf": { schema: { type: "string", format: "binary" } } } },
+                "401": ERROR("No autenticado"), "404": ERROR("No encontrada"),
+                "409": ERROR("SALE_ORDER_NOT_SHIPPED: la orden no se ha enviado y todavía no tiene comprobante"),
+            },
+        },
+    },
     "/sale-orders/{id}/ship": {
         post: {
             tags: ["Sale Orders"], summary: "Enviar la orden (ADMIN o WAREHOUSE)",

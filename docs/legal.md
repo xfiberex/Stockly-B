@@ -39,6 +39,7 @@ monta una empresa con el código, es esa empresa.
 | Nombre, correo, teléfono, **documento de identidad o fiscal** y notas de cada cliente | `customers` (T5-06; `document`, T6-06) | Se crea al darlo de alta o al vender con un correo nuevo. **Se puede borrar**, pero sus órdenes conservan la instantánea de la fila siguiente |
 | Nombre, correo, teléfono y **documento** del cliente de un pedido de venta | `sale_orders.customerName` / `customerEmail` / `customerPhone` / `customerDocument` (T6-06) | Opcionales. Pueden ser de una persona física. Es la instantánea de a quién se vendió: no cambia al editar ni al borrar el cliente |
 | **El documento del cliente (T6-06), en particular** | Las dos filas de arriba | Cédula, NIF o equivalente: en una persona física es un **identificador nacional**, que varias leyes tratan con más cuidado que un correo. Es opcional y texto libre; lo lee todo el que lee ventas o clientes, sale en la exportación de ventas —solo `ADMIN`— y saldrá en el comprobante (T6-07). Borrar el cliente **no** lo borra de sus órdenes: atender una petición de supresión exige además vaciar `customerDocument` en ellas, que hoy se hace orden a orden con `PATCH /sale-orders/:id` |
+| **El comprobante de venta (T6-07)** | No se guarda: se genera en cada descarga (`GET /sale-orders/:id/receipt`) | Un PDF con el nombre, el documento, el correo y el teléfono del cliente, y el **correo de quien registró la venta**, además de los datos del negocio. Lo descarga cualquier usuario con sesión, y está hecho para **entregarse a quien compra**: a partir de ahí es un papel fuera de la aplicación, que ni se corrige ni se borra desde ella. Vaciar el documento de una orden (`PATCH`) cambia los comprobantes que se descarguen después, no los ya entregados. El correo del empleado en un papel que sale del negocio es una decisión del negocio: si no se quiere, hoy no hay ajuste para quitarlo |
 | Correo y teléfono de proveedores | `suppliers` | Suelen ser de empresas, pero pueden ser de una persona |
 | Nombre, documento fiscal, dirección, teléfono y correo **del negocio** | `app_settings`, claves `business*` (T6-03) | Son de una empresa, salvo que el negocio sea de un autónomo: entonces su nombre, su documento y su domicilio son datos personales suyos. Los lee **cualquier usuario con sesión** (`GET /settings/business`), porque encabezan el comprobante de venta. Se borran vaciando el campo |
 | A qué administradores se envió cada resumen semanal | `weekly_digests.sentToUserIds` (T5-11) | Solo el identificador del usuario, no su correo. El resumen que reciben no lleva nombres de clientes |
@@ -51,7 +52,8 @@ monta una empresa con el código, es esa empresa.
 - **Proveedor SMTP:** recibe el nombre y el correo de los destinatarios de cada correo.
 - **Cloudinary:** recibe las imágenes de producto y, desde T6-03, el logo del negocio. En
   principio no son datos personales, salvo que alguien suba una foto con personas. Quitar el
-  logo lo borra también de allí.
+  logo lo borra también de allí. Desde T6-07 el servidor **descarga** el logo de Cloudinary cada
+  vez que hace un comprobante: es una petición de lectura, que no envía ningún dato de la venta.
 - **El alojamiento** de la base de datos, el servidor y los registros.
 
 **Cookies.** La aplicación pone tres: `token`, `refreshToken` y la de CSRF, todas de sesión y

@@ -17,6 +17,13 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Comprobante de venta en PDF** (`T6-07`): cada venta enviada tiene un comprobante para darle a
+  quien compra —`GET /sale-orders/:id/receipt`—, con el logo y los datos del negocio, el número,
+  la fecha, el cliente y su documento, quién la registró, las líneas y subtotal, impuesto y
+  total. Se descarga desde el detalle de la venta y desde la ficha del cliente, con cualquier
+  rol. Es un **comprobante interno**: dice «Documento sin valor fiscal». Una venta cancelada
+  después de enviarse lo conserva, marcado «ANULADA»; una pendiente no lo tiene (409). La orden
+  declara ahora `shippedAt` en el contrato.
 - **Vendedor y documento del cliente en la venta** (`T6-06`): cada venta dice quién la registró
   —el correo de su sesión, que sobrevive a la cuenta— y los clientes tienen un documento (cédula,
   RNC, NIF) que la venta copia a su instantánea. Se ven en el detalle de la venta, en la ficha

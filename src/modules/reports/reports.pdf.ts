@@ -1,22 +1,7 @@
-import PDFDocument from "pdfkit";
 import type { PeriodReport, ReportSummary } from "./reports.service";
 import { formatearImporte } from "@/shared/lib/moneda";
-
-type Doc = InstanceType<typeof PDFDocument>;
-
-// ─── Paleta minimalista: escala de grises + un único acento de marca ─────────
-const INK = "#111827"; // gray-900 — títulos y valores destacados
-const BODY = "#374151"; // gray-700 — texto normal de tablas
-const MUTED = "#9ca3af"; // gray-400 — etiquetas y datos secundarios
-const FAINT = "#6b7280"; // gray-500 — fecha y pie
-const LINE = "#d1d5db"; // gray-300 — líneas finas
-const ACCENT = "#2563eb"; // blue-600 — solo el logotipo
-const CRIT = "#b91c1c"; // red-700 — reservado a lo crítico (agotado / urgente)
-
-// ─── Geometría ──────────────────────────────────────────────────────────────
-const MARGIN = 40;
-const PAGE_W = 595.28; // A4
-const CONTENT_W = PAGE_W - MARGIN * 2; // 515.28
+// T6-07 — la paleta, los márgenes y el recorte de texto son de todos los PDF en A4.
+import { ACCENT, BODY, CONTENT_W, CRIT, FAINT, INK, LINE, MARGIN, MUTED, bottom, fitText, hairline, type Doc } from "@/shared/lib/pdf";
 
 // ─── Formato ──────────────────────────────────────────────────────────────
 /**
@@ -33,16 +18,6 @@ function formatosDeImporte(moneda: string) {
 const int = (n: number) => n.toLocaleString("es-MX");
 /** T5-02 — sin ventas no hay porcentaje: se dice «—», no «0.0%». */
 const pct = (n: number | null) => (n === null ? "—" : `${n.toFixed(1)}%`);
-
-// Trunca a una sola línea que quepa en `maxWidth`. En pdfkit 0.18 `lineBreak:false`
-// no evita el ajuste de línea, así que recortamos a mano (usa la métrica de la
-// fuente activa, por lo que debe llamarse tras fijar fuente y tamaño).
-function fitText(doc: Doc, text: string, maxWidth: number): string {
-    if (maxWidth <= 4 || doc.widthOfString(text) <= maxWidth) return text;
-    let t = text;
-    while (t.length > 1 && doc.widthOfString(t + "…") > maxWidth) t = t.slice(0, -1);
-    return t.replace(/\s+$/, "") + "…";
-}
 
 // ─── Modelo de celda / tabla ────────────────────────────────────────────────
 interface Cell {
@@ -66,18 +41,12 @@ interface Row {
 
 const cell = (c: RawCell): Cell => (typeof c === "string" ? { text: c } : c);
 
-function bottom(doc: Doc): number {
-    return doc.page.height - 48;
-}
 function ensureSpace(doc: Doc, y: number, needed: number): number {
     if (y + needed > bottom(doc)) {
         doc.addPage();
         return MARGIN;
     }
     return y;
-}
-function hairline(doc: Doc, y: number, width = 0.75, color = LINE) {
-    doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(width).strokeColor(color).stroke();
 }
 
 // ─── Cabecera ────────────────────────────────────────────────────────────────

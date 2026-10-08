@@ -2,6 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import { saleOrderService } from "./sale-orders.service";
 import { auditService } from "@/modules/audit-logs";
 import { enviarExportacion } from "@/shared/lib/exportacion";
+import { traerLogoDelNegocio } from "@/shared/lib/logoDelNegocio";
+import { settingsService } from "@/modules/settings/settings.service";
+import { escribirNumeroDeVenta } from "@/contratos/api";
+import { nuevoDocumentoDeComprobante, renderComprobante } from "./sale-orders.comprobante";
 import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 export const saleOrderController = {
@@ -16,6 +20,25 @@ export const saleOrderController = {
         try {
             const order = await saleOrderService.getById(req.params.id);
             res.json({ success: true, message: "Orden de venta obtenida exitosamente", data: order });
+        } catch (error) { next(error); }
+    },
+
+    /** T6-07 — `GET /:id/receipt`: el comprobante de una venta enviada, en PDF. */
+    async getSaleOrderReceipt(req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> {
+        try {
+            // Se lee todo **antes** de escribir la cabecera: un error después de empezar el PDF
+            // ya no puede ser una respuesta JSON. El logo va el último, y solo si la orden tiene
+            // comprobante: un 404 o un 409 no deben costar una llamada a Cloudinary.
+            const orden = await saleOrderService.paraComprobante(req.params.id);
+            const [negocio, zonaHoraria] = await Promise.all([settingsService.negocio(), settingsService.zonaHoraria()]);
+            const logo = await traerLogoDelNegocio(negocio.logoUrl);
+
+            const doc = nuevoDocumentoDeComprobante(orden.number);
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader("Content-Disposition", `attachment; filename=comprobante-${escribirNumeroDeVenta(orden.number)}.pdf`);
+            doc.pipe(res);
+            renderComprobante(doc, { negocio, logo, zonaHoraria, orden });
+            doc.end();
         } catch (error) { next(error); }
     },
 
