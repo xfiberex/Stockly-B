@@ -154,7 +154,9 @@ No dependen del rol. Públicas: `POST /register`, `/login`, `/logout`, `/refresh
 
 ### Rutas por módulo y rol
 
-Hay tres roles: `USER` lee, `WAREHOUSE` además recibe, envía y mueve stock, y `ADMIN` hace todo.
+Hay cuatro roles: `USER` lee, `WAREHOUSE` además recibe, envía y mueve stock, `SELLER` además vende
+en el mostrador, y `ADMIN` hace todo. `SELLER` no tiene columna en la tabla porque solo añade una
+ruta a las de «Todos los roles»: `POST /sale-orders/counter`, que comparte con `ADMIN`.
 La tabla es un reflejo de la matriz `PERMISOS` de [`src/contratos/api.ts`](src/contratos/api.ts),
 que es **la única copia que cuenta**: con ella se protege cada ruta y con ella decide el frontend
 qué botones enseñar.
@@ -164,7 +166,7 @@ qué botones enseñar.
 | `/products` | `GET /` · `/:id` · `/lookup` · `/labels` · `/export` · `/:id/movements` · `/:id/movements/export` · `/:id/price-history` · `/:id/cost-history` | `POST /:id/movements` · `PATCH /bulk-stock` | `POST /` · `POST /import` · `PUT /:id` · `DELETE /:id` · `PATCH /:id/restore` |
 | `/categories` `/brands` `/suppliers` `/tags` | `GET /` · `/:id` | — | `POST /` · `PUT /:id` · `DELETE /:id` |
 | `/purchase-orders` | `GET /` · `/:id` · `/suggestions` | `POST /:id/receipts` | `POST /` · `POST /suggestions` · `PATCH /:id` · `DELETE /:id` · `GET /export` |
-| `/sale-orders` | `GET /` · `/:id` | `POST /:id/ship` | `POST /` · `PATCH /:id` · `DELETE /:id` · `GET /export` |
+| `/sale-orders` | `GET /` · `/:id` · `/:id/receipt` | `POST /:id/ship` | `POST /` · `PATCH /:id` · `DELETE /:id` · `GET /export` |
 | `/customers` | `GET /` · `/:id` | — | `POST /` · `PUT /:id` · `DELETE /:id` |
 | `/inventory-counts` | `GET /` · `/:id` · `/:id/lines` | `POST /` · `PATCH /:id/lines` · `POST /:id/close` · `POST /:id/cancel` | — |
 | `/reports` | `GET /` · `/period` · `/abc` | — | — |
@@ -248,6 +250,7 @@ físico abierto. Los movimientos **cuadran con el stock** de cada producto.
 | ADMIN | `carlos@stockly.app` | `Admin1234!` |
 | USER | `laura@stockly.app` | `User1234!` |
 | WAREHOUSE | `almacen@stockly.app` | `Almacen1234!` |
+| SELLER | `vendedor@stockly.app` | `Vendedor1234!` |
 
 > **El administrador inicial sale de aquí.** En un despliegue nuevo hay que ejecutar el seed —o
 > promover a alguien con `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN—, porque

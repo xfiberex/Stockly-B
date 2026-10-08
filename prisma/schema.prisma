@@ -62,6 +62,8 @@ enum Role {
   ADMIN
   USER
   WAREHOUSE
+  // T6-08 — quien atiende el mostrador: vende en un paso y lee lo que lee USER.
+  SELLER
 }
 
 // T4-12 — el idioma en el que se le escribe a este usuario.
@@ -98,6 +100,8 @@ enum AuditAction {
   // T5-07
   COUNT_CLOSE
   COUNT_CANCEL
+  // T6-08 — una venta de mostrador: creada y enviada en la misma operación.
+  SALE_COUNTER
 }
 
 enum AuditEntity {

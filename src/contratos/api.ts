@@ -31,13 +31,15 @@ import { z } from "zod";
 // ─────────────────────────── Enums ───────────────────────────
 // Espejo de `prisma/schema.prisma`, vigilado por `contratos.test.ts`.
 
-export const rolSchema = z.enum(["ADMIN", "USER", "WAREHOUSE"]);
+export const rolSchema = z.enum(["ADMIN", "USER", "WAREHOUSE", "SELLER"]);
 
 // ─────────────────────── Permisos (T5-13) ───────────────────────
 
-const TODOS = ["ADMIN", "USER", "WAREHOUSE"] as const;
+const TODOS = ["ADMIN", "USER", "WAREHOUSE", "SELLER"] as const;
 const SOLO_ADMIN = ["ADMIN"] as const;
 const ALMACEN = ["ADMIN", "WAREHOUSE"] as const;
+/** T6-08 — quien vende en el mostrador. */
+const MOSTRADOR = ["ADMIN", "SELLER"] as const;
 
 /**
  * T5-13 — qué rol puede llamar a cada ruta de la API. **Es la única copia de la matriz.**
@@ -52,6 +54,12 @@ const ALMACEN = ["ADMIN", "WAREHOUSE"] as const;
  * ni catálogo —todo eso fija precios o costes—, no cancela ni borra —deshacer es una decisión
  * comercial—, y no ve usuarios, configuración, auditoría ni exportaciones de órdenes. Lee lo
  * mismo que `USER`.
+ *
+ * T6-08 — `SELLER` atiende el mostrador: lee lo mismo que `USER` y **solo añade una ruta**, la
+ * venta de un paso (`POST /sale-orders/counter`), donde el precio lo pone el catálogo y no él.
+ * No crea ni edita órdenes pendientes —fijan un precio—, no envía las de otros —eso es del
+ * almacén—, no cancela una venta hecha —devolver stock es una decisión comercial— y no ve
+ * usuarios, configuración, auditoría ni exportaciones de órdenes.
  *
  * `/auth` queda fuera: sus rutas son de la propia sesión y no dependen del rol.
  */
@@ -118,6 +126,8 @@ export const PERMISOS = {
     // T6-07 — el comprobante lo descarga quien lee la venta: no dice nada que la orden no diga ya.
     "GET /sale-orders/:id/receipt": TODOS,
     "POST /sale-orders": SOLO_ADMIN,
+    // T6-08 — la venta de mostrador: creada y enviada en una operación, al precio del catálogo.
+    "POST /sale-orders/counter": MOSTRADOR,
     "POST /sale-orders/:id/ship": ALMACEN,
     "PATCH /sale-orders/:id": SOLO_ADMIN,
     "DELETE /sale-orders/:id": SOLO_ADMIN,
@@ -183,6 +193,8 @@ export const accionAuditoriaSchema = z.enum([
     "ORDER_RECEIVE", "ORDER_CANCEL", "USER_ROLE_CHANGE", "USER_ACTIVATE",
     "USER_DEACTIVATE", "SALE_SHIP", "SALE_CANCEL", "REFRESH_REUSE",
     "COUNT_CLOSE", "COUNT_CANCEL",
+    // T6-08 — una venta de mostrador.
+    "SALE_COUNTER",
 ]);
 
 export const entidadAuditoriaSchema = z.enum([
@@ -419,6 +431,8 @@ export const CODIGOS_DE_ERROR = [
     "TAG_NAME_EXISTS",
     // 409 — el estado del inventario no admite la petición
     "INSUFFICIENT_AVAILABLE_STOCK",
+    // T6-08 — se quiso vender en el mostrador un producto descatalogado.
+    "INACTIVE_PRODUCT_SALE",
     // T5-07 — cerrar dejaría un producto en negativo, o un producto ya está en otro conteo abierto.
     "COUNT_ADJUSTMENT_NEGATIVE",
     "PRODUCTS_IN_OPEN_COUNT",
@@ -705,6 +719,34 @@ export const TASA_DE_IMPUESTO_MAXIMA = 100;
 export function esTasaDeImpuestoValida(tasa: number): boolean {
     if (!Number.isFinite(tasa) || tasa < 0 || tasa > TASA_DE_IMPUESTO_MAXIMA) return false;
     return Math.abs(tasa * 100 - Math.round(tasa * 100)) < 1e-9;
+}
+
+/** T6-08 — cuántas líneas admite una venta de mostrador. */
+export const MAXIMO_DE_LINEAS_DE_MOSTRADOR = 100;
+
+/**
+ * T6-08 — lo que va a sumar una venta **que todavía no existe**: lo que el mostrador enseña
+ * antes de registrarla, para que quien cobra sepa cuánto pedir.
+ *
+ * La regla es la de `totalesDeLinea`, en el servidor —el impuesto se redondea **por línea**, a
+ * dos decimales y con el medio hacia arriba—, escrita aquí en céntimos enteros para no depender
+ * de `Decimal` ni de la coma flotante. Un test del backend compara las dos sobre una rejilla de
+ * precios, cantidades y tasas: si un día divergen, rompe.
+ *
+ * Es una **previsión**: lo que vale es lo que devuelve la venta al registrarse, que es lo que
+ * la pantalla enseña después.
+ */
+export function totalesPrevistos(lineas: ReadonlyArray<{ quantity: number; unitPrice: number | string }>, tasa: number) {
+    const centesimasDeTasa = Math.round(tasa * 100);
+    let subtotal = 0;
+    let tax = 0;
+    for (const linea of lineas) {
+        const centimos = Math.round(Number(linea.unitPrice) * 100) * linea.quantity;
+        subtotal += centimos;
+        tax += Math.floor((centimos * centesimasDeTasa + 5000) / 10000);
+    }
+    const escribir = (centimos: number) => (centimos / 100).toFixed(2);
+    return { subtotal: escribir(subtotal), tax: escribir(tax), total: escribir(subtotal + tax) };
 }
 
 /** T6-04 — con cuántas cifras se enseña el número de una venta. Es un mínimo, no un tope. */
@@ -1089,10 +1131,15 @@ export const negocioSchema = z.object({
     currencySymbol: z.string(),
     /**
      * T6-05 — cómo se llama el impuesto en este negocio («ITBIS», «IVA»). Vacío, la interfaz
-     * pone el genérico de su catálogo de textos. La tasa no viene aquí: la que cuenta es la que
-     * cada orden lleva congelada en sus líneas.
+     * pone el genérico de su catálogo de textos.
      */
     taxName: z.string(),
+    /**
+     * T6-08 — la tasa con la que nace una venta **ahora**, en porcentaje. Es para que el
+     * mostrador diga cuánto se va a cobrar antes de registrar la venta (`totalesPrevistos`).
+     * **No sirve para una orden que ya existe**: esa lleva la suya congelada en sus líneas.
+     */
+    taxRate: z.number(),
     logoUrl: z.string().nullable(),
 });
 

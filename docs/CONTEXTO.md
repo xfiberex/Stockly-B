@@ -50,17 +50,17 @@ Medido el 2026-10-08 en este equipo, con `pnpm verify` y el E2E:
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1305** en 63 archivos | **786** en 73 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.65 % *(suelo 85 %)* | 78.23 % *(suelo 45 %)* |
+| Tests | **1449** en 64 archivos | **816** en 74 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.75 % *(suelo 85 %)* | 78.46 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **32 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
+| E2E (Playwright) | — | **34 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 134 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 135 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
 `T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
-de las que están cerradas de `T6-01` a `T6-07`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+de las que están cerradas de `T6-01` a `T6-08`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
 el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
@@ -328,6 +328,21 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   no puede escribir su URL: solo la pone `PUT /settings/logo`, con lo que devuelve Cloudinary. Meterla
   en el catálogo «por simetría» abre la puerta a que el servidor pida cualquier dirección (`T6-07`).
 
+- **En el mostrador, el precio no lo pone quien vende** (`T6-08`). `POST /sale-orders/counter`
+  recibe un producto y una cantidad por línea; el nombre y el precio salen del producto, con su
+  fila bloqueada. `counterSaleSchema` no declara `unitPrice` **a propósito**: añadirlo «para un
+  descuento» le da a `SELLER` lo que la matriz le niega. Un descuento es otra tarea, con su rol.
+- **Vender son dos mitades, y cada una vive en un solo sitio** (`T6-08`): `reservarDisponible`
+  y `despachar`, en `sale-orders.service.ts`. `create`, el envío y el mostrador las combinan. Una
+  ruta nueva que venda las llama; no las copia.
+- **`GET /settings/business` trae la tasa vigente, y solo sirve para prever** (`T6-08`). T6-05
+  la dejó fuera para que ninguna pantalla sumara por su cuenta; el mostrador la necesita para
+  decir cuánto cobrar antes de que la venta exista. La cuenta la hace `totalesPrevistos`, en el
+  contrato, y un test la ata a `totalesDeLinea`. **Una orden que ya existe no se recalcula con
+  ella**: lleva la suya en sus líneas, y sus importes los manda el servidor.
+- **Una pantalla que abren varios roles se guarda por permiso** (`T6-08`): `requirePermiso` en
+  `ProtectedRoute` y `permiso` en la entrada del menú, los dos con la ruta de la API de la que
+  depende la pantalla. `requireRole` se queda para las de un solo rol.
 - **El comprobante de venta no calcula y no se llama como el documento fiscal** (`T6-07`). Pinta
   los importes de `conTotales`; qué órdenes lo tienen lo dice `tieneComprobante`, en el contrato,
   y el servidor y la interfaz preguntan ahí. Es interno —«Documento sin valor fiscal»— por la

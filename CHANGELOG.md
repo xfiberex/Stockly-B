@@ -17,6 +17,13 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Venta de mostrador y rol de vendedor** (`T6-08`): una pantalla nueva, **Mostrador**, para
+  vender en un paso —buscar o escanear, decir cuántos y registrar—: la venta queda hecha, con el
+  stock descontado, su número y su comprobante. Es `POST /sale-orders/counter`, que pone el
+  precio del catálogo y no admite otro. Y un rol nuevo, **Vendedor** (`SELLER`), que lee lo que
+  lee un usuario y vende en el mostrador: no crea órdenes pendientes, no cancela ventas y no
+  cambia precios. En la auditoría, `SALE_COUNTER`. `GET /settings/business` añade `taxRate`.
+  El seed trae `vendedor@stockly.app`. **Requiere migración.**
 - **Comprobante de venta en PDF** (`T6-07`): cada venta enviada tiene un comprobante para darle a
   quien compra —`GET /sale-orders/:id/receipt`—, con el logo y los datos del negocio, el número,
   la fecha, el cliente y su documento, quién la registró, las líneas y subtotal, impuesto y

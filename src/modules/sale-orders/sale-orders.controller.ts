@@ -6,7 +6,7 @@ import { traerLogoDelNegocio } from "@/shared/lib/logoDelNegocio";
 import { settingsService } from "@/modules/settings/settings.service";
 import { escribirNumeroDeVenta } from "@/contratos/api";
 import { nuevoDocumentoDeComprobante, renderComprobante } from "./sale-orders.comprobante";
-import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
+import type { CounterSaleDto, CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 export const saleOrderController = {
     async getAllSaleOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -54,6 +54,20 @@ export const saleOrderController = {
                 "CREATE", "SaleOrder", order.id,
             );
             res.status(201).json({ success: true, message: "Orden de venta creada exitosamente", data: order });
+        } catch (error) { next(error); }
+    },
+
+    /** T6-08 — `POST /counter`: la venta de mostrador, creada y enviada de una vez. */
+    async createCounterSale(req: Request<{}, {}, CounterSaleDto>, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const order = await saleOrderService.ventaDeMostrador(req.body, req.userEmail);
+            // Con su propia acción: en la auditoría, una venta de mostrador no es una orden
+            // creada y después enviada por otra persona.
+            await auditService.log(
+                { userId: req.userId, userEmail: req.userEmail },
+                "SALE_COUNTER", "SaleOrder", order.id,
+            );
+            res.status(201).json({ success: true, message: "Venta registrada", data: order });
         } catch (error) { next(error); }
     },
 

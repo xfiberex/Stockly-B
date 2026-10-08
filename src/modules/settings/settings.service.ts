@@ -158,6 +158,9 @@ const AJUSTE_DE_CAMPO = {
     email: "businessEmail",
 } as const satisfies Partial<Record<keyof Negocio, SettingKey>>;
 
+/** La tasa si es un porcentaje válido, y si no 0: solo puede fallar editando la tabla a mano. */
+const tasaValida = (tasa: number) => (esTasaDeImpuestoValida(tasa) ? tasa : 0);
+
 /** `null` si `simbolo` no pasa la regla del contrato: solo puede ocurrir editando la tabla a mano. */
 const simboloValido = (simbolo: string) => (motivoSimboloDeMonedaInvalido(simbolo) === null ? simbolo : null);
 
@@ -206,15 +209,14 @@ export const settingsService = {
      * a mano con `abc` o con `250` no puede acabar multiplicando una venta: se lee como 0.
      */
     async tasaDeImpuesto(): Promise<number> {
-        const tasa = Number(await settingsService.get("taxRate"));
-        return esTasaDeImpuestoValida(tasa) ? tasa : 0;
+        return tasaValida(Number(await settingsService.get("taxRate")));
     },
 
     /** T6-03 — quién vende y en qué moneda, en una sola consulta. Lo lee cualquier rol. */
     async negocio(): Promise<Negocio> {
         const campos = Object.entries(AJUSTE_DE_CAMPO) as Array<[keyof typeof AJUSTE_DE_CAMPO, SettingKey]>;
         const guardados = await prisma.appSetting.findMany({
-            where: { key: { in: [...campos.map(([, clave]) => clave), "currencySymbol", "taxName", CLAVE_LOGO_URL] } },
+            where: { key: { in: [...campos.map(([, clave]) => clave), "currencySymbol", "taxName", "taxRate", CLAVE_LOGO_URL] } },
         });
         const valorDe = new Map(guardados.map((s) => [s.key, s.value]));
 
@@ -225,6 +227,9 @@ export const settingsService = {
             >),
             currencySymbol: simboloValido(valorDe.get("currencySymbol") ?? "") ?? SIMBOLO_DE_MONEDA_POR_DEFECTO,
             taxName: valorDe.get("taxName") ?? "",
+            // T6-08 — la misma lectura defensiva que `tasaDeImpuesto()`: una fila tocada a mano no
+            // puede acabar en la previsión del mostrador.
+            taxRate: tasaValida(Number(valorDe.get("taxRate") ?? 0)),
             logoUrl: valorDe.get(CLAVE_LOGO_URL) ?? null,
         };
     },

@@ -408,6 +408,28 @@ export const rutasAdicionales: Record<string, Ruta> = {
             },
         },
     },
+    "/sale-orders/counter": {
+        post: {
+            tags: ["Sale Orders"], summary: "Venta de mostrador: crear y enviar en un paso (ADMIN o SELLER)",
+            description: "T6-08 — crea la orden y la deja **enviada** en una sola transacción: comprueba lo disponible, descuenta el stock, congela el coste y escribe un movimiento `OUT` por línea. Cada línea es un producto del catálogo y una cantidad: **el precio y el nombre los pone el producto**, y un `unitPrice` enviado se descarta. Si algo falla no queda ni la orden ni su número. Devuelve la orden con sus importes, lista para pedir su comprobante.",
+            requestBody: { required: true, content: { "application/json": { schema: {
+                type: "object", required: ["items"],
+                properties: {
+                    customerId: { type: "string", format: "uuid" },
+                    customerName: { type: "string" }, customerEmail: { type: "string", format: "email" },
+                    customerPhone: { type: "string" }, customerDocument: { type: "string", maxLength: 40 },
+                    items: { type: "array", minItems: 1, maxItems: 100, items: { type: "object", required: ["productId", "quantity"], properties: { productId: { type: "string", format: "uuid" }, quantity: { type: "integer", minimum: 1 } } } },
+                },
+            } } } },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Vendida y enviada"),
+                "403": ERROR("Requiere rol ADMIN o SELLER"),
+                "404": ERROR("Un productId o el customerId no existe"),
+                "409": ERROR("INSUFFICIENT_AVAILABLE_STOCK: la cantidad supera lo disponible · INACTIVE_PRODUCT_SALE: el producto está descatalogado"),
+                "422": ERROR("Datos inválidos"),
+            },
+        },
+    },
     "/sale-orders/export": exportacion("Sale Orders", "las órdenes de venta"),
     "/sale-orders/{id}": {
         get: {
@@ -627,7 +649,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
             parameters: [
                 ...PARAMS_PAGINA,
                 { name: "search", in: "query", schema: { type: "string" }, description: "Busca en nombre y correo (índice de trigramas, T2-09)" },
-                { name: "role", in: "query", schema: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE"] } },
+                { name: "role", in: "query", schema: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE", "SELLER"] } },
                 { name: "isActive", in: "query", schema: { type: "string", enum: ["true", "false"] } },
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/User"), "Listado paginado"), "403": ERROR("Requiere rol ADMIN") },
@@ -642,7 +664,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/users/{id}/role": {
         patch: {
             tags: ["Users"], summary: "Cambiar el rol (ADMIN)", parameters: [PARAM_ID],
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["role"], properties: { role: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE"] } } } } } },
+            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["role"], properties: { role: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE", "SELLER"] } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/User" }, "Rol actualizado"),
                 "400": ERROR("No puedes cambiar tu propio rol"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("No encontrado"),

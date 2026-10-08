@@ -13,7 +13,7 @@ import { escribirNumeroDeVenta, tieneComprobante } from "@/contratos/api";
 import { conTotales, totalesDeLinea } from "@/shared/lib/totalesDeVenta";
 import { settingsService } from "@/modules/settings/settings.service";
 import { Prisma } from "@/generated/prisma/client";
-import type { CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
+import type { CounterSaleDto, CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 const ORDER_INCLUDE = {
     items: {
@@ -44,7 +44,10 @@ function clienteNoEncontrado(): HttpError {
  *   nada de clientes sigue viendo sus ventas juntas en la ficha.
  * - Sin correo, a nadie. **No se agrupa por nombre**: dos «Juan Pérez» no son la misma persona.
  */
-async function clienteDeLaVenta(tx: Prisma.TransactionClient, dto: CreateSaleOrderDto) {
+async function clienteDeLaVenta(
+    tx: Prisma.TransactionClient,
+    dto: Pick<CreateSaleOrderDto, "customerId" | "customerName" | "customerEmail" | "customerPhone" | "customerDocument">,
+) {
     if (dto.customerId) {
         const cliente = await tx.customer.findUnique({ where: { id: dto.customerId } });
         if (!cliente) throw clienteNoEncontrado();
@@ -64,6 +67,126 @@ async function clienteDeLaVenta(tx: Prisma.TransactionClient, dto: CreateSaleOrd
             // T6-06 — el cliente nace con el documento de la venta. Pero no se **busca** por él.
             document: dto.customerDocument?.trim() || null,
         },
+    });
+}
+
+/** Cuánto se pide de cada producto, **sumando las líneas**: dos de 3 sobre 5 disponibles son 6. */
+function pedidoPorProducto(items: Array<{ productId?: string; quantity: number }>): Map<string, number> {
+    const pedido = new Map<string, number>();
+    for (const item of items) {
+        if (item.productId) pedido.set(item.productId, (pedido.get(item.productId) ?? 0) + item.quantity);
+    }
+    return pedido;
+}
+
+/**
+ * T5-03 — la primera mitad de una venta: comprobar que cabe en lo **disponible**, stock menos
+ * lo comprometido en ventas pendientes. La usan `create` y la venta de mostrador (T6-08).
+ *
+ * Se bloquean las filas de los productos **antes** de contar lo comprometido. Sin el bloqueo,
+ * dos ventas simultáneas de las mismas unidades leerían el mismo disponible y pasarían las
+ * dos. Ordenadas por id, para que dos ventas con productos en distinto orden no se esperen
+ * mutuamente. El bloqueo dura lo que la transacción: lo que se lea aquí —el precio, el stock—
+ * sigue siendo verdad cuando se escriba la orden.
+ */
+async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<string, number>) {
+    const ids = [...pedido.keys()].sort();
+    if (ids.length === 0) return [];
+
+    await tx.$queryRaw`SELECT id FROM products WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+
+    const productos = await tx.product.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, stock: true, price: true, isActive: true },
+    });
+    const comprometido = await comprometidoPorProducto(ids, tx);
+
+    for (const id of ids) {
+        const producto = productos.find((p) => p.id === id);
+        if (!producto) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+
+        const disponible = producto.stock - (comprometido.get(id) ?? 0);
+        const requerido = pedido.get(id)!;
+        if (requerido > disponible) {
+            throw new HttpError(
+                409,
+                `No hay suficiente disponible de "${producto.name}". Disponible: ${Math.max(disponible, 0)}, requerido: ${requerido}`,
+                "INSUFFICIENT_AVAILABLE_STOCK",
+                { producto: producto.name, disponible: Math.max(disponible, 0), requerido },
+            );
+        }
+    }
+    return productos;
+}
+
+/**
+ * La segunda mitad: **el envío**. Descuenta el stock, congela el coste, escribe un movimiento
+ * por línea y deja la orden enviada. Vivía dentro de `update`; T6-08 la saca para que la venta
+ * de mostrador haga exactamente lo mismo y no una copia.
+ *
+ * Tiene que correr dentro de una transacción: el decremento condicional (stock >= cantidad)
+ * cierra la ventana entre «comprobar» y «descontar», y si cualquier ítem falla, todo se
+ * revierte. Los productos que quedan en su mínimo o por debajo se apuntan en `bajoMinimos`,
+ * para avisar **después** del `commit`.
+ */
+async function despachar(
+    tx: Prisma.TransactionClient,
+    orden: { id: string; number: number },
+    opciones: { datos?: Prisma.SaleOrderUpdateInput; concepto: string; bajoMinimos: ProductoEnAlerta[] },
+) {
+    const items = await tx.saleOrderItem.findMany({
+        where: { saleOrderId: orden.id, productId: { not: null } },
+        include: { product: true },
+    });
+
+    for (const item of items) {
+        if (!item.productId || !item.product) continue;
+
+        const res = await tx.product.updateMany({
+            where: { id: item.productId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+        });
+        if (res.count === 0) {
+            throw new HttpError(
+                400,
+                `Stock insuficiente para "${item.product.name}". Disponible: ${item.product.stock}, requerido: ${item.quantity}`,
+                "INSUFFICIENT_STOCK",
+                { producto: item.product.name, disponible: item.product.stock, requerido: item.quantity },
+            );
+        }
+
+        const refreshed = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
+
+        // T5-02 — el coste se congela en el ítem **al enviar**, que es cuando la
+        // mercancía sale. Se lee de `refreshed` y no del `include` de arriba: esa
+        // lectura es anterior al `updateMany` que bloquea la fila, y entre las dos una
+        // recepción podría haber cambiado el coste medio.
+        await tx.saleOrderItem.update({ where: { id: item.id }, data: { unitCost: refreshed.costPrice } });
+
+        await tx.stockMovement.create({
+            data: {
+                productId: item.productId,
+                type: "OUT",
+                delta: -item.quantity,
+                stockAfter: refreshed.stock,
+                note: `${opciones.concepto} #${escribirNumeroDeVenta(orden.number)}`,
+            },
+        });
+
+        if (refreshed.stock <= item.product.minStock) {
+            opciones.bajoMinimos.push({
+                id: item.productId,
+                name: item.product.name,
+                stock: refreshed.stock,
+                minStock: item.product.minStock,
+            });
+        }
+    }
+
+    return tx.saleOrder.update({
+        where: { id: orden.id },
+        data: { ...opciones.datos, status: "SHIPPED", shippedAt: new Date() },
+        include: ORDER_INCLUDE,
     });
 }
 
@@ -126,44 +249,14 @@ export const saleOrderService = {
      * El mismo producto en varias líneas **suma**: dos líneas de 3 sobre 5 disponibles son 6.
      */
     async create(dto: CreateSaleOrderDto, actorEmail?: string) {
-        const pedido = new Map<string, number>();
-        for (const item of dto.items) {
-            if (item.productId) pedido.set(item.productId, (pedido.get(item.productId) ?? 0) + item.quantity);
-        }
-        const ids = [...pedido.keys()].sort();
+        const pedido = pedidoPorProducto(dto.items);
 
         // T6-05 — la tasa vigente **ahora**, que se congela en cada línea como `unitPrice`. Los
         // importes no vienen en `dto`: se calculan al responder, de lo que queda guardado.
         const taxRate = await settingsService.tasaDeImpuesto();
 
         const orden = await prisma.$transaction(async (tx) => {
-            if (ids.length > 0) {
-                // Se bloquean las filas de los productos **antes** de contar lo comprometido.
-                // Sin el bloqueo, dos ventas simultáneas de las mismas unidades leerían el
-                // mismo disponible y pasarían las dos — que es el defecto que viene a cerrar
-                // la tarea, solo que en una ventana más estrecha. Ordenadas por id, para que
-                // dos ventas con productos en distinto orden no se esperen mutuamente.
-                await tx.$queryRaw`SELECT id FROM products WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
-
-                const productos = await tx.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, stock: true } });
-                const comprometido = await comprometidoPorProducto(ids, tx);
-
-                for (const id of ids) {
-                    const producto = productos.find((p) => p.id === id);
-                    if (!producto) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
-
-                    const disponible = producto.stock - (comprometido.get(id) ?? 0);
-                    const requerido = pedido.get(id)!;
-                    if (requerido > disponible) {
-                        throw new HttpError(
-                            409,
-                            `No hay suficiente disponible de "${producto.name}". Disponible: ${Math.max(disponible, 0)}, requerido: ${requerido}`,
-                            "INSUFFICIENT_AVAILABLE_STOCK",
-                            { producto: producto.name, disponible: Math.max(disponible, 0), requerido },
-                        );
-                    }
-                }
-            }
+            await reservarDisponible(tx, pedido);
 
             const cliente = await clienteDeLaVenta(tx, dto);
 
@@ -197,6 +290,71 @@ export const saleOrderService = {
                 include: ORDER_INCLUDE,
             });
         });
+
+        return conTotales(orden);
+    },
+
+    /**
+     * T6-08 — la venta de mostrador: **creada y enviada en una sola transacción**. Es `create`
+     * y el envío seguidos, con sus mismas dos mitades, y con dos diferencias que son la razón
+     * de que exista:
+     *
+     * - **El precio y el nombre salen del producto, no de la petición.** Quien vende en el
+     *   mostrador no fija precios: `dto` trae un producto y una cantidad por línea, y nada más.
+     *   Se leen con la fila ya bloqueada, así que son los del instante de la venta.
+     * - **Todas las líneas son del catálogo**, y de productos activos: un ítem escrito a mano
+     *   no movería stock, y aquí vender es mover stock.
+     *
+     * Si algo falla —no hay disponible, el producto no existe—, no queda ni la orden, ni el
+     * número gastado, ni el cliente que se hubiera creado por su correo.
+     */
+    async ventaDeMostrador(dto: CounterSaleDto, actorEmail?: string) {
+        const pedido = pedidoPorProducto(dto.items);
+        const taxRate = await settingsService.tasaDeImpuesto();
+        const bajoMinimos: ProductoEnAlerta[] = [];
+
+        const orden = await prisma.$transaction(async (tx) => {
+            const productos = new Map((await reservarDisponible(tx, pedido)).map((p) => [p.id, p]));
+
+            const inactivo = [...productos.values()].find((p) => !p.isActive);
+            if (inactivo) {
+                throw new HttpError(409, `"${inactivo.name}" está descatalogado y no se puede vender`, "INACTIVE_PRODUCT_SALE", {
+                    producto: inactivo.name,
+                });
+            }
+
+            const cliente = await clienteDeLaVenta(tx, dto);
+            const number = await siguienteNumeroDeVenta(tx);
+
+            const creada = await tx.saleOrder.create({
+                data: {
+                    number,
+                    customerId: cliente?.id ?? null,
+                    customerName: dto.customerName ?? cliente?.name,
+                    customerEmail: dto.customerEmail ?? cliente?.email,
+                    customerPhone: dto.customerPhone ?? cliente?.phone,
+                    customerDocument: dto.customerDocument ?? cliente?.document,
+                    createdByEmail: actorEmail ?? null,
+                    items: {
+                        create: dto.items.map((item) => {
+                            const producto = productos.get(item.productId)!;
+                            return {
+                                productId: producto.id,
+                                productName: producto.name,
+                                quantity: item.quantity,
+                                unitPrice: producto.price,
+                                taxRate,
+                            };
+                        }),
+                    },
+                },
+            });
+
+            return despachar(tx, creada, { concepto: "Venta de mostrador", bajoMinimos });
+        });
+
+        // Después del `commit` y sin esperarlas, como en el envío.
+        for (const producto of bajoMinimos) dispararAlertaStock(producto);
 
         return conTotales(orden);
     },
@@ -275,66 +433,13 @@ export const saleOrderService = {
         }
 
         // Envío: verificación de stock, descuento, movimientos y cambio de estado ocurren
-        // en UNA sola transacción. El decremento condicional (stock >= cantidad) cierra la
-        // ventana entre "comprobar" y "descontar"; si cualquier ítem falla, todo se revierte.
+        // en UNA sola transacción (`despachar`).
         const lowStockTargets: ProductoEnAlerta[] = [];
 
-        const updated = await prisma.$transaction(async (tx) => {
-            const items = await tx.saleOrderItem.findMany({
-                where: { saleOrderId: id, productId: { not: null } },
-                include: { product: true },
-            });
-
-            for (const item of items) {
-                if (!item.productId || !item.product) continue;
-
-                const res = await tx.product.updateMany({
-                    where: { id: item.productId, stock: { gte: item.quantity } },
-                    data: { stock: { decrement: item.quantity } },
-                });
-                if (res.count === 0) {
-                    throw new HttpError(
-                        400,
-                        `Stock insuficiente para "${item.product.name}". Disponible: ${item.product.stock}, requerido: ${item.quantity}`,
-                        "INSUFFICIENT_STOCK",
-                        { producto: item.product.name, disponible: item.product.stock, requerido: item.quantity },
-                    );
-                }
-
-                const refreshed = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
-
-                // T5-02 — el coste se congela en el ítem **al enviar**, que es cuando la
-                // mercancía sale. Se lee de `refreshed` y no del `include` de arriba: esa
-                // lectura es anterior al `updateMany` que bloquea la fila, y entre las dos una
-                // recepción podría haber cambiado el coste medio.
-                await tx.saleOrderItem.update({ where: { id: item.id }, data: { unitCost: refreshed.costPrice } });
-
-                await tx.stockMovement.create({
-                    data: {
-                        productId: item.productId,
-                        type: "OUT",
-                        delta: -item.quantity,
-                        stockAfter: refreshed.stock,
-                        note: `Orden de venta #${escribirNumeroDeVenta(existing.number)}`,
-                    },
-                });
-
-                if (refreshed.stock <= item.product.minStock) {
-                    lowStockTargets.push({
-                        id: item.productId,
-                        name: item.product.name,
-                        stock: refreshed.stock,
-                        minStock: item.product.minStock,
-                    });
-                }
-            }
-
-            return tx.saleOrder.update({
-                where: { id },
-                data: { ...customerData, status: "SHIPPED", shippedAt: new Date() },
-                include: ORDER_INCLUDE,
-            });
-        }).catch((error: unknown) => {
+        const updated = await prisma.$transaction((tx) =>
+            despachar(tx, existing, { datos: customerData, concepto: "Orden de venta", bajoMinimos: lowStockTargets }),
+        ).catch((error: unknown) => {
+            // T5-12        }).catch((error: unknown) => {
             // T5-12 — fuera de la transacción, que ya se ha deshecho: un aviso creado dentro
             // se habría ido con ella. El error sigue su camino tal cual.
             if (error instanceof HttpError && error.code === "INSUFFICIENT_STOCK" && error.params) {

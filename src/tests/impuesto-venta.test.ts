@@ -306,14 +306,25 @@ describe("Impuesto en la venta (T6-05)", () => {
             expect([-0.01, 100.01, 18.125, Number.NaN, Number.POSITIVE_INFINITY].some(esTasaDeImpuestoValida)).toBe(false);
         });
 
-        it("el nombre lo lee cualquier rol en GET /settings/business; la tasa no va ahí", async () => {
+        it("el nombre y la tasa vigente los lee cualquier rol en GET /settings/business", async () => {
             const lector = await createUser({ email: "lector@example.com", role: "USER" });
             await ajustar({ taxName: "  ITBIS ", taxRate: 18 });
 
             const res = await request(app).get(`${AJUSTES}/business`).set("Cookie", getAuthCookie(lector.id));
 
             expect(res.body.data.taxName).toBe("ITBIS");
-            expect(res.body.data).not.toHaveProperty("taxRate");
+            // T6-08 — la tasa no iba aquí. Ahora va: el mostrador tiene que decir cuánto se va a
+            // cobrar antes de registrar la venta. Es la vigente, no la de ninguna orden.
+            expect(res.body.data.taxRate).toBe(18);
+        });
+
+        it("una tasa estropeada a mano en la tabla se lee como 0 también ahí", async () => {
+            const lector = await createUser({ email: "lector@example.com", role: "USER" });
+            await prisma.appSetting.create({ data: { key: "taxRate", value: "250" } });
+
+            const res = await request(app).get(`${AJUSTES}/business`).set("Cookie", getAuthCookie(lector.id));
+
+            expect(res.body.data.taxRate).toBe(0);
         });
 
         it("422 con un nombre de más de 20 caracteres", async () => {

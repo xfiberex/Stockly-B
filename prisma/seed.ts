@@ -128,6 +128,16 @@ async function sembrarUsuarios(): Promise<User[]> {
                 isVerified: true,
             },
         }),
+        // T6-08 — atiende el mostrador: vende en un paso, al precio del catálogo.
+        prisma.user.create({
+            data: {
+                name: "Sofía Peña",
+                email: "vendedor@stockly.app",
+                password: await hashPassword("Vendedor1234!"),
+                role: "SELLER",
+                isVerified: true,
+            },
+        }),
     ]);
     console.log(`  - ${usuarios.length} usuarios creados`);
     return usuarios;
@@ -965,6 +975,7 @@ async function main(): Promise<void> {
     carlos@stockly.app   Admin1234!   (ADMIN)
     laura@stockly.app    User1234!    (USER, correos en ingles)
     almacen@stockly.app  Almacen1234!  (WAREHOUSE)
+    vendedor@stockly.app Vendedor1234! (SELLER)
 `);
 }
 

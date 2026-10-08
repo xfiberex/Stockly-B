@@ -148,7 +148,7 @@ describe("Settings API (ADMIN)", () => {
 
                 expect(res.status).toBe(200);
                 expect(res.body.data).toEqual({
-                    name: "", taxId: "", address: "", phone: "", email: "", currencySymbol: "$", taxName: "", logoUrl: null,
+                    name: "", taxId: "", address: "", phone: "", email: "", currencySymbol: "$", taxName: "", taxRate: 0, logoUrl: null,
                 });
                 expect(negocioSchema.safeParse(res.body.data).success).toBe(true);
             });
@@ -163,14 +163,14 @@ describe("Settings API (ADMIN)", () => {
                 expect((await request(app).get(BASE).set("Cookie", userCookie)).status).toBe(403);
             });
 
-            it("no trae ningún ajuste de administración: solo sus ocho campos", async () => {
+            it("no trae ningún ajuste de administración: solo sus nueve campos", async () => {
                 // Con todo el catálogo guardado, para que no sea la ausencia de filas lo que lo oculte.
                 await guardar({ lowStockAlertEnabled: true, weeklyDigestEnabled: true, defaultLeadTimeDays: 9, timezone: "UTC" });
 
                 const res = await negocio();
 
                 expect(Object.keys(res.body.data).sort()).toEqual(
-                    ["address", "currencySymbol", "email", "logoUrl", "name", "phone", "taxId", "taxName"],
+                    ["address", "currencySymbol", "email", "logoUrl", "name", "phone", "taxId", "taxName", "taxRate"],
                 );
                 expect(JSON.stringify(res.body.data)).not.toContain("UTC");
             });
