@@ -13,6 +13,8 @@ export interface CreateSaleOrderDto {
     customerName?: string;
     customerEmail?: string;
     customerPhone?: string;
+    /** T6-06 — sin él, se copia el del cliente vinculado. */
+    customerDocument?: string;
     notes?: string;
     items: SaleOrderItemDto[];
 }
@@ -23,6 +25,8 @@ export interface UpdateSaleOrderDto {
     customerName?: string;
     customerEmail?: string;
     customerPhone?: string;
+    /** T6-06 — sin él, se copia el del cliente vinculado. */
+    customerDocument?: string;
     notes?: string;
     status?: SaleOrderStatus;
 }

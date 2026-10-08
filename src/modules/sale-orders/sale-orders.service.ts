@@ -57,7 +57,13 @@ async function clienteDeLaVenta(tx: Prisma.TransactionClient, dto: CreateSaleOrd
     return tx.customer.upsert({
         where: { email },
         update: {},
-        create: { name: dto.customerName?.trim() || email, email, phone: dto.customerPhone?.trim() || null },
+        create: {
+            name: dto.customerName?.trim() || email,
+            email,
+            phone: dto.customerPhone?.trim() || null,
+            // T6-06 — el cliente nace con el documento de la venta. Pero no se **busca** por él.
+            document: dto.customerDocument?.trim() || null,
+        },
     });
 }
 
@@ -106,7 +112,7 @@ export const saleOrderService = {
      *
      * El mismo producto en varias líneas **suma**: dos líneas de 3 sobre 5 disponibles son 6.
      */
-    async create(dto: CreateSaleOrderDto) {
+    async create(dto: CreateSaleOrderDto, actorEmail?: string) {
         const pedido = new Map<string, number>();
         for (const item of dto.items) {
             if (item.productId) pedido.set(item.productId, (pedido.get(item.productId) ?? 0) + item.quantity);
@@ -160,6 +166,10 @@ export const saleOrderService = {
                     customerName: dto.customerName ?? cliente?.name,
                     customerEmail: dto.customerEmail ?? cliente?.email,
                     customerPhone: dto.customerPhone ?? cliente?.phone,
+                    customerDocument: dto.customerDocument ?? cliente?.document,
+                    // T6-06 — quién la registra, de la sesión. No viene en `dto`, y el `PATCH`
+                    // no lo toca: quien edita una orden no pasa a ser quien la vendió.
+                    createdByEmail: actorEmail ?? null,
                     notes: dto.notes,
                     items: {
                         create: dto.items.map((item) => ({
@@ -198,6 +208,7 @@ export const saleOrderService = {
             ...(dto.customerName !== undefined && { customerName: dto.customerName }),
             ...(dto.customerEmail !== undefined && { customerEmail: dto.customerEmail }),
             ...(dto.customerPhone !== undefined && { customerPhone: dto.customerPhone }),
+            ...(dto.customerDocument !== undefined && { customerDocument: dto.customerDocument }),
             ...(dto.notes !== undefined && { notes: dto.notes }),
         };
 
@@ -377,7 +388,9 @@ export const saleOrderService = {
                         status: o.status,
                         customerName: o.customerName ?? "",
                         customerEmail: o.customerEmail ?? "",
+                        customerDocument: o.customerDocument ?? "",
                         createdAt: o.createdAt.toISOString(),
+                        createdByEmail: o.createdByEmail ?? "",
                         productName: item.productName,
                         quantity: item.quantity,
                         unitPrice: Number(item.unitPrice),

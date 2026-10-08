@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentoSchema } from "@/modules/customers/customers.validator";
 
 const itemSchema = z.object({
     productId: z.string().uuid().optional(),
@@ -12,6 +13,7 @@ export const createSaleOrderSchema = z.object({
     customerName: z.string().trim().max(200).optional(),
     customerEmail: z.email("Correo del cliente inválido").optional(),
     customerPhone: z.string().trim().max(30).optional(),
+    customerDocument: documentoSchema.optional(),
     notes: z.string().trim().max(1000).optional(),
     items: z.array(itemSchema).min(1, "Se requiere al menos un ítem"),
 });
@@ -21,6 +23,7 @@ export const updateSaleOrderSchema = z.object({
     customerName: z.string().trim().max(200).optional(),
     customerEmail: z.email("Correo del cliente inválido").optional(),
     customerPhone: z.string().trim().max(30).optional(),
+    customerDocument: documentoSchema.optional(),
     notes: z.string().trim().max(1000).optional(),
     status: z.enum(["PENDING", "SHIPPED", "CANCELLED"]).optional(),
 });

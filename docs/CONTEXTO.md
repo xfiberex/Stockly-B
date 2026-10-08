@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-10-07
+# Contexto de trabajo — al 2026-10-08
 
 Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
 trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
@@ -45,22 +45,22 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-10-07 en este equipo, con `pnpm verify` y el E2E:
+Medido el 2026-10-08 en este equipo, con `pnpm verify` y el E2E:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1229** en 61 archivos | **769** en 72 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.49 % *(suelo 85 %)* | 78.06 % *(suelo 45 %)* |
+| Tests | **1251** en 62 archivos | **774** en 72 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.49 % *(suelo 85 %)* | 78.11 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **30 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 132 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 133 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
 `T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
-de las que están cerradas de `T6-01` a `T6-05`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+de las que están cerradas de `T6-01` a `T6-06`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
 el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
@@ -144,6 +144,12 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   (`playwright test -g …`): el 2026-10-07 dejó los dos servidores vivos y la pasada completa
   siguiente dio 27 fallos de 30. Antes de investigar un fallo, mirar el puerto:
   `Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 3000,5173 }`.
+- **Entre dos pasadas completas, unos segundos.** El 2026-10-08, relanzar el E2E nada más terminar
+  otra pasada dio siete esperas agotadas una vez y un `ECONNRESET` otra, en escenarios distintos y
+  sin relación con lo que se había tocado; con cinco segundos de pausa pasó limpio dos veces
+  seguidas. La explicación más probable —**no demostrada**— es la de arriba: `reuseExistingServer`
+  encuentra el puerto todavía respondiendo y reutiliza un servidor que se está cerrando. Si un
+  fallo no se repite tras esperar, no es del cambio.
 - **Si el 3000 es un `pnpm dev` abierto a propósito, no hace falta cerrarlo.** Se levanta otra pareja
   en otros puertos y Playwright la reutiliza: el backend con
   `PORT=3100 FRONTEND_URL=http://localhost:5174 RATE_LIMIT_MAX=100000 AUTH_RATE_LIMIT_MAX=1000`,
@@ -325,6 +331,12 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   que devuelva una orden de venta pasa por ahí. El redondeo vive solo en `totalesDeLinea`: por línea,
   medio céntimo hacia arriba, y el impuesto de la orden es la suma. **`unitPrice` no lleva impuesto
   nunca**: de él salen ingresos, margen y clase ABC, y por eso los informes siguen en neto.
+
+- **Quién registró una venta es un texto que pone el servidor, y el documento del cliente no es
+  una clave** (`T6-06`). `createdByEmail` sale de la sesión, no de la petición, y ninguna ruta lo
+  edita. `document` no es único y no vincula ventas a clientes: la única regla de vinculación
+  sigue siendo el correo normalizado (`T5-06`). Cambiarla es una decisión con su ficha, no un
+  arreglo de paso.
 
 ### Textos, correos y avisos
 

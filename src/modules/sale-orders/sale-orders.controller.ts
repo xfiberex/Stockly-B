@@ -25,7 +25,7 @@ export const saleOrderController = {
         next: NextFunction,
     ): Promise<void> {
         try {
-            const order = await saleOrderService.create(req.body);
+            const order = await saleOrderService.create(req.body, req.userEmail);
             await auditService.log(
                 { userId: req.userId, userEmail: req.userEmail },
                 "CREATE", "SaleOrder", order.id,

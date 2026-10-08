@@ -339,7 +339,7 @@ describe("Sale Orders API", () => {
             // que es justo lo que decide si el tope de la exportación se queda corto.
             const lineas = res.text.replace(/^﻿/, "").trim().split("\n");
             expect(lineas).toHaveLength(3);
-            expect(lineas[0]).toBe("orderNumber,orderId,status,customerName,customerEmail,createdAt,productName,quantity,unitPrice,totalLine,taxRate,taxLine,totalLineWithTax");
+            expect(lineas[0]).toBe("orderNumber,orderId,status,customerName,customerEmail,customerDocument,createdAt,createdByEmail,productName,quantity,unitPrice,totalLine,taxRate,taxLine,totalLineWithTax");
             expect(res.text).toContain("Servicio de instalación");
         });
 

@@ -17,6 +17,11 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Vendedor y documento del cliente en la venta** (`T6-06`): cada venta dice quién la registró
+  —el correo de su sesión, que sobrevive a la cuenta— y los clientes tienen un documento (cédula,
+  RNC, NIF) que la venta copia a su instantánea. Se ven en el detalle de la venta, en la ficha
+  del cliente y en la exportación, y los clientes se buscan también por su documento. El
+  vendedor de las ventas anteriores se recupera de la auditoría. **Requiere migración.**
 - **Impuesto en la venta** (`T6-05`): en Configuración, la tasa de impuesto sobre las ventas —un
   porcentaje, **0 por defecto**, que deja todo como estaba— y su nombre («ITBIS», «IVA»). Cada
   venta nueva congela la tasa vigente en sus líneas, y la orden trae `subtotal`, `tax` y `total`

@@ -45,6 +45,8 @@ export const customersService = {
                     // El correo está guardado en minúsculas: basta con bajar lo buscado.
                     { email: { contains: busqueda.toLowerCase() } },
                     { phone: { contains: busqueda } },
+                    // T6-06 — por el documento también: es lo que el cliente dicta en el mostrador.
+                    { document: { contains: busqueda, mode: "insensitive" } },
                 ],
             }
             : {};
@@ -114,6 +116,7 @@ export const customersService = {
                     name: dto.name,
                     email: normalizarCorreo(dto.email),
                     phone: textoOpcional(dto.phone) ?? null,
+                    document: textoOpcional(dto.document) ?? null,
                     notes: textoOpcional(dto.notes) ?? null,
                 },
             })
@@ -134,6 +137,7 @@ export const customersService = {
                     name: dto.name,
                     ...(dto.email !== undefined && { email: normalizarCorreo(dto.email) }),
                     ...(dto.phone !== undefined && { phone: textoOpcional(dto.phone) }),
+                    ...(dto.document !== undefined && { document: textoOpcional(dto.document) }),
                     ...(dto.notes !== undefined && { notes: textoOpcional(dto.notes) }),
                 },
             })

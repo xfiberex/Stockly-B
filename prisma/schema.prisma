@@ -410,6 +410,9 @@ model Customer {
   // `Ana@Correo.com` y `ana@correo.com ` tienen que ser el mismo cliente.
   email      String?     @unique
   phone      String?
+  // T6-06 — cédula, RNC, NIF: lo que el comprobante pone junto al nombre. **No es clave de
+  // nada**: no es único y no agrupa clientes; eso lo sigue haciendo solo el correo.
+  document   String?
   notes      String?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -448,6 +451,12 @@ model SaleOrder {
   customerName  String?
   customerEmail String?
   customerPhone String?
+  // T6-06 — el documento del cliente, en la instantánea por lo mismo que los tres de arriba.
+  customerDocument String?
+  // T6-06 — quién registró la venta. El correo y no una clave foránea, como en la auditoría y
+  // los conteos: la orden tiene que seguir diciéndolo aunque esa cuenta se desactive o se borre.
+  // `null` en las anteriores a este campo que no tenían fila en la auditoría.
+  createdByEmail String?
   notes         String?
   // T5-02 — cuándo salió la mercancía. `updatedAt` no sirve para esto: cambia con cualquier
   // edición de la orden, y el margen de un periodo se cuenta por la fecha de envío. Se

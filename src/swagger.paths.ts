@@ -329,7 +329,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
             tags: ["Customers"], summary: "Listar clientes, por nombre",
             parameters: [
                 ...PARAMS_PAGINA,
-                { name: "search", in: "query", schema: { type: "string" }, description: "Busca en nombre, correo y teléfono" },
+                { name: "search", in: "query", schema: { type: "string" }, description: "Busca en nombre, correo, teléfono y documento" },
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/CustomerListItem"), "Listado paginado"), "401": ERROR("No autenticado") },
         },
@@ -389,13 +389,13 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
         post: {
             tags: ["Sale Orders"], summary: "Crear orden de venta",
-            description: "T6-05 — `subtotal`, `tax` y `total` los calcula el servidor con la tasa de Configuración vigente, que queda congelada en cada línea (`taxRate`); los que vengan en el cuerpo se descartan, y `unitPrice` es siempre sin impuesto. T6-04 — la respuesta trae `number`, el correlativo de la venta: lo asigna el servidor dentro de la transacción que la crea, y una venta rechazada no lo gasta. T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
+            description: "T6-06 — `createdByEmail` lo pone el servidor con la sesión de quien crea la venta; no se envía ni se edita. T6-05 — `subtotal`, `tax` y `total` los calcula el servidor con la tasa de Configuración vigente, que queda congelada en cada línea (`taxRate`); los que vengan en el cuerpo se descartan, y `unitPrice` es siempre sin impuesto. T6-04 — la respuesta trae `number`, el correlativo de la venta: lo asigna el servidor dentro de la transacción que la crea, y una venta rechazada no lo gasta. T5-06 — con `customerId` se vincula a ese cliente, y los datos de cliente que falten se copian de él. Sin `customerId`, se vincula **por el correo**: al cliente que lo tenga o a uno nuevo. Sin correo, a ninguno.",
             requestBody: { required: true, content: { "application/json": { schema: {
                 type: "object", required: ["items"],
                 properties: {
                     customerId: { type: "string", format: "uuid" },
                     customerName: { type: "string" }, customerEmail: { type: "string", format: "email" },
-                    customerPhone: { type: "string" }, notes: { type: "string" },
+                    customerPhone: { type: "string" }, customerDocument: { type: "string", maxLength: 40, description: "Cédula, RNC, NIF (T6-06). Sin él se copia el del cliente vinculado" }, notes: { type: "string" },
                     items: { type: "array", minItems: 1, items: { type: "object", properties: { productId: { type: "string", format: "uuid" }, productName: { type: "string" }, quantity: { type: "integer" }, unitPrice: { type: "number" } } } },
                 },
             } } } },

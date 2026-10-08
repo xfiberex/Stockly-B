@@ -734,6 +734,14 @@ export const ordenVentaSchema = z.object({
     customerName: z.string().nullable(),
     customerEmail: z.string().nullable(),
     customerPhone: z.string().nullable(),
+    /** T6-06 — el documento del cliente, parte de la misma instantánea. */
+    customerDocument: z.string().nullable(),
+    /**
+     * T6-06 — el correo de quien registró la venta. Lo pone el servidor con la sesión, no la
+     * petición, y no se puede editar. Sobrevive a la cuenta: es texto, no una clave foránea.
+     * `null` en las órdenes anteriores de las que la auditoría no guardaba quién las creó.
+     */
+    createdByEmail: z.string().nullable(),
     notes: z.string().nullable(),
     items: z.array(itemOrdenVentaSchema),
     /**
@@ -750,12 +758,20 @@ export const ordenVentaSchema = z.object({
 
 // ─────────────────────── Clientes (T5-06) ───────────────────────
 
+/** T6-06 — lo más largo que puede ser el documento de un cliente (cédula, RNC, NIF…). */
+export const LARGO_MAXIMO_DE_DOCUMENTO = 40;
+
 /** El correo se guarda normalizado —minúsculas, sin espacios alrededor—: es la clave del cliente. */
 export const clienteSchema = z.object({
     id: z.string(),
     name: z.string(),
     email: z.string().nullable(),
     phone: z.string().nullable(),
+    /**
+     * T6-06 — cédula, RNC, NIF. Texto libre: cada país tiene el suyo. **No identifica al
+     * cliente**: no es único, y una venta no se vincula a nadie por él.
+     */
+    document: z.string().nullable(),
     notes: z.string().nullable(),
     createdAt: fechaSchema,
     updatedAt: fechaSchema,

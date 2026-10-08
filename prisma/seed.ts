@@ -367,6 +367,8 @@ interface OrdenDeVenta {
     customerName: string;
     customerEmail?: string;
     customerPhone?: string;
+    /** T6-06 — cédula, RNC, RFC… del cliente. */
+    customerDocument?: string;
     notes?: string;
     dias: number;
     items: LineaDePedido[];
@@ -378,6 +380,7 @@ const ordenesDeVenta: OrdenDeVenta[] = [
         customerName: "Distribuidora Vega",
         customerEmail: "compras@distribuidoravega.mx",
         customerPhone: "+52 55 4821 9930",
+        customerDocument: "DVE010203AB1",
         notes: "Entregado en almacén central, firmado por recepción",
         dias: 25,
         items: [
@@ -737,13 +740,16 @@ async function sembrarOrdenesDeVenta(
                     customer: {
                         connectOrCreate: {
                             where: { email },
-                            create: { name: orden.customerName, email, phone: orden.customerPhone ?? null, createdAt: fecha },
+                            create: { name: orden.customerName, email, phone: orden.customerPhone ?? null, document: orden.customerDocument ?? null, createdAt: fecha },
                         },
                     },
                 }),
                 customerName: orden.customerName,
                 customerEmail: orden.customerEmail,
                 customerPhone: orden.customerPhone,
+                customerDocument: orden.customerDocument,
+                // T6-06 — como si las hubiera registrado el administrador de la demostración.
+                createdByEmail: "admin@stockly.app",
                 notes: orden.notes,
                 createdAt: fecha,
                 shippedAt: orden.status === "SHIPPED" ? fecha : null,
