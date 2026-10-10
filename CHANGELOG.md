@@ -17,6 +17,9 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Ventas de la semana en el panel** (`T6-09`): las ventas enviadas de los últimos siete días,
+  por día, y los cinco productos más vendidos. Por fecha de envío, en la zona horaria del negocio
+  y sin impuesto. `GET /reports` lo trae en `salesByDay` y `topSold`.
 - **Venta de mostrador y rol de vendedor** (`T6-08`): una pantalla nueva, **Mostrador**, para
   vender en un paso —buscar o escanear, decir cuántos y registrar—: la venta queda hecha, con el
   stock descontado, su número y su comprobante. Es `POST /sale-orders/counter`, que pone el
@@ -155,6 +158,8 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- `pnpm carga:sembrar` fallaba a medias desde `T6-04`: sembraba las ventas sin su número, que es
+  obligatorio. Ahora las numera por fecha y deja el contador en la última (`T6-09`).
 - Subir una imagen de más de 2 MB, de un tipo no admitido o en un campo equivocado respondía 500,
   en el logo y en la foto de un producto. Ahora responde 413, 422 o 400, con un código que la
   interfaz traduce (`T6-03`).

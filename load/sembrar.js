@@ -267,11 +267,16 @@ paso(`${VENTAS.toLocaleString("es")} órdenes de venta (${(VENTAS * 2).toLocaleS
                    now() - (floor(random() * 525600)::int || ' minutes')::interval AS fecha
             FROM generate_series(1, ${VENTAS}) i;
 
-        INSERT INTO sale_orders (id, status, "customerName", "shippedAt", "createdAt", "updatedAt")
-        SELECT id, status, 'Cliente '||(i % 5000),
+        -- T6-04 — el correlativo es obligatorio. Va por orden de creación, como lo numeraría la
+        -- aplicación, y el contador se deja en el último para que la serie pueda seguir.
+        INSERT INTO sale_orders (id, number, status, "customerName", "shippedAt", "createdAt", "updatedAt")
+        SELECT id, row_number() OVER (ORDER BY fecha, id), status, 'Cliente '||(i % 5000),
                CASE WHEN status <> 'PENDING' THEN fecha END,
                fecha - interval '1 day', fecha
         FROM ordenes;
+
+        INSERT INTO counters (key, value) SELECT 'saleOrder', count(*) FROM ordenes
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
         INSERT INTO sale_order_items (id, "saleOrderId", "productId", "productName", quantity, "unitPrice", "unitCost", "createdAt")
         SELECT gen_random_uuid()::text, l.orden, n.id, n.name, l.cantidad, n.price,

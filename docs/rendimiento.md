@@ -520,3 +520,36 @@ La columna «con» se midió creando el índice **dentro de una transacción que
 base de carga quedó como estaba, sin él. `pnpm carga:sembrar` la recrea con las migraciones, así
 que la próxima vez que se siembre lo tendrá.
 
+---
+
+## 14. T6-09 — las ventas del panel, sobre el conjunto de carga
+
+Medido el 2026-10-09 sobre `Stockly_carga` recién sembrada —330 000 órdenes y 660 000 líneas, con
+**5 413 ventas enviadas en la ventana de siete días**, unas 770 al día—, con
+`EXPLAIN (ANALYZE, BUFFERS)`, cinco pasadas y `work_mem` de fábrica (4 MB). Son las dos consultas
+que `T6-09` añade a `getSummary`, y las paga cada visita al panel.
+
+| Consulta | Mejor | Mediana | Plan | ¿A disco? |
+|---|---:|---:|---|---|
+| **Ventas por día**, un `LATERAL` por día | **105,2 ms** | 109,8 ms | `Index Scan` por `sale_orders_status_shippedAt_idx`, siete veces; ordena 1 547 filas por día para el `COUNT(DISTINCT)` | no (`quicksort`, 132 kB) |
+| Ventas por día, `GROUP BY` sobre el día *(descartada)* | 117,9 ms | 121,3 ms | `Bitmap Index Scan` + `Gather Merge` con dos procesos; ordena las 10 826 líneas por la expresión | no (`quicksort`, 1 230 kB) |
+| **Más vendidos** de la ventana | **79,2 ms** | 84,4 ms | `Bitmap Index Scan` por el mismo índice, `HashAggregate` de 10 245 nombres y `top-N heapsort` | no (4 241 kB de tabla hash) |
+
+**Ninguna recorre una tabla entera ni ordena en disco**: las dos entran por `(status, shippedAt)`,
+que acota la ventana, y llegan a las líneas por `sale_order_items_saleOrderId_idx`. Casi todo el
+tiempo es eso último, 5 413 búsquedas de dos líneas cada una.
+
+**El `LATERAL` gana por poco, y no es por lo que gana por lo que se eligió.** A este tamaño el
+`GROUP BY` sobre `("shippedAt" AT TIME ZONE …)::date` tampoco se va a disco —son siete días, no
+los seis meses de §5—, pero ordena por una expresión sin estadísticas, estima 4 968 grupos donde
+hay siete y necesita dos procesos en paralelo para quedarse en 120 ms. El `LATERAL` no ordena por
+el día, no depende de esa estimación y **devuelve los días sin ventas a cero** sin un `LEFT JOIN`
+contra la serie.
+
+Lo que las dos suman al panel no son 185 ms: corren a la vez que el resto de `getSummary`, cuyo
+tramo más lento ya era el margen (~190 ms, §8). **No se ha medido el panel entero con k6** tras
+añadirlas; es una fila más de la carga sostenida que sigue sin repetirse.
+
+Para medir hubo que **arreglar `load/sembrar.js`**: desde `T6-04` insertaba ventas sin `number`,
+que es obligatorio, y la siembra fallaba a medias. Ahora numera por fecha y deja el contador en
+el último.

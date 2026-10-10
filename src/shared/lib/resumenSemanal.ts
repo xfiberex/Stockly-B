@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { env } from "@/config/env";
 import { logger } from "@/shared/lib/logger";
 import { hoyEn } from "@/shared/lib/zonaHoraria";
+import { enviadasEntre, masVendidoEntre } from "@/shared/lib/ventasEnviadas";
 import { sendWeeklyDigestEmail } from "@/shared/lib/nodemailer";
 import { settingsService } from "@/modules/settings/settings.service";
 
@@ -79,11 +80,9 @@ export function semanaAnterior(hoy: string): Semana {
 
 /** Todo lo que cuenta el correo, reunido **una vez** para todos los destinatarios. */
 export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: string): Promise<DatosDelResumen> {
-    // Los extremos de la semana como instantes UTC, igual que en `reports.service.ts` (T5-09):
-    // el lunes a las 00:00 **de la zona del negocio**, no de UTC.
-    const desde = Prisma.sql`((${semana.from}::date::timestamp) AT TIME ZONE ${zona} AT TIME ZONE 'UTC')`;
-    const hasta = Prisma.sql`(((${semana.to}::date + 1)::timestamp) AT TIME ZONE ${zona} AT TIME ZONE 'UTC')`;
-    const enviadasEnLaSemana = Prisma.sql`so."status" = 'SHIPPED' AND so."shippedAt" >= ${desde} AND so."shippedAt" < ${hasta}`;
+    // El lunes a las 00:00 **de la zona del negocio**, no de UTC. El filtro y «lo más vendido»
+    // son los mismos que usa el panel (T6-09).
+    const enviadasEnLaSemana = enviadasEntre(semana.from, semana.to, zona);
 
     const plazoPorDefecto = Number(await settingsService.get("defaultLeadTimeDays"));
     const moneda = await settingsService.moneda();
@@ -95,17 +94,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
             JOIN "sale_order_items" i ON i."saleOrderId" = so."id"
             WHERE ${enviadasEnLaSemana}
         `,
-        // Por el nombre congelado en la línea: es lo que se vendió, aunque el producto se haya
-        // renombrado o borrado después.
-        prisma.$queryRaw<Array<{ nombre: string; unidades: bigint; importe: Prisma.Decimal }>>`
-            SELECT i."productName" AS nombre, SUM(i."quantity") AS unidades, SUM(i."quantity" * i."unitPrice") AS importe
-            FROM "sale_orders" so
-            JOIN "sale_order_items" i ON i."saleOrderId" = so."id"
-            WHERE ${enviadasEnLaSemana}
-            GROUP BY i."productName"
-            ORDER BY unidades DESC, importe DESC, nombre ASC
-            LIMIT ${MOSTRADOS.masVendido}
-        `,
+        masVendidoEntre(semana.from, semana.to, zona, MOSTRADOS.masVendido),
         // El mismo criterio que el panel de reportes: activos con el stock en el mínimo o por debajo.
         prisma.$queryRaw<Array<{ nombre: string; stock: number; minimo: number; total: bigint }>>`
             SELECT p."name" AS nombre, p."stock", p."minStock" AS minimo, COUNT(*) OVER () AS total
@@ -149,7 +138,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
             unidades: Number(totales[0]?.unidades ?? 0),
             importe: Number(totales[0]?.importe ?? 0),
         },
-        masVendido: masVendido.map((p) => ({ nombre: p.nombre, unidades: Number(p.unidades), importe: Number(p.importe) })),
+        masVendido,
         stockBajo: {
             total: Number(stockBajo[0]?.total ?? 0),
             productos: stockBajo.map((p) => ({ nombre: p.nombre, stock: p.stock, minimo: p.minimo })),

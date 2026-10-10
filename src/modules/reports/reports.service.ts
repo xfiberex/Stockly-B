@@ -2,6 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 import { hoyEn } from "@/shared/lib/zonaHoraria";
+import { haceDias, masVendidoEntre, ventasPorDia } from "@/shared/lib/ventasEnviadas";
 import { settingsService } from "@/modules/settings/settings.service";
 import { mesesDe, resolverPeriodo } from "./reports.periodo";
 
@@ -74,6 +75,14 @@ const rotacionExacta = Prisma.sql`
  * del informe hablen del mismo mes; los rangos de fechas a elección son T5-09.
  */
 export const DIAS_DE_MARGEN = 30;
+
+/**
+ * T6-09 — la ventana de ventas del panel: hoy y los seis días anteriores, en días del negocio.
+ * Corta a propósito: es lo que acota las dos consultas por el índice `(status, shippedAt)`, y
+ * las paga cada visita al panel.
+ */
+export const DIAS_DE_VENTAS = 7;
+const MAS_VENDIDOS = 5;
 
 /**
  * Ventas enviadas dentro de la ventana, que es de lo único que sale un margen realizado. Van
@@ -308,6 +317,7 @@ export const reportsService = {
         // T5-09 — el gráfico de movimientos va por meses del negocio. Es una lectura por
         // clave primaria de `app_settings`; mientras, el margen ya está en marcha.
         const zona = await settingsService.zonaHoraria();
+        const hoy = hoyEn(zona);
 
         const [
             totalProducts,
@@ -318,6 +328,8 @@ export const reportsService = {
             movementsByMonth,
             lowStockProducts,
             stockMetrics,
+            salesByDay,
+            masVendido,
         ] = await Promise.all([
             prisma.product.count(),
             prisma.product.count({ where: { isActive: true } }),
@@ -454,6 +466,10 @@ export const reportsService = {
              * compromete memoria de nadie. La configuración se deja como está a propósito.
              */
             prisma.$queryRaw<FilaDeRotacion[]>(rotacionRapida),
+            // T6-09 — las ventas de la semana, por día, y lo más vendido en ella: la misma
+            // consulta que el resumen semanal, con otra ventana.
+            ventasPorDia(hoy, DIAS_DE_VENTAS, zona),
+            masVendidoEntre(haceDias(hoy, DIAS_DE_VENTAS - 1), hoy, zona, MAS_VENDIDOS),
         ]);
 
         const [margenTotal, margenPorCategoria, margenPorProducto] = await margenEnCurso;
@@ -540,6 +556,8 @@ export const reportsService = {
                 category: p.categoryName ?? null,
             })),
             stockMetrics: rotationMetrics,
+            salesByDay,
+            topSold: masVendido.map((p) => ({ name: p.nombre, units: p.unidades, revenue: p.importe })),
             margin: {
                 days: DIAS_DE_MARGEN,
                 ...conMargen({

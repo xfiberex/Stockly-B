@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-10-08
+# Contexto de trabajo — al 2026-10-10
 
 Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
 trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
@@ -45,22 +45,22 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-10-08 en este equipo, con `pnpm verify` y el E2E:
+Medido el 2026-10-10 en este equipo, con `pnpm verify` y el E2E:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1449** en 64 archivos | **816** en 74 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.75 % *(suelo 85 %)* | 78.46 % *(suelo 45 %)* |
+| Tests | **1460** en 65 archivos | **820** en 74 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.77 % *(suelo 85 %)* | 78.38 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **34 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 135 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Tareas: 136 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
 `T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas,
-de las que están cerradas de `T6-01` a `T6-08`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
+de las que están cerradas de `T6-01` a `T6-09`; las tres decisiones de producto que lo gobiernan están al principio de ese tier, en
 el ROADMAP.
 
 Cuatro cosas que conviene saber antes de tocar nada:
@@ -290,6 +290,13 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
 
 ### Datos y consultas
 
+- **Una serie de días o de meses se genera con `timestamp`, no con `date`.** `generate_series`
+  con argumentos `date` devuelve `timestamptz` en la zona de la sesión, y `AT TIME ZONE` sobre
+  eso convierte en el sentido contrario: el corte del día se va de hora sin dar error. Y los
+  huecos salen de un `LATERAL` con un agregado sin `GROUP BY`, que siempre devuelve una fila
+  (`shared/lib/ventasEnviadas.ts`).
+- **Qué es una venta en un informe se decide en un sitio**, `enviadasEntre`: enviada, por fecha de
+  envío, en días del negocio y en neto. Lo usan el panel y el resumen semanal.
 - **Ningún listado se devuelve entero.** Todo `findMany` de lectura lleva `parsePagination` y
   `meta`, y **sus filtros van en el `where`**: filtrar en el navegador filtra solo la página
   traída, sin error y sin aviso. En pantalla, los recuentos salen de `meta.total`, cambiar un

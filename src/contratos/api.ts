@@ -1253,6 +1253,23 @@ export const margenRealizadoSchema = z.object({
     topProducts: z.array(margenPorProductoSchema),
 });
 
+/**
+ * T6-09 — las ventas **enviadas** de un día del negocio (`YYYY-MM-DD`, en la zona `timezone`).
+ * `revenue` es neto, como el resto de informes. Un día sin ventas viene a cero, no falta.
+ */
+export const ventasPorDiaSchema = z.object({
+    day: z.string(),
+    orders: z.number(),
+    revenue: z.number(),
+});
+
+/** T6-09 — por el nombre congelado en la línea de venta: el producto puede ya no existir. */
+export const masVendidoSchema = z.object({
+    name: z.string(),
+    units: z.number(),
+    revenue: z.number(),
+});
+
 export const resumenReporteSchema = z.object({
     totals: totalesReporteSchema,
     stockByCategory: z.array(stockPorCategoriaSchema),
@@ -1260,6 +1277,10 @@ export const resumenReporteSchema = z.object({
     movementsByMonth: z.array(movimientoPorMesSchema),
     lowStockProducts: z.array(productoBajoStockSchema),
     stockMetrics: z.array(metricaStockSchema),
+    /** T6-09 — hoy y los seis días anteriores, del más antiguo al más reciente: siempre siete. */
+    salesByDay: z.array(ventasPorDiaSchema),
+    /** T6-09 — los cinco más vendidos por unidades en esos siete días. */
+    topSold: z.array(masVendidoSchema),
     margin: margenRealizadoSchema,
 });
 
@@ -1401,6 +1422,8 @@ export type MovimientoPorMes = z.infer<typeof movimientoPorMesSchema>;
 export type ProductoBajoStock = z.infer<typeof productoBajoStockSchema>;
 export type MetricaStock = z.infer<typeof metricaStockSchema>;
 export type ResumenReporte = z.infer<typeof resumenReporteSchema>;
+export type VentasPorDia = z.infer<typeof ventasPorDiaSchema>;
+export type MasVendido = z.infer<typeof masVendidoSchema>;
 export type MargenRealizado = z.infer<typeof margenRealizadoSchema>;
 export type AtajoDePeriodo = z.infer<typeof atajoDePeriodoSchema>;
 export type PeriodoPorMes = z.infer<typeof periodoPorMesSchema>;
