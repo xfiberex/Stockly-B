@@ -17,6 +17,10 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Venta de mostrador y documento de venta (Tier 6)**
 
+- **Alta de usuarios por invitación** (`T6-10`): un administrador da de alta a una persona desde
+  **Usuarios** —nombre, correo y rol— con `POST /users`. A la persona le llega un correo con un
+  enlace para elegir su contraseña, válido 7 días; ninguna contraseña viaja por correo. Queda en
+  la auditoría como `CREATE` sobre `User`. Necesita el SMTP configurado (503 si no).
 - **Ventas de la semana en el panel** (`T6-09`): las ventas enviadas de los últimos siete días,
   por día, y los cinco productos más vendidos. Por fecha de envío, en la zona horaria del negocio
   y sin impuesto. `GET /reports` lo trae en `salesByDay` y `topSold`.
@@ -122,6 +126,9 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Restablecer la contraseña verifica la cuenta** (`T6-10`): quien usa el enlace de «olvidé mi
+  contraseña» ha demostrado que el buzón es suyo, así que una cuenta que no había confirmado su
+  correo queda confirmada al poner la contraseña nueva.
 - **Documentación reorganizada y compactada** (2026-10-05). El ROADMAP pasa a ser el índice del
   trabajo pendiente; las fichas completas y la auditoría se archivan en `docs/historico/`.
 - **Licencia: GNU AGPL v3**, en lugar de la MIT ([ADR 0009](docs/adr/0009-licencia-agpl.md)). El

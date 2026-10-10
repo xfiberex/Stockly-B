@@ -654,6 +654,24 @@ export const rutasAdicionales: Record<string, Ruta> = {
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/User"), "Listado paginado"), "403": ERROR("Requiere rol ADMIN") },
         },
+        // T6-10
+        post: {
+            tags: ["Users"], summary: "Invitar a una persona (ADMIN)",
+            description: "Crea la cuenta con su rol y envía un correo con un enlace para que la persona elija su contraseña; ninguna contraseña viaja por correo. El enlace caduca a los 7 días y, al usarlo, la cuenta queda verificada. El correo sale en el idioma de la petición (`Accept-Language`).",
+            requestBody: { required: true, content: { "application/json": { schema: {
+                type: "object", required: ["name", "email", "role"],
+                properties: {
+                    name: { type: "string", maxLength: 80 },
+                    email: { type: "string", format: "email" },
+                    role: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE", "SELLER"] },
+                },
+            } } } },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/User" }, "Cuenta creada e invitación enviada"),
+                "403": ERROR("Requiere rol ADMIN"), "409": ERROR("El correo ya está registrado"),
+                "422": ERROR("Datos inválidos"), "503": ERROR("El envío de correo no está configurado"),
+            },
+        },
     },
     "/users/{id}": {
         get: {

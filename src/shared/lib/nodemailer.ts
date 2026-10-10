@@ -66,7 +66,9 @@ export const transporter = nodemailer.createTransport({
 
 // Sin credenciales SMTP el servidor arranca igual (T1-26). El fallo se produce aquí,
 // al intentar enviar, con un mensaje que dice qué falta.
-function requireSmtp(): void {
+//
+// Se exporta para la invitación (T6-10), que tiene que saberlo **antes** de crear la cuenta.
+export function requireSmtp(): void {
     if (!env.smtp.configured) {
         throw new HttpError(
             503,
@@ -118,6 +120,35 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
         html: renderEmail({
             preheader: t("reset.preencabezado"),
             heading: t("reset.titulo"),
+            bodyHtml,
+            idioma,
+        }),
+    });
+}
+
+/**
+ * T6-10 — la invitación a una cuenta que ha creado un administrador. **No lleva contraseña**:
+ * lleva un enlace para ponerla, a la misma página que «olvidé mi contraseña» y con el mismo
+ * token. `invitacion=1` solo cambia lo que dice esa página; no decide nada en el servidor.
+ */
+export async function sendInvitationEmail(to: string, name: string, token: string, dias: number, idioma: Idioma) {
+    requireSmtp();
+    const url = `${env.frontendUrl}/auth/reset-password?token=${token}&invitacion=1`;
+    const t = traductorDeCorreo(idioma);
+
+    const bodyHtml =
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(name) })) +
+        emailParagraph(t("invitacion.cuerpo")) +
+        emailButton(url, t("invitacion.boton")) +
+        emailNote(t("invitacion.nota", { dias }));
+
+    await transporter.sendMail({
+        from: env.smtp.from,
+        to,
+        subject: t("invitacion.asunto"),
+        html: renderEmail({
+            preheader: t("invitacion.preencabezado"),
+            heading: t("invitacion.titulo"),
             bodyHtml,
             idioma,
         }),

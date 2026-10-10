@@ -34,6 +34,14 @@ export const correosEs = {
     "reset.boton": "Restablecer contraseña",
     "reset.nota": "El enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo y tu contraseña seguirá siendo la misma.",
 
+    // ── Invitación a una cuenta (T6-10) ──────────────────────────────────────
+    "invitacion.asunto": "Te han invitado a {marca}",
+    "invitacion.preencabezado": "Elige tu contraseña para entrar en {marca}.",
+    "invitacion.titulo": "Tu cuenta está lista",
+    "invitacion.cuerpo": "Un administrador te ha creado una cuenta en {marca}. Elige tu contraseña para empezar a usarla.",
+    "invitacion.boton": "Elegir mi contraseña",
+    "invitacion.nota": "El enlace expira en {dias} días. Si caduca, usa «¿Olvidaste tu contraseña?» en la página de inicio de sesión para recibir otro.",
+
     // ── Alerta de bajo stock ─────────────────────────────────────────────────
     "stock.asunto": "⚠️ Alerta de bajo stock: {producto} — {marca}",
     "stock.preencabezado": "{producto} está en {actual} unidades (mínimo {minimo}).",

@@ -202,10 +202,18 @@ export const authService = {
         // El reset es el flujo de recuperación de una cuenta potencialmente comprometida:
         // se revocan también las sesiones activas para que un refresh token robado deje
         // de servir de inmediato (mismo criterio que updatePassword).
+        //
+        // T6-10 — y **verifica la cuenta**. El token llegó al buzón de la cuenta, que es lo
+        // mismo que demuestra el correo de verificación; sin esto, una persona invitada pondría
+        // su contraseña y `login` la seguiría rechazando. Vale igual para quien se registró, no
+        // confirmó y restablece: ha demostrado lo mismo por otro correo.
         await prisma.user.update({
             where: { id: user.id },
             data: {
                 password: hashed,
+                isVerified: true,
+                verifyToken: null,
+                verifyExpires: null,
                 resetToken: null,
                 resetExpires: null,
                 refreshToken: null,

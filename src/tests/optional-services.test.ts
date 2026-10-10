@@ -36,6 +36,32 @@ describe("Servicios opcionales sin configurar", () => {
         });
     });
 
+    // T6-10 — la invitación lo comprueba **antes** de crear la cuenta: creada y sin correo, no
+    // se la podría volver a invitar.
+    it("sin SMTP, invitar responde 503 y no crea la cuenta", async () => {
+        await conEntornoSin(CLAVES_SMTP, async () => {
+            const { usersService } = await import("@/modules/users/users.service");
+            const { prisma } = await import("@/shared/lib/prisma");
+            const email = "invitada_sin_smtp@example.com";
+            // Que al final no haya cuenta no basta: también la retira el fallo del envío. Lo que
+            // se pide es que no llegue a crearse.
+            const crear = jest.spyOn(prisma.user, "create");
+
+            try {
+                await expect(usersService.invite({ name: "Ana", email, role: "USER" }, "ES")).rejects.toMatchObject({
+                    statusCode: 503,
+                    code: "EMAIL_NOT_CONFIGURED",
+                });
+                expect(crear).not.toHaveBeenCalled();
+                expect(await prisma.user.findUnique({ where: { email } })).toBeNull();
+            } finally {
+                crear.mockRestore();
+                await prisma.user.deleteMany({ where: { email } });
+                await prisma.$disconnect();
+            }
+        });
+    });
+
     it("la subida de imágenes responde 503 nombrando las variables de Cloudinary", async () => {
         await conEntornoSin(CLAVES_CLOUDINARY, async () => {
             const { uploadToCloudinary, deleteFromCloudinary } = await import(

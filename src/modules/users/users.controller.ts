@@ -1,12 +1,25 @@
 import type { Request, Response, NextFunction } from "express";
 import { usersService } from "./users.service";
 import type { $Enums } from "@/generated/prisma/client";
+import { auditService } from "@/modules/audit-logs";
+import { idiomaDePeticion } from "@/shared/lib/idiomaDePeticion";
 
 export const usersController = {
     async getAll(req: Request, res: Response, next: NextFunction) {
         try {
             const result = await usersService.getAll(req.query as Record<string, string>);
             res.json({ success: true, message: "Usuarios obtenidos exitosamente", data: result });
+        } catch (error) { next(error); }
+    },
+
+    async invite(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { name, email, role } = req.body as { name: string; email: string; role: $Enums.Role };
+            // De la persona invitada no se conoce ningún idioma: va el de quien la invita, y se
+            // corrige solo en su primer inicio de sesión (T4-12).
+            const user = await usersService.invite({ name, email, role }, idiomaDePeticion(req));
+            await auditService.log({ userId: req.userId, userEmail: req.userEmail }, "CREATE", "User", user.id, { email: user.email, role: user.role });
+            res.status(201).json({ success: true, message: "Invitación enviada", data: user });
         } catch (error) { next(error); }
     },
 

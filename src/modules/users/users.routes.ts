@@ -4,12 +4,15 @@ import { validate } from "@/shared/middlewares/validate.middleware";
 import { requireAuth, permitir } from "@/shared/middlewares/auth.middleware";
 import { rolSchema } from "@/contratos/api";
 import { usersController } from "./users.controller";
+import { invitarUsuarioSchema } from "./users.validator";
 
 export const usersRouter = Router();
 
 usersRouter.use(requireAuth);
 
 usersRouter.get("/", permitir("GET /users"), usersController.getAll);
+// T6-10 — alta por invitación: crea la cuenta y manda el enlace para poner la contraseña.
+usersRouter.post("/", permitir("POST /users"), validate(invitarUsuarioSchema), usersController.invite);
 usersRouter.get("/:id", permitir("GET /users/:id"), usersController.getById);
 usersRouter.patch(
     "/:id/role",

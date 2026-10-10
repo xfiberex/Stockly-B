@@ -4,8 +4,8 @@ La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tare
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
 `fix(T0-01): resolver alias de rutas en el build de producción`.
 
-> **Estado al 2026-10-10: 136 de 139 cerradas.** Queda una del Tier 6, abierto el 2026-10-05,
-> y `T5-14` y `T5-15`, que solo se abren con un caso de uso real.
+> **Estado al 2026-10-10: 137 de 139 cerradas.** El Tier 6, abierto el 2026-10-05, está cerrado.
+> Quedan `T5-14` y `T5-15`, que solo se abren con un caso de uso real.
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
 > se **descartó sin ejecutarse**: el listón de accesibilidad del proyecto es teclado más árbol de
@@ -30,8 +30,8 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 | **3** | Pulido y mantenimiento | 15 / 15 |
 | **4** | Lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 / 17 |
 | **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 13 / 15 |
-| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 9 / 10 |
-| | **Total** | **136 / 139** |
+| **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 10 / 10 |
+| | **Total** | **137 / 139** |
 
 Los Tiers 0 a 4 son la remediación de la auditoría del 2026-08-04: 100 tareas salieron de sus
 hallazgos y de la consultoría de diseño del día siguiente, y otras 14 las abrió el cierre de una
@@ -47,55 +47,13 @@ actualizar un número y olvidar otro. Al cerrar o abrir una tarea cambian la cas
 esta tabla y la fila del índice; si no coinciden, manda el recuento:
 
 ```bash
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 3
-grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 136
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 2
+grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 137
 ```
 
 ---
 
 ## Tareas abiertas
-
-### Tier 6 — Venta de mostrador y documento de venta
-
-*Sale de comparar Stockly, el 2026-10-05, con SistemaVenta (`xfiberex/SistemaVenta_ASP.NET_CORE_MVC`),
-un punto de venta en ASP.NET Core MVC. **No es una fusión**: los dos llevan inventario y el de
-Stockly ya cubre el del otro, así que solo se trae lo que aquel hace y este no. SistemaVenta es la
-especificación, no el código —allí los totales los calcula el navegador y el servidor los guarda
-como llegan, y el menú por rol solo oculta enlaces—: aquí se reescribe con las reglas de «Una tarea
-nueva».*
-
-**Decidido el 2026-10-05, antes de escribir las fichas:**
-
-- **El comprobante es interno, por ahora.** No tiene valor fiscal y lo dice. Es temporal: si un día
-  lo tiene, el número fiscal será **otro campo**, con su propia serie y emitido al enviar; el
-  correlativo de `T6-04` no se reutiliza para eso. Hasta entonces, la palabra «factura» no aparece
-  ni en la interfaz ni en el PDF.
-- **Una tasa de impuesto global, guardada en cada línea** de la orden: si después hay productos
-  exentos, solo cambia de dónde sale el valor.
-- **Un rol nuevo de vendedor** para el mostrador, como se hizo con `WAREHOUSE` en `T5-13`.
-
-**Lo que se dejó fuera, a propósito:** la exportación a `.xlsx` —el CSV ya abre en Excel, y sería
-una dependencia más que auditar—; la foto de usuario —manda una cara a Cloudinary, que hoy solo
-recibe imágenes de producto ([legal.md §2.1](legal.md))—; las tablas de roles y menús —la matriz
-`PERMISOS` es más fuerte—; el tipo de documento «Boleta / Factura» —sin valor fiscal es solo una
-etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión».
-
-**Orden.** `T6-01` y `T6-02` corregían defectos, iban primero y están cerradas, como las siete siguientes, de `T6-03` a `T6-09`. Queda `T6-10`, que es
-independiente del resto.
-
-- [ ] **[T6-10] Alta de usuarios por invitación**
-  - **Área:** Usuarios / Autenticación
-  - **Ubicación:** `src/modules/users/` (ruta nueva), `src/modules/auth/auth.service.ts` (`resetPassword`), `src/shared/lib/nodemailer.ts`, `src/shared/i18n/correos.es.ts` y `correos.en.ts`, `src/contratos/api.ts` (`PERMISOS`), `Stockly-F/src/modules/users/components/UsersPage.tsx`
-  - **Qué hacer:** un administrador no puede dar de alta a nadie: la persona se registra sola en la página pública, confirma su correo y después alguien le cambia el rol. Añadir `POST /users`, solo de `ADMIN`, con nombre, correo y rol, que crea la cuenta y manda una **invitación con enlace** para que la persona ponga su contraseña. SistemaVenta genera una contraseña y la manda por correo; aquí ninguna contraseña viaja por correo. El enlace reutiliza el token de restablecimiento (`resetToken`, que ya se guarda hasheado) y la página de `reset-password`, con una caducidad propia: la hora de «olvidé mi contraseña» es poco para una invitación.
-  - **Atención:**
-    - **`login` exige `isVerified`** y `resetPassword` no lo toca: una cuenta invitada que pusiera su contraseña seguiría sin poder entrar. Quien abre el enlace ha demostrado que el buzón es suyo, que es lo mismo que demuestra el correo de verificación: poner la contraseña con un token válido debe verificar la cuenta. Eso cambia también el caso de quien se registró, no confirmó y restablece la contraseña: se decide a sabiendas y se cubre con un test.
-    - `User.password` es obligatorio: la cuenta nace con el hash de un secreto aleatorio que nadie conoce, no con una cadena vacía.
-    - El correo necesita **idioma** y de la persona invitada no se conoce ninguno: va el de la petición del administrador (`idiomaDePeticion`), que se corrige solo en su primer inicio de sesión.
-    - El correo sale **fuera de la transacción** ([ADR 0004](adr/0004-correo-fuera-de-la-transaccion.md)). Sin SMTP la ruta responde 503, como las demás que envían, y lo comprueba **antes** de crear la cuenta: creada y sin correo, no se la podría volver a invitar. Si la invitación caduca, «olvidé mi contraseña» hace el mismo papel, así que no hace falta una ruta para reenviarla.
-    - Sin ruta pública nueva, ni la lista de exenciones de CSRF ni los límites de `/auth` cambian. Deja rastro en la auditoría: `CREATE` sobre `User`, con el rol.
-  - **Criterio de aceptación:** un `ADMIN` invita a una persona como `WAREHOUSE`; con el enlace del correo pone su contraseña y entra con ese rol, sin pasar por la verificación; el enlace no sirve dos veces ni después de caducar; invitar un correo ya registrado responde 409; un `USER` recibe 403; el registro público sigue creando solo `USER`.
-  - **Esfuerzo:** medio
-  - **Depende de:** —
 
 ### Tier 5 — las dos que quedan
 
@@ -326,6 +284,29 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 
 ### Tier 6
 
+*Sale de comparar Stockly, el 2026-10-05, con SistemaVenta (`xfiberex/SistemaVenta_ASP.NET_CORE_MVC`),
+un punto de venta en ASP.NET Core MVC. **No es una fusión**: los dos llevan inventario y el de
+Stockly ya cubre el del otro, así que solo se trae lo que aquel hace y este no. SistemaVenta es la
+especificación, no el código —allí los totales los calcula el navegador y el servidor los guarda
+como llegan, y el menú por rol solo oculta enlaces—: aquí se reescribe con las reglas de «Una tarea
+nueva».*
+
+**Decidido el 2026-10-05, antes de escribir las fichas:**
+
+- **El comprobante es interno, por ahora.** No tiene valor fiscal y lo dice. Es temporal: si un día
+  lo tiene, el número fiscal será **otro campo**, con su propia serie y emitido al enviar; el
+  correlativo de `T6-04` no se reutiliza para eso. Hasta entonces, la palabra «factura» no aparece
+  ni en la interfaz ni en el PDF.
+- **Una tasa de impuesto global, guardada en cada línea** de la orden: si después hay productos
+  exentos, solo cambia de dónde sale el valor.
+- **Un rol nuevo de vendedor** para el mostrador, como se hizo con `WAREHOUSE` en `T5-13`.
+
+**Lo que se dejó fuera, a propósito:** la exportación a `.xlsx` —el CSV ya abre en Excel, y sería
+una dependencia más que auditar—; la foto de usuario —manda una cara a Cloudinary, que hoy solo
+recibe imágenes de producto ([legal.md §2.1](legal.md))—; las tablas de roles y menús —la matriz
+`PERMISOS` es más fuerte—; el tipo de documento «Boleta / Factura» —sin valor fiscal es solo una
+etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión».
+
 | ID | Tarea | Cerrada | Nota |
 |---|---|---|---|
 | T6-01 | La pantalla de ventas solo enseñaba las diez órdenes más recientes | 2026-10-05 | Índice nuevo por `createdAt`, decidido midiendo: sobre 330 000 órdenes el listado sin filtro pasa de 33 ms a 0,01 ms ([rendimiento.md §13](rendimiento.md)). El criterio de aceptación, comprobado en tests de los dos repositorios —falsificados: diez roturas, diez caídas— y en navegador con 26 órdenes, en escritorio y móvil. **La ficha se quedaba corta en una cosa:** el filtro nuevo metió un «Cancelado» oculto en la página y rompió un selector del E2E de `T0-03`, que ahora mira la insignia de su orden |
@@ -337,3 +318,4 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 | T6-07 | Comprobante de venta en PDF | 2026-10-08 | `GET /sale-orders/:id/receipt`, para los tres roles: un PDF en A4 y en español con el logo y los datos del negocio, el número, la fecha del envío en la zona del negocio, el cliente con su documento, quién la registró, las líneas y subtotal, impuesto y total. Se titula «Comprobante de venta» y lleva «Documento sin valor fiscal» en la cabecera y en el pie de cada página. **No calcula nada:** pinta los importes de `conTotales`, los mismos de la pantalla; sin impuesto, el pie es solo el total. **Qué órdenes lo tienen** lo dice `tieneComprobante`, en el contrato, para los dos lados: las enviadas, y las canceladas después de enviarse —`shippedAt` sobrevive a la cancelación—, que salen marcadas «ANULADA» en la cabecera y en el pie. Una pendiente o una cancelada sin enviar responde 409 `SALE_ORDER_NOT_SHIPPED`, y la interfaz no les pone el botón. `shippedAt` entra en el contrato de la orden: la API ya lo mandaba. **El logo** lo trae `traerLogoDelNegocio`, la única petición que el servidor hace a una URL guardada: tope de 3 s, solo `https://res.cloudinary.com`, sin redirecciones, 2 MB como mucho y solo PNG o JPEG por su firma; pase lo que pase devuelve `null` y el papel sale sin logo. **Lo que no hay no deja hueco:** sin datos del negocio no hay bloque del negocio, y sin cliente ni vendedor no hay bloque del cliente. La descripción de una línea no se recorta: la fila crece. En la interfaz, `BotonDeComprobante` —por `descargarDeLaApi`, no un enlace—: en el detalle de la venta y, como icono, en cada fila del historial del cliente. La paleta y el recorte de texto de los PDF pasan a `shared/lib/pdf.ts`; `conTotales` deja de perder el tipo de la línea. **El criterio, comprobado:** dos líneas al 18 % llevan número, datos del negocio, las dos líneas y `RD$2,968.00` / `ITBIS (18 %)` `RD$534.24` / `RD$3,502.24`; un `USER` y un `WAREHOUSE` lo descargan; la pendiente responde 409; con Cloudinary caído —y con otros siete fallos suyos— sale sin logo; sin datos del negocio sale sin líneas vacías. Falsificado: 54 roturas, 53 caídas a la primera; la que pasó —no mirar la firma de la imagen— tenía una segunda red en PDFKit y se le añadió un test propio: 54 de 54. E2E en los dos proyectos: la pendiente no lo ofrece y la API responde 409; enviada por la interfaz, se descarga y el texto del PDF —leído con pdf.js— lleva número, cliente, documento, vendedor, líneas y el total de la API; se descarga también desde la ficha del cliente; cancelada, dice «ANULADA». Y el de `T6-05` comprueba en el papel `Subtotal 300.00 · ITBIS (18 %) 54.00 · Total 354.00`. Vistos cuatro PDF de muestra —completo, anulado, mínimo y de tres páginas— y las dos pantallas a 1280 y a 393 px; en la ficha del cliente el botón iba el último y a 393 px quedaba fuera de la pantalla: va el segundo. **Sin comprobar:** el logo contra Cloudinary de verdad —los tests simulan `fetch`, y en este equipo no hay credenciales—; y el papel impreso. **A saber:** las notas de la orden no salen, que son internas. Lo que no está en Latin-1 **no se imprime**: la Helvetica de PDFKit mide «株式会社» con ancho cero y pierde la `Ł` de «Łódź», sin error; ya les pasaba a los nombres de producto en los informes, y arreglarlo es incrustar una fuente. La palabra vetada no está en el PDF ni en los textos de la interfaz, con test en los dos lados; «facturación», la de la clasificación ABC, es otra palabra y se queda. **Dos defectos encontrados al pasar el E2E, ninguno del comprobante:** una lista que se está cargando por primera vez cuando termina una mutación no se vuelve a pedir, y se queda con lo que leyó antes —reproducido: enviar una venta dentro de los 300 ms del filtro por número la deja en «Pendiente» con el aviso de éxito—; es de todos los módulos y **no se ha arreglado**. Y el `ECONNRESET` intermitente del E2E era la reutilización de conexiones que Node cierra a los 6 s: arreglado en `e2e/helpers.ts`. Los dos, en [CONTEXTO.md §4](CONTEXTO.md). |
 | T6-08 | Venta de mostrador y rol de vendedor | 2026-10-08 | **La matriz, primero, y es la propuesta de la ficha:** `SELLER` entra en `TODOS` —lee lo que lee `USER`— y en un grupo nuevo, `MOSTRADOR`, con `ADMIN`, para una sola ruta. Un test lo fija: lo único que tiene y un `USER` no es `POST /sale-orders/counter`. **La venta de un paso:** `POST /sale-orders/counter` crea la orden y la deja enviada en **una transacción**. Cada línea es un producto y una cantidad; **el nombre y el precio los pone el producto**, leídos con su fila ya bloqueada, y el validador ni siquiera declara `unitPrice`. No hay líneas escritas a mano ni productos descatalogados (409 `INACTIVE_PRODUCT_SALE`). **El servicio, partido en sus dos mitades:** `reservarDisponible` —bloquear y comprobar lo disponible— la comparten `create` y el mostrador; `despachar` —descontar, congelar el coste, escribir el movimiento y marcar enviada— la comparten el envío y el mostrador. Se extrajo, no se copió: `update` se queda sin sesenta líneas. El movimiento dice «Venta de mostrador #000123»; la auditoría, `SALE_COUNTER`; el aviso de stock bajo sale después del `commit`. Migración: un valor en `Role` y otro en `AuditAction`. **La pantalla:** `/counter`, la segunda del menú para quien puede vender, guardada **por permiso** (`requirePermiso`, nuevo en `ProtectedRoute`). Una columna, sin tabla: buscar o escanear, un producto por línea con su − y su +, el disponible, un cliente opcional y lo que se va a cobrar; después, el número, el importe que devolvió la venta y el comprobante. **Una decisión de T6-05 se revierte a sabiendas:** `GET /settings/business` trae ahora `taxRate`, la tasa vigente. Sin ella el mostrador no podía decir cuánto cobrar **antes** de registrar la venta. La previsión la hace `totalesPrevistos`, en el contrato y en céntimos enteros; un test la compara con `totalesDeLinea` sobre 528 combinaciones de precio, cantidad y tasa. Lo que la pantalla enseña después de vender es lo del servidor. **El criterio, comprobado:** un `SELLER` vende dos productos y el stock baja, hay dos `OUT`, la orden está enviada con `unitCost` a cuatro decimales y el comprobante se descarga; 403 al crear una pendiente, al cancelar y al cambiar un precio, y la interfaz no le pone ninguno de los tres botones; un `unitPrice` de 0,01 en el cuerpo no cambia la línea; pedir de más es 409 y no queda ni orden, ni movimientos, ni cliente, ni número gastado; dos ventas a la vez de la última unidad dan 201 y 409 —y diez de un producto con cuatro, cuatro y seis, con los números del 1 al 4—. `permisos.test.ts` recorre el rol solo. Falsificado: 62 roturas, 59 caídas a la primera; dos pasaban por tests míos flojos —la cantidad a 0 se rechazaba por otro campo, y nada miraba que la ruta llevara su guardia— y se corrigieron; la tercera es equivalente: `checkLowStockAlert` vuelve a mirar el mínimo. E2E en los dos proyectos, con la cuenta nueva del seed (`vendedor@stockly.app`): busca dos productos, se pasa de lo disponible y corrige, registra, descarga el comprobante y lee en él las dos líneas; stock y movimientos, por la API; los tres 403, y el 409 sin mover nada; ni «Nueva orden», ni cancelar, ni editar el producto; `/settings` lo devuelve al panel, y el almacén no entra en `/counter`. Vista a 393 y a 1280 px. **Sin comprobar:** el escáner con cámara en el mostrador —el E2E busca por nombre; el escáner lo prueban los tests de componente con el lector simulado—, y el uso con un móvil de verdad en la mano. **A saber:** el mostrador no admite un cliente nuevo ni un documento escrito en el momento, solo elegir uno que ya exista —la API sí los admite—; no hay descuentos ni forma de pago, que no pedía la ficha; el disponible de una línea es el de cuando se añadió el producto, y si otro vende entretanto se entera al registrar, con el 409; y la previsión usa la tasa que el navegador leyó al entrar: si un administrador la cambia con el mostrador abierto, lo previsto y lo cobrado difieren hasta recargar. |
 | T6-09 | Ventas por día y productos más vendidos en el panel | 2026-10-10 | `GET /reports` trae dos campos nuevos: `salesByDay` —hoy y los seis días anteriores del negocio, **siempre siete**, con los vacíos a cero— y `topSold`, los cinco más vendidos por unidades. «Lo más vendido» es una sola consulta (`shared/lib/ventasEnviadas.ts`) que comparten el panel y el resumen semanal. El criterio, en 11 tests del backend y 4 del panel, falsificados: trece roturas, trece caídas; y en el navegador, en escritorio y a 393 px. El `EXPLAIN` de las dos consultas sobre 330 000 órdenes, en [rendimiento.md §14](rendimiento.md): 105 y 79 ms, por el índice `(status, shippedAt)` y sin ordenar en disco. **Las ventas por día no agrupan por una expresión**: un `LATERAL` por día, como los movimientos por mes de `T4-16`; gana por poco —105 ms frente a 118— y se eligió por no depender de una estimación sin estadísticas. **Un error mío que cazaron los tests, no la revisión:** `generate_series` con argumentos `date` devuelve `timestamptz` en la zona de la sesión, y la venta de las 23:30 cambiaba de día; cayeron cuatro. **La ficha no decía dos cosas:** que `load/sembrar.js` estaba roto desde `T6-04` —insertaba ventas sin `number`— y hubo que arreglarlo para medir; y que en el móvil el eje escondía tres de las siete etiquetas. El gráfico lleva al lado una lista oculta con las mismas cifras, para quien no lo ve. **Sin medir:** el panel entero bajo carga sostenida con las dos consultas nuevas. Una de cuatro pasadas del E2E falló en el primer login, con el equipo saturado; las dos siguientes, limpias |
+| T6-10 | Alta de usuarios por invitación | 2026-10-10 | `POST /users`, solo de `ADMIN`: crea la cuenta con su rol y manda un enlace para elegir la contraseña; **ninguna contraseña viaja por correo**. El enlace es el token de restablecimiento, con 7 días de caducidad, y lleva a la página de `reset-password`, que con `invitacion=1` dice «elige» en vez de «restablece». El criterio, en 24 tests del backend —con el enlace sacado del correo que se habría enviado, no de un mock— y 8 del frontend, falsificados: diecisiete roturas, diecisiete caídas. **Poner la contraseña con un token válido verifica la cuenta**, también la de quien se registró, no confirmó y restablece: ha demostrado lo mismo por otro correo; decidido a sabiendas y con su test. **La ficha no decía qué pasa si el envío falla** con el SMTP configurado: la cuenta se retira y se devuelve el error, para que la invitación se pueda repetir. El correo se espera, a diferencia de los avisos del ADR 0004: aquí es la única forma de entrar. **Sin comprobar:** el recorrido entero en un navegador con un buzón de verdad —el E2E no tiene buzón y el `.env` de desarrollo envía correo real—; en el navegador se vieron el formulario y la página de la contraseña, en escritorio y a 393 px, sin enviar nada. No hay ruta para reenviar una invitación: caducada, «olvidé mi contraseña» hace el mismo papel. Una de dos pasadas del E2E falló en el primer login de cuatro tests, como en `T6-09`; la siguiente, limpia |

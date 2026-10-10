@@ -28,6 +28,14 @@ export const correosEn: Record<ClaveDeCorreo, string> = {
     "reset.boton": "Reset password",
     "reset.nota": "The link expires in 1 hour. If you did not request this change, ignore this email and your password will stay the same.",
 
+    // ── Account invitation (T6-10) ───────────────────────────────────────────
+    "invitacion.asunto": "You have been invited to {marca}",
+    "invitacion.preencabezado": "Choose your password to sign in to {marca}.",
+    "invitacion.titulo": "Your account is ready",
+    "invitacion.cuerpo": "An administrator created a {marca} account for you. Choose your password to start using it.",
+    "invitacion.boton": "Choose my password",
+    "invitacion.nota": "The link expires in {dias} days. If it does, use “Forgot your password?” on the sign-in page to get a new one.",
+
     "stock.asunto": "⚠️ Low stock alert: {producto} — {marca}",
     "stock.preencabezado": "{producto} is down to {actual} units (minimum {minimo}).",
     "stock.titulo": "Low stock alert",

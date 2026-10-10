@@ -171,7 +171,7 @@ qué botones enseñar.
 | `/inventory-counts` | `GET /` · `/:id` · `/:id/lines` | `POST /` · `PATCH /:id/lines` · `POST /:id/close` · `POST /:id/cancel` | — |
 | `/reports` | `GET /` · `/period` · `/abc` | — | — |
 | `/notifications` | `GET /` · `/unread-count` · `POST /read-all` · `POST /:id/read` — siempre los propios | — | — |
-| `/users` | — | — | `GET /` · `/:id` · `PATCH /:id/role` · `/:id/activate` · `/:id/deactivate` |
+| `/users` | — | — | `GET /` · `/:id` · `POST /` (invitar) · `PATCH /:id/role` · `/:id/activate` · `/:id/deactivate` |
 | `/settings` | — | — | `GET /` · `PATCH /` |
 | `/audit-logs` | — | — | `GET /` |
 
@@ -228,7 +228,7 @@ qué botones enseñar.
 | Sesión | Access token de 15 min en cookie `httpOnly`; refresh token rotativo y hasheado, con detección de reuso: presentar uno ya rotado cierra la familia entera |
 | Roles | Matriz `PERMISOS` del contrato; `permisos.test.ts` recorre todas las rutas con cada rol |
 | Contraseñas | `bcryptjs` con 12 rondas. Restablecerla revoca las sesiones |
-| Cuentas | Una cuenta desactivada pierde el acceso en la siguiente petición. El registro público crea siempre `USER` |
+| Cuentas | Una cuenta desactivada pierde el acceso en la siguiente petición. El registro público crea siempre `USER`; con otro rol solo se entra por invitación de un `ADMIN`, que manda un enlace y nunca una contraseña |
 | Límite de peticiones | 100 cada 15 min por IP; 10 en login y recuperación; 5 por hora en registro |
 | Correo | STARTTLS obligatorio: un servidor sin cifrado aborta el envío |
 | Subidas | Imágenes validadas por sus *magic bytes*, no solo por el `Content-Type` |

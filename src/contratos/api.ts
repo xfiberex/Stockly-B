@@ -145,6 +145,7 @@ export const PERMISOS = {
     "GET /reports/abc": TODOS,
     // Administración
     "GET /users": SOLO_ADMIN,
+    "POST /users": SOLO_ADMIN,
     "GET /users/:id": SOLO_ADMIN,
     "PATCH /users/:id/role": SOLO_ADMIN,
     "PATCH /users/:id/activate": SOLO_ADMIN,
