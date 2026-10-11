@@ -35,7 +35,7 @@ function traducirUnicidad(error: unknown): never {
 async function cifrasPorAlmacen(): Promise<Map<string, Cifras>> {
     const filas = await prisma.$queryRaw<Array<Cifras & { warehouseId: string }>>`
         SELECT l."warehouseId",
-               COUNT(*) FILTER (WHERE l.stock > 0)::int AS "products",
+               COUNT(DISTINCT l."productId") FILTER (WHERE l.stock > 0)::int AS "products",
                COALESCE(SUM(l.stock), 0)::int AS "units",
                COALESCE(SUM(l.stock * p."costPrice") FILTER (WHERE p."costPrice" IS NOT NULL), 0)::float8 AS "costValue",
                COALESCE(SUM(l.stock) FILTER (WHERE p."costPrice" IS NULL), 0)::int AS "unitsWithoutCost"

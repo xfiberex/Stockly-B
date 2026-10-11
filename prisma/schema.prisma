@@ -189,6 +189,10 @@ model Product {
   // sea la suma de sus niveles (el disparador `stock_cuadra` de la migración).
   stock         Int                  @default(0)
   minStock      Int                  @default(0)
+  // T5-15 — si sus **entradas** piden lote y fecha de caducidad. Es lo único que gobierna: la
+  // salida FEFO y el bloqueo de lo caducado miran los lotes que haya, esté marcado o no, así
+  // que desmarcarlo no deja huérfano el stock que ya tiene lote (ADR 0011).
+  tracksLots    Boolean              @default(false)
   categoryId    String?
   category      Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   brandId       String?
@@ -209,6 +213,7 @@ model Product {
   tags          Tag[]
   abc           ProductAbc?
   stockLevels   StockLevel[]
+  lots          Lot[]
 
   // PostgreSQL no indexa las claves foráneas por sí solo: sin esto, filtrar por
   // categoría, marca o proveedor recorre la tabla entera.
@@ -351,6 +356,10 @@ model StockMovement {
   // en todo lo demás (ventas, ajustes, importaciones y la salida que deshace una cancelación).
   purchaseOrderItemId String?
   purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+  // T5-15 — de qué lote eran las unidades. Una salida que toca dos lotes son dos movimientos.
+  // `null` en lo que no tiene lote: los productos que no los llevan y el stock «sin lote».
+  lotId               String?
+  lot                 Lot?               @relation(fields: [lotId], references: [id], onDelete: SetNull)
 
   // El histórico de un producto se lee siempre ordenado por fecha: el índice
   // compuesto sirve el filtro y el orden de una sola pasada.
@@ -471,39 +480,39 @@ model Counter {
 }
 
 model SaleOrder {
-  id            String          @id @default(uuid())
+  id               String          @id @default(uuid())
   // T6-04 — el número con el que se nombra la venta (`#000123`). Lo da `siguienteNumeroDeVenta`,
   // nunca quien llama. Es interno: borrar una orden pendiente deja un hueco, y se acepta.
-  number        Int             @unique
-  status        SaleOrderStatus @default(PENDING)
+  number           Int             @unique
+  status           SaleOrderStatus @default(PENDING)
   // T5-14 — de qué almacén sale. Lo comprometido de una venta pendiente lo es **en él**, y es
   // el que se descuenta al enviar y al que vuelve la mercancía si se cancela.
-  warehouseId   String
-  warehouse     Warehouse       @relation(fields: [warehouseId], references: [id])
+  warehouseId      String
+  warehouse        Warehouse       @relation(fields: [warehouseId], references: [id])
   // T5-06 — opcional: una venta sin correo no se vincula a nadie, y borrar el cliente deja
   // sus órdenes sin él, no las borra.
-  customerId    String?
-  customer      Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId       String?
+  customer         Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   // Instantánea de a quién se vendió, **aunque haya cliente**: igual que `productName` en los
   // ítems, una orden pasada tiene que seguir diciendo a quién se envió aunque el cliente
   // cambie después de teléfono o de nombre.
-  customerName  String?
-  customerEmail String?
-  customerPhone String?
+  customerName     String?
+  customerEmail    String?
+  customerPhone    String?
   // T6-06 — el documento del cliente, en la instantánea por lo mismo que los tres de arriba.
   customerDocument String?
   // T6-06 — quién registró la venta. El correo y no una clave foránea, como en la auditoría y
   // los conteos: la orden tiene que seguir diciéndolo aunque esa cuenta se desactive o se borre.
   // `null` en las anteriores a este campo que no tenían fila en la auditoría.
-  createdByEmail String?
-  notes         String?
+  createdByEmail   String?
+  notes            String?
   // T5-02 — cuándo salió la mercancía. `updatedAt` no sirve para esto: cambia con cualquier
   // edición de la orden, y el margen de un periodo se cuenta por la fecha de envío. Se
   // conserva si después se cancela: el estado ya dice que no cuenta.
-  shippedAt     DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  items         SaleOrderItem[]
+  shippedAt        DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  items            SaleOrderItem[]
 
   @@index([status, createdAt])
   // El informe de margen filtra por estado y por fecha de envío, en ese orden.
@@ -520,29 +529,48 @@ model SaleOrder {
 }
 
 model SaleOrderItem {
-  id          String    @id @default(uuid())
+  id          String             @id @default(uuid())
   saleOrderId String
-  saleOrder   SaleOrder @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
+  saleOrder   SaleOrder          @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
   productId   String?
-  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  product     Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
   productName String
   quantity    Int
-  unitPrice   Decimal   @db.Decimal(10, 2)
+  unitPrice   Decimal            @db.Decimal(10, 2)
   // T5-02 — el coste medio del producto **en el momento del envío**, congelado igual que
   // `productName` congela el nombre. Calcular el margen de una venta pasada con el coste
   // actual da un número, y está mal. `null` si el producto no tenía coste, si el ítem no
   // está ligado a uno o si la venta se envió antes de que existiera este campo.
-  unitCost    Decimal?  @db.Decimal(12, 4)
+  unitCost    Decimal?           @db.Decimal(12, 4)
   // T6-05 — el porcentaje de impuesto **vigente al crear la orden**, congelado como
   // `unitPrice`: cambiar el ajuste después no toca las órdenes que ya existen. `unitPrice`
   // sigue siendo sin impuesto, que es de lo que salen los ingresos y el margen de los
   // informes. `null` en las líneas anteriores a este campo: se lee como «sin impuesto».
-  taxRate     Decimal?  @db.Decimal(5, 2)
-  createdAt   DateTime  @default(now())
+  taxRate     Decimal?           @db.Decimal(5, 2)
+  createdAt   DateTime           @default(now())
+  // T5-15 — de qué lotes salió, anotado al enviar. Es lo que imprime el comprobante y lo que
+  // deja devolver cada unidad a su lote si la venta se cancela.
+  lots        SaleOrderItemLot[]
 
   @@index([saleOrderId])
   @@index([productId])
   @@map("sale_order_items")
+}
+
+// T5-15 — cuántas unidades de una línea de venta salieron de cada lote. Solo las que tenían
+// lote: lo que salió del stock «sin lote» no deja fila.
+model SaleOrderItemLot {
+  id              String        @id @default(uuid())
+  saleOrderItemId String
+  saleOrderItem   SaleOrderItem @relation(fields: [saleOrderItemId], references: [id], onDelete: Cascade)
+  lotId           String
+  lot             Lot           @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  quantity        Int
+
+  @@index([saleOrderItemId])
+  // A quién se vendió un lote: la pregunta de una retirada.
+  @@index([lotId])
+  @@map("sale_order_item_lots")
 }
 
 // ─── T5-07 — Conteo físico de inventario ───────────────────────────────────────
@@ -637,6 +665,8 @@ enum NotificationType {
   LOW_STOCK
   SALE_UNSHIPPABLE
   PURCHASE_OVERDUE
+  // T5-15 — un lote con existencias entra en el plazo de aviso de caducidad.
+  LOT_EXPIRING
 }
 
 model Notification {
@@ -700,21 +730,54 @@ model Warehouse {
 // Lo que hay de un producto en un almacén. **Dispersa**: sin fila es cero, así que un catálogo
 // de 100 000 productos no son 100 000 filas por almacén nuevo.
 //
-// La clave es un `id` propio y no `(productId, warehouseId)` pensando en `T5-15`: con lotes el
-// nivel pasa a ser `(producto, almacén, lote)`, y eso será una columna y un índice único más
-// ancho, no rehacer la tabla ni lo que apunte a ella.
+// T5-15 — y de un **lote**: el nivel es `(producto, almacén, lote)`. `lotId` a `null` es el stock
+// «sin lote» —todo el de un producto que no los lleva, y lo que un producto con lotes tenía
+// antes de marcarse—. Lo que hay de un producto en un almacén es **la suma de sus filas**.
+//
+// El índice único es `NULLS NOT DISTINCT` en la base, que Prisma no sabe expresar: lo escribe la
+// migración a mano, y sin eso habría una fila «sin lote» nueva en cada entrada.
 model StockLevel {
   id          String    @id @default(uuid())
   productId   String
   product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   warehouseId String
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  lotId       String?
+  // `NoAction` y no `Restrict`: al borrar un producto caen a la vez sus lotes y sus niveles, y
+  // `Restrict` se negaría antes de que la segunda cascada llegara.
+  lot         Lot?      @relation(fields: [lotId], references: [id], onDelete: NoAction)
   stock       Int       @default(0)
 
-  @@unique([productId, warehouseId])
+  @@unique([productId, warehouseId, lotId])
   // El stock de un almacén entero: su valor, y si se puede desactivar.
   @@index([warehouseId])
+  // El informe de caducidades entra por los lotes que vencen y de ahí a sus niveles.
+  @@index([lotId])
   @@map("stock_levels")
+}
+
+// ─── T5-15 — Lotes y fechas de caducidad ───────────────────────────────────────
+//
+// El caso de uso: un comercio de **catálogo mixto** —parte perecedero, parte no—, donde se marca
+// producto a producto, al darlo de alta, cuál lleva lote. Un lote es de un producto y tiene una
+// fecha de caducidad, siempre; el código es el del fabricante o, si no se escribe, uno que sale
+// de la fecha, así que dos entradas con la misma fecha y sin código son el mismo lote.
+model Lot {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  code      String
+  // Un día, no un instante: caduca al terminar ese día **en la zona del negocio**.
+  expiresAt DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  levels    StockLevel[]
+  movements StockMovement[]
+  saleItems SaleOrderItemLot[]
+
+  @@unique([productId, code])
+  @@index([expiresAt])
+  @@map("lots")
 }
 
 // Una transferencia: la cabecera de sus movimientos. No tiene líneas propias —son los

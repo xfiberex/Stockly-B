@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { logger } from "@/shared/lib/logger";
 import { hoyEn } from "@/shared/lib/zonaHoraria";
+import { diasDeAvisoDeCaducidad } from "@/shared/lib/lotes";
 import { settingsService } from "@/modules/settings/settings.service";
 import type { Aviso } from "@/contratos/api";
 
@@ -123,6 +124,9 @@ export const notificationsService = {
      *   el plazo de su proveedor —o el de Configuración— desde el día en que se pidió, en días
      *   del negocio. `DO NOTHING` y no `DO UPDATE`: una orden sigue atrasada mañana, y reabrir
      *   su aviso cada cinco minutos lo haría imposible de marcar como leído.
+     * - **Lotes que caducan** (T5-15): cada lote con existencias cuya fecha cae dentro del plazo
+     *   de aviso —o ya pasó—. `DO NOTHING` por lo mismo: se avisa **una vez**, cuando entra en
+     *   el plazo, y no cada cinco minutos hasta que se venda.
      * - **La purga** solo toca los leídos. Si la orden sigue atrasada cuando su aviso se
      *   purga, vuelve a avisarse: tres meses después, sigue siendo verdad.
      */
@@ -145,6 +149,24 @@ export const notificationsService = {
             ) a
             CROSS JOIN "users" u
             WHERE a.vence < ${hoy}::date AND u."role" = 'ADMIN' AND u."isActive"
+            ON CONFLICT ("userId", "type", "entityId") DO NOTHING`;
+
+        const diasDeAviso = await diasDeAvisoDeCaducidad();
+        await prisma.$executeRaw`
+            INSERT INTO "notifications" ("id", "userId", "type", "entityId", "data", "createdAt")
+            SELECT gen_random_uuid(), u."id", 'LOT_EXPIRING'::"NotificationType", c."id",
+                   jsonb_build_object('productName', c.producto, 'lotCode', c."code",
+                                      'expiresAt', to_char(c."expiresAt", 'YYYY-MM-DD'), 'units', c.unidades), ${enUtc(ahora)}
+            FROM (
+                SELECT l."id", l."code", l."expiresAt", p."name" AS producto, SUM(sl."stock")::int AS unidades
+                FROM "lots" l
+                JOIN "stock_levels" sl ON sl."lotId" = l."id"
+                JOIN "products" p ON p."id" = l."productId"
+                WHERE sl."stock" > 0 AND l."expiresAt" <= ${hoy}::date + ${diasDeAviso}::int
+                GROUP BY l."id", p."name"
+            ) c
+            CROSS JOIN "users" u
+            WHERE u."role" = 'ADMIN' AND u."isActive"
             ON CONFLICT ("userId", "type", "entityId") DO NOTHING`;
 
         const limite = new Date(ahora.getTime() - DIAS_DE_LEIDOS * 86_400_000);

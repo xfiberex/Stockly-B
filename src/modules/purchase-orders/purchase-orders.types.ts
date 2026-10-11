@@ -19,11 +19,14 @@ export interface UpdatePurchaseOrderDto {
     supplierId?: string;
     notes?: string;
     status?: PurchaseOrderStatus;
+    /** T5-15 — al marcar recibida: el lote de lo que falta por entrar de cada línea que lo lleve. */
+    lots?: Array<{ itemId: string; expiresAt?: string; lotCode?: string }>;
 }
 
 /** T5-04 — una entrega: cuánto llega de cada línea. Las que no aparecen no reciben nada. */
 export interface ReceivePurchaseOrderDto {
-    items: Array<{ itemId: string; quantity: number }>;
+    /** T5-15 — `expiresAt` y `lotCode`: el lote en el que entra, si el producto los lleva. */
+    items: Array<{ itemId: string; quantity: number; expiresAt?: string; lotCode?: string }>;
 }
 
 /**

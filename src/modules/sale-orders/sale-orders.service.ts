@@ -8,6 +8,7 @@ import { filtroDeEnum } from "@/shared/lib/enums";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 import { bloquearProductos, entrar, nivelesEn, sacar } from "@/shared/lib/stock";
 import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
+import { aDia, hoyDelNegocio } from "@/shared/lib/lotes";
 import { normalizarCorreo } from "@/shared/lib/correo";
 import { rangoDeDias } from "@/shared/lib/diasDelNegocio";
 import { numeroDeVentaDelFiltro, siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
@@ -21,9 +22,39 @@ const ORDER_INCLUDE = {
     // T5-14 — de qué almacén sale: la interfaz lo nombra junto al número.
     warehouse: { select: { id: true, name: true } },
     items: {
-        include: { product: { select: { id: true, name: true, sku: true } } },
+        include: {
+            product: { select: { id: true, name: true, sku: true } },
+            // T5-15 — de qué lotes salió cada línea, del que caduca antes al que caduca después.
+            lots: {
+                include: { lot: { select: { id: true, code: true, expiresAt: true } } },
+                orderBy: [{ lot: { expiresAt: "asc" } }, { lot: { code: "asc" } }],
+            },
+        },
     },
-} as const;
+} satisfies Prisma.SaleOrderInclude;
+
+type OrdenLeida = Prisma.SaleOrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
+
+/**
+ * La orden como la devuelve la API: con sus importes (`conTotales`) y con los lotes de cada
+ * línea aplanados. **La caducidad sale como día** (`AAAA-MM-DD`), no como el instante en que
+ * Prisma lee una columna `date`: ver `loteRefSchema`, en el contrato.
+ */
+function aRespuesta(orden: OrdenLeida) {
+    const conImportes = conTotales(orden);
+    return {
+        ...conImportes,
+        items: conImportes.items.map((item) => ({
+            ...item,
+            lots: item.lots.map((l) => ({
+                id: l.lot.id,
+                code: l.lot.code,
+                expiresAt: aDia(l.lot.expiresAt),
+                quantity: l.quantity,
+            })),
+        })),
+    };
+}
 
 // T3-02 — antes esto era `status in $Enums.SaleOrderStatus`, y la guarda tenía un agujero:
 // los enums generados son objetos literales, así que heredan de `Object.prototype` y
@@ -95,8 +126,11 @@ function pedidoPorProducto(items: Array<{ productId?: string; quantity: number }
  * dos. Ordenadas por id, para que dos ventas con productos en distinto orden no se esperen
  * mutuamente. El bloqueo dura lo que la transacción: lo que se lea aquí —el precio, el stock—
  * sigue siendo verdad cuando se escriba la orden.
+ *
+ * T5-15 — lo caducado a `hoy` **no está disponible**: sigue en el almacén, pero no se le puede
+ * prometer a nadie.
  */
-async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<string, number>, warehouseId: string) {
+async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<string, number>, warehouseId: string, hoy: string) {
     const ids = [...pedido.keys()].sort();
     if (ids.length === 0) return [];
 
@@ -106,7 +140,7 @@ async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<stri
         where: { id: { in: ids } },
         select: { id: true, name: true, price: true, isActive: true },
     });
-    const enAlmacen = await nivelesEn(tx, warehouseId, ids);
+    const enAlmacen = await nivelesEn(tx, warehouseId, ids, { vigentesA: hoy });
     const comprometido = await comprometidoPorProducto(ids, tx, warehouseId);
 
     for (const id of ids) {
@@ -139,11 +173,15 @@ async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<stri
  *
  * T5-14 — sale **del almacén de la orden**, y «insuficiente» es que no lo hay en él, aunque
  * sobre en otro. El mínimo, en cambio, se mira contra el total: es del producto, no del local.
+ *
+ * T5-15 — sale **primero lo que caduca antes** (FEFO), y de lo caducado a `hoy` no sale nada:
+ * si lo único que queda está vencido, es «stock insuficiente». De qué lotes salió cada línea
+ * queda anotado en ella, para el comprobante y para devolverlo si se cancela.
  */
 async function despachar(
     tx: Prisma.TransactionClient,
     orden: { id: string; number: number; warehouseId: string },
-    opciones: { datos?: Prisma.SaleOrderUpdateInput; concepto: string; bajoMinimos: ProductoEnAlerta[] },
+    opciones: { datos?: Prisma.SaleOrderUpdateInput; concepto: string; bajoMinimos: ProductoEnAlerta[]; hoy: string },
 ) {
     const items = await tx.saleOrderItem.findMany({
         where: { saleOrderId: orden.id, productId: { not: null } },
@@ -166,6 +204,7 @@ async function despachar(
                 cantidad: item.quantity,
                 type: "OUT",
                 note: `${opciones.concepto} #${escribirNumeroDeVenta(orden.number)}`,
+                vigentesA: opciones.hoy,
             },
             (enAlmacen, producto) =>
                 new HttpError(
@@ -180,6 +219,9 @@ async function despachar(
         // sale. Es el de la fila que `sacar` acaba de escribir y deja bloqueada: una recepción
         // que cambiara el coste medio a la vez tiene que esperar a que esto termine.
         await tx.saleOrderItem.update({ where: { id: item.id }, data: { unitCost: movido.costPrice } });
+
+        const deLotes = movido.lotes.flatMap((l) => (l.lotId ? [{ saleOrderItemId: item.id, lotId: l.lotId, quantity: l.cantidad }] : []));
+        if (deLotes.length > 0) await tx.saleOrderItemLot.createMany({ data: deLotes });
 
         if (movido.stock <= movido.minStock) {
             opciones.bajoMinimos.push({ id: productId, name: movido.name, stock: movido.stock, minStock: movido.minStock });
@@ -223,13 +265,13 @@ export const saleOrderService = {
             prisma.saleOrder.count({ where }),
         ]);
 
-        return { data: orders.map(conTotales), meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+        return { data: orders.map(aRespuesta), meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     },
 
     async getById(id: string) {
         const order = await prisma.saleOrder.findUnique({ where: { id }, include: ORDER_INCLUDE });
         if (!order) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
-        return conTotales(order);
+        return aRespuesta(order);
     },
 
     /**
@@ -262,9 +304,10 @@ export const saleOrderService = {
         // T6-05 — la tasa vigente **ahora**, que se congela en cada línea como `unitPrice`. Los
         // importes no vienen en `dto`: se calculan al responder, de lo que queda guardado.
         const taxRate = await settingsService.tasaDeImpuesto();
+        const hoy = await hoyDelNegocio();
 
         const orden = await prisma.$transaction(async (tx) => {
-            await reservarDisponible(tx, pedido, almacen.id);
+            await reservarDisponible(tx, pedido, almacen.id, hoy);
 
             const cliente = await clienteDeLaVenta(tx, dto);
 
@@ -300,7 +343,7 @@ export const saleOrderService = {
             });
         });
 
-        return conTotales(orden);
+        return aRespuesta(orden);
     },
 
     /**
@@ -321,10 +364,11 @@ export const saleOrderService = {
         const pedido = pedidoPorProducto(dto.items);
         const taxRate = await settingsService.tasaDeImpuesto();
         const almacen = await almacenParaOperar(dto.warehouseId);
+        const hoy = await hoyDelNegocio();
         const bajoMinimos: ProductoEnAlerta[] = [];
 
         const orden = await prisma.$transaction(async (tx) => {
-            const productos = new Map((await reservarDisponible(tx, pedido, almacen.id)).map((p) => [p.id, p]));
+            const productos = new Map((await reservarDisponible(tx, pedido, almacen.id, hoy)).map((p) => [p.id, p]));
 
             const inactivo = [...productos.values()].find((p) => !p.isActive);
             if (inactivo) {
@@ -361,13 +405,13 @@ export const saleOrderService = {
                 },
             });
 
-            return despachar(tx, creada, { concepto: "Venta de mostrador", bajoMinimos });
+            return despachar(tx, creada, { concepto: "Venta de mostrador", bajoMinimos, hoy });
         });
 
         // Después del `commit` y sin esperarlas, como en el envío.
         for (const producto of bajoMinimos) dispararAlertaStock(producto);
 
-        return conTotales(orden);
+        return aRespuesta(orden);
     },
 
     /** `actorId` es quien hace el cambio: si el envío falla por stock, es a quien **no** se avisa (T5-12). */
@@ -400,7 +444,7 @@ export const saleOrderService = {
 
         // Sin envío ni cancelación de un envío: actualización simple de campos / estado.
         if (!beingShipped && !beingCancelled) {
-            return conTotales(await prisma.saleOrder.update({
+            return aRespuesta(await prisma.saleOrder.update({
                 where: { id },
                 data: { ...customerData, ...(dto.status !== undefined && { status: dto.status }) },
                 include: ORDER_INCLUDE,
@@ -417,19 +461,32 @@ export const saleOrderService = {
 
                 const items = await tx.saleOrderItem.findMany({
                     where: { saleOrderId: id, productId: { not: null } },
+                    include: { lots: { select: { lotId: true, quantity: true } } },
                 });
                 await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
 
                 for (const item of items) {
                     if (!item.productId) continue;
 
-                    await entrar(tx, {
-                        productId: item.productId,
-                        warehouseId: almacen.id,
-                        cantidad: item.quantity,
-                        type: "IN",
-                        note: `Cancelación de orden de venta #${escribirNumeroDeVenta(existing.number)}`,
-                    });
+                    // T5-15 — cada unidad vuelve **al lote del que salió**, aunque mientras tanto
+                    // haya caducado: devolverla a otro la haría pasar por lo que no es. Lo que
+                    // salió sin lote vuelve sin lote.
+                    const deLotes = item.lots.reduce((suma, l) => suma + l.quantity, 0);
+                    const devoluciones = [
+                        ...item.lots.map((l) => ({ lotId: l.lotId as string | null, cantidad: l.quantity })),
+                        { lotId: null, cantidad: item.quantity - deLotes },
+                    ].filter((d) => d.cantidad > 0);
+
+                    for (const devolucion of devoluciones) {
+                        await entrar(tx, {
+                            productId: item.productId,
+                            warehouseId: almacen.id,
+                            cantidad: devolucion.cantidad,
+                            lotId: devolucion.lotId,
+                            type: "IN",
+                            note: `Cancelación de orden de venta #${escribirNumeroDeVenta(existing.number)}`,
+                        });
+                    }
                 }
 
                 return tx.saleOrder.update({
@@ -438,17 +495,17 @@ export const saleOrderService = {
                     include: ORDER_INCLUDE,
                 });
             });
-            return conTotales(cancelada);
+            return aRespuesta(cancelada);
         }
 
         // Envío: verificación de stock, descuento, movimientos y cambio de estado ocurren
         // en UNA sola transacción (`despachar`).
         const lowStockTargets: ProductoEnAlerta[] = [];
+        const hoy = await hoyDelNegocio();
 
         const updated = await prisma.$transaction((tx) =>
-            despachar(tx, existing, { datos: customerData, concepto: "Orden de venta", bajoMinimos: lowStockTargets }),
+            despachar(tx, existing, { datos: customerData, concepto: "Orden de venta", bajoMinimos: lowStockTargets, hoy }),
         ).catch((error: unknown) => {
-            // T5-12        }).catch((error: unknown) => {
             // T5-12 — fuera de la transacción, que ya se ha deshecho: un aviso creado dentro
             // se habría ido con ella. El error sigue su camino tal cual.
             if (error instanceof HttpError && error.code === "INSUFFICIENT_STOCK" && error.params) {
@@ -467,7 +524,7 @@ export const saleOrderService = {
         // tantas idas y vueltas al SMTP como productos bajaran de mínimo.
         for (const target of lowStockTargets) dispararAlertaStock(target);
 
-        return conTotales(updated);
+        return aRespuesta(updated);
     },
 
     async delete(id: string) {

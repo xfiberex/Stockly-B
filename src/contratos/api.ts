@@ -75,6 +75,8 @@ export const PERMISOS = {
     "GET /products/:id/movements/export": TODOS,
     "GET /products/:id/price-history": TODOS,
     "GET /products/:id/cost-history": TODOS,
+    // T5-15 — los lotes de un producto y dónde está cada uno: leer, como su histórico.
+    "GET /products/:id/lots": TODOS,
     "POST /products/import": SOLO_ADMIN,
     "POST /products": SOLO_ADMIN,
     "PUT /products/:id": SOLO_ADMIN,
@@ -156,6 +158,8 @@ export const PERMISOS = {
     "GET /reports": TODOS,
     "GET /reports/period": TODOS,
     "GET /reports/abc": TODOS,
+    // T5-15 — lo que caduca pronto y lo ya caducado, con su valor a coste.
+    "GET /reports/expiring": TODOS,
     // Administración
     "GET /users": SOLO_ADMIN,
     "POST /users": SOLO_ADMIN,
@@ -403,11 +407,16 @@ export const CODIGOS_DE_ERROR = [
     "INACTIVE_PRODUCT_MOVEMENT",
     "INSUFFICIENT_STOCK",
     "INVALID_FILTER_VALUE",
+    // T5-15 — una entrada con fecha de caducidad ya pasada, o sin fecha en un producto que lleva lotes.
+    "LOT_ALREADY_EXPIRED",
+    "LOT_EXPIRY_REQUIRED",
     "INVALID_OR_EXPIRED_TOKEN",
     "ORDER_ALREADY_SHIPPED",
     "ORDER_NOT_RECEIVABLE",
     "PRODUCT_ALREADY_ACTIVE",
     "PRODUCT_NOT_IN_COUNT",
+    // T5-15 — se dijo un lote para un producto que no los lleva.
+    "PRODUCT_WITHOUT_LOTS",
     "PRODUCT_WITHOUT_SUPPLIER",
     // T5-08 — se piden etiquetas de productos sin código de barras ni SKU que imprimir, o con
     // uno tan largo que sus barras saldrían más finas de lo que se puede leer.
@@ -431,6 +440,8 @@ export const CODIGOS_DE_ERROR = [
     "CATEGORY_NOT_FOUND",
     "CUSTOMER_NOT_FOUND",
     "INVENTORY_COUNT_NOT_FOUND",
+    // T5-15 — el lote no existe **o es de otro producto**.
+    "LOT_NOT_FOUND",
     // T5-12 — el aviso no existe **o es de otro usuario**: desde fuera no se distinguen.
     "NOTIFICATION_NOT_FOUND",
     "PRODUCT_NOT_FOUND",
@@ -455,6 +466,8 @@ export const CODIGOS_DE_ERROR = [
     "CUSTOMER_EMAIL_EXISTS",
     "EMAIL_ALREADY_REGISTERED",
     "EMAIL_IN_USE",
+    // T5-15 — ese código de lote ya existe para el producto, con otra fecha de caducidad.
+    "LOT_EXPIRY_MISMATCH",
     "SKU_EXISTS",
     "SUPPLIER_EMAIL_EXISTS",
     "TAG_NAME_EXISTS",
@@ -605,6 +618,11 @@ export const productoSchema = z.object({
      */
     stock: z.number(),
     minStock: z.number(),
+    /**
+     * T5-15 — si sus **entradas** piden lote y fecha de caducidad. Solo gobierna eso: lo que ya
+     * tiene lote sale por FEFO y deja de venderse al caducar, esté marcado o no.
+     */
+    tracksLots: z.boolean(),
     imageUrl: z.string().nullable(),
     imagePublicId: z.string().nullable(),
     isActive: z.boolean(),
@@ -619,10 +637,17 @@ export const productoSchema = z.object({
     updatedAt: fechaSchema,
 });
 
-/** T5-14 — lo que hay de un producto en un almacén: lo físico, lo comprometido y lo vendible. */
+/**
+ * T5-14 — lo que hay de un producto en un almacén: lo físico, lo comprometido y lo vendible.
+ *
+ * T5-15 — `expiredStock` es la parte de `stock` que está en lotes ya caducados. Sigue en la
+ * estantería —y en el total— hasta que alguien la dé de baja, pero **no se puede vender**:
+ * `availableStock` es `stock − expiredStock − committedStock`.
+ */
 export const nivelDeStockSchema = z.object({
     warehouseId: z.string(),
     stock: z.number(),
+    expiredStock: z.number(),
     committedStock: z.number(),
     availableStock: z.number(),
 });
@@ -637,7 +662,7 @@ export function nivelEn(
 ): z.infer<typeof nivelDeStockSchema> {
     return (
         producto.stockLevels?.find((n) => n.warehouseId === warehouseId) ??
-        { warehouseId, stock: 0, committedStock: 0, availableStock: 0 }
+        { warehouseId, stock: 0, expiredStock: 0, committedStock: 0, availableStock: 0 }
     );
 }
 
@@ -651,6 +676,8 @@ export function nivelEn(
  */
 export const productoConDisponibleSchema = productoSchema.extend({
     committedStock: z.number(),
+    /** T5-15 — lo caducado, en todos los almacenes. El disponible ya lo descuenta. */
+    expiredStock: z.number(),
     availableStock: z.number(),
     abcClass: claseAbcSchema,
     /**
@@ -659,6 +686,109 @@ export const productoConDisponibleSchema = productoSchema.extend({
      * leerlo está `nivelEn`. Las tres cifras de arriba son la suma de estas.
      */
     stockLevels: z.array(nivelDeStockSchema),
+});
+
+// ─────────────────────── Lotes y caducidad (T5-15) ───────────────────────
+
+/** Lo más largo que puede ser el código de un lote. */
+export const LARGO_MAXIMO_DE_CODIGO_DE_LOTE = 60;
+
+/** Con cuántos días de antelación se avisa de una caducidad si nadie ha cambiado el ajuste. */
+export const DIAS_DE_AVISO_DE_CADUCIDAD_POR_DEFECTO = 30;
+
+/** El tope del plazo de aviso, y de `?days=` en el informe de caducidades. */
+export const DIAS_DE_AVISO_DE_CADUCIDAD_MAXIMOS = 730;
+
+/**
+ * Si `texto` es un día que existe, escrito `AAAA-MM-DD`. `2026-02-30` tiene la forma y no
+ * existe; `Date` lo pasaría a marzo sin avisar. **Es la regla de los dos lados.**
+ */
+export function esDiaValido(texto: unknown): texto is string {
+    if (typeof texto !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false;
+    const [y, m, d] = texto.split("-").map(Number);
+    return new Date(Date.UTC(y!, m! - 1, d!)).toISOString().slice(0, 10) === texto;
+}
+
+/**
+ * El código de un lote al que nadie le puso uno: sale de su fecha de caducidad (`L-20261231`).
+ * Así dos entradas sin código que caducan el mismo día son **el mismo lote**, que es lo que son
+ * para quien solo mira la fecha de la caja.
+ */
+export function codigoDeLotePorDefecto(expiresAt: string): string {
+    return `L-${expiresAt.replaceAll("-", "")}`;
+}
+
+/**
+ * Un lote, donde se nombra: en un movimiento, en una línea de venta. **`expiresAt` es un día**
+ * (`AAAA-MM-DD`), no un instante: caduca al terminar ese día en la zona del negocio, y pasarlo
+ * por `new Date()` en un navegador al oeste de Greenwich lo adelantaría un día.
+ */
+export const loteRefSchema = z.object({
+    id: z.string(),
+    code: z.string(),
+    expiresAt: z.string(),
+});
+
+/**
+ * `GET /products/:id/lots` — un lote **con existencias** y dónde las tiene. `daysLeft` cuenta
+ * desde hoy en la zona del negocio: 0 es «caduca hoy» —todavía se vende— y negativo, caducado.
+ */
+export const loteDeProductoSchema = loteRefSchema.extend({
+    daysLeft: z.number(),
+    expired: z.boolean(),
+    /** En todos los almacenes. */
+    stock: z.number(),
+    levels: z.array(z.object({ warehouseId: z.string(), stock: z.number() })),
+});
+
+/**
+ * Los lotes de un producto, del que caduca antes al que caduca después: el orden en que salen.
+ * `withoutLot` es lo que hay **sin lote** —lo anterior a que el producto los llevara, o lo que
+ * un conteo encontró de más—, que sale antes que cualquiera de ellos.
+ */
+export const lotesDeProductoSchema = z.object({
+    lots: z.array(loteDeProductoSchema),
+    withoutLot: z.number(),
+});
+
+/** Una fila del informe de caducidades: lo que hay de un lote **en un almacén**. */
+export const caducidadSchema = z.object({
+    lotId: z.string(),
+    code: z.string(),
+    expiresAt: z.string(),
+    daysLeft: z.number(),
+    expired: z.boolean(),
+    productId: z.string(),
+    productName: z.string(),
+    sku: z.string().nullable(),
+    warehouseId: z.string(),
+    warehouseName: z.string(),
+    stock: z.number(),
+    /** El coste medio del producto, y `stock` por él. `null` si el producto no tiene coste. */
+    unitCost: z.number().nullable(),
+    costValue: z.number().nullable(),
+});
+
+/**
+ * `GET /reports/expiring?days=N` — lo ya caducado y lo que caduca de hoy a dentro de `days`
+ * días, los dos extremos incluidos. `data` va paginado; `summary` suma **todo** lo que cumple
+ * el filtro, no solo la página.
+ *
+ * Los valores son a coste, como el valor de inventario del panel, y por lo mismo las unidades
+ * de productos sin coste se cuentan aparte (`unitsWithoutCost`) en vez de sumar cero.
+ */
+export const informeDeCaducidadesSchema = z.object({
+    today: z.string(),
+    days: z.number(),
+    summary: z.object({
+        expiredUnits: z.number(),
+        expiredCostValue: z.number(),
+        expiringUnits: z.number(),
+        expiringCostValue: z.number(),
+        unitsWithoutCost: z.number(),
+    }),
+    data: z.array(caducidadSchema),
+    meta: metaPaginacionSchema,
 });
 
 export const movimientoStockSchema = z.object({
@@ -673,6 +803,12 @@ export const movimientoStockSchema = z.object({
     warehouseStockAfter: z.number(),
     /** T5-14 — la transferencia que lo originó; `null` en todos los demás. */
     transferId: z.string().nullable(),
+    /**
+     * T5-15 — de qué lote eran las unidades; `null` si no tenían. Una salida que toca dos lotes
+     * llega como **dos movimientos**.
+     */
+    lotId: z.string().nullable(),
+    lot: loteRefSchema.nullable(),
     note: z.string().nullable(),
     createdAt: fechaSchema,
 });
@@ -780,6 +916,11 @@ export const itemOrdenVentaSchema = z.object({
     /** El impuesto de la línea, redondeado a dos decimales. */
     tax: importeSchema,
     total: importeSchema,
+    /**
+     * T5-15 — de qué lotes salió la línea, anotado **al enviar**: vacío en una orden pendiente y
+     * en lo que salió del stock sin lote. Lo imprime el comprobante.
+     */
+    lots: z.array(loteRefSchema.extend({ quantity: z.number() })),
     createdAt: fechaSchema,
 });
 
@@ -941,7 +1082,7 @@ export const fichaClienteSchema = clienteSchema.extend({ summary: resumenCliente
 
 // ─────────────────────── Avisos (T5-12) ───────────────────────
 
-export const tipoDeAvisoSchema = z.enum(["LOW_STOCK", "SALE_UNSHIPPABLE", "PURCHASE_OVERDUE"]);
+export const tipoDeAvisoSchema = z.enum(["LOW_STOCK", "SALE_UNSHIPPABLE", "PURCHASE_OVERDUE", "LOT_EXPIRING"]);
 
 /**
  * `entityId` es de qué habla el aviso —el producto, la venta o la compra, según el tipo—, y
@@ -990,6 +1131,15 @@ export const avisoSchema = z.discriminatedUnion("type", [
         /** `dueDate` es el día en que vencía el plazo, `AAAA-MM-DD` en la zona del negocio. */
         data: z.object({ supplierName: z.string().nullable(), dueDate: z.string() }),
     }),
+    z.object({
+        ...camposDeAviso,
+        type: z.literal("LOT_EXPIRING"),
+        /**
+         * T5-15 — un lote con existencias ha entrado en el plazo de aviso. `entityId` es el
+         * lote; `units` es lo que quedaba de él, en todos los almacenes, al avisar.
+         */
+        data: z.object({ productName: z.string(), lotCode: z.string(), expiresAt: z.string(), units: z.number() }),
+    }),
 ]);
 
 /** `GET /notifications`: los más recientes —no todos— y cuántos hay sin leer **en total**. */
@@ -1002,7 +1152,11 @@ export const itemOrdenCompraSchema = z.object({
     id: z.string(),
     purchaseOrderId: z.string(),
     productId: z.string().nullable(),
-    product: productoDeItemSchema,
+    /**
+     * T5-15 — con `tracksLots`: es lo que le dice a la pantalla de recepción en qué líneas hay
+     * que pedir la fecha de caducidad.
+     */
+    product: z.object({ id: z.string(), name: z.string(), sku: z.string().nullable(), tracksLots: z.boolean() }).nullable(),
     productName: z.string(),
     quantity: z.number(),
     /** T5-04 — lo que ha entrado de la línea entre todas sus recepciones; nunca más que `quantity`. */
@@ -1552,6 +1706,11 @@ export type LineaConteo = z.infer<typeof lineaConteoSchema>;
 export type LineasConteo = z.infer<typeof lineasConteoSchema>;
 
 export type NivelDeStock = z.infer<typeof nivelDeStockSchema>;
+export type LoteRef = z.infer<typeof loteRefSchema>;
+export type LoteDeProducto = z.infer<typeof loteDeProductoSchema>;
+export type LotesDeProducto = z.infer<typeof lotesDeProductoSchema>;
+export type Caducidad = z.infer<typeof caducidadSchema>;
+export type InformeDeCaducidades = z.infer<typeof informeDeCaducidadesSchema>;
 export type Almacen = z.infer<typeof almacenSchema>;
 export type AlmacenConCifras = z.infer<typeof almacenConCifrasSchema>;
 export type Transferencia = z.infer<typeof transferenciaSchema>;

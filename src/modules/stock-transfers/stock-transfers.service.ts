@@ -1,11 +1,13 @@
 import { prisma } from "@/shared/lib/prisma";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
 import { bloquearProductos, nivelesEn, transferir } from "@/shared/lib/stock";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
 import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
+import { hoyDelNegocio } from "@/shared/lib/lotes";
 import type { CreateStockTransferInput } from "./stock-transfers.validator";
+import { lineasDe } from "./stock-transfers.lineas";
 
 /**
  * T5-14 — transferencias entre almacenes.
@@ -25,16 +27,18 @@ type TransferenciaConAlmacenes = Prisma.StockTransferGetPayload<{ include: typeo
 
 const numero = (id: string) => id.slice(0, 8).toUpperCase();
 
-/** Cuántos productos y cuántas unidades llevó cada una: se cuentan las entradas, una por producto. */
+/**
+ * Cuántos productos y cuántas unidades llevó cada una. Se cuentan las entradas, y **productos
+ * distintos**: desde T5-15, uno que viajó en dos lotes son dos entradas.
+ */
 async function cifras(ids: string[]): Promise<Map<string, { lines: number; units: number }>> {
     if (ids.length === 0) return new Map();
-    const filas = await prisma.stockMovement.groupBy({
-        by: ["transferId"],
-        where: { transferId: { in: ids }, delta: { gt: 0 } },
-        _count: { _all: true },
-        _sum: { delta: true },
-    });
-    return new Map(filas.flatMap((f) => (f.transferId ? [[f.transferId, { lines: f._count._all, units: f._sum.delta ?? 0 }] as const] : [])));
+    const filas = await prisma.$queryRaw<Array<{ transferId: string; lines: number; units: number }>>`
+        SELECT "transferId", COUNT(DISTINCT "productId")::int AS lines, SUM(delta)::int AS units
+        FROM stock_movements
+        WHERE "transferId" IN (${Prisma.join(ids)}) AND delta > 0
+        GROUP BY "transferId"`;
+    return new Map(filas.map((f) => [f.transferId, { lines: f.lines, units: f.units }]));
 }
 
 function aTransferencia(t: TransferenciaConAlmacenes, c: { lines: number; units: number } | undefined) {
@@ -87,17 +91,7 @@ export const stockTransfersService = {
             orderBy: [{ product: { name: "asc" } }, { productId: "asc" }],
         });
 
-        const salidas = new Map(movimientos.filter((m) => m.delta < 0).map((m) => [m.productId, m]));
-        const items = movimientos
-            .filter((m) => m.delta > 0)
-            .map((entrada) => ({
-                productId: entrada.productId,
-                name: entrada.product.name,
-                sku: entrada.product.sku,
-                quantity: entrada.delta,
-                fromStockAfter: salidas.get(entrada.productId)?.warehouseStockAfter ?? 0,
-                toStockAfter: entrada.warehouseStockAfter,
-            }));
+        const items = lineasDe(movimientos);
 
         return {
             ...aTransferencia(transferencia, { lines: items.length, units: items.reduce((suma, i) => suma + i.quantity, 0) }),
@@ -113,6 +107,9 @@ export const stockTransfersService = {
      * comprometido en sus ventas pendientes—, no todo lo que hay: llevarse a otro local unas
      * unidades ya prometidas a un cliente de este dejaría esa venta sin poder enviarse. Una
      * salida a mano no mira eso, porque cuenta algo que ya pasó; una transferencia se decide.
+     *
+     * T5-15 — y **lo caducado no viaja**: no está disponible para venderse aquí ni allí, y lo
+     * que toca es darlo de baja donde está. Lo que sí viaja conserva su lote.
      */
     async create(dto: CreateStockTransferInput, email: string | undefined) {
         if (dto.fromWarehouseId === dto.toWarehouseId) {
@@ -125,6 +122,7 @@ export const stockTransfersService = {
 
         const ids = dto.items.map((i) => i.productId).sort();
         const pedido = new Map(dto.items.map((i) => [i.productId, i.quantity]));
+        const hoy = await hoyDelNegocio();
 
         const id = await prisma.$transaction(async (tx) => {
             await bloquearProductos(tx, ids);
@@ -132,7 +130,7 @@ export const stockTransfersService = {
             const productos = new Map(
                 (await tx.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map((p) => [p.id, p]),
             );
-            const enOrigen = await nivelesEn(tx, origen.id, ids);
+            const enOrigen = await nivelesEn(tx, origen.id, ids, { vigentesA: hoy });
             const comprometido = await comprometidoPorProducto(ids, tx, origen.id);
 
             const sinDisponible = (producto: string, disponible: number, requerido: number) =>
@@ -170,6 +168,7 @@ export const stockTransfersService = {
                         toWarehouseId: destino.id,
                         cantidad,
                         transferId: transferencia.id,
+                        vigentesA: hoy,
                         note: `Transferencia #${numero(transferencia.id)}: ${origen.name} → ${destino.name}`,
                     },
                     (enAlmacen) => sinDisponible(productos.get(productId)!.name, enAlmacen, cantidad),

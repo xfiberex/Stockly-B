@@ -30,6 +30,8 @@ interface LineaDelComprobante {
     unitPrice: { toString(): string };
     taxRate: number | null;
     subtotal: string;
+    /** T5-15 — de qué lotes salió, si salió de alguno. La caducidad, como día `AAAA-MM-DD`. */
+    lots?: Array<{ code: string; expiresAt: string; quantity: number }>;
 }
 
 export interface DatosDelComprobante {
@@ -86,6 +88,19 @@ export function fechaDelComprobante(fecha: Date, zonaHoraria: string): string {
     return new Intl.DateTimeFormat("es-MX", { dateStyle: "long", timeStyle: "short", hourCycle: "h23", timeZone: zonaHoraria })
         .format(fecha)
         .replace(/[  ]/g, " ");
+}
+
+/**
+ * T5-15 — los lotes de una línea, en un renglón: «Lote L-20261231 · cad. 31/12/2026». Con más de
+ * uno, cada cual dice cuántas unidades son suyas, que es lo que hace falta en una retirada.
+ * Vacío si la línea no salió de ningún lote.
+ */
+export function lotesDeLaLinea(lots: LineaDelComprobante["lots"]): string {
+    if (!lots || lots.length === 0) return "";
+    const dia = (expiresAt: string) => expiresAt.split("-").reverse().join("/");
+    return lots
+        .map((l) => `Lote ${unaLinea(l.code)} · cad. ${dia(l.expiresAt)}${lots.length > 1 ? ` (${l.quantity})` : ""}`)
+        .join("   ");
 }
 
 /**
@@ -239,8 +254,12 @@ function dibujarLineas(doc: Doc, { orden, negocio }: DatosDelComprobante, y: num
 
     for (const linea of orden.items) {
         const nombre = unaLinea(linea.productName);
+        const lotes = lotesDeLaLinea(linea.lots);
         doc.font("Helvetica").fontSize(9);
-        const alto = Math.max(doc.heightOfString(nombre, { width: descripcion.ancho - 16 }), 10) + 12;
+        const altoNombre = Math.max(doc.heightOfString(nombre, { width: descripcion.ancho - 16 }), 10);
+        doc.fontSize(7.5);
+        const altoLotes = lotes ? doc.heightOfString(lotes, { width: descripcion.ancho - 16 }) + 2 : 0;
+        const alto = altoNombre + altoLotes + 12;
 
         if (y + alto > bottom(doc)) {
             doc.addPage();
@@ -249,6 +268,9 @@ function dibujarLineas(doc: Doc, { orden, negocio }: DatosDelComprobante, y: num
 
         let x = MARGIN;
         doc.font("Helvetica").fontSize(9).fillColor(INK).text(nombre, x + 8, y + 6, { width: descripcion.ancho - 16 });
+        if (lotes) {
+            doc.font("Helvetica").fontSize(7.5).fillColor(FAINT).text(lotes, x + 8, y + 6 + altoNombre + 2, { width: descripcion.ancho - 16 });
+        }
         x += descripcion.ancho;
 
         const celda = (texto: string, ancho: number, color: string, negrita = false) => {

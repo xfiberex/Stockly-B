@@ -248,6 +248,33 @@ justo la guarda que se quiere tener. **Revertir este despliegue es restaurar la 
 migración. Restaurar un volcado lo trae; `prisma db push` contra una base vacía, no. Para saber
 si una base lo tiene: `SELECT tgname FROM pg_trigger WHERE tgname LIKE '%cuadra'` —dos filas—.
 
+**T5-15 — lotes y caducidad.** No mueve datos: añade `products.tracksLots` (a `false` en todo el
+catálogo), `stock_levels.lotId` y `stock_movements.lotId` (vacías), y las tablas `lots` y
+`sale_order_item_lots`. Todo el stock se queda en su fila de siempre, que pasa a ser la de «sin
+lote». Sobre la base de carga, 2,6 s ([rendimiento.md §16](rendimiento.md)). **Tampoco es
+expansiva, y se aplica con la aplicación parada**: cambia el índice único de `stock_levels` de
+`(producto, almacén)` a `(producto, almacén, lote)`, y la versión anterior de la aplicación
+escribe cada nivel con `ON CONFLICT` sobre el que desaparece —toda entrada de stock daría 500—.
+A diferencia de `T5-14`, esta **debería** tener vuelta atrás sin restaurar mientras nadie haya
+creado un lote: reponiendo el índice anterior, la biblioteca de stock de la versión anterior
+funciona contra el esquema nuevo —así se midió el «antes» de [rendimiento.md §16](rendimiento.md)—.
+**No se ha ensayado con la aplicación anterior entera**, así que el camino seguro sigue siendo
+la copia previa. Con lotes creados ya no hay otro: dos filas del mismo producto y almacén no
+caben en el índice de antes.
+
+```sql
+-- T5-15: el total sigue cuadrando, y el índice único trata dos «sin lote» como la misma fila
+SELECT
+    (SELECT SUM("stock") FROM "products") AS total,
+    (SELECT SUM("stock") FROM "stock_levels") AS en_almacenes,
+    (SELECT i.indnullsnotdistinct FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+      WHERE c.relname = 'stock_levels_productId_warehouseId_lotId_key') AS sin_lote_es_una_fila;
+```
+
+`sin_lote_es_una_fila` tiene que ser `true`. Es lo segundo que `schema.prisma` no sabe expresar:
+el índice es `NULLS NOT DISTINCT`, y sin eso cada entrada de un producto sin lotes crearía una
+fila nueva en vez de sumar a la suya. Pide **PostgreSQL 15 o posterior** (§9: el proyecto fija la 17).
+
 ## 7. Trampas ya pagadas
 
 Las cuatro se encontraron montando esto, y las cuatro fallan en silencio o con un mensaje que

@@ -42,7 +42,7 @@ auditoria`. El workflow llama a ese mismo script: no se le añaden pasos propios
   migra**. Tras una migración nueva se ejecuta **su propio SQL**:
   `DATABASE_URL=…/Stockly_test pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`.
   Ni `migrate deploy` (falla ahí) ni `db push` (no trae lo que `schema.prisma` no sabe expresar,
-  como el disparador de `T5-14`). Un fallo masivo de la suite que hable del esquema es esto.
+  como el disparador de `T5-14` o el índice `NULLS NOT DISTINCT` de `T5-15`). Un fallo masivo de la suite que hable del esquema es esto.
 - **`smoke` no es redundante con `build`**: `tsc` no reescribe los alias `@/`, y un build que
   compila puede no arrancar.
 - **`auditoria`** rompe ante una vulnerabilidad alta o crítica en producción o una licencia fuera

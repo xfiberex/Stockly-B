@@ -50,15 +50,15 @@ Medido el 2026-10-10 en este equipo, con `pnpm verify` y el E2E:
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1586** en 67 archivos | **864** en 78 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.96 % *(suelo 85 %)* | 79.82 % *(suelo 45 %)* |
+| Tests | **1652** en 68 archivos | **910** en 80 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 97.15 % *(suelo 85 %)* | 80.93 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **36 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
+| E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 138 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
-cerrados, y del Tier 5, funcionalidad de negocio, 14 de 15. Queda `T5-15` (lotes y caducidad), que
-solo se abre con un caso de uso real. El Tier 6 —el mostrador y el
+**Tareas: 139 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+cerrados, y el Tier 5, funcionalidad de negocio, también: su última tarea, `T5-15` (lotes y
+caducidad), se cerró el 2026-10-10. No queda ninguna abierta. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas
 y está cerrado; las tres decisiones de producto que lo gobernaron están al principio de ese tier, en
 el índice de cerradas del ROADMAP.
@@ -75,7 +75,7 @@ Cinco cosas que conviene saber antes de tocar nada:
 - **Las fichas son pistas, no descripciones verificadas.** Siete describían mal su propio problema
   —la causa, el alcance o el remedio— y están marcadas en el índice del ROADMAP. Medir antes de
   arreglar, y medir otra vez después.
-- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay diez
+- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay once
   [ADR](adr/). Antes de simplificar algo que parezca complicado de más, se lee la suya.
 - **Un árbol de dependencias limpio no se queda limpio solo.** `verify` ya amaneció en rojo dos
   veces por avisos publicados sin que nadie tocara nada; el patrón para resolverlo está en
@@ -105,6 +105,9 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   sincronizada con `db push` se queda sin él **sin avisar**. `varios-almacenes.test.ts` lo
   comprueba y falla con ese mensaje; el resto de la suite pasaría igual, sin la guarda. Lo mismo
   le pasa a `pg_trgm`, que hay que crear a mano una vez (`CREATE EXTENSION IF NOT EXISTS pg_trgm`).
+  **Desde `T5-15` hay una segunda cosa que `db push` no trae**: el índice único de `stock_levels`
+  es `NULLS NOT DISTINCT`, y sin eso cada entrada de un producto sin lotes crea una fila nueva
+  en vez de sumar a la suya. `lotes.test.ts` lo comprueba.
 - **El desfase no avisa: se disfraza de fallo del cambio recién hecho.** Cientos de tests en rojo
   con «la tabla X no existe» o «no existe el tipo `public.Role`». Antes de investigar un fallo
   masivo, mirar si el mensaje habla del esquema. Para ver qué falta:
@@ -377,6 +380,29 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   guarda cada almacén cuesta recorrer todos los niveles y tiene su ruta, `/warehouses/summary`.
 - **Cambiar el predeterminado lleva un bloqueo consultivo además de su única sentencia** (`T5-14`).
   Sin él, dos cambios a la vez dejaban dos predeterminados. Parece redundante y no lo es.
+- **Lo que hay de un producto en un almacén es una suma, no una fila** (`T5-15`,
+  [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md)): `stock_levels` tiene una por lote y
+  otra para lo que no tiene lote. Se lee con `nivelesEn`; un `findUnique` por producto y almacén
+  ya no existe, y un `findFirst` devuelve un lote cualquiera.
+- **De qué lote sale cada unidad lo decide `shared/lib/stock.ts`, y ningún servicio recorre
+  lotes** (`T5-15`). Un servicio dice cuánto sacar y, si acaso, `vigentesA` —que solo valga lo no
+  caducado: lo pasan la venta y la transferencia— o un `lotId` concreto. El orden es: lo que no
+  tiene lote, después por caducidad, y a igual fecha por código.
+- **El camino corto de `bajarNivel` no es una optimización prematura** (`T5-15`): sin él, la
+  salida de un producto que no lleva lotes costaba un 38 % más, medido. Quitarlo «porque el
+  reparto ya lo cubre» lo devuelve.
+- **`tracksLots` gobierna solo si las entradas piden lote** (`T5-15`). La salida por caducidad y
+  el bloqueo de lo caducado miran los lotes que haya, esté el producto marcado o no: por eso
+  marcarlo o desmarcarlo no mueve nada. Un `if (producto.tracksLots)` delante de una salida
+  dejaría vender lo caducado de un producto desmarcado.
+- **«Caducado» se decide comparando con hoy en la zona del negocio** (`hoyDelNegocio`), nunca con
+  `new Date()` ni en el navegador (`T5-15`). Un lote caduca al terminar su día: el que vence hoy
+  todavía se vende. **La caducidad viaja como día** (`AAAA-MM-DD`), no como instante: pasada por
+  `new Date()` al oeste de Greenwich sale el día anterior; en pantalla, `formatearDia`.
+- **Dar de baja lo caducado es un `ADJUSTMENT` a cero de ese lote, no un `OUT`** (`T5-15`): la
+  rotación y la reposición cuentan salidas. Por eso `quantity: 0` vale en un ajuste a mano.
+- **Lo que un ajuste o un conteo encuentra de más queda «sin lote»** (`T5-15`), y no en el lote
+  más reciente ni en uno inventado: nadie ha dicho de cuál es. Sale primero.
 - **En el mostrador, el precio no lo pone quien vende** (`T6-08`). `POST /sale-orders/counter`
   recibe un producto y una cantidad por línea; el nombre y el precio salen del producto, con su
   fila bloqueada. `counterSaleSchema` no declara `unitPrice` **a propósito**: añadirlo «para un

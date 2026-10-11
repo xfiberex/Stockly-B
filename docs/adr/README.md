@@ -19,6 +19,7 @@ evidente es la equivocada. Si algo se hizo de la forma obvia, no necesita una en
 | [0008](0008-integracion-continua.md) | Integración continua: la misma puerta, también en GitHub | Aceptada |
 | [0009](0009-licencia-agpl.md) | Licencia: GNU AGPL v3, no MIT | Aceptada |
 | [0010](0010-stock-total-desnormalizado.md) | `Product.stock` se conserva como total de los almacenes, y la base lo comprueba | Aceptada |
+| [0011](0011-lotes-como-dimension-del-nivel.md) | El lote es una dimensión del nivel de stock, y de qué lote sale cada unidad lo decide una sola sentencia | Aceptada |
 
 ## Formato
 

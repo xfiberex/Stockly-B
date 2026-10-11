@@ -249,7 +249,7 @@ export const reposicionService = {
                     include: {
                         supplier: { select: { id: true, name: true } },
                         warehouse: { select: { id: true, name: true } },
-                        items: { include: { product: { select: { id: true, name: true, sku: true } } } },
+                        items: { include: { product: { select: { id: true, name: true, sku: true, tracksLots: true } } } },
                     },
                 }),
             ),

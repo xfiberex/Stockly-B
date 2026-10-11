@@ -134,17 +134,21 @@ export const postDeMovimientoManual = {
             content: { "application/json": { schema: {
                 type: "object", required: ["type", "quantity"],
                 properties: {
-                    type: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT"], description: "`ADJUSTMENT` deja **el almacén** en `quantity`, no el total del producto (T5-14)" },
-                    quantity: { type: "integer", example: 5 },
+                    type: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT"], description: "`ADJUSTMENT` deja **el almacén** en `quantity`, no el total del producto (T5-14); con `lotId`, deja en `quantity` lo que hay **de ese lote** (T5-15)" },
+                    quantity: { type: "integer", example: 5, description: "Mayor que 0 en `IN` y `OUT`. En `ADJUSTMENT` puede ser 0: así se da de baja un lote caducado" },
                     reason: { type: "string" },
                     warehouseId: { type: "string", format: "uuid", description: "T5-14 — el almacén de la operación; sin él, el predeterminado" },
+                    lotId: { type: "string", format: "uuid", description: "T5-15 — un lote del producto. En `IN` suma a ese lote; en `OUT` saca solo de él; en `ADJUSTMENT` fija lo que queda de él. Sin él, `OUT` y un ajuste a la baja siguen el orden de caducidad —vencido incluido—, y lo que un ajuste encuentra de más queda sin lote" },
+                    expiresAt: { type: "string", format: "date", description: "T5-15 — solo `IN`: la caducidad de lo que entra. **Obligatoria si el producto lleva lotes** y no se da `lotId`" },
+                    lotCode: { type: "string", description: "T5-15 — solo `IN`: el código del lote. Sin él, sale de la fecha (`L-AAAAMMDD`)" },
                 },
             } } },
         },
         responses: {
             "201": JSON_OK({ $ref: "#/components/schemas/Product" }, "Movimiento registrado"),
-            "400": ERROR("Stock insuficiente en ese almacén"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("Producto o almacén no encontrados"),
-            "409": ERROR("El almacén está desactivado"),
+            "400": ERROR("Stock insuficiente en ese almacén; entrada sin caducidad en un producto con lotes (`LOT_EXPIRY_REQUIRED`), con caducidad ya pasada (`LOT_ALREADY_EXPIRED`) o con lote en un producto que no los lleva (`PRODUCT_WITHOUT_LOTS`)"),
+            "403": ERROR("Requiere rol ADMIN"), "404": ERROR("Producto, almacén o lote no encontrados"),
+            "409": ERROR("El almacén está desactivado, o ese código de lote ya existe con otra caducidad (`LOT_EXPIRY_MISMATCH`)"),
         },
     },
 };
@@ -231,6 +235,14 @@ export const rutasAdicionales: Record<string, Ruta> = {
     // entera —el spread sustituye, no fusiona—, dejando el `get` sin documentar **en
     // silencio**. Su `post` se exporta arriba y se inserta dentro del objeto existente.
     "/products/{id}/movements/export": exportacion("Stock Movements", "los movimientos de un producto"),
+    "/products/{id}/lots": {
+        get: {
+            tags: ["Products"], summary: "Lotes con existencias de un producto, en el orden en que salen (T5-15)",
+            description: "Del que caduca antes al que caduca después (FEFO), con lo que hay de cada uno en cada almacén. Los agotados no vienen. `withoutLot` es lo que hay sin lote, que sale antes que cualquiera. `daysLeft` cuenta en la zona del negocio: 0 es «caduca hoy» y todavía se vende; negativo, caducado.",
+            parameters: [PARAM_ID],
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/ProductLots" }, "Lotes"), "404": ERROR("Producto no encontrado") },
+        },
+    },
     "/products/{id}/price-history": {
         get: {
             tags: ["Products"], summary: "Historial de cambios de precio", parameters: [PARAM_ID],
@@ -295,18 +307,18 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/purchase-orders/{id}/receipts": {
         post: {
             tags: ["Purchase Orders"], summary: "Registrar una recepción, parcial o completa (T5-04; ADMIN o WAREHOUSE)",
-            description: "Suma a cada línea indicada la cantidad recibida, con su stock, su movimiento `IN` y el coste medio calculado sobre lo recibido. La orden queda `RECEIVED` si todas sus líneas se completan y `PARTIALLY_RECEIVED` si no. Las líneas que no se envían no reciben nada.",
+            description: "Suma a cada línea indicada la cantidad recibida, con su stock, su movimiento `IN` y el coste medio calculado sobre lo recibido. La orden queda `RECEIVED` si todas sus líneas se completan y `PARTIALLY_RECEIVED` si no. Las líneas que no se envían no reciben nada. T5-15 — la línea de un producto **que lleva lotes** necesita `expiresAt`: lo recibido entra en ese lote. Dos lotes de la misma línea son dos recepciones.",
             parameters: [PARAM_ID],
             requestBody: { required: true, content: { "application/json": { schema: {
                 type: "object", required: ["items"],
                 properties: {
-                    items: { type: "array", minItems: 1, items: { type: "object", required: ["itemId", "quantity"], properties: { itemId: { type: "string", format: "uuid" }, quantity: { type: "integer", minimum: 1 } } } },
+                    items: { type: "array", minItems: 1, items: { type: "object", required: ["itemId", "quantity"], properties: { itemId: { type: "string", format: "uuid" }, quantity: { type: "integer", minimum: 1 }, expiresAt: { type: "string", format: "date", description: "T5-15 — la caducidad de lo que entra; obligatoria si el producto lleva lotes" }, lotCode: { type: "string", description: "T5-15 — el código del lote; sin él, sale de la fecha" } } } },
                 },
             } } } },
             responses: {
                 "201": JSON_OK({ $ref: "#/components/schemas/PurchaseOrder" }, "Recepción registrada"),
-                "400": ERROR("Más de lo pendiente (`RECEIPT_EXCEEDS_PENDING`) u orden recibida o cancelada (`ORDER_NOT_RECEIVABLE`)"),
-                "404": ERROR("La orden o la línea no existen"), "422": ERROR("Datos inválidos"),
+                "400": ERROR("Más de lo pendiente (`RECEIPT_EXCEEDS_PENDING`), orden recibida o cancelada (`ORDER_NOT_RECEIVABLE`), o un producto con lotes sin caducidad (`LOT_EXPIRY_REQUIRED`) o con una ya pasada (`LOT_ALREADY_EXPIRED`)"),
+                "404": ERROR("La orden o la línea no existen"), "409": ERROR("Ese código de lote ya existe con otra caducidad (`LOT_EXPIRY_MISMATCH`)"), "422": ERROR("Datos inválidos"),
             },
         },
     },
@@ -317,9 +329,9 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
         patch: {
             tags: ["Purchase Orders"], summary: "Actualizar o cambiar de estado",
-            description: "Pasar a `RECEIVED` **suma lo que falte** de cada línea ligada a un producto; cancelar una recibida, entera o a medias, retira lo que entró (`receivedQuantity`) y falla con 400 si esas unidades ya se consumieron (T0-04). `PARTIALLY_RECEIVED` no se escribe: se llega a él con `POST /purchase-orders/{id}/receipts`. Una orden con mercancía recibida no vuelve a `PENDING`.",
+            description: "Pasar a `RECEIVED` **suma lo que falte** de cada línea ligada a un producto; cancelar una recibida, entera o a medias, retira lo que entró (`receivedQuantity`) y falla con 400 si esas unidades ya se consumieron (T0-04). `PARTIALLY_RECEIVED` no se escribe: se llega a él con `POST /purchase-orders/{id}/receipts`. Una orden con mercancía recibida no vuelve a `PENDING`. T5-15 — al pasar a `RECEIVED`, cada línea de un producto que lleva lotes necesita su entrada en `lots`; al cancelar, lo recibido en un lote se retira **de ese lote**.",
             parameters: [PARAM_ID],
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["PENDING", "RECEIVED", "CANCELLED"] }, supplierId: { type: "string", format: "uuid" }, notes: { type: "string" } } } } } },
+            requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["PENDING", "RECEIVED", "CANCELLED"] }, supplierId: { type: "string", format: "uuid" }, notes: { type: "string" }, lots: { type: "array", description: "T5-15 — con `status: RECEIVED`: el lote de lo que falta por entrar de cada línea que lo lleve", items: { type: "object", required: ["itemId"], properties: { itemId: { type: "string", format: "uuid" }, expiresAt: { type: "string", format: "date" }, lotCode: { type: "string" } } } } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/PurchaseOrder" }, "Actualizada"),
                 "400": ERROR("Transición inválida, vuelta a pendiente de una orden con mercancía o stock ya consumido"), "404": ERROR("No encontrada"),
@@ -707,6 +719,27 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 "400": ERROR("Periodo no válido: fecha mal escrita, atajo desconocido, fin antes del inicio o más de 60 meses"),
                 "401": ERROR("No autenticado"),
                 "413": ERROR("El CSV supera el máximo de filas de una exportación"),
+            },
+        },
+    },
+    "/reports/expiring": {
+        get: {
+            tags: ["Reports"],
+            summary: "Lo caducado y lo que caduca en los próximos días, con su valor a coste (T5-15)",
+            description:
+                "Una fila por lote **y almacén** con existencias cuya caducidad ya pasó o cae de hoy a dentro de `days` días, " +
+                "los dos extremos incluidos. Ordenado por caducidad. Los días se cuentan en la zona del negocio. `summary` " +
+                "suma todo lo que cumple el filtro, no solo la página; el valor es a coste medio, y las unidades de " +
+                "productos sin coste se cuentan aparte en `unitsWithoutCost`.",
+            parameters: [
+                { name: "days", in: "query", schema: { type: "integer", minimum: 0, maximum: 730 }, description: "El plazo. Sin él, el del ajuste `expiryWarningDays` (30 por defecto)" },
+                PARAM_ALMACEN,
+                ...PARAMS_PAGINA,
+            ],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/ExpiryReport" }, "Informe paginado"),
+                "400": ERROR("`days` no es un entero entre 0 y 730"),
+                "404": ERROR("Almacén no encontrado"),
             },
         },
     },

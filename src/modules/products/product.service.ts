@@ -4,8 +4,9 @@ import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/u
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { mismoCoste } from "@/shared/lib/costeMedio";
 import { conDisponible } from "@/shared/lib/stockComprometido";
-import { altaConStock, entrar, fijar, sacar, type Movido } from "@/shared/lib/stock";
+import { altaConStock, bloquearProductos, entrar, fijar, sacar, type Movido } from "@/shared/lib/stock";
 import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
+import { aDia, diasHasta, hoyDelNegocio, loteDeEntrada, loteDelProducto } from "@/shared/lib/lotes";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
@@ -332,6 +333,7 @@ export const productService = {
 
         // T5-14 — el stock inicial entra en un almacén: el de la petición o el predeterminado.
         const almacen = stock > 0 ? await almacenParaOperar(dto.warehouseId) : null;
+        const hoy = await hoyDelNegocio();
 
         // El producto nace con su stock, y en la misma transacción se le pone el nivel y el
         // movimiento que lo explican: sin los dos, la base no confirma el alta.
@@ -346,6 +348,7 @@ export const productService = {
                     costPrice: dto.costPrice ?? null,
                     stock,
                     minStock,
+                    tracksLots: dto.tracksLots ?? false,
                     categoryId: dto.categoryId ?? null,
                     brandId: dto.brandId ?? null,
                     supplierId: dto.supplierId ?? null,
@@ -357,7 +360,10 @@ export const productService = {
             });
 
             if (almacen) {
-                await altaConStock(tx, { warehouseId: almacen.id, type: "IN", note: "Stock inicial", productos: [{ id: product.id, stock }] });
+                // T5-15 — el stock inicial de un producto con lotes es una entrada como otra
+                // cualquiera: nace en un lote, y sin fecha de caducidad no nace.
+                const lotId = await loteDeEntrada(tx, product, { expiresAt: dto.lotExpiresAt, lotCode: dto.lotCode }, hoy);
+                await altaConStock(tx, { warehouseId: almacen.id, type: "IN", note: "Stock inicial", productos: [{ id: product.id, stock, lotId }] });
             }
             return product;
         }).catch(traducirUnicidad);
@@ -401,6 +407,7 @@ export const productService = {
         const hasStockChange = dto.stock !== undefined;
         const newStock = hasStockChange ? parseInt(String(dto.stock), 10) : undefined;
         const almacen = hasStockChange && newStock !== existing.stock ? await almacenParaOperar(dto.warehouseId) : null;
+        const hoy = await hoyDelNegocio();
         let movido: Movido | null = null;
 
         // Producto, historial de precio y movimiento de stock se escriben en una sola
@@ -416,6 +423,7 @@ export const productService = {
                     ...(newPrice !== undefined && { price: newPrice }),
                     ...(costChanged && { costPrice: dto.costPrice }),
                     ...(dto.minStock !== undefined && { minStock: parseInt(String(dto.minStock), 10) }),
+                    ...(dto.tracksLots !== undefined && { tracksLots: dto.tracksLots }),
                     ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
                     ...(dto.brandId !== undefined && { brandId: dto.brandId }),
                     ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
@@ -443,8 +451,11 @@ export const productService = {
             const diferencia = almacen ? newStock! - product.stock : 0;
             if (almacen && diferencia !== 0) {
                 const movimiento = { productId: id, warehouseId: almacen.id, cantidad: Math.abs(diferencia), note: "Ajuste manual" };
+                // T5-15 — subir el total de un producto con lotes desde aquí sería una entrada sin
+                // lote, y esta ruta no tiene dónde decirlo: `loteDeEntrada` lo rechaza. Se sube con
+                // un movimiento de entrada. Bajarlo sí vale, y sale por orden de caducidad.
                 movido = diferencia > 0
-                    ? await entrar(tx, { ...movimiento, type: "IN" })
+                    ? await entrar(tx, { ...movimiento, type: "IN", lotId: await loteDeEntrada(tx, product, {}, hoy) })
                     : await sacar(tx, { ...movimiento, type: "OUT" }, stockNoPuedeQuedarNegativo);
                 product.stock = movido.stock;
             }
@@ -638,11 +649,18 @@ export const productService = {
                 skip,
                 take: limit,
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                // T5-15 — de qué lote eran las unidades.
+                include: { lot: { select: { id: true, code: true, expiresAt: true } } },
             }),
             prisma.stockMovement.count({ where }),
         ]);
 
-        return { product, movements, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+        return {
+            product,
+            // La caducidad sale como día, no como el instante en que Prisma lee una columna `date`.
+            movements: movements.map((m) => ({ ...m, lot: m.lot && { ...m.lot, expiresAt: aDia(m.lot.expiresAt) } })),
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        };
     },
 
     /**
@@ -682,7 +700,7 @@ export const productService = {
                 take: TAM_LOTE_EXPORTACION,
                 ...(cursor && { cursor: { id: cursor }, skip: 1 }),
                 orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                include: { warehouse: { select: { name: true } } },
+                include: { warehouse: { select: { name: true } }, lot: { select: { code: true, expiresAt: true } } },
             });
 
             if (pagina.length === 0) return;
@@ -698,6 +716,9 @@ export const productService = {
                 // columnas que ya había.
                 warehouseName: m.warehouse.name,
                 warehouseStockAfter: m.warehouseStockAfter,
+                // T5-15 — el lote y su caducidad, vacíos en lo que no tenía.
+                lotCode: m.lot?.code ?? "",
+                lotExpiresAt: m.lot ? aDia(m.lot.expiresAt) : "",
             }));
             if (pagina.length < TAM_LOTE_EXPORTACION) return;
             cursor = pagina[pagina.length - 1]!.id;
@@ -712,15 +733,28 @@ export const productService = {
         const note = dto.note ? `${dto.reason} — ${dto.note}` : dto.reason;
         // T5-14 — en qué almacén: el de la petición o el predeterminado.
         const almacen = await almacenParaOperar(dto.warehouseId);
+        const hoy = await hoyDelNegocio();
         const movimiento = { productId, warehouseId: almacen.id, cantidad: dto.quantity, type: dto.type, note };
 
         // El ajuste de stock y su movimiento son atómicos. Para `OUT`, un decremento condicional
         // sobre el nivel del almacén (ADR 0001); `ADJUSTMENT` deja **ese almacén** en la cifra,
         // no el total: se ajusta lo que se ha contado, y se cuenta un sitio.
-        const movido = await prisma.$transaction((tx) => {
-            if (dto.type === "ADJUSTMENT") return fijar(tx, movimiento);
-            if (dto.type === "OUT") return sacar(tx, movimiento, stockNoPuedeQuedarNegativo);
-            return entrar(tx, movimiento);
+        //
+        // T5-15 — con lote, los tres hablan **de ese lote**: la entrada le suma, la salida saca
+        // solo de él y el ajuste fija lo que queda de él —a cero, para dar de baja uno caducado—.
+        // Sin lote, la salida y el ajuste a la baja siguen el orden de caducidad, vencido
+        // incluido: una merma no elige. La entrada de un producto que lleva lotes sí lo exige.
+        const movido = await prisma.$transaction(async (tx) => {
+            if (dto.type === "IN") {
+                // Con la fila bloqueada: es lo que impide que dos entradas creen dos veces el mismo lote.
+                await bloquearProductos(tx, [productId]);
+                const actual = await tx.product.findUniqueOrThrow({ where: { id: productId }, select: { id: true, name: true, tracksLots: true } });
+                return entrar(tx, { ...movimiento, lotId: await loteDeEntrada(tx, actual, dto, hoy) });
+            }
+
+            const lotId = dto.lotId ? (await loteDelProducto(tx, productId, dto.lotId)).id : null;
+            if (dto.type === "ADJUSTMENT") return fijar(tx, { ...movimiento, lotId });
+            return sacar(tx, { ...movimiento, lotId }, stockNoPuedeQuedarNegativo);
         });
 
         // Solo alerta si el stock disminuyó. El mínimo se compara con el total.
@@ -729,6 +763,41 @@ export const productService = {
         }
 
         return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
+    },
+
+    /**
+     * T5-15 — los lotes **con existencias** de un producto y dónde está cada uno, del que caduca
+     * antes al que caduca después: el orden en que salen. Los agotados no vienen —su rastro son
+     * sus movimientos—, así que la lista no crece con cada lote que ha pasado por el almacén.
+     */
+    async getLots(productId: string) {
+        const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+        if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
+
+        const [hoy, niveles] = await Promise.all([
+            hoyDelNegocio(),
+            prisma.stockLevel.findMany({
+                where: { productId, stock: { not: 0 } },
+                select: { warehouseId: true, stock: true, lot: { select: { id: true, code: true, expiresAt: true } } },
+                orderBy: [{ lot: { expiresAt: "asc" } }, { lot: { code: "asc" } }, { warehouseId: "asc" }],
+            }),
+        ]);
+
+        const lotes = new Map<string, { id: string; code: string; expiresAt: string; daysLeft: number; expired: boolean; stock: number; levels: Array<{ warehouseId: string; stock: number }> }>();
+        let withoutLot = 0;
+        for (const nivel of niveles) {
+            if (!nivel.lot) {
+                withoutLot += nivel.stock;
+                continue;
+            }
+            const expiresAt = aDia(nivel.lot.expiresAt);
+            const daysLeft = diasHasta(expiresAt, hoy);
+            const lote = lotes.get(nivel.lot.id) ?? { id: nivel.lot.id, code: nivel.lot.code, expiresAt, daysLeft, expired: daysLeft < 0, stock: 0, levels: [] };
+            lote.stock += nivel.stock;
+            lote.levels.push({ warehouseId: nivel.warehouseId, stock: nivel.stock });
+            lotes.set(nivel.lot.id, lote);
+        }
+        return { lots: [...lotes.values()], withoutLot };
     },
 
     /**

@@ -209,6 +209,16 @@ export const productController = {
         }
     },
 
+    /** T5-15 — los lotes con existencias de un producto, en el orden en que salen. */
+    async getProductLots(req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const lotes = await productService.getLots(req.params.id);
+            res.json({ success: true, message: "Lotes obtenidos", data: lotes });
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async createManualMovement(
         req: Request<{ id: string }, {}, CreateManualMovementDto>,
         res: Response,
@@ -219,7 +229,7 @@ export const productController = {
             await auditService.log(
                 { userId: req.userId, userEmail: req.userEmail },
                 "STOCK_MOVEMENT", "Product", req.params.id,
-                { type: req.body.type, quantity: req.body.quantity, reason: req.body.reason },
+                { type: req.body.type, quantity: req.body.quantity, reason: req.body.reason, ...(req.body.lotId && { lotId: req.body.lotId }) },
             );
             res.status(201).json({ success: true, message: "Movimiento registrado correctamente", data: product });
         } catch (error) {

@@ -64,6 +64,20 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Funcionalidad de negocio (Tier 5)**
 
+- **Lotes y fechas de caducidad** (`T5-15`): un producto se puede marcar como «lleva lotes» al
+  darlo de alta o después. Desde entonces, lo que entra de él —una recepción de compra, un
+  movimiento, su stock inicial— pide la **fecha de caducidad** y, si se quiere, el código del
+  lote; las ventas sacan **primero lo que caduca antes** (FEFO) y **lo caducado no se puede
+  vender ni transferir**, aunque siga contando en el stock hasta que se dé de baja. Una pantalla
+  nueva, **Caducidades**, lista lo ya caducado y lo que caduca en un plazo, con su valor a
+  coste, y da de baja un lote vencido como un ajuste. La ficha del producto desglosa sus lotes;
+  el histórico, el detalle de la venta y el comprobante dicen de qué lote salió cada cosa; y la
+  campana avisa de los lotes que entran en el plazo. Los productos que no se marcan siguen
+  exactamente como estaban. `GET /products/:id/lots` y `GET /reports/expiring`; `tracksLots` en
+  el producto; `expiredStock` junto al disponible; `lots` en cada línea de venta; `lotId`,
+  `expiresAt` y `lotCode` en movimientos y recepciones; un ajuste nuevo, `expiryWarningDays`
+  (30 días). El seed trae cuatro productos perecederos. **Requiere migración, con la aplicación
+  parada** ([operaciones.md §6](docs/operaciones.md)).
 - **Varios almacenes** (`T5-14`): el stock de cada producto se reparte entre almacenes —sucursales,
   bodegas—, y cada venta, compra, conteo y movimiento ocurre en uno. Una pantalla nueva,
   **Almacenes**, para darlos de alta, elegir el predeterminado y ver lo que guarda cada uno; y
@@ -171,6 +185,14 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
   quedó en su almacén (`T5-14`). Con un solo almacén coinciden.
 - **`PUT /products/:id` trata `stock` como el total** (`T5-14`): lo que cambia es la diferencia,
   que entra o sale de un almacén. `ADJUSTMENT` y el ajuste masivo fijan **el almacén**, no el total.
+- **El disponible de un producto descuenta lo caducado** (`T5-15`): es `stock − caducado −
+  comprometido`. Sin lotes no cambia nada.
+- **Una salida puede dejar más de un movimiento** (`T5-15`): uno por lote tocado. Una línea de
+  venta que sale de dos lotes son dos movimientos `OUT`.
+- **`POST /products/:id/movements` admite `quantity: 0` en un `ADJUSTMENT`** (`T5-15`): es como se
+  da de baja un lote. En `IN` y `OUT` sigue siendo mayor que cero.
+- **La navegación añade «Caducidades»** al grupo «Inventario» (`T5-15`).
+- La exportación del histórico de un producto añade al final `lotCode` y `lotExpiresAt` (`T5-15`).
 - **La navegación agrupa «Conteos físicos», «Transferencias» y «Almacenes»** bajo «Inventario»
   (`T5-14`).
 - Las exportaciones de ventas, de compras y del histórico de un producto añaden al final la
@@ -271,3 +293,4 @@ No son versiones: son los días en que se cerraron bloques de tareas.
 | 2026-09-30 | Licencia AGPL v3 |
 | 2026-10-01 | Tier 5 en 13 de 15: quedan las dos tareas condicionadas |
 | 2026-10-10 | Varios almacenes (`T5-14`), con el caso de uso de varias sucursales. Queda `T5-15` |
+| 2026-10-10 | Lotes y caducidad (`T5-15`). **Tier 5 cerrado**: no queda ninguna tarea abierta |

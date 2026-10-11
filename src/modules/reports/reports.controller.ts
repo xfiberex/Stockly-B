@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import PDFDocument from "pdfkit";
 import { reportsService } from "./reports.service";
 import { abcService } from "./reports.abc";
+import { caducidadesService } from "./reports.caducidades";
 import { renderPeriodReportPdf, renderReportPdf } from "./reports.pdf";
 import { enviarExportacion } from "@/shared/lib/exportacion";
 import { settingsService } from "@/modules/settings/settings.service";
@@ -97,6 +98,16 @@ export const reportsController = {
         try {
             const resumen = await abcService.resumen();
             res.json({ success: true, message: "Clasificación ABC obtenida", data: resumen });
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    /** T5-15 — lo caducado y lo que caduca en los próximos `days` días, con su valor a coste. */
+    async getExpiring(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const informe = await caducidadesService.informe(req.query as Record<string, string>);
+            res.json({ success: true, message: "Informe de caducidades obtenido", data: informe });
         } catch (error) {
             next(error);
         }

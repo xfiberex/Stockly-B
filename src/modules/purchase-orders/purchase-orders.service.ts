@@ -6,6 +6,7 @@ import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { costeMedioTrasRecepcion, mismoCoste } from "@/shared/lib/costeMedio";
 import { bloquearProductos, entrar, sacar } from "@/shared/lib/stock";
 import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
+import { hoyDelNegocio, loteDeEntrada, type LoteDeLaPeticion } from "@/shared/lib/lotes";
 import type { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 const ORDER_INCLUDE = {
@@ -13,7 +14,7 @@ const ORDER_INCLUDE = {
     // T5-14 — a qué almacén entra lo que se reciba.
     warehouse: { select: { id: true, name: true } },
     items: {
-        include: { product: { select: { id: true, name: true, sku: true } } },
+        include: { product: { select: { id: true, name: true, sku: true, tracksLots: true } } },
     },
 } as const;
 
@@ -47,14 +48,29 @@ async function bloquearOrden(tx: Tx, id: string) {
  * T5-14 — entra **en el almacén de la orden**. El coste medio, en cambio, sigue siendo uno por
  * producto y se pondera con el stock de todos los almacenes: lo que costó una unidad no
  * depende de en qué local esté.
+ *
+ * T5-15 — lo que entra de un producto **que lleva lotes** entra en uno: el de la fecha de
+ * caducidad que diga la línea. Sin fecha no entra nada de la entrega: una caja recibida sin
+ * apuntar cuándo caduca ya no se puede vender por orden de caducidad.
  */
-async function registrarEntradas(tx: Tx, orden: { id: string; warehouseId: string }, lineas: Array<{ item: PurchaseOrderItem; cantidad: number }>) {
+async function registrarEntradas(
+    tx: Tx,
+    orden: { id: string; warehouseId: string },
+    lineas: Array<{ item: PurchaseOrderItem; cantidad: number; lote?: LoteDeLaPeticion }>,
+    hoy: string,
+) {
     const purchaseOrderId = orden.id;
+    const productIds = lineas.flatMap(({ item }) => (item.productId ? [item.productId] : []));
     // Todos los productos, bloqueados antes de tocar ninguno y en orden de id: dos recepciones
     // con los mismos productos en distinto orden no se esperan en cruz.
-    await bloquearProductos(tx, lineas.flatMap(({ item }) => (item.productId ? [item.productId] : [])));
+    await bloquearProductos(tx, productIds);
 
-    for (const { item, cantidad } of lineas) {
+    // Con la fila ya bloqueada: si lleva lotes o no es lo que hay ahora, no lo que había.
+    const productos = new Map(
+        (await tx.product.findMany({ where: { id: { in: productIds } }, select: { id: true, name: true, tracksLots: true } })).map((p) => [p.id, p]),
+    );
+
+    for (const { item, cantidad, lote } of lineas) {
         await tx.purchaseOrderItem.update({
             where: { id: item.id },
             data: { receivedQuantity: { increment: cantidad } },
@@ -62,10 +78,13 @@ async function registrarEntradas(tx: Tx, orden: { id: string; warehouseId: strin
 
         if (!item.productId) continue;
 
+        const lotId = await loteDeEntrada(tx, productos.get(item.productId)!, lote ?? {}, hoy);
+
         const product = await entrar(tx, {
             productId: item.productId,
             warehouseId: orden.warehouseId,
             cantidad,
+            lotId,
             type: "IN",
             note: `Orden de compra #${purchaseOrderId.slice(0, 8)}`,
             // T5-09 — fecha esta recepción para el informe de compras por periodo.
@@ -148,6 +167,7 @@ export const purchaseOrderService = {
     },
 
     async update(id: string, dto: UpdatePurchaseOrderDto) {
+        const hoy = await hoyDelNegocio();
         // T5-04 — todo dentro de una transacción con la orden bloqueada. Antes el estado se leía
         // fuera, y dos «recibir» simultáneos veían los dos `PENDING` y sumaban el stock dos
         // veces; con recepciones parciales de por medio, el hueco sería además más ancho.
@@ -170,10 +190,17 @@ export const purchaseOrderService = {
             // Marcar recibida recibe **lo que falta** de cada línea: todo, si estaba pendiente;
             // el resto, si iba a medias. Es la forma corta de una recepción completa.
             if (dto.status === "RECEIVED" && orden.status !== "RECEIVED") {
+                // T5-15 — el lote de cada línea que lo lleve. Uno para una línea que no es de
+                // esta orden es un error de quien llama, no algo que ignorar.
+                const lotes = new Map((dto.lots ?? []).map((l) => [l.itemId, l]));
+                if ([...lotes.keys()].some((itemId) => !orden.items.some((item) => item.id === itemId))) {
+                    throw new HttpError(404, "La línea no pertenece a esta orden de compra", "PURCHASE_ORDER_ITEM_NOT_FOUND");
+                }
+
                 const lineas = orden.items
                     .filter((item) => item.receivedQuantity < item.quantity)
-                    .map((item) => ({ item, cantidad: item.quantity - item.receivedQuantity }));
-                await registrarEntradas(tx, orden, lineas);
+                    .map((item) => ({ item, cantidad: item.quantity - item.receivedQuantity, lote: lotes.get(item.id) }));
+                await registrarEntradas(tx, orden, lineas, hoy);
 
                 return tx.purchaseOrder.update({
                     where: { id },
@@ -193,6 +220,11 @@ export const purchaseOrderService = {
             // T5-14 — se retira **del almacén al que entró**. Si esas unidades se transfirieron
             // a otro, aquí ya no están, y es el mismo caso que si se hubieran vendido.
             //
+            // T5-15 — y **del lote en el que entró**: lo recibido en un lote se retira de ese
+            // lote, no del que toque por caducidad. Si ya se vendió, es el mismo caso de arriba
+            // aunque queden unidades de otro lote. Lo que entró sin lote sale por el orden de
+            // siempre, caducado incluido: se está deshaciendo una entrada, no vendiendo.
+            //
             // T5-01 — **el coste medio no se toca al cancelar**, y es una decisión, no un olvido
             // (anotada en la ficha). Deshacer una media ponderada solo es exacto si no hubo otra
             // recepción ni un ajuste manual entre medias; dejarlo como está es siempre válido, y
@@ -204,27 +236,43 @@ export const purchaseOrderService = {
                 // Todos los productos, bloqueados antes de tocar ninguno y en orden de id.
                 await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
 
+                // Cuánto entró de cada línea en cada lote: lo dicen sus movimientos de recepción.
+                const recibidoPorLote = await tx.stockMovement.groupBy({
+                    by: ["purchaseOrderItemId", "lotId"],
+                    where: { purchaseOrderItemId: { in: items.map((item) => item.id) }, lotId: { not: null }, delta: { gt: 0 } },
+                    _sum: { delta: true },
+                });
+
                 for (const item of items) {
                     if (!item.productId) continue;
-                    const retirar = item.receivedQuantity;
+                    const productId = item.productId;
 
-                    await sacar(
-                        tx,
-                        {
-                            productId: item.productId,
-                            warehouseId: orden.warehouseId,
-                            cantidad: retirar,
-                            type: "OUT",
-                            note: `Cancelación de orden de compra #${id.slice(0, 8)}`,
-                        },
-                        (enAlmacen, producto) =>
-                            new HttpError(
-                                400,
-                                `No se puede cancelar: las unidades recibidas de "${producto.name}" ya se consumieron. Disponible: ${enAlmacen}, requerido: ${retirar}`,
-                                "CANNOT_CANCEL_UNITS_CONSUMED",
-                                { producto: producto.name, disponible: enAlmacen, requerido: retirar },
-                            ),
-                    );
+                    const deLotes = recibidoPorLote
+                        .filter((r) => r.purchaseOrderItemId === item.id)
+                        .map((r) => ({ lotId: r.lotId, cantidad: r._sum.delta ?? 0 }));
+                    const sinLote = item.receivedQuantity - deLotes.reduce((suma, r) => suma + r.cantidad, 0);
+                    const retiradas = [...deLotes, { lotId: null, cantidad: sinLote }].filter((r) => r.cantidad > 0);
+
+                    for (const { lotId, cantidad: retirar } of retiradas) {
+                        await sacar(
+                            tx,
+                            {
+                                productId,
+                                warehouseId: orden.warehouseId,
+                                cantidad: retirar,
+                                lotId,
+                                type: "OUT",
+                                note: `Cancelación de orden de compra #${id.slice(0, 8)}`,
+                            },
+                            (enAlmacen, producto) =>
+                                new HttpError(
+                                    400,
+                                    `No se puede cancelar: las unidades recibidas de "${producto.name}" ya se consumieron. Disponible: ${enAlmacen}, requerido: ${retirar}`,
+                                    "CANNOT_CANCEL_UNITS_CONSUMED",
+                                    { producto: producto.name, disponible: enAlmacen, requerido: retirar },
+                                ),
+                        );
+                    }
                 }
 
                 return tx.purchaseOrder.update({
@@ -249,6 +297,7 @@ export const purchaseOrderService = {
      * `PARTIALLY_RECEIVED` si no. Las líneas que no aparecen no reciben nada.
      */
     async receive(id: string, dto: ReceivePurchaseOrderDto) {
+        const hoy = await hoyDelNegocio();
         return prisma.$transaction(async (tx) => {
             const orden = await bloquearOrden(tx, id);
             if (orden.status === "CANCELLED" || orden.status === "RECEIVED") {
@@ -269,10 +318,10 @@ export const purchaseOrderService = {
                         { producto: item.productName, pendiente, requerido: linea.quantity },
                     );
                 }
-                return { item, cantidad: linea.quantity };
+                return { item, cantidad: linea.quantity, lote: { expiresAt: linea.expiresAt, lotCode: linea.lotCode } };
             });
 
-            await registrarEntradas(tx, orden, lineas);
+            await registrarEntradas(tx, orden, lineas, hoy);
 
             const recibidoAhora = new Map(lineas.map((l) => [l.item.id, l.cantidad]));
             const completa = orden.items.every((item) => item.receivedQuantity + (recibidoAhora.get(item.id) ?? 0) === item.quantity);

@@ -24,7 +24,7 @@ repositorio hermano.
 | [ROADMAP.md](ROADMAP.md) | Tareas abiertas, cabos sueltos e índice de las cerradas | antes de planificar trabajo |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Puerta de calidad, CI, orden de subida, commits y cómo se cierra una tarea | antes del primer push |
 | [`design-system.md`](../../Stockly-F/docs/design-system.md) | Tokens, densidad, estados y los tests que los vigilan | antes de tocar una pantalla |
-| [adr/](adr/) | Nueve decisiones de arquitectura donde la opción evidente es la equivocada | antes de simplificar algo |
+| [adr/](adr/) | Once decisiones de arquitectura donde la opción evidente es la equivocada | antes de simplificar algo |
 | [operaciones.md](operaciones.md) | Copia de seguridad, restauración, reversión, alertas, versión de PostgreSQL y resumen semanal | antes de tocar una migración desplegada |
 | [dependencias.md](dependencias.md) | Vulnerabilidades, licencias y la puerta de `pnpm auditoria` | antes de añadir una dependencia |
 | [rendimiento.md](rendimiento.md) | Mediciones con 100 000 productos y cómo repetirlas | antes de tocar una consulta de listado |

@@ -4,8 +4,8 @@ La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tare
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
 `fix(T0-01): resolver alias de rutas en el build de producción`.
 
-> **Estado al 2026-10-10: 138 de 139 cerradas.** El Tier 6, abierto el 2026-10-05, está cerrado.
-> Queda `T5-15`, que solo se abre con un caso de uso real.
+> **Estado al 2026-10-10: 139 de 139 cerradas.** No queda ninguna tarea abierta: `T5-15`, la
+> última del Tier 5, se cerró el 2026-10-10. Lo que sigue sin hacerse está en «Sin tarea».
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
 > se **descartó sin ejecutarse**: el listón de accesibilidad del proyecto es teclado más árbol de
@@ -29,9 +29,9 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 | **2** | Mejoras sustanciales: rendimiento, accesibilidad, sistema de diseño, cobertura, infraestructura | 48 / 48 |
 | **3** | Pulido y mantenimiento | 15 / 15 |
 | **4** | Lo que la auditoría dejó fuera del alcance inmediato, abordado igualmente | 17 / 17 |
-| **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 14 / 15 |
+| **5** | Funcionalidad de negocio: costes, compras, clientes, almacén, informes, avisos y roles | 15 / 15 |
 | **6** | Venta de mostrador y documento de venta: lo que SistemaVenta hace y Stockly no | 10 / 10 |
-| | **Total** | **138 / 139** |
+| | **Total** | **139 / 139** |
 
 Los Tiers 0 a 4 son la remediación de la auditoría del 2026-08-04: 100 tareas salieron de sus
 hallazgos y de la consultoría de diseño del día siguiente, y otras 14 las abrió el cierre de una
@@ -47,27 +47,16 @@ actualizar un número y olvidar otro. Al cerrar o abrir una tarea cambian la cas
 esta tabla y la fila del índice; si no coinciden, manda el recuento:
 
 ```bash
-grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 1
-grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 138
+grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
+grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
 ```
 
 ---
 
 ## Tareas abiertas
 
-### Tier 5 — la que queda
-
-*Cambia dónde vive el stock, así que toca casi todos los módulos, las pruebas de carga y los
-informes. Se lista para que no hacerla sea una decisión consciente. **No empieza sin un caso de
-uso real escrito en su ficha.***
-
-- [ ] **[T5-15] Lotes y fechas de caducidad**
-  - **Área:** Negocio
-  - **Ubicación:** transversal, los dos repositorios
-  - **Qué hacer:** solo tiene sentido con producto perecedero o con trazabilidad obligatoria (alimentación, farmacia, cosmética). Lote con fecha de caducidad al recibir, salida **FEFO** (primero lo que caduca antes) al enviar, aviso de lotes próximos a caducar y ajuste de caducados como merma.
-  - **Criterio de aceptación:** enviar una venta consume primero el lote que caduca antes; un lote caducado no se asigna a una venta; el informe de caducidades lista lo que vence en los próximos N días con su valor a coste.
-  - **Esfuerzo:** alto
-  - **Depende de:** nada pendiente. `T5-14` se cerró contando con esta: la clave de `stock_levels` es un `id` propio, así que el nivel `(producto, almacén, lote)` es una columna y un índice único más ancho, no rehacer la tabla ([ADR 0010](adr/0010-stock-total-desnormalizado.md)). Lo que sí toca rehacer es `shared/lib/stock.ts`, que hoy mueve unidades de un nivel sin elegir cuáles.
+*Ninguna.* Las 139 están cerradas. Una tarea nueva se abre con su ficha, como dice «Una tarea
+nueva», más abajo.
 
 ### Sin tarea: lo que hay que decidir, no consultar
 
@@ -83,6 +72,8 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 | **La fila de la tabla de productos mide 48 px**, no los 36 del perfil denso: bajar exige quitar el SKU o encoger la miniatura | [CONTEXTO.md §6](CONTEXTO.md) |
 | **La clase ABC podría filtrar al abrir un conteo físico**; hoy solo filtra la categoría | — |
 | **La prueba de carga ya no cumple sus umbrales**, y no es de `T5-14`: repetida el 2026-10-10 con el código de antes, el panel da 2,2 s de p(95) (límite, 2 s; eran 337 ms tras `T4-16`) y arrastra a las demás rutas. Son las consultas que `getSummary` ganó en los Tiers 5 y 6, que solas no ordenan en disco y juntas, con diez usuarios, saturan la base. Pide tarea propia | [rendimiento.md §15](rendimiento.md) |
+| **Los lotes no tienen retirada, ni se eligen al vender, ni entran por CSV** (`T5-15`). De qué lote salió cada venta está guardado (`sale_order_item_lots`), pero no hay pantalla que liste a quién se vendió un lote; el lote lo elige siempre el orden de caducidad; la importación crea productos sin lotes; y el resumen semanal no habla de caducidades | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
+| **El conteo físico es por producto, no por lote** (`T5-15`): lo que sobra queda «sin lote» y lo que falta sale por orden de caducidad | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
 | **Lo legal que falta antes de tener usuarios reales o de cobrar**: privacidad, plazos de conservación, condiciones, marca | [legal.md §2](legal.md) |
 
 ---
@@ -273,6 +264,7 @@ cierre a partir de ahora añade aquí su fila; lo medido va en la nota y en el c
 | T5-12 | Notificaciones dentro de la aplicación | 2026-10-01 |  |
 | T5-13 | Rol de almacén | 2026-09-29 |  |
 | T5-14 | Varios almacenes | 2026-10-10 | **El caso de uso, que la ficha exigía escrito:** varias sucursales que venden y reciben cada una lo suyo y se pasan mercancía (decidido el 2026-10-10, con otras tres cosas: se hará `T5-15`, el mínimo sigue siendo del producto y no del almacén, y cada operación elige almacén con uno predeterminado). **La decisión previa, medida antes de tocar el esquema:** `products.stock` se conserva como total. Sobre 100 000 productos en tres almacenes, derivarlo de los niveles multiplica por 5–8 las cuatro consultas del panel que leen el catálogo entero y las manda a disco; conservarlo cuesta 0,2 ms más por movimiento ([ADR 0010](adr/0010-stock-total-desnormalizado.md)). El riesgo de que diverja se cierra por dos lados: **un solo sitio lo escribe** (`shared/lib/stock.ts`) y **la base no confirma un descuadre** —un disparador de restricción diferido comprueba al `COMMIT` que el total es la suma—. **Lo que hay:** `Warehouse`, `StockLevel` (dispersa: sin fila es cero) y `StockTransfer`; cada movimiento, venta, compra y conteo lleva su almacén; `stockAfter` sigue siendo el total y `warehouseStockAfter` lo que quedó en el almacén. Una transferencia son dos movimientos `TRANSFER` enlazados por `transferId`, en una transacción y sin «en tránsito». Lo disponible y lo comprometido son **del almacén de la venta**; el mínimo, su aviso, la reposición y el coste medio, del producto entero. **Quien no dice almacén opera sobre el predeterminado**, así que la API de antes vale tal cual. Rutas nuevas bajo `/warehouses` y `/stock-transfers`; dos pantallas, **Almacenes** y **Transferencias**, y el almacén en cada formulario que mueve stock. **Con un solo almacén activo la interfaz no pinta nada de esto.** **El criterio, comprobado:** una transferencia de 10 no cambia el total y deja dos movimientos enlazados (test y E2E); la migración pone todo el stock en un almacén y el total no cambia —14 940 100 = 14 940 100 sobre la base de carga, 975 = 975 sobre la de desarrollo, y un test ejecuta la sentencia del propio archivo—; y la prueba de carga, **antes y después en la misma máquina**: la escritura sube un 21 % de media (339 → 410 ms) bajo la mezcla saturada y nada medible sin saturar, que es lo que el ADR acepta. Falsificado: 135 roturas —77 en el backend y 58 en el frontend—. En el backend, 73 caídas a la primera; dos pasaban por tests flojos —nada miraba que una venta enviada dejara de estar comprometida, y una sola ronda de cambios simultáneos de predeterminado dejaba pasar la carrera una vez de cada dos— y se reforzaron; las otras dos son equivalentes. En el frontend, 57 a la primera; la que pasaba —un local recordado que ya no existe se seguía enviando en la venta, aunque el desplegable enseñara otro— se cubrió con un test. E2E en los dos proyectos: el almacén transfiere por la interfaz, se comprueban por la API el total, los niveles y los dos movimientos, lo transferido se vende en el mostrador desde la sucursal, y un almacén con existencias no se deja desactivar. **Cuatro cosas que salieron al hacerlo y no estaban en la ficha:** (1) cambiar el predeterminado dos veces a la vez dejaba dos —una sola sentencia no bastaba; lo cazó su test y ahora van en fila—; (2) `GET /warehouses` traía las cifras de cada almacén y la pedía cada formulario: 200 ms de agregado para pintar un selector; las cifras tienen ya su ruta; (3) el `Modal` recolocaba el foco cada vez que su padre se repintaba —un defecto anterior, que la lista de almacenes hizo visible—; (4) **la prueba de carga incumple cuatro de sus cinco umbrales con el código de antes**: no se había repetido desde agosto y el panel pasó de 337 ms a 2,2 s de p(95) (abajo, «Sin tarea»). **Sin comprobar:** las pantallas nuevas con un móvil de verdad; y `T4-17` sigue sin hacerse, así que tampoco con lector de pantalla. **A saber:** la migración **no es expansiva** —el código anterior no funciona contra la base migrada, y revertir es restaurar la copia—, reescribe `stock_movements` (77 s con 1,2 M de filas) y se aplica con la aplicación parada ([operaciones.md §6](operaciones.md)); no hay informe de ventas por sucursal —el listado y la exportación sí filtran y nombran el almacén—; el almacén de una orden no se cambia después de crearla; la importación por CSV entra siempre en el predeterminado; un usuario no tiene almacén asignado: el mostrador recuerda el suyo por dispositivo; y desactivar un almacén no bloquea contra una orden que se esté creando en ese mismo instante. |
+| T5-15 | Lotes y fechas de caducidad | 2026-10-10 | **El caso de uso, que la ficha exigía escrito:** un comercio de catálogo mixto —parte perecedero, parte no—, donde se marca producto a producto, al darlo de alta, cuál lleva lote (decidido el 2026-10-10, con otras tres cosas: llevan lotes los productos que se marquen; al recibir, la fecha de caducidad es obligatoria y el código, opcional; y al vender elige siempre Stockly, por orden de caducidad). **Lo que hay:** el nivel de stock se abre por lote —`stock_levels` pasa a `(producto, almacén, lote)`, como dejó previsto el ADR 0010—, con `Lot` y `SaleOrderItemLot` ([ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md)). «Sin lote» es una fila más: ahí está todo lo de un producto que no los lleva y lo que uno que sí tenía antes de marcarse, así que **marcar o desmarcar no mueve nada**; `tracksLots` gobierna solo si las entradas piden lote. **De qué lote sale cada unidad lo decide `shared/lib/stock.ts`, en una sentencia**: primero lo que no tiene lote, después por caducidad y a igual fecha por código. «Caducado» no es un estado sino una fecha comparada con hoy **en la zona del negocio**; lo caducado sigue en el stock hasta que se da de baja, pero no en el disponible. Cada línea de venta anota de qué lotes salió: lo imprime el comprobante y es lo que deja devolver cada unidad al suyo al cancelar. Cancelar una compra retira lo recibido del lote en el que entró. Dar de baja lo caducado es un `ADJUSTMENT` a cero de ese lote —tirar no es vender—, sin ruta propia. Una pantalla nueva, **Caducidades**; el lote en la recepción, en el movimiento a mano y en el alta del producto; el desglose por lote en la ficha; y el aviso `LOT_EXPIRING` en la campana, con el plazo del ajuste `expiryWarningDays`. **Un producto sin lotes no ve nada de esto.** **El criterio, comprobado:** enviar una venta consume primero el lote que caduca antes, aunque se recibiera después (test y E2E); un lote caducado no se asigna a una venta —ni al crearla, ni al enviarla si caducó entretanto, ni en el mostrador, ni en una transferencia— y el que caduca hoy todavía se vende; y el informe lista lo que vence en los próximos N días, y lo ya caducado, con su valor a coste, con los totales de todo el filtro y no de la página. **Lo medido** ([rendimiento.md §16](rendimiento.md)): por movimiento, una entrada pasa de 1,21 a 1,30 ms y una salida de 1,23 a 1,37 ms en un producto sin lotes; una salida que reparte entre lotes, 2,17 ms. **Lo que salió al medir:** la primera versión repartía en toda salida y costaba 1,70 ms —un 38 % más— también para quien no lleva lotes; lo quitó un camino corto. La migración, 2,6 s sobre 297 665 niveles; **no es expansiva** —cambia el índice único que la versión anterior usa en su `ON CONFLICT`— y se aplica con la aplicación parada. Falsificado: 174 roturas —100 en el backend y 74 en el frontend—. En el backend, 93 caídas a la primera, 6 tras reforzar los tests (el camino corto no sumaba los lotes al saldo del almacén; el lote de otro producto en una salida daba «sin stock» y no 404; el lote que caduca hoy, en la ficha y en el resumen del informe; una transferencia con lo caducado y lo comprometido a la vez; y las líneas de una transferencia, que dependían del orden en que la base devolviera sus movimientos y se sacaron a una función que se prueba en los dos órdenes) y 1 equivalente (el filtro `stock > 0` del aviso: un lote agotado no deja fila). En el frontend, 72 a la primera y 2 tras reforzar (pedir los lotes de un producto que no los lleva; el color de lo ya caducado). `pnpm verify` en verde en los dos: 1652 tests y 97.15 % en el backend, 910 y 80.93 % en el frontend; E2E, 39 pasados y 3 omitidos, dos pasadas. Pantallas vistas a 393 y 1280 px: Caducidades y su confirmación, la ficha con sus lotes, el movimiento a mano (entrada y salida), el alta de producto, la recepción y la campana —esta, antes de corregirle el texto: después solo la cubre su test—; **cuatro cosas se corrigieron al verlas** —el rótulo de la fecha, de otro tamaño que el de al lado; el lote, cortado en móvil al recibir; el aviso, que decía «está por caducar» de un lote ya vencido; y la nota del histórico, partida en seis líneas—. **Sin comprobar:** el detalle de la venta con sus lotes y el comprobante en PDF solo tienen test, no se miraron; el inglés, solo por test; nada con un móvil real ni con lector de pantalla; y la carga sostenida con k6 no se repitió (§15: ya no cumple por el panel). |
 
 ### Tier 6
 

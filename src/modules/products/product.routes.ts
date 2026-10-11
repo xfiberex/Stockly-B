@@ -26,6 +26,8 @@ productRouter.get("/:id/movements", permitir("GET /products/:id/movements"), pro
 productRouter.get("/:id/movements/export", permitir("GET /products/:id/movements/export"), productController.exportProductMovements);
 productRouter.get("/:id/price-history", permitir("GET /products/:id/price-history"), productController.getPriceHistory);
 productRouter.get("/:id/cost-history", permitir("GET /products/:id/cost-history"), productController.getCostHistory);
+// T5-15 — los lotes con existencias del producto y dónde está cada uno.
+productRouter.get("/:id/lots", permitir("GET /products/:id/lots"), productController.getProductLots);
 
 // Escritura — solo ADMIN
 productRouter.post("/import", permitir("POST /products/import"), validate(importProductsSchema), productController.importProducts);

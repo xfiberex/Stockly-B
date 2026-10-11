@@ -3,6 +3,8 @@ import { logger } from "@/shared/lib/logger";
 import { ZONA_HORARIA_POR_DEFECTO, zonaHorariaCanonica } from "@/shared/lib/zonaHoraria";
 import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/upload.middleware";
 import {
+    DIAS_DE_AVISO_DE_CADUCIDAD_MAXIMOS,
+    DIAS_DE_AVISO_DE_CADUCIDAD_POR_DEFECTO,
     LARGO_MAXIMO_SIMBOLO_DE_MONEDA,
     SIMBOLO_DE_MONEDA_POR_DEFECTO,
     esTasaDeImpuestoValida,
@@ -123,6 +125,19 @@ export const SETTINGS_CATALOG = [
         entero: true,
         min: 0,
         max: 365,
+    },
+    {
+        // T5-15 — cuánto antes de que caduque un lote se avisa, y el plazo con el que abre el
+        // informe de caducidades. En 0 solo se avisa de lo que vence hoy o ya venció.
+        key: "expiryWarningDays",
+        label: "Aviso de caducidad (días)",
+        description: "Con cuántos días de antelación se avisa de que un lote va a caducar. Es también el plazo con el que abre el informe de caducidades.",
+        type: "number" as const,
+        defaultValue: String(DIAS_DE_AVISO_DE_CADUCIDAD_POR_DEFECTO),
+        group: "general" as const,
+        entero: true,
+        min: 0,
+        max: DIAS_DE_AVISO_DE_CADUCIDAD_MAXIMOS,
     },
     {
         // T5-09 — dónde empieza y termina cada día de los informes por periodo. Se valida

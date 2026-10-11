@@ -8,3 +8,4 @@ reportsRouter.use(requireAuth);
 reportsRouter.get("/", permitir("GET /reports"), reportsController.getSummary);
 reportsRouter.get("/period", permitir("GET /reports/period"), reportsController.getPeriod);
 reportsRouter.get("/abc", permitir("GET /reports/abc"), reportsController.getAbc);
+reportsRouter.get("/expiring", permitir("GET /reports/expiring"), reportsController.getExpiring);

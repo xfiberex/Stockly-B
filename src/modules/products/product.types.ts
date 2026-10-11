@@ -13,6 +13,11 @@ export interface CreateProductDto {
     tagIds?: string[];
     /** T5-14 — el almacén en el que entra el stock inicial; sin él, el predeterminado. */
     warehouseId?: string;
+    /** T5-15 — si sus entradas piden lote. */
+    tracksLots?: boolean;
+    /** T5-15 — el lote del stock inicial: obligatoria la fecha si lleva lotes y nace con stock. */
+    lotExpiresAt?: string;
+    lotCode?: string;
 }
 
 export interface UpdateProductDto {
@@ -33,6 +38,8 @@ export interface UpdateProductDto {
     tagIds?: string[];
     /** T5-14 — el almacén que absorbe la diferencia si cambia `stock`; sin él, el predeterminado. */
     warehouseId?: string;
+    /** T5-15 — marcarlo o desmarcarlo. No mueve nada: lo que ya tiene lote lo conserva. */
+    tracksLots?: boolean;
 }
 
 export interface ProductQuery {
@@ -94,6 +101,10 @@ export interface CreateManualMovementDto {
     note?: string;
     /** T5-14 — en qué almacén; sin él, en el predeterminado. */
     warehouseId?: string;
+    /** T5-15 — el lote: uno que existe, o —en una entrada— su caducidad y su código. */
+    lotId?: string;
+    expiresAt?: string;
+    lotCode?: string;
 }
 
 export interface BulkStockDto {

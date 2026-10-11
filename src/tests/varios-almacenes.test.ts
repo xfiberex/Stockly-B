@@ -55,7 +55,7 @@ describe("Varios almacenes (T5-14)", () => {
 
     const total = async (id: string) => (await prisma.product.findUniqueOrThrow({ where: { id } })).stock;
     const nivel = async (productId: string, warehouseId: string) =>
-        (await prisma.stockLevel.findUnique({ where: { productId_warehouseId: { productId, warehouseId } } }))?.stock ?? 0;
+        (await prisma.stockLevel.aggregate({ where: { productId, warehouseId }, _sum: { stock: true } }))._sum.stock ?? 0;
 
     const transferirPorApi = (items: Array<{ productId: string; quantity: number }>, extra: object = {}, cookie = almacenero) =>
         request(app).post(`${API}/stock-transfers`).set("Cookie", cookie).send({ fromWarehouseId: ALMACEN, toWarehouseId: norte, items, ...extra });
@@ -202,7 +202,7 @@ describe("Varios almacenes (T5-14)", () => {
         it("cambiar solo el nivel de un almacén, tampoco", async () => {
             const p = await producto("Teclado", 10);
             await expect(
-                prisma.stockLevel.update({ where: { productId_warehouseId: { productId: p.id, warehouseId: ALMACEN } }, data: { stock: 9 } }),
+                prisma.$executeRaw`UPDATE stock_levels SET stock = 9 WHERE "productId" = ${p.id} AND "warehouseId" = ${ALMACEN}`,
             ).rejects.toThrow(/no es la suma de sus almacenes/);
             await expect(prisma.stockLevel.deleteMany({ where: { productId: p.id } })).rejects.toThrow(/no es la suma de sus almacenes/);
             expect(await nivel(p.id, ALMACEN)).toBe(10);
@@ -441,7 +441,7 @@ describe("Varios almacenes (T5-14)", () => {
             const salida = await prisma.stockMovement.findFirstOrThrow({ where: { productId: p.id, type: "OUT" } });
             expect(salida).toMatchObject({ warehouseId: norte, delta: -3, warehouseStockAfter: 1, stockAfter: 7 });
             // Enviada, deja de estar comprometida: lo que queda en el norte se puede vender entero.
-            expect(nivelEn((await comoAdmin.get(`/products/${p.id}`)).body.data, norte)).toEqual({ warehouseId: norte, stock: 1, committedStock: 0, availableStock: 1 });
+            expect(nivelEn((await comoAdmin.get(`/products/${p.id}`)).body.data, norte)).toEqual({ warehouseId: norte, stock: 1, expiredStock: 0, committedStock: 0, availableStock: 1 });
 
             expect((await comoAdmin.patch(`/sale-orders/${body.data.id}`, { status: "CANCELLED" })).status).toBe(200);
             expect(await nivel(p.id, norte)).toBe(4);
@@ -762,16 +762,16 @@ describe("Varios almacenes (T5-14)", () => {
 
             const ficha = (await comoAdmin.get(`/products/${p.id}`)).body.data;
             expect(() => productoConDisponibleSchema.parse(ficha)).not.toThrow();
-            expect(ficha).toMatchObject({ stock: 10, committedStock: 4, availableStock: 6 });
-            expect(nivelEn(ficha, ALMACEN)).toEqual({ warehouseId: ALMACEN, stock: 6, committedStock: 1, availableStock: 5 });
-            expect(nivelEn(ficha, norte)).toEqual({ warehouseId: norte, stock: 4, committedStock: 3, availableStock: 1 });
+            expect(ficha).toMatchObject({ stock: 10, expiredStock: 0, committedStock: 4, availableStock: 6 });
+            expect(nivelEn(ficha, ALMACEN)).toEqual({ warehouseId: ALMACEN, stock: 6, expiredStock: 0, committedStock: 1, availableStock: 5 });
+            expect(nivelEn(ficha, norte)).toEqual({ warehouseId: norte, stock: 4, expiredStock: 0, committedStock: 3, availableStock: 1 });
 
             const lista = (await comoAdmin.get("/products")).body.data.data as Array<{ id: string; stockLevels: unknown[] }>;
             expect(lista.find((x) => x.id === p.id)!.stockLevels).toHaveLength(2);
             // Disperso: el que no tiene nada en ningún sitio no trae filas, y `nivelEn` da ceros.
             const vacio = lista.find((x) => x.id === sinStock.id)!;
             expect(vacio.stockLevels).toEqual([]);
-            expect(nivelEn(vacio as never, norte)).toEqual({ warehouseId: norte, stock: 0, committedStock: 0, availableStock: 0 });
+            expect(nivelEn(vacio as never, norte)).toEqual({ warehouseId: norte, stock: 0, expiredStock: 0, committedStock: 0, availableStock: 0 });
         });
 
         it("el catálogo filtra por lo que hay en un almacén, y un almacén que no existe es un 404", async () => {
@@ -782,7 +782,7 @@ describe("Varios almacenes (T5-14)", () => {
             expect(enElNorte.body.data.data.map((p: { name: string }) => p.name)).toEqual(["A"]);
             expect(enElNorte.body.data.meta.total).toBe(1);
             // A dejo una fila a cero en el principal: el desglose no la trae.
-            expect(enElNorte.body.data.data[0].stockLevels).toEqual([{ warehouseId: norte, stock: 10, committedStock: 0, availableStock: 10 }]);
+            expect(enElNorte.body.data.data[0].stockLevels).toEqual([{ warehouseId: norte, stock: 10, expiredStock: 0, committedStock: 0, availableStock: 10 }]);
             // A se quedó a cero en el principal: no «está» en él.
             expect((await comoAdmin.get(`/products?warehouseId=${ALMACEN}`)).body.data.data.map((p: { name: string }) => p.name)).toEqual(["B"]);
             expect((await comoAdmin.get("/products?warehouseId=11111111-1111-4111-8111-111111111111")).status).toBe(404);
@@ -802,7 +802,7 @@ describe("Varios almacenes (T5-14)", () => {
             expect((await comoAdmin.get(`/products/${p.id}/movements?type=TRANSFER`)).body.data.meta.total).toBe(2);
 
             const csv = (await comoAdmin.get(`/products/${p.id}/movements/export?format=csv&warehouseId=${norte}`)).text.trim().split("\n");
-            expect(csv[0]!.trim().endsWith(",warehouseName,warehouseStockAfter")).toBe(true);
+            expect(csv[0]!.trim().endsWith(",warehouseName,warehouseStockAfter,lotCode,lotExpiresAt")).toBe(true);
             expect(csv).toHaveLength(3);
             expect(csv[1]).toContain("Sucursal Norte,4");
         });

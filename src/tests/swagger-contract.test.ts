@@ -61,6 +61,9 @@ describe("Contrato entre Swagger y el validador de productos", () => {
             supplierId: "33333333-3333-4333-8333-333333333333",
             tagIds: ["44444444-4444-4444-8444-444444444444"],
             warehouseId: "55555555-5555-4555-8555-555555555555",
+            tracksLots: "true",
+            lotExpiresAt: "2099-12-31",
+            lotCode: "L-1",
         };
 
         // Si se documenta un campo nuevo sin añadirlo aquí, el test lo señala.

@@ -1,9 +1,10 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 import type { NivelDeStock } from "@/contratos/api";
+import { hoyDelNegocio } from "@/shared/lib/lotes";
 
 /** El cliente de Prisma o el de una transacción: los dos sirven para leer. */
-type Cliente = Pick<typeof prisma, "$queryRaw" | "stockLevel">;
+type Cliente = Pick<typeof prisma, "$queryRaw">;
 
 /**
  * T5-03 — unidades comprometidas: las pedidas en ventas **pendientes**. T5-14 — **por almacén**:
@@ -53,8 +54,13 @@ export async function comprometidoPorProducto(productIds: string[], cliente: Cli
 }
 
 /**
- * Añade a cada producto su comprometido, su disponible (\`stock − comprometido\`) y el desglose
- * por almacén (T5-14). Dos consultas para la página entera, no dos por producto.
+ * Añade a cada producto su comprometido, su disponible y el desglose por almacén (T5-14). Dos
+ * consultas para la página entera, no dos por producto.
+ *
+ * T5-15 — **lo caducado no está disponible**: `disponible = stock − caducado − comprometido`.
+ * Sigue contando en `stock`, porque sigue en la estantería hasta que alguien lo dé de baja. Lo
+ * que hay en un almacén es la suma de sus lotes; caducado es lo de los lotes cuya fecha ya pasó
+ * en la zona del negocio.
  *
  * **El disponible puede salir negativo** y no se recorta a cero: con datos anteriores a T5-03
  * puede haber más vendido en pendiente que stock, y esconderlo detrás de un 0 taparía
@@ -67,32 +73,47 @@ export async function conDisponible<T extends { id: string; stock: number }>(pro
     const ids = productos.map((p) => p.id);
     const [comprometido, niveles] = await Promise.all([
         comprometidoPorAlmacen(ids, cliente),
-        ids.length === 0
-            ? []
-            : cliente.stockLevel.findMany({
-                  where: { productId: { in: ids }, stock: { not: 0 } },
-                  select: { productId: true, warehouseId: true, stock: true },
-              }),
+        ids.length === 0 ? [] : nivelesPorAlmacen(ids, cliente),
     ]);
 
-    const stockPorProducto = new Map<string, Map<string, number>>();
+    const stockPorProducto = new Map<string, Map<string, { stock: number; caducado: number }>>();
     for (const n of niveles) {
-        const almacenes = stockPorProducto.get(n.productId) ?? new Map<string, number>();
-        almacenes.set(n.warehouseId, n.stock);
+        const almacenes = stockPorProducto.get(n.productId) ?? new Map<string, { stock: number; caducado: number }>();
+        almacenes.set(n.warehouseId, n);
         stockPorProducto.set(n.productId, almacenes);
     }
 
     return productos.map((p) => {
-        const stock = stockPorProducto.get(p.id) ?? new Map<string, number>();
+        const stock = stockPorProducto.get(p.id) ?? new Map<string, { stock: number; caducado: number }>();
         const comprometidoAqui = comprometido.get(p.id) ?? new Map<string, number>();
 
         const stockLevels: NivelDeStock[] = [...new Set([...stock.keys(), ...comprometidoAqui.keys()])].sort().map((warehouseId) => {
-            const enAlmacen = stock.get(warehouseId) ?? 0;
+            const enAlmacen = stock.get(warehouseId) ?? { stock: 0, caducado: 0 };
             const committedStock = comprometidoAqui.get(warehouseId) ?? 0;
-            return { warehouseId, stock: enAlmacen, committedStock, availableStock: enAlmacen - committedStock };
+            return {
+                warehouseId,
+                stock: enAlmacen.stock,
+                expiredStock: enAlmacen.caducado,
+                committedStock,
+                availableStock: enAlmacen.stock - enAlmacen.caducado - committedStock,
+            };
         });
 
         const committedStock = stockLevels.reduce((suma, n) => suma + n.committedStock, 0);
-        return { ...p, committedStock, availableStock: p.stock - committedStock, stockLevels };
+        const expiredStock = stockLevels.reduce((suma, n) => suma + n.expiredStock, 0);
+        return { ...p, committedStock, expiredStock, availableStock: p.stock - expiredStock - committedStock, stockLevels };
     });
+}
+
+/** Lo que hay de cada producto en cada almacén, sumados sus lotes, y cuánto de eso ha caducado. */
+async function nivelesPorAlmacen(productIds: string[], cliente: Cliente) {
+    const hoy = await hoyDelNegocio();
+    return cliente.$queryRaw<Array<{ productId: string; warehouseId: string; stock: number; caducado: number }>>`
+        SELECT sl."productId", sl."warehouseId", SUM(sl.stock)::int AS stock,
+               COALESCE(SUM(sl.stock) FILTER (WHERE l."expiresAt" < ${hoy}::date), 0)::int AS caducado
+        FROM stock_levels sl
+        LEFT JOIN lots l ON l.id = sl."lotId"
+        WHERE sl."productId" IN (${Prisma.join(productIds)})
+        GROUP BY sl."productId", sl."warehouseId"
+        HAVING SUM(sl.stock) <> 0`;
 }

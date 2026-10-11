@@ -665,3 +665,58 @@ misma hora.
 sus niveles van en una transacción, porque la base comprueba el cuadre al confirmar. La base de
 «antes» no se puede rehacer con el árbol actual —necesita el generador y las migraciones del
 commit anterior a T5-14—, y se borró al terminar.
+
+---
+
+## 16. T5-15 — lotes y caducidad: lo que cuesta un movimiento
+
+Medido el 2026-10-10 sobre `Stockly_carga` —100 000 productos, tres almacenes, 297 665 niveles,
+1,2 millones de movimientos—. No se repitió la carga sostenida con k6: ya no cumple sus umbrales
+por el panel (§15) y no sirve para ver un cambio de décimas de milisegundo en la escritura. Se
+midió **la escritura sola**.
+
+### Un movimiento, antes y después
+
+2 000 movimientos seguidos sobre 500 productos, cada uno en su transacción —`BEGIN`, las
+sentencias de `shared/lib/stock.ts`, `COMMIT` con su comprobación diferida—, con la biblioteca de
+antes y con la de ahora. Mejor de cinco pasadas, dos rondas, sin el registro de consultas de
+Prisma (que en desarrollo escribe cada sentencia por consola y distorsiona la cifra):
+
+| | Antes de T5-15 | Ahora | |
+|---|---:|---:|---:|
+| Entrada, producto sin lotes | 1,19 – 1,21 ms | 1,29 – 1,30 ms | +8 % |
+| Salida, producto sin lotes | 1,21 – 1,25 ms | 1,36 – 1,39 ms | +11 % |
+| Salida que reparte entre lotes | — | 2,17 ms | |
+
+«Antes» corrió con las columnas nuevas ya creadas pero con el índice único de `T5-14`, que es
+el que su `ON CONFLICT` necesita; «ahora», con el de `(producto, almacén, lote)`.
+
+### El hallazgo: el reparto en todas las salidas costaba un 38 %
+
+La primera versión hacía **toda** salida con la sentencia que reparte entre lotes —tres CTE y
+dos funciones de ventana—, también la de un producto que no los lleva: **1,70 ms** por salida
+frente a 1,23. Lo quitó un camino corto, que es el que queda: si lo que no tiene lote alcanza,
+sale de ahí con el decremento condicional de siempre —es lo primero en el orden de salida, haya
+lotes o no—, y solo si no alcanza se reparte. Con él, 1,37 ms.
+
+Lo que queda del 11 % es la suma de las demás filas del nivel, que ahora hay que leer para
+anotar lo que queda en el almacén. La salida de un producto **con** lotes paga las dos
+sentencias —la corta, que no encuentra nada, y el reparto—: 2,17 ms. Es casi un milisegundo más
+por línea de venta de un perecedero, y se acepta: es el precio de que el orden de caducidad lo
+decida la base y no un bucle.
+
+### La migración
+
+`prisma db execute` del SQL de la migración sobre la base de carga: las columnas, las dos tablas
+y sus claves, **menos de un segundo** —nacen vacías, no se reescribe nada—; el cambio de índice
+único de `stock_levels`, **2,6 s**. Después, 20 331 256 = 20 331 256 unidades entre `products` y
+`stock_levels`, y ningún producto descuadrado.
+
+### Repetirlo
+
+El banco de pruebas no se conservó: era un guion de `tsx` que importaba `shared/lib/stock.ts` y
+una copia del archivo de antes (`git show <commit anterior>:src/shared/lib/stock.ts`), contra
+`DATABASE_URL=…/Stockly_carga` y con `NODE_ENV=production`. Para comparar con la versión de
+antes hay que aplicar la migración **sin** el cambio de índice, medir, y cambiarlo después.
+`Stockly_carga` quedó con la migración aplicada y con lotes de prueba en 200 productos;
+`pnpm carga:sembrar` la rehace.

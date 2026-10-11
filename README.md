@@ -164,7 +164,7 @@ qué botones enseñar.
 
 | Módulo | Todos los roles | `WAREHOUSE` y `ADMIN` | Solo `ADMIN` |
 |---|---|---|---|
-| `/products` | `GET /` · `/:id` · `/lookup` · `/labels` · `/export` · `/:id/movements` · `/:id/movements/export` · `/:id/price-history` · `/:id/cost-history` | `POST /:id/movements` · `PATCH /bulk-stock` | `POST /` · `POST /import` · `PUT /:id` · `DELETE /:id` · `PATCH /:id/restore` |
+| `/products` | `GET /` · `/:id` · `/lookup` · `/labels` · `/export` · `/:id/movements` · `/:id/movements/export` · `/:id/price-history` · `/:id/cost-history` · `/:id/lots` | `POST /:id/movements` · `PATCH /bulk-stock` | `POST /` · `POST /import` · `PUT /:id` · `DELETE /:id` · `PATCH /:id/restore` |
 | `/categories` `/brands` `/suppliers` `/tags` | `GET /` · `/:id` | — | `POST /` · `PUT /:id` · `DELETE /:id` |
 | `/purchase-orders` | `GET /` · `/:id` · `/suggestions` | `POST /:id/receipts` | `POST /` · `POST /suggestions` · `PATCH /:id` · `DELETE /:id` · `GET /export` |
 | `/sale-orders` | `GET /` · `/:id` · `/:id/receipt` | `POST /:id/ship` | `POST /` · `PATCH /:id` · `DELETE /:id` · `GET /export` |
@@ -172,7 +172,7 @@ qué botones enseñar.
 | `/inventory-counts` | `GET /` · `/:id` · `/:id/lines` | `POST /` · `PATCH /:id/lines` · `POST /:id/close` · `POST /:id/cancel` | — |
 | `/warehouses` | `GET /` · `/summary` | — | `POST /` · `PUT /:id` · `PATCH /:id/default` · `/:id/activate` · `/:id/deactivate` |
 | `/stock-transfers` | `GET /` · `/:id` | `POST /` | — |
-| `/reports` | `GET /` · `/period` · `/abc` | — | — |
+| `/reports` | `GET /` · `/period` · `/abc` · `/expiring` | — | — |
 | `/notifications` | `GET /` · `/unread-count` · `POST /read-all` · `POST /:id/read` — siempre los propios | — | — |
 | `/users` | — | — | `GET /` · `/:id` · `POST /` (invitar) · `PATCH /:id/role` · `/:id/activate` · `/:id/deactivate` |
 | `/settings` | — | — | `GET /` · `PATCH /` |

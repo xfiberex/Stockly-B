@@ -85,6 +85,8 @@ const RESPUESTAS = {
     WarehouseWithFigures: contrato.almacenConCifrasSchema,
     StockTransfer: contrato.transferenciaSchema,
     StockTransferDetail: contrato.transferenciaConLineasSchema,
+    ProductLots: contrato.lotesDeProductoSchema,
+    ExpiryReport: contrato.informeDeCaducidadesSchema,
     PaginationMeta: contrato.metaPaginacionSchema,
     Error: contrato.errorSchema,
 } as const;

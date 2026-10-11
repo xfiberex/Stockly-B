@@ -2,7 +2,8 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../src/shared/lib/prisma";
 import { hashPassword } from "../src/shared/lib/hash";
-import { digitoDeControlGtin } from "../src/contratos/api";
+import { codigoDeLotePorDefecto, digitoDeControlGtin } from "../src/contratos/api";
+import { ZONA_HORARIA_POR_DEFECTO, hoyEn } from "../src/shared/lib/zonaHoraria";
 import { CONTADOR_DE_VENTAS } from "../src/shared/lib/numeroDeVenta";
 import { transferir } from "../src/shared/lib/stock";
 import { categoriesData } from "./data/categories";
@@ -970,6 +971,84 @@ async function sembrarTransferencia(productos: Product[], principal: Warehouse, 
     return elegidos.length;
 }
 
+// ─── Lotes y caducidad (T5-15) ────────────────────────────────────────────────
+
+/**
+ * Cuatro productos perecederos que llevan lotes, aparte del catálogo de siempre: sin ellos, el
+ * informe de caducidades y el desglose por lote de la ficha saldrían vacíos.
+ *
+ * `dias` es cuándo caduca cada lote **contando desde hoy**, en la zona del negocio —como las
+ * fechas del resto del seed, se mueven con el día en que se siembra—: uno ya caducado, que es
+ * el que hay que dar de baja; otros que vencen dentro del plazo de aviso; y otros lejos. Uno de
+ * los productos tiene además el mismo lote repartido entre los dos almacenes.
+ */
+const PERECEDEROS = [
+    {
+        name: "Yogur natural 4 × 125 g", sku: "ALI-YOG-125", price: 95, costPrice: 58, minStock: 12,
+        lotes: [{ dias: -3, unidades: 6 }, { dias: 5, unidades: 18 }, { dias: 21, unidades: 30 }, { dias: 21, unidades: 12, enSucursal: true }],
+    },
+    {
+        name: "Leche entera 1 L", sku: "ALI-LEC-1L", price: 72, costPrice: 49, minStock: 24,
+        lotes: [{ dias: 2, unidades: 20 }, { dias: 9, unidades: 48 }, { dias: 9, unidades: 24, enSucursal: true }],
+    },
+    {
+        name: "Queso fresco 400 g", sku: "ALI-QUE-400", price: 210, costPrice: 140, minStock: 6,
+        lotes: [{ dias: 12, unidades: 10 }, { dias: 40, unidades: 16 }],
+    },
+    {
+        name: "Jamón cocido 200 g", sku: "ALI-JAM-200", price: 185, costPrice: null, minStock: 8,
+        lotes: [{ dias: 0, unidades: 4 }, { dias: 75, unidades: 22 }],
+    },
+] as const;
+
+async function sembrarLotes(principal: Warehouse, sucursal: Warehouse): Promise<number> {
+    const hoy = hoyEn(ZONA_HORARIA_POR_DEFECTO);
+    const diaEn = (dias: number) => new Date(Date.parse(`${hoy}T00:00:00Z`) + dias * 86_400_000);
+    const categoria = await prisma.category.create({
+        data: { name: "Alimentación", description: "Perecederos: se venden por orden de caducidad" },
+    });
+
+    for (const p of PERECEDEROS) {
+        const total = p.lotes.reduce((suma, l) => suma + l.unidades, 0);
+
+        await prisma.$transaction(async (tx) => {
+            const producto = await tx.product.create({
+                data: {
+                    name: p.name, sku: p.sku, price: p.price, costPrice: p.costPrice,
+                    stock: total, minStock: p.minStock, tracksLots: true, categoryId: categoria.id,
+                },
+            });
+
+            let acumulado = 0;
+            const porAlmacen = new Map<string, number>();
+            for (const [i, l] of p.lotes.entries()) {
+                const almacen = "enSucursal" in l ? sucursal : principal;
+                const expiresAt = diaEn(l.dias);
+                const code = codigoDeLotePorDefecto(expiresAt.toISOString().slice(0, 10));
+                const lote = await tx.lot.upsert({
+                    where: { productId_code: { productId: producto.id, code } },
+                    update: {},
+                    create: { productId: producto.id, code, expiresAt },
+                });
+
+                acumulado += l.unidades;
+                porAlmacen.set(almacen.id, (porAlmacen.get(almacen.id) ?? 0) + l.unidades);
+                await tx.stockLevel.create({ data: { productId: producto.id, warehouseId: almacen.id, lotId: lote.id, stock: l.unidades } });
+                await tx.stockMovement.create({
+                    data: {
+                        productId: producto.id, warehouseId: almacen.id, lotId: lote.id, type: "IN", delta: l.unidades,
+                        stockAfter: acumulado, warehouseStockAfter: porAlmacen.get(almacen.id)!,
+                        note: "Stock inicial", createdAt: hace(20 - i),
+                    },
+                });
+            }
+        });
+    }
+
+    console.log(`  - ${PERECEDEROS.length} productos con lotes (uno con un lote caducado y varios que vencen este mes)`);
+    return PERECEDEROS.length;
+}
+
 async function sembrarConteo(productos: Product[], principal: Warehouse): Promise<void> {
     const porCategoria = new Map<string, Product[]>();
     for (const p of productos) {
@@ -1039,6 +1118,8 @@ async function main(): Promise<void> {
     await sembrarHistorialDePrecios(productos);
     await sembrarAuditoria(usuarios, productos);
     await sembrarConteo(productos, principal);
+    // T5-15 — al final y aparte: no entran en el libro de movimientos ni en el conteo de arriba.
+    const conLotes = await sembrarLotes(principal, sucursal);
 
     // `app_settings` se deja vacía a propósito: `SETTINGS_CATALOG` ya define el valor por
     // defecto de cada ajuste y la tabla solo guarda lo que alguien haya cambiado. Sembrar
@@ -1056,7 +1137,7 @@ async function main(): Promise<void> {
     Proveedores         ${proveedores.size}
     Etiquetas           ${etiquetas.size}
     Almacenes           2  (Tienda Central y Sucursal Santiago)
-    Productos           ${productos.length}  (${bajos.length} bajo minimo, 2 descontinuados)
+    Productos           ${productos.length + conLotes}  (${bajos.length} bajo minimo, 2 descontinuados, ${conLotes} con lotes)
     Ordenes de compra   ${ordenesDeCompra.length}
     Con coste medio     ${conCoste}  (el resto, sin coste conocido)
     Ordenes de venta    ${ordenesDeVenta.length}
