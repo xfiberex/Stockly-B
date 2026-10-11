@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -58,7 +58,7 @@ describe("Sugerencias de reposición (T5-05)", () => {
         name: string,
         datos: { stock: number; minStock: number; supplierId?: string | null; costPrice?: number; isActive?: boolean },
     ) =>
-        prisma.product.create({
+        crearProducto({
             data: {
                 name,
                 price: 50,
@@ -73,7 +73,7 @@ describe("Sugerencias de reposición (T5-05)", () => {
     /** Salidas `OUT` hace `hace` días. El stock no se toca: la fórmula lee los movimientos. */
     const salidas = (productId: string, unidades: number, hace = 1) =>
         prisma.stockMovement.create({
-            data: { productId, type: "OUT", delta: -unidades, stockAfter: 0, createdAt: new Date(Date.now() - hace * DIA) },
+            data: { productId, type: "OUT", delta: -unidades, stockAfter: 0, warehouseId: ALMACEN, warehouseStockAfter: 0, createdAt: new Date(Date.now() - hace * DIA) },
         });
 
     const listar = async (query = "") => {
@@ -95,7 +95,7 @@ describe("Sugerencias de reposición (T5-05)", () => {
         quantity: number; receivedQuantity?: number; unitPrice?: number; createdAt?: Date;
     }) =>
         prisma.purchaseOrder.create({
-            data: {
+            data: { warehouseId: ALMACEN,
                 supplierId: datos.supplierId ?? null,
                 status: datos.status,
                 ...(datos.createdAt && { createdAt: datos.createdAt }),
@@ -169,8 +169,8 @@ describe("Sugerencias de reposición (T5-05)", () => {
             const p = await producto("Arandela", { stock: 0, minStock: 1, supplierId: prov.id });
             await prisma.stockMovement.createMany({
                 data: [
-                    { productId: p.id, type: "IN", delta: 300, stockAfter: 300 },
-                    { productId: p.id, type: "ADJUSTMENT", delta: -300, stockAfter: 0 },
+                    { productId: p.id, type: "IN", delta: 300, stockAfter: 300, warehouseId: ALMACEN, warehouseStockAfter: 300 },
+                    { productId: p.id, type: "ADJUSTMENT", delta: -300, stockAfter: 0, warehouseId: ALMACEN, warehouseStockAfter: 0 },
                 ],
             });
 
@@ -181,11 +181,11 @@ describe("Sugerencias de reposición (T5-05)", () => {
             const prov = await proveedor("Norte", 7);
             const p = await producto("Tuerca", { stock: 10, minStock: 10, supplierId: prov.id });
             await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), status: "PENDING", items: { create: { productId: p.id, productName: "Tuerca", quantity: 4, unitPrice: 50 } } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), status: "PENDING", items: { create: { productId: p.id, productName: "Tuerca", quantity: 4, unitPrice: 50 } } },
             });
             // Una venta enviada ya salió del stock: no compromete nada más.
             await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), status: "SHIPPED", items: { create: { productId: p.id, productName: "Tuerca", quantity: 99, unitPrice: 50 } } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), status: "SHIPPED", items: { create: { productId: p.id, productName: "Tuerca", quantity: 99, unitPrice: 50 } } },
             });
 
             const s = await sugerenciaDe(p.id);

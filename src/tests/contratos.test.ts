@@ -3,7 +3,7 @@ import path from "node:path";
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 import { $Enums } from "@/generated/prisma/client";
 import type { z } from "zod";
 import * as contrato from "@/contratos/api";
@@ -156,7 +156,7 @@ describe("Contrato de la API (T4-01)", () => {
 
             // `price` con decimales a propósito: es el campo `Decimal` que llega como
             // cadena y el motivo de que `importeSchema` sea una unión.
-            const producto = await prisma.product.create({
+            const producto = await crearProducto({
                 data: {
                     name: "Producto de contrato",
                     price: 1234.56,
@@ -172,7 +172,7 @@ describe("Contrato de la API (T4-01)", () => {
             productoId = producto.id;
 
             await prisma.stockMovement.create({
-                data: { productId: producto.id, type: "IN", delta: 10, stockAfter: 10, note: "alta" },
+                data: { productId: producto.id, type: "IN", delta: 10, stockAfter: 10, warehouseId: ALMACEN, warehouseStockAfter: 10, note: "alta" },
             });
             await prisma.priceHistory.create({
                 data: { productId: producto.id, oldPrice: 1000, newPrice: 1234.56 },
@@ -181,7 +181,7 @@ describe("Contrato de la API (T4-01)", () => {
             // Una orden con ítem enlazado y otro suelto: `productId: null` es la
             // distinción de la que depende el recuento de reposición de T2-42.
             await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(),
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
                     customerName: "Cliente",
                     items: {
                         create: [
@@ -193,7 +193,7 @@ describe("Contrato de la API (T4-01)", () => {
             });
 
             await prisma.purchaseOrder.create({
-                data: {
+                data: { warehouseId: ALMACEN,
                     supplierId: proveedor.id,
                     items: {
                         create: [{ productId: producto.id, productName: producto.name, quantity: 5, unitPrice: 900 }],

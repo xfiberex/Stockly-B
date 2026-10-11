@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -39,7 +39,7 @@ describe("Flujo de alerta de bajo stock", () => {
     });
 
     it("NO envía alerta cuando la configuración está desactivada (por defecto)", async () => {
-        const product = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+        const product = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
         const res = await request(app)
             .post(`${BASE}/${product.id}/movements`)
@@ -53,7 +53,7 @@ describe("Flujo de alerta de bajo stock", () => {
 
     it("envía alerta a los administradores cuando el stock cae por debajo del mínimo y la alerta está activa", async () => {
         await prisma.appSetting.create({ data: { key: "lowStockAlertEnabled", value: "true" } });
-        const product = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+        const product = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
         const res = await request(app)
             .post(`${BASE}/${product.id}/movements`)
@@ -83,7 +83,7 @@ describe("Flujo de alerta de bajo stock", () => {
             () => new Promise((resolve) => setTimeout(resolve, RETRASO_SMTP)),
         );
         await prisma.appSetting.create({ data: { key: "lowStockAlertEnabled", value: "true" } });
-        const product = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+        const product = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
         const inicio = Date.now();
         const res = await request(app)
@@ -103,7 +103,7 @@ describe("Flujo de alerta de bajo stock", () => {
     it("un fallo del correo no rompe la operación ya guardada", async () => {
         (sendLowStockAlertEmail as jest.Mock).mockRejectedValueOnce(new Error("SMTP caído"));
         await prisma.appSetting.create({ data: { key: "lowStockAlertEnabled", value: "true" } });
-        const product = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+        const product = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
         const res = await request(app)
             .post(`${BASE}/${product.id}/movements`)
@@ -119,7 +119,7 @@ describe("Flujo de alerta de bajo stock", () => {
 
     it("NO envía alerta si el stock se mantiene por encima del mínimo", async () => {
         await prisma.appSetting.create({ data: { key: "lowStockAlertEnabled", value: "true" } });
-        const product = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 20, minStock: 5 } });
+        const product = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 20, minStock: 5 } });
 
         const res = await request(app)
             .post(`${BASE}/${product.id}/movements`)

@@ -4,7 +4,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { productService } from "@/modules/products/product.service";
 import { barrasDe } from "@/modules/products/codigoDeBarras";
 import { nuevoDocumentoDeEtiquetas, renderEtiquetas } from "@/modules/products/product.etiquetas";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -48,7 +48,7 @@ describe("Código de barras en la API (T5-08)", () => {
         request(app).post(PRODUCTOS).set("Cookie", admin).send({ price: 10, ...cuerpo });
 
     const producto = (name: string, extra: { barcode?: string; sku?: string; isActive?: boolean } = {}) =>
-        prisma.product.create({ data: { name, price: 12.5, stock: 3, ...extra } });
+        crearProducto({ data: { name, price: 12.5, stock: 3, ...extra } });
 
     describe("Guardarlo", () => {
         it("se guarda al crear y un segundo producto con el mismo código recibe 409, no 500", async () => {

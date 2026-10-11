@@ -39,8 +39,10 @@ auditoria`. El workflow llama a ese mismo script: no se le añaden pasos propios
   (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `FRONTEND_URL`). El puerto de la base varía
   según el equipo: manda el `.env` local.
 - **Los tests corren contra `Stockly_test`**, nunca contra la de desarrollo, y **`verify` no la
-  migra**. Tras una migración nueva: `DATABASE_URL=…/Stockly_test pnpm exec prisma db push`
-  (`migrate deploy` falla ahí). Un fallo masivo de la suite que hable del esquema es esto.
+  migra**. Tras una migración nueva se ejecuta **su propio SQL**:
+  `DATABASE_URL=…/Stockly_test pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`.
+  Ni `migrate deploy` (falla ahí) ni `db push` (no trae lo que `schema.prisma` no sabe expresar,
+  como el disparador de `T5-14`). Un fallo masivo de la suite que hable del esquema es esto.
 - **`smoke` no es redundante con `build`**: `tsc` no reescribe los alias `@/`, y un build que
   compila puede no arrancar.
 - **`auditoria`** rompe ante una vulnerabilidad alta o crítica en producción o una licencia fuera
@@ -81,7 +83,11 @@ auditoria`. El workflow llama a ese mismo script: no se le añaden pasos propios
 - **Antes de subir `work_mem` u otro parámetro del servidor, reescribe la consulta**, y desconfía
   de un `GROUP BY` sobre una expresión ([docs/rendimiento.md §5](docs/rendimiento.md)).
 - **Todo lo que mueve stock ocurre en una transacción** y con decremento condicional
-  ([ADR 0001](docs/adr/0001-decremento-condicional-de-stock.md)).
+  ([ADR 0001](docs/adr/0001-decremento-condicional-de-stock.md)), **y pasa por
+  [`src/shared/lib/stock.ts`](src/shared/lib/stock.ts)**: es el único sitio que escribe el stock,
+  que vive en `stock_levels` y, como total, en `products.stock`
+  ([ADR 0010](docs/adr/0010-stock-total-desnormalizado.md)). Ningún servicio hace
+  `product.update({ stock })`.
 - **Una transitiva vulnerable que su dueño fija a versión exacta se sube con `overrides`** en
   `pnpm-workspace.yaml`, y cada línea dice cuándo retirarla.
 - **El seed es un libro mayor**, no un montón de `create`: cierra exactamente en el stock del

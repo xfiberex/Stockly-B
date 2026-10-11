@@ -31,6 +31,9 @@ const ERROR = (descripcion: string) => ({
 
 const PARAM_ID = { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } };
 
+/** T5-14 — el filtro por almacén de los listados. Uno que no existe es 404, no una lista vacía. */
+const PARAM_ALMACEN = { name: "warehouseId", in: "query", schema: { type: "string", format: "uuid" }, description: "Solo lo de ese almacén (T5-14)" };
+
 /** Los parámetros de paginación que acepta `parsePagination` en todos los listados. */
 const PARAMS_PAGINA = [
     { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
@@ -131,15 +134,17 @@ export const postDeMovimientoManual = {
             content: { "application/json": { schema: {
                 type: "object", required: ["type", "quantity"],
                 properties: {
-                    type: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT"] },
+                    type: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT"], description: "`ADJUSTMENT` deja **el almacén** en `quantity`, no el total del producto (T5-14)" },
                     quantity: { type: "integer", example: 5 },
                     reason: { type: "string" },
+                    warehouseId: { type: "string", format: "uuid", description: "T5-14 — el almacén de la operación; sin él, el predeterminado" },
                 },
             } } },
         },
         responses: {
             "201": JSON_OK({ $ref: "#/components/schemas/Product" }, "Movimiento registrado"),
-            "400": ERROR("Stock insuficiente"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("Producto no encontrado"),
+            "400": ERROR("Stock insuficiente en ese almacén"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("Producto o almacén no encontrados"),
+            "409": ERROR("El almacén está desactivado"),
         },
     },
 };
@@ -202,12 +207,14 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/products/bulk-stock": {
         patch: {
             tags: ["Products"], summary: "Ajuste masivo de stock (ADMIN o WAREHOUSE)",
+            description: "T5-14 — cada `stock` es lo que tiene que quedar **en el almacén** de la petición (o en el predeterminado), no el total del producto.",
             requestBody: {
                 required: true,
                 content: { "application/json": { schema: {
                     type: "object", required: ["items"],
                     properties: {
                         reason: { type: "string", example: "Recuento de inventario" },
+                        warehouseId: { type: "string", format: "uuid", description: "T5-14 — el almacén de la operación; sin él, el predeterminado" },
                         items: { type: "array", items: { type: "object", properties: { productId: { type: "string", format: "uuid" }, stock: { type: "integer" } } } },
                     },
                 } } },
@@ -250,7 +257,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/purchase-orders": {
         get: {
             tags: ["Purchase Orders"], summary: "Listar órdenes de compra",
-            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] } }],
+            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] } }, PARAM_ALMACEN],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/PurchaseOrder"), "Listado paginado"), "401": ERROR("No autenticado") },
         },
         post: {
@@ -259,6 +266,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 type: "object", required: ["items"],
                 properties: {
                     supplierId: { type: "string", format: "uuid" }, notes: { type: "string" },
+                    warehouseId: { type: "string", format: "uuid", description: "T5-14 — a qué almacén entra lo recibido; sin él, al predeterminado. No se cambia después" },
                     items: { type: "array", minItems: 1, items: { type: "object", properties: { productId: { type: "string", format: "uuid" }, productName: { type: "string" }, quantity: { type: "integer" }, unitPrice: { type: "number" } } } },
                 },
             } } } },
@@ -380,6 +388,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 { name: "number", in: "query", schema: { type: "string", pattern: "^[0-9]+$" }, description: "La venta con ese número correlativo, exacto: `123` y `000123` son la misma (T6-04)" },
                 { name: "from", in: "query", schema: { type: "string", format: "date" }, description: "Creadas desde este día, incluido. Un día **del negocio**: empieza en la zona horaria de Configuración, no en UTC (T6-01)" },
                 { name: "to", in: "query", schema: { type: "string", format: "date" }, description: "Creadas hasta este día, incluido, en la misma zona (T6-01)" },
+                PARAM_ALMACEN,
             ],
             responses: {
                 "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/SaleOrder"), "Listado paginado"),
@@ -396,6 +405,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
                     customerId: { type: "string", format: "uuid" },
                     customerName: { type: "string" }, customerEmail: { type: "string", format: "email" },
                     customerPhone: { type: "string" }, customerDocument: { type: "string", maxLength: 40, description: "Cédula, RNC, NIF (T6-06). Sin él se copia el del cliente vinculado" }, notes: { type: "string" },
+                    warehouseId: { type: "string", format: "uuid", description: "T5-14 — de qué almacén sale; sin él, del predeterminado. Lo disponible es **lo de ese almacén**. No se cambia después" },
                     items: { type: "array", minItems: 1, items: { type: "object", properties: { productId: { type: "string", format: "uuid" }, productName: { type: "string" }, quantity: { type: "integer" }, unitPrice: { type: "number" } } } },
                 },
             } } } },
@@ -418,6 +428,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
                     customerId: { type: "string", format: "uuid" },
                     customerName: { type: "string" }, customerEmail: { type: "string", format: "email" },
                     customerPhone: { type: "string" }, customerDocument: { type: "string", maxLength: 40 },
+                    warehouseId: { type: "string", format: "uuid", description: "T5-14 — el local del mostrador; sin él, el predeterminado" },
                     items: { type: "array", minItems: 1, maxItems: 100, items: { type: "object", required: ["productId", "quantity"], properties: { productId: { type: "string", format: "uuid" }, quantity: { type: "integer", minimum: 1 } } } },
                 },
             } } } },
@@ -480,17 +491,17 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/inventory-counts": {
         get: {
             tags: ["Inventory Counts"], summary: "Listar sesiones de conteo, con sus cifras",
-            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED", "CANCELLED"] } }],
-            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/InventoryCount"), "Listado paginado") },
+            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED", "CANCELLED"] } }, PARAM_ALMACEN],
+            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/InventoryCount"), "Listado paginado"), "404": ERROR("Almacén no encontrado") },
         },
         post: {
             tags: ["Inventory Counts"], summary: "Abrir un conteo (ADMIN o WAREHOUSE)",
-            description: "Crea una línea sin contar por cada producto **activo** del filtro (`categoryId`, o todo el catálogo). Un producto no puede estar en dos conteos abiertos.",
+            description: "Crea una línea sin contar por cada producto **activo** del filtro (`categoryId`, o todo el catálogo). Se cuenta **un almacén** (`warehouseId`; sin él, el predeterminado): el esperado de cada línea es lo que hay en él. Un producto no puede estar en dos conteos abiertos del mismo almacén.",
             requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/InventoryCountCreate" } } } },
             responses: {
                 "201": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Abierto"),
-                "400": ERROR("Ningún producto activo con ese filtro"), "404": ERROR("Categoría no encontrada"),
-                "409": ERROR("Algún producto ya está en otro conteo abierto"),
+                "400": ERROR("Ningún producto activo con ese filtro"), "404": ERROR("Categoría o almacén no encontrados"),
+                "409": ERROR("Algún producto ya está en otro conteo abierto de ese almacén, o el almacén está desactivado"),
             },
         },
     },
@@ -526,7 +537,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/inventory-counts/{id}/close": {
         post: {
             tags: ["Inventory Counts"], summary: "Cerrar: aplicar las diferencias (ADMIN o WAREHOUSE)",
-            description: "Cada línea contada con diferencia genera un movimiento `ADJUSTMENT` de `contado − esperado` sobre el stock actual, todos en una transacción. Las no contadas no se tocan. Si algún ajuste dejara un producto en negativo, no se cierra nada.",
+            description: "Cada línea contada con diferencia genera un movimiento `ADJUSTMENT` de `contado − esperado` sobre el stock actual **del almacén del conteo**, todos en una transacción. Las no contadas no se tocan. Si algún ajuste dejara un producto en negativo, no se cierra nada.",
             parameters: [PARAM_ID],
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Cerrada"),
@@ -542,6 +553,93 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 "200": JSON_OK({ $ref: "#/components/schemas/InventoryCount" }, "Cancelada"),
                 "400": ERROR("Ya cerrada o cancelada"), "404": ERROR("No encontrada"),
             },
+        },
+    },
+
+    // ── Almacenes (T5-14) ────────────────────────────────────────────────────
+    "/warehouses": {
+        get: {
+            tags: ["Warehouses"], summary: "Todos los almacenes",
+            description: "Sin paginar: son los locales de un negocio, y de esta lista sale el selector de cada formulario. El predeterminado va primero. No trae cifras: para eso, `GET /warehouses/summary`.",
+            responses: { "200": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/Warehouse" } }, "Listado") },
+        },
+        post: {
+            tags: ["Warehouses"], summary: "Dar de alta un almacén (ADMIN)",
+            description: "Nace activo, vacío y sin ser el predeterminado.",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/WarehouseCreate" } } } },
+            responses: { "201": JSON_OK({ $ref: "#/components/schemas/Warehouse" }, "Creado"), "409": ERROR("Ya existe uno con ese nombre") },
+        },
+    },
+    "/warehouses/summary": {
+        get: {
+            tags: ["Warehouses"], summary: "Todos los almacenes, con lo que guarda cada uno",
+            description: "Productos con existencias, unidades y valor a coste de cada almacén, sobre los productos activos. `costValue` suma solo los productos con coste; las unidades de los que no lo tienen van en `unitsWithoutCost`. Recorre todos los niveles del catálogo: no es la lista para un selector.",
+            responses: { "200": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/WarehouseWithFigures" } }, "Listado") },
+        },
+    },
+    "/warehouses/{id}": {
+        put: {
+            tags: ["Warehouses"], summary: "Cambiar el nombre o la dirección (ADMIN)", parameters: [PARAM_ID],
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/WarehouseUpdate" } } } },
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Warehouse" }, "Actualizado"),
+                "404": ERROR("No encontrado"), "409": ERROR("Ya existe uno con ese nombre"),
+            },
+        },
+    },
+    "/warehouses/{id}/default": {
+        patch: {
+            tags: ["Warehouses"], summary: "Hacerlo el predeterminado (ADMIN)",
+            description: "El predeterminado es el que usa una operación que no dice almacén. Siempre hay uno y solo uno: marcar este se lo quita al que lo era.",
+            parameters: [PARAM_ID],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Warehouse" }, "Es el predeterminado"),
+                "404": ERROR("No encontrado"), "409": ERROR("Está desactivado"),
+            },
+        },
+    },
+    "/warehouses/{id}/activate": {
+        patch: {
+            tags: ["Warehouses"], summary: "Reactivar un almacén (ADMIN)", parameters: [PARAM_ID],
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/Warehouse" }, "Activo"), "404": ERROR("No encontrado") },
+        },
+    },
+    "/warehouses/{id}/deactivate": {
+        patch: {
+            tags: ["Warehouses"], summary: "Desactivar un almacén (ADMIN)",
+            description: "Deja de admitir operaciones nuevas; su historia se conserva. No se puede si es el predeterminado, si le quedan existencias o si tiene ventas pendientes, compras por recibir o conteos abiertos.",
+            parameters: [PARAM_ID],
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/Warehouse" }, "Desactivado"),
+                "404": ERROR("No encontrado"),
+                "409": ERROR("Es el predeterminado, guarda existencias o tiene operaciones sin terminar"),
+            },
+        },
+    },
+
+    // ── Transferencias (T5-14) ───────────────────────────────────────────────
+    "/stock-transfers": {
+        get: {
+            tags: ["Stock Transfers"], summary: "Listar transferencias, de la más reciente a la más antigua",
+            parameters: [...PARAMS_PAGINA, { ...PARAM_ALMACEN, description: "Las que salen de ese almacén o entran en él" }],
+            responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/StockTransfer"), "Listado paginado"), "404": ERROR("Almacén no encontrado") },
+        },
+        post: {
+            tags: ["Stock Transfers"], summary: "Mover mercancía de un almacén a otro (ADMIN o WAREHOUSE)",
+            description: "Una salida y una entrada **en la misma transacción**, sin estado «en tránsito»: deja dos movimientos `TRANSFER` por producto, enlazados por `transferId`, y el total del producto no cambia. Todo o nada. Se puede transferir lo **disponible** en el origen: lo que hay menos lo comprometido en sus ventas pendientes.",
+            requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/StockTransferCreate" } } } },
+            responses: {
+                "201": JSON_OK({ $ref: "#/components/schemas/StockTransferDetail" }, "Registrada"),
+                "400": ERROR("El origen y el destino son el mismo almacén"),
+                "404": ERROR("Almacén o producto no encontrados"),
+                "409": ERROR("No hay suficiente disponible en el origen, o un almacén está desactivado"),
+            },
+        },
+    },
+    "/stock-transfers/{id}": {
+        get: {
+            tags: ["Stock Transfers"], summary: "Una transferencia con sus líneas", parameters: [PARAM_ID],
+            responses: { "200": JSON_OK({ $ref: "#/components/schemas/StockTransferDetail" }, "Encontrada"), "404": ERROR("No encontrada") },
         },
     },
 
@@ -840,4 +938,6 @@ export const etiquetasAdicionales = [
     { name: "Settings", description: "Configuración de la aplicación" },
     { name: "Audit Logs", description: "Rastro de acciones sensibles" },
     { name: "Notifications", description: "Avisos dentro de la aplicación, por usuario" },
+    { name: "Warehouses", description: "Almacenes: sucursales y bodegas que guardan stock por separado" },
+    { name: "Stock Transfers", description: "Transferencias entre almacenes — el total del producto no cambia" },
 ];

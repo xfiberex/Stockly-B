@@ -64,6 +64,16 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 **Funcionalidad de negocio (Tier 5)**
 
+- **Varios almacenes** (`T5-14`): el stock de cada producto se reparte entre almacenes —sucursales,
+  bodegas—, y cada venta, compra, conteo y movimiento ocurre en uno. Una pantalla nueva,
+  **Almacenes**, para darlos de alta, elegir el predeterminado y ver lo que guarda cada uno; y
+  otra, **Transferencias**, para pasar mercancía de uno a otro sin que cambie el total. El
+  mostrador vende desde el local que se elija, y lo recuerda en ese dispositivo. El mínimo y su
+  aviso siguen siendo del producto entero. Quien no dice almacén opera sobre el predeterminado:
+  con uno solo, la aplicación y la API se comportan como antes. Rutas nuevas bajo `/warehouses`
+  y `/stock-transfers`; `warehouseId` opcional en ventas, compras, conteos, movimientos y
+  productos; `stockLevels` en el catálogo y la ficha. **Requiere migración, con la aplicación
+  parada** ([operaciones.md §6](docs/operaciones.md)).
 - **Avisos dentro de la aplicación** (`T5-12`): una campana con los avisos de cada usuario —stock
   bajo, venta que no se pudo enviar, compra fuera de plazo— y su contador de no leídos. El de
   stock bajo sale aunque el correo esté desactivado. Rutas bajo `/notifications`.
@@ -157,6 +167,15 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 - Las exportaciones CSV de los dos repositorios producen las mismas columnas (`T3-05`).
 - El resumen del dashboard se calcula en la base (`T2-02`).
 
+- **`stockAfter` de un movimiento es el total del producto**, y `warehouseStockAfter`, lo que
+  quedó en su almacén (`T5-14`). Con un solo almacén coinciden.
+- **`PUT /products/:id` trata `stock` como el total** (`T5-14`): lo que cambia es la diferencia,
+  que entra o sale de un almacén. `ADJUSTMENT` y el ajuste masivo fijan **el almacén**, no el total.
+- **La navegación agrupa «Conteos físicos», «Transferencias» y «Almacenes»** bajo «Inventario»
+  (`T5-14`).
+- Las exportaciones de ventas, de compras y del histórico de un producto añaden al final la
+  columna del almacén (`T5-14`).
+
 ### Eliminado
 
 - `morgan` y `@types/morgan` (2026-10-05): nadie los importaba desde que `pino` los sustituyó en
@@ -212,6 +231,14 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
   descartaban en silencio (`T1-03`).
 - Cancelar una venta enviada o una compra recibida no revertía el stock (`T0-03`, `T0-04`).
 
+- **El foco saltaba al primer campo de un diálogo** cada vez que la pantalla de debajo se
+  repintaba (`T5-14`). No se veía porque casi nunca pasaba con el diálogo abierto; con la lista de
+  almacenes llegando un instante después de abrir un formulario, pasaba siempre.
+- **Cambiar el almacén predeterminado dos veces a la vez podía dejar dos** (`T5-14`). No llegó a
+  publicarse: lo encontró su propio test.
+- La auditoría no dejaba filtrar por «Venta de mostrador» ni por «Cliente», aunque las pintaba
+  (`T6-08`, `T5-06`).
+
 ### Seguridad
 
 - **Dependencias al día ante avisos publicados** (2026-09-28 y 2026-09-30): `axios` 1.20,
@@ -243,3 +270,4 @@ No son versiones: son los días en que se cerraron bloques de tareas.
 | 2026-09-28 | Los repositorios pasan a ser públicos, con CI |
 | 2026-09-30 | Licencia AGPL v3 |
 | 2026-10-01 | Tier 5 en 13 de 15: quedan las dos tareas condicionadas |
+| 2026-10-10 | Varios almacenes (`T5-14`), con el caso de uso de varias sucursales. Queda `T5-15` |

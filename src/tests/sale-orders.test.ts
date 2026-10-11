@@ -2,7 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { productService } from "@/modules/products/product.service";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto, ponerStock } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -14,7 +14,7 @@ jest.mock("@/shared/lib/nodemailer", () => ({
 const BASE = "/api/v1/sale-orders";
 
 async function createProduct(name: string, stock: number, minStock = 0) {
-    return prisma.product.create({ data: { name, price: 10, stock, minStock } });
+    return crearProducto({ data: { name, price: 10, stock, minStock } });
 }
 
 describe("Sale Orders API", () => {
@@ -162,7 +162,7 @@ describe("Sale Orders API", () => {
             // T5-03: ya no se puede **crear** una venta mayor que lo disponible, así que el
             // stock baja después, como lo haría un ajuste manual o una merma. El envío sigue
             // siendo la última comprobación, y esto es lo que la vigila.
-            await prisma.product.update({ where: { id: product.id }, data: { stock: 2 } });
+            await ponerStock(product.id, 2);
 
             const shipped = await request(app)
                 .patch(`${BASE}/${orderId}`)
@@ -192,7 +192,7 @@ describe("Sale Orders API", () => {
                 });
             const orderId = created.body.data.id;
             // T5-03: la venta se crea con stock suficiente y el escaso baja después (ver arriba).
-            await prisma.product.update({ where: { id: short.id }, data: { stock: 1 } });
+            await ponerStock(short.id, 1);
 
             const shipped = await request(app)
                 .patch(`${BASE}/${orderId}`)
@@ -275,7 +275,7 @@ describe("Sale Orders API", () => {
     // solo lectura, justo las que nadie mira hasta que dejan de funcionar.
     describe("Listado, lectura y exportación (T2-23)", () => {
         async function ordenDePrueba() {
-            const product = await prisma.product.create({
+            const product = await crearProducto({
                 data: { name: "T223-Teclado", price: 25, stock: 10, minStock: 0 },
             });
             const res = await request(app).post(BASE).set("Cookie", adminCookie).send({
@@ -320,7 +320,7 @@ describe("Sale Orders API", () => {
         });
 
         it("exporta en CSV una fila por línea de orden, no una por orden", async () => {
-            const product = await prisma.product.create({
+            const product = await crearProducto({
                 data: { name: "T223-Ratón", price: 15, stock: 10, minStock: 0 },
             });
             await request(app).post(BASE).set("Cookie", adminCookie).send({
@@ -339,7 +339,7 @@ describe("Sale Orders API", () => {
             // que es justo lo que decide si el tope de la exportación se queda corto.
             const lineas = res.text.replace(/^﻿/, "").trim().split("\n");
             expect(lineas).toHaveLength(3);
-            expect(lineas[0]).toBe("orderNumber,orderId,status,customerName,customerEmail,customerDocument,createdAt,createdByEmail,productName,quantity,unitPrice,totalLine,taxRate,taxLine,totalLineWithTax");
+            expect(lineas[0]).toBe("orderNumber,orderId,status,customerName,customerEmail,customerDocument,createdAt,createdByEmail,productName,quantity,unitPrice,totalLine,taxRate,taxLine,totalLineWithTax,warehouseName");
             expect(res.text).toContain("Servicio de instalación");
         });
 
@@ -368,7 +368,7 @@ describe("Sale Orders API", () => {
      */
     describe("Paginación y filtro por fecha de creación (T6-01)", () => {
         const creadaEl = async (createdAt: string, extra: { status?: "PENDING" | "SHIPPED" | "CANCELLED"; customerName?: string } = {}) =>
-            prisma.saleOrder.create({ data: { number: await numeroDeVenta(), createdAt: new Date(createdAt), ...extra } });
+            prisma.saleOrder.create({ data: { warehouseId: ALMACEN, number: await numeroDeVenta(), createdAt: new Date(createdAt), ...extra } });
 
         const listar = (query: string) => request(app).get(`${BASE}?${query}`).set("Cookie", adminCookie);
         const nombres = (res: { body: { data: { data: Array<{ customerName: string | null }> } } }) =>

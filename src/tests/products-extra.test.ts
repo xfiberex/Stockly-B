@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -33,7 +33,7 @@ describe("Products API — endpoints adicionales", () => {
         const user = await createUser({ email: "px_user@example.com", role: "USER" });
         userCookie = getAuthCookie(user.id);
 
-        const product = await prisma.product.create({
+        const product = await crearProducto({
             data: { name: "Teclado mecánico", price: 100, stock: 20, minStock: 5 },
         });
         productId = product.id;

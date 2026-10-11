@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -138,7 +138,7 @@ describe("Categories API", () => {
     describe("DELETE /categories/:id", () => {
         it("200: elimina categoría y pone categoryId=null en productos", async () => {
             const category = await prisma.category.create({ data: { name: "A eliminar" } });
-            const product = await prisma.product.create({
+            const product = await crearProducto({
                 data: { name: "Prod con categoría", price: 10, stock: 1, categoryId: category.id },
             });
 

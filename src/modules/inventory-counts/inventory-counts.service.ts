@@ -4,6 +4,8 @@ import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
 import { filtroDeEnum } from "@/shared/lib/enums";
 import { dispararAlertaStock, type ProductoEnAlerta } from "@/shared/lib/stockAlerts";
+import { aplicar, bloquearProductos, nivelesEn } from "@/shared/lib/stock";
+import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
 import type { CreateInventoryCountInput, RecordInventoryCountLinesInput } from "./inventory-counts.validator";
 
 /**
@@ -13,6 +15,10 @@ import type { CreateInventoryCountInput, RecordInventoryCountLinesInput } from "
  * contarla**, y cerrar aplica `contado − esperado` sobre el stock de ese momento. Comparar con el
  * stock al cerrar convertiría cada venta del día en merma; comparar con una foto al abrir
  * obligaría a parar el almacén mientras se cuenta.
+ *
+ * T5-14 — **se cuenta un almacén.** El esperado de una línea es lo que hay del producto en el
+ * almacén de la sesión, y el ajuste del cierre se aplica a ese almacén y a ningún otro. El
+ * mismo producto puede estar a la vez en el conteo de dos locales: son dos estanterías.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -75,7 +81,10 @@ async function resumenes(ids: string[]): Promise<Map<string, Resumen>> {
     return new Map(filas.map(({ countId, ...resumen }) => [countId, resumen]));
 }
 
-const CONTEO_INCLUDE = { category: { select: { id: true, name: true } } } as const;
+const CONTEO_INCLUDE = {
+    category: { select: { id: true, name: true } },
+    warehouse: { select: { id: true, name: true } },
+} as const;
 
 type ConteoConCategoria = Prisma.InventoryCountGetPayload<{ include: typeof CONTEO_INCLUDE }>;
 
@@ -84,6 +93,7 @@ function conResumen(conteo: ConteoConCategoria, resumen: Resumen | undefined) {
         id: conteo.id,
         status: conteo.status,
         note: conteo.note,
+        warehouse: conteo.warehouse,
         category: conteo.category,
         createdByEmail: conteo.createdByEmail,
         closedByEmail: conteo.closedByEmail,
@@ -123,19 +133,21 @@ function aLinea(linea: LineaConProducto) {
  * cerrada, y dos cierres a la vez aplicarían los ajustes dos veces.
  */
 async function bloquearAbierta(tx: Tx, id: string) {
-    const filas = await tx.$queryRaw<Array<{ status: $Enums.InventoryCountStatus }>>`
-        SELECT status FROM inventory_counts WHERE id = ${id} FOR UPDATE`;
+    const filas = await tx.$queryRaw<Array<{ status: $Enums.InventoryCountStatus; warehouseId: string }>>`
+        SELECT status, "warehouseId" FROM inventory_counts WHERE id = ${id} FOR UPDATE`;
     if (filas.length === 0) throw new HttpError(404, "Conteo no encontrado", "INVENTORY_COUNT_NOT_FOUND");
     if (filas[0]!.status !== "OPEN") {
         throw new HttpError(400, "El conteo ya está cerrado o cancelado", "COUNT_NOT_OPEN");
     }
+    return { warehouseId: filas[0]!.warehouseId };
 }
 
 export const inventoryCountsService = {
     async getAll(query: Record<string, string | undefined>) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 20 });
         const status = filtroDeEnum($Enums.InventoryCountStatus, query.status, "status");
-        const where = status ? { status } : {};
+        const warehouseId = await almacenDelFiltro(query.warehouseId);
+        const where = { ...(status && { status }), ...(warehouseId && { warehouseId }) };
 
         const [conteos, total] = await Promise.all([
             prisma.inventoryCount.findMany({ where, include: CONTEO_INCLUDE, orderBy: { createdAt: "desc" }, skip, take: limit }),
@@ -157,8 +169,9 @@ export const inventoryCountsService = {
 
     /**
      * Abre una sesión con una línea por producto **activo** del filtro, sin contar. Un producto
-     * no puede estar en dos sesiones abiertas: la segunda anotaría otra cifra para la misma
-     * estantería y el segundo cierre ajustaría otra vez lo que el primero ya corrigió.
+     * no puede estar en dos sesiones abiertas **del mismo almacén**: la segunda anotaría otra
+     * cifra para la misma estantería y el segundo cierre ajustaría otra vez lo que el primero
+     * ya corrigió.
      */
     async create(dto: CreateInventoryCountInput, email: string | undefined) {
         const categoryId = dto.categoryId ?? null;
@@ -171,13 +184,14 @@ export const inventoryCountsService = {
             if (categoryId && !(await tx.category.findUnique({ where: { id: categoryId }, select: { id: true } }))) {
                 throw new HttpError(404, "Categoría no encontrada", "CATEGORY_NOT_FOUND");
             }
+            const almacen = await almacenParaOperar(dto.warehouseId, tx);
 
             const filtro = categoryId === null ? Prisma.empty : Prisma.sql`AND p."categoryId" = ${categoryId}`;
 
             const [{ enOtra }] = await tx.$queryRaw<Array<{ enOtra: number }>>`
                 SELECT COUNT(DISTINCT l."productId")::int AS "enOtra"
                 FROM inventory_count_lines l
-                JOIN inventory_counts c ON c.id = l."countId" AND c.status = 'OPEN'
+                JOIN inventory_counts c ON c.id = l."countId" AND c.status = 'OPEN' AND c."warehouseId" = ${almacen.id}
                 JOIN products p ON p.id = l."productId"
                 WHERE p."isActive" ${filtro}`;
             if (enOtra > 0) {
@@ -190,7 +204,7 @@ export const inventoryCountsService = {
             }
 
             const conteo = await tx.inventoryCount.create({
-                data: { categoryId, note: dto.note || null, createdByEmail: email ?? null },
+                data: { warehouseId: almacen.id, categoryId, note: dto.note || null, createdByEmail: email ?? null },
             });
             // Una sentencia y no un `createMany` con los ids leídos antes: el catálogo entero son
             // 100 000 filas, y así no pasan por Node.
@@ -257,13 +271,14 @@ export const inventoryCountsService = {
 
     /**
      * Anota lo contado. El esperado se lee **ahora**, en la misma transacción que escribe la
-     * cifra: es el stock contra el que se comparará al cerrar. Volver a contar sobrescribe los dos.
+     * cifra: es el stock —el del almacén de la sesión— contra el que se comparará al cerrar.
+     * Volver a contar sobrescribe los dos.
      */
     async recordLines(id: string, dto: RecordInventoryCountLinesInput, email: string | undefined) {
         const productIds = dto.items.map((i) => i.productId);
 
         const lineas = await prisma.$transaction(async (tx) => {
-            await bloquearAbierta(tx, id);
+            const { warehouseId } = await bloquearAbierta(tx, id);
 
             const existentes = await tx.inventoryCountLine.findMany({
                 where: { countId: id, productId: { in: productIds } },
@@ -279,10 +294,8 @@ export const inventoryCountsService = {
                 );
             }
 
-            const stock = new Map(
-                (await tx.product.findMany({ where: { id: { in: productIds } }, select: { id: true, stock: true } }))
-                    .map((p) => [p.id, p.stock]),
-            );
+            // Sin fila es cero: el producto nunca ha estado en este almacén.
+            const stock = await nivelesEn(tx, warehouseId, productIds);
             const ahora = new Date();
             const lineaDe = new Map(existentes.map((l) => [l.productId, l.id]));
 
@@ -292,7 +305,7 @@ export const inventoryCountsService = {
                         where: { id: lineaDe.get(item.productId)! },
                         data: {
                             countedQuantity: item.countedQuantity,
-                            expectedQuantity: stock.get(item.productId)!,
+                            expectedQuantity: stock.get(item.productId) ?? 0,
                             countedAt: ahora,
                             countedByEmail: email ?? null,
                         },
@@ -312,13 +325,13 @@ export const inventoryCountsService = {
 
     /**
      * Cierra: cada línea contada con diferencia es un `ADJUSTMENT` de `contado − esperado` sobre
-     * el stock actual, **todos o ninguno**. Las no contadas no se tocan. Si un ajuste dejara un
+     * el stock actual **del almacén de la sesión**, **todos o ninguno**. Las no contadas no se tocan. Si un ajuste dejara un
      * producto en negativo —se contaron 8 de 10 y después se vendieron 9—, no se cierra nada: ese
      * producto hay que volver a contarlo.
      */
     async close(id: string, email: string | undefined) {
         const { ajustes, sinContar, alertas } = await prisma.$transaction(async (tx) => {
-            await bloquearAbierta(tx, id);
+            const { warehouseId } = await bloquearAbierta(tx, id);
 
             const contadas = await tx.inventoryCountLine.findMany({
                 where: { countId: id, countedQuantity: { not: null } },
@@ -334,32 +347,29 @@ export const inventoryCountsService = {
             if (conDiferencia.length > 0) {
                 // En orden de id, como cualquier otro bloqueo de varios productos: dos cierres que
                 // compartan productos los piden en el mismo orden y no se bloquean en cruz.
-                const productos = await tx.$queryRaw<Array<{ id: string; name: string; stock: number; minStock: number }>>`
-                    SELECT id, name, stock, "minStock" FROM products
-                    WHERE id IN (${Prisma.join(conDiferencia.map((l) => l.productId))})
-                    ORDER BY id FOR UPDATE`;
-                const actual = new Map(productos.map((p) => [p.id, p]));
+                const ids = conDiferencia.map((l) => l.productId).sort();
+                await bloquearProductos(tx, ids);
+                const enAlmacen = await nivelesEn(tx, warehouseId, ids);
 
-                const negativos = conDiferencia.filter((l) => actual.get(l.productId)!.stock + l.delta < 0);
+                const negativos = conDiferencia.filter((l) => (enAlmacen.get(l.productId) ?? 0) + l.delta < 0);
                 if (negativos.length > 0) {
+                    const primero = await tx.product.findUniqueOrThrow({ where: { id: negativos[0]!.productId }, select: { name: true } });
                     throw new HttpError(
                         409,
-                        `Cerrar dejaría ${negativos.length} productos en negativo (${actual.get(negativos[0]!.productId)!.name}, …): ` +
+                        `Cerrar dejaría ${negativos.length} productos en negativo (${primero.name}, …): ` +
                             "han salido unidades después de contarlos. Vuelve a contarlos.",
                         "COUNT_ADJUSTMENT_NEGATIVE",
-                        { productos: negativos.length, producto: actual.get(negativos[0]!.productId)!.name },
+                        { productos: negativos.length, producto: primero.name },
                     );
                 }
 
                 const nota = `Conteo #${numero(id)}`;
-                for (const { productId, delta } of conDiferencia) {
-                    const producto = actual.get(productId)!;
-                    const stockAfter = producto.stock + delta;
-                    await tx.product.update({ where: { id: productId }, data: { stock: stockAfter } });
-                    await tx.stockMovement.create({
-                        data: { productId, type: "ADJUSTMENT", delta, stockAfter, note: nota },
-                    });
-                    if (delta < 0) alertas.push({ id: productId, name: producto.name, stock: stockAfter, minStock: producto.minStock });
+                const porProducto = new Map(conDiferencia.map((l) => [l.productId, l.delta]));
+                for (const productId of ids) {
+                    const delta = porProducto.get(productId)!;
+                    const movido = await aplicar(tx, { productId, warehouseId, type: "ADJUSTMENT", note: nota }, delta);
+                    // El mínimo es del producto entero: se compara con el total, no con este almacén.
+                    if (delta < 0) alertas.push({ id: productId, name: movido.name, stock: movido.stock, minStock: movido.minStock });
                 }
             }
 

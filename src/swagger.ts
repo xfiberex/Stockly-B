@@ -121,6 +121,7 @@ export const spec = {
                     { name: "supplierId", in: "query", schema: { type: "string", format: "uuid" } },
                     { name: "tagId", in: "query", schema: { type: "string", format: "uuid" } },
                     { name: "isActive", in: "query", schema: { type: "boolean" } },
+                    { name: "warehouseId", in: "query", schema: { type: "string", format: "uuid" }, description: "Solo los productos con existencias en ese almacén (T5-14)" },
                 ],
                 responses: {
                     // T5-03 — cada producto trae su comprometido en ventas pendientes y su disponible.
@@ -223,9 +224,10 @@ export const spec = {
                     { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
                     { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
                     { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } },
-                    { name: "type", in: "query", schema: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT", "IMPORT"] } },
+                    { name: "type", in: "query", schema: { type: "string", enum: ["IN", "OUT", "ADJUSTMENT", "IMPORT", "TRANSFER"] } },
                     { name: "dateFrom", in: "query", schema: { type: "string", format: "date" } },
                     { name: "dateTo", in: "query", description: "Inclusivo: incluye el día entero", schema: { type: "string", format: "date" } },
+                    { name: "warehouseId", in: "query", schema: { type: "string", format: "uuid" }, description: "Solo los de ese almacén (T5-14)" },
                 ],
                 responses: {
                     "200": {

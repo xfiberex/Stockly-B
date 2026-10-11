@@ -1,12 +1,12 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto, ponerStock } from "./helpers";
 
 const BASE = "/api/v1/purchase-orders";
 
 async function createProduct(name: string, stock: number) {
-    return prisma.product.create({ data: { name, price: 10, stock } });
+    return crearProducto({ data: { name, price: 10, stock } });
 }
 
 describe("Purchase Orders API", () => {
@@ -137,7 +137,7 @@ describe("Purchase Orders API", () => {
 
             await request(app).patch(`${BASE}/${orderId}`).set("Cookie", adminCookie).send({ status: "RECEIVED" });
             // Se vende todo lo recibido antes de intentar cancelar la compra
-            await prisma.product.update({ where: { id: product.id }, data: { stock: 3 } });
+            await ponerStock(product.id, 3);
 
             const res = await request(app)
                 .patch(`${BASE}/${orderId}`)

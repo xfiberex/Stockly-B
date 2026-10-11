@@ -8,7 +8,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { tieneComprobante } from "@/contratos/api";
 import { PESO_MAXIMO_DEL_LOGO, traerLogoDelNegocio } from "@/shared/lib/logoDelNegocio";
 import { fechaDelComprobante, rotuloDelImpuesto } from "@/modules/sale-orders/sale-orders.comprobante";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendLowStockAlertEmail: jest.fn().mockResolvedValue(undefined),
@@ -86,7 +86,7 @@ describe("Comprobante de venta en PDF (T6-07)", () => {
 
     /** Una venta de dos líneas creada por la API —así congela la tasa vigente y a quien la registra—. */
     async function vender(extra: Record<string, unknown> = {}) {
-        const taladro = await prisma.product.create({ data: { name: "Taladro", price: 1234.5, stock: 10 } });
+        const taladro = await crearProducto({ data: { name: "Taladro", price: 1234.5, stock: 10 } });
         const res = await request(app)
             .post(VENTAS)
             .set("Cookie", admin)

@@ -13,7 +13,7 @@ import {
     escribirImporte,
     motivoSimboloDeMonedaInvalido,
 } from "@/contratos/api";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 
 /**
  * T6-03 — la moneda del negocio.
@@ -160,13 +160,13 @@ describe("Cambiar el símbolo a RD$ cambia todos los importes que salen del serv
         cookie = getAuthCookie(admin.id);
 
         const categoria = await prisma.category.create({ data: { name: "Herramientas" } });
-        const producto = await prisma.product.create({
+        const producto = await crearProducto({
             data: { name: "Taladro", sku: "TAL-01", price: 1234.5, costPrice: 800, stock: 4, minStock: 1, categoryId: categoria.id },
         });
         // Enviada el jueves 24 de septiembre de 2026: entra en el margen, en julio-septiembre y
         // en la semana que resume el comando el miércoles 30.
         await prisma.saleOrder.create({
-            data: { number: await numeroDeVenta(),
+            data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
                 status: "SHIPPED",
                 shippedAt: new Date("2026-09-24T12:00:00Z"),
                 createdAt: new Date("2026-09-23T12:00:00Z"),
@@ -174,7 +174,7 @@ describe("Cambiar el símbolo a RD$ cambia todos los importes que salen del serv
             },
         });
         await prisma.saleOrder.create({
-            data: { number: await numeroDeVenta(), status: "PENDING", items: { create: [{ productId: producto.id, productName: "Taladro", quantity: 1, unitPrice: 1234.5 }] } },
+            data: { warehouseId: ALMACEN, number: await numeroDeVenta(), status: "PENDING", items: { create: [{ productId: producto.id, productName: "Taladro", quantity: 1, unitPrice: 1234.5 }] } },
         });
     });
 

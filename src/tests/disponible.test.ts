@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -42,7 +42,7 @@ describe("Stock comprometido y disponible (T5-03)", () => {
         await cleanDb();
     });
 
-    const producto = (name: string, stock: number) => prisma.product.create({ data: { name, price: 10, stock } });
+    const producto = (name: string, stock: number) => crearProducto({ data: { name, price: 10, stock } });
 
     const vender = (items: Array<{ productId?: string; productName: string; quantity: number }>) =>
         request(app)
@@ -132,7 +132,7 @@ describe("Stock comprometido y disponible (T5-03)", () => {
                 async (tx) => {
                     await tx.$queryRaw`SELECT id FROM products WHERE id = ${p.id} FOR UPDATE`;
                     await tx.saleOrder.create({
-                        data: { number: await numeroDeVenta(), items: { create: [{ productId: p.id, productName: "Monitor", quantity: 5, unitPrice: 10 }] } },
+                        data: { warehouseId: ALMACEN, number: await numeroDeVenta(), items: { create: [{ productId: p.id, productName: "Monitor", quantity: 5, unitPrice: 10 }] } },
                     });
                     await retenida;
                 },
@@ -200,7 +200,7 @@ describe("Stock comprometido y disponible (T5-03)", () => {
             const p = await producto("Sobrevendido", 2);
             // Así pudo quedar antes de T5-03: una pendiente mayor que el stock, escrita directamente.
             await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), items: { create: [{ productId: p.id, productName: "Sobrevendido", quantity: 5, unitPrice: 10 }] } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), items: { create: [{ productId: p.id, productName: "Sobrevendido", quantity: 5, unitPrice: 10 }] } },
             });
 
             expect(await disponibleDe(p.id)).toEqual({ comprometido: 5, disponible: -3 });
@@ -214,7 +214,7 @@ describe("Stock comprometido y disponible (T5-03)", () => {
         it("los días hasta agotarse se cuentan sobre el disponible, no sobre el stock", async () => {
             const p = await producto("Rota", 30);
             // 30 salidas en 30 días: 1 al día.
-            await prisma.stockMovement.create({ data: { productId: p.id, type: "OUT", delta: -30, stockAfter: 30 } });
+            await prisma.stockMovement.create({ data: { productId: p.id, type: "OUT", delta: -30, stockAfter: 30, warehouseId: ALMACEN, warehouseStockAfter: 30 } });
             await vender([{ productId: p.id, productName: "Rota", quantity: 20 }]);
 
             const res = await request(app).get("/api/v1/reports").set("Cookie", cookie);

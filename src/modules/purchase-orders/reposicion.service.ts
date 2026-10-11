@@ -1,3 +1,4 @@
+import { almacenParaOperar } from "@/shared/lib/almacenes";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
@@ -195,6 +196,9 @@ export const reposicionService = {
      * volver a pedir sugerencias justo después ya no propone lo que se acaba de pedir.
      */
     async generar(dto: GenerarDesdeSugerenciasDto) {
+        // T5-14 — la sugerencia es del producto, no de un local: el mínimo es global. A qué
+        // almacén se pide lo decide quien genera las órdenes.
+        const almacen = await almacenParaOperar(dto.warehouseId);
         const ids = dto.items.map((i) => i.productId);
         const productos = await prisma.product.findMany({
             where: { id: { in: ids }, isActive: true },
@@ -232,6 +236,7 @@ export const reposicionService = {
                 prisma.purchaseOrder.create({
                     data: {
                         supplierId,
+                        warehouseId: almacen.id,
                         items: {
                             create: grupo.map((linea) => ({
                                 productId: linea.productId,
@@ -243,6 +248,7 @@ export const reposicionService = {
                     },
                     include: {
                         supplier: { select: { id: true, name: true } },
+                        warehouse: { select: { id: true, name: true } },
                         items: { include: { product: { select: { id: true, name: true, sku: true } } } },
                     },
                 }),

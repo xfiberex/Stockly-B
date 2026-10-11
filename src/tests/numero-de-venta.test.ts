@@ -6,7 +6,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { CONTADOR_DE_VENTAS, siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
 import { esperarAlertasEnVuelo } from "@/shared/lib/stockAlerts";
 import { escribirNumeroDeVenta } from "@/contratos/api";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto, ponerStock } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendLowStockAlertEmail: jest.fn().mockResolvedValue(undefined),
@@ -92,7 +92,7 @@ describe("Número correlativo de venta (T6-04)", () => {
     });
 
     it("una venta rechazada con 409 no consume número: la siguiente recibe el que le tocaba", async () => {
-        const producto = await prisma.product.create({ data: { name: "Escaso", price: 10, stock: 2 } });
+        const producto = await crearProducto({ data: { name: "Escaso", price: 10, stock: 2 } });
         await vender();
 
         const rechazada = await vender([{ productId: producto.id, productName: "Escaso", quantity: 3, unitPrice: 10 }]);
@@ -141,7 +141,7 @@ describe("Número correlativo de venta (T6-04)", () => {
     // ─────────────────────────────────────────────────────────────────────────
     describe("dónde se lee", () => {
         it("la nota del movimiento al enviar y al cancelar lleva el número, no el principio del id", async () => {
-            const producto = await prisma.product.create({ data: { name: "Lámpara", price: 10, stock: 5 } });
+            const producto = await crearProducto({ data: { name: "Lámpara", price: 10, stock: 5 } });
             const { body } = await vender([{ productId: producto.id, productName: "Lámpara", quantity: 2, unitPrice: 10 }]);
             const id = body.data.id as string;
 
@@ -154,10 +154,10 @@ describe("Número correlativo de venta (T6-04)", () => {
 
         it("el aviso de venta sin stock trae el número de la orden", async () => {
             const otro = await createUser({ email: "otra-admin@example.com", role: "ADMIN" });
-            const producto = await prisma.product.create({ data: { name: "Teclado", price: 30, stock: 5 } });
+            const producto = await crearProducto({ data: { name: "Teclado", price: 30, stock: 5 } });
             await vender();
             const { body } = await vender([{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }]);
-            await prisma.product.update({ where: { id: producto.id }, data: { stock: 3 } });
+            await ponerStock(producto.id, 3);
 
             await request(app).post(`${BASE}/${body.data.id}/ship`).set("Cookie", cookie).expect(400);
             await esperarAlertasEnVuelo();
@@ -276,7 +276,7 @@ describe("Número correlativo de venta (T6-04)", () => {
          * tocara, o los ordenara por otra cosa, el resultado no sería 1, 2, 3…
          */
         const antigua = (id: string, createdAt: string, provisional: number) =>
-            prisma.saleOrder.create({ data: { id, number: provisional, createdAt: new Date(createdAt) } });
+            prisma.saleOrder.create({ data: { warehouseId: ALMACEN, id, number: provisional, createdAt: new Date(createdAt) } });
 
         const migrar = async () => {
             await prisma.counter.deleteMany();

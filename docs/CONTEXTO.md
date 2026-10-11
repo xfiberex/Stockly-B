@@ -50,20 +50,24 @@ Medido el 2026-10-10 en este equipo, con `pnpm verify` y el E2E:
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1488** en 66 archivos | **828** en 75 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 96.75 % *(suelo 85 %)* | 78.46 % *(suelo 45 %)* |
+| Tests | **1586** en 67 archivos | **864** en 78 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 96.96 % *(suelo 85 %)* | 79.82 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **34 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
+| E2E (Playwright) | — | **36 pasados**, 2 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 137 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
-cerrados, y del Tier 5, funcionalidad de negocio, 13 de 15. Quedan `T5-14` (varios almacenes) y
-`T5-15` (lotes y caducidad), que solo se abren con un caso de uso real. El Tier 6 —el mostrador y el
+**Tareas: 138 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+cerrados, y del Tier 5, funcionalidad de negocio, 14 de 15. Queda `T5-15` (lotes y caducidad), que
+solo se abre con un caso de uso real. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas
 y está cerrado; las tres decisiones de producto que lo gobernaron están al principio de ese tier, en
 el índice de cerradas del ROADMAP.
 
-Cuatro cosas que conviene saber antes de tocar nada:
+Cinco cosas que conviene saber antes de tocar nada:
+
+- **La prueba de carga ya no cumple sus umbrales**, desde antes de `T5-14`: el panel pasó de 337 ms
+  a 2,2 s de p(95) con las consultas que ganó en los Tiers 5 y 6. Medido el 2026-10-10, sin tarea
+  todavía ([rendimiento.md §15](rendimiento.md)).
 
 - **Cerrada no es comprobada del todo.** `T4-17`, el recorrido con lector de pantalla, se descartó
   sin ejecutarse. El listón verificado es teclado más árbol de accesibilidad
@@ -71,7 +75,7 @@ Cuatro cosas que conviene saber antes de tocar nada:
 - **Las fichas son pistas, no descripciones verificadas.** Siete describían mal su propio problema
   —la causa, el alcance o el remedio— y están marcadas en el índice del ROADMAP. Medir antes de
   arreglar, y medir otra vez después.
-- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay nueve
+- **Varias decisiones se tomaron en contra de la opción evidente**, y por eso hay diez
   [ADR](adr/). Antes de simplificar algo que parezca complicado de más, se lee la suya.
 - **Un árbol de dependencias limpio no se queda limpio solo.** `verify` ya amaneció en rojo dos
   veces por avisos publicados sin que nadie tocara nada; el patrón para resolverlo está en
@@ -90,22 +94,25 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
 ### La base de tests (`Stockly_test`)
 
 - **`verify` no la migra.** `jest.setup.js` deriva su nombre de `DATABASE_URL`, pero `verify` solo
-  migra la de desarrollo. Tras **cada** migración nueva hay que llevarla ahí:
-  `DATABASE_URL=<la de Stockly_test> pnpm exec prisma db push`.
+  migra la de desarrollo. Tras **cada** migración nueva hay que llevarla ahí, **ejecutando el SQL
+  de la propia migración**:
+  `DATABASE_URL=<la de Stockly_test> pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`.
 - **`migrate deploy` no sirve para ella**: falla con P3005 o por una migración antigua marcada
-  como fallida. Se sincroniza con `db push`.
+  como fallida.
+- **Y `db push` tampoco, desde `T5-14`.** Era lo que se usaba, y lleva el esquema pero **no el SQL
+  de las migraciones**: la de `T5-14` crea un disparador que `schema.prisma` no sabe expresar —el
+  que impide que el stock de un producto deje de ser la suma de sus almacenes—, y una base
+  sincronizada con `db push` se queda sin él **sin avisar**. `varios-almacenes.test.ts` lo
+  comprueba y falla con ese mensaje; el resto de la suite pasaría igual, sin la guarda. Lo mismo
+  le pasa a `pg_trgm`, que hay que crear a mano una vez (`CREATE EXTENSION IF NOT EXISTS pg_trgm`).
 - **El desfase no avisa: se disfraza de fallo del cambio recién hecho.** Cientos de tests en rojo
   con «la tabla X no existe» o «no existe el tipo `public.Role`». Antes de investigar un fallo
   masivo, mirar si el mensaje habla del esquema. Para ver qué falta:
   `DATABASE_URL=<…> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
-  (en Prisma 7 ya no existe `--from-url`).
-- **`db push` no ejecuta el SQL de las migraciones**, solo lleva el esquema. Lo que viva únicamente
-  en un archivo de migración no llega: `pg_trgm` hay que crearla a mano, una vez
-  (`CREATE EXTENSION IF NOT EXISTS pg_trgm` en esa base), o el push falla con «no existe la clase
-  de operadores gin_trgm_ops».
-- **Un índice único nuevo hace que `db push` pida `--accept-data-loss`** aunque la columna esté
-  vacía —pasó otra vez con `sale_orders.number`, `T6-04`—. Si la migración es aditiva, se aplica su propio SQL:
-  `DATABASE_URL=<…> pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`.
+  (en Prisma 7 ya no existe `--from-url`). Tiene que responder «empty migration».
+- **Una migración sin commitear que se edita después de aplicarla** deja las bases locales con la
+  versión vieja y con su `checksum`: se rehace el cambio a mano en cada una y se actualiza
+  `_prisma_migrations.checksum` con el sha256 del archivo. Pasó dos veces en `T5-14`.
 - **Prisma 7 pide consentimiento explícito si quien lo invoca es un agente**: hay que pasarle
   `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` con el texto literal de la autorización.
 - **Cada archivo de Jest crea su propio pool.** Por eso en `test` las conexiones inactivas se
@@ -118,6 +125,11 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   `PATCH` a mano necesita la cabecera `x-csrf-token` con el valor de la cookie `csrfToken`.
 - **No borrar productos**: los de otros bloques tienen movimientos y la clave foránea lo impide.
   Se limpia lo propio.
+- **Un producto con stock no se crea con `prisma.product.create` a secas** (`T5-14`): sin su nivel
+  en un almacén, la base no confirma la inserción. Los tests usan `crearProducto`, `crearProductos`
+  y `ponerStock`, de `helpers.ts`, y `ALMACEN` para lo que crean directamente —una orden, un
+  conteo o un movimiento sin almacén no existen—. Y **`stock_levels` no se borra aparte**: cae con
+  sus productos; borrarla antes deja productos descuadrados y la base lo rechaza.
 - **El formato multipart no se puede probar por HTTP**: `upload.middleware` está mockeado, así que
   multer nunca corre. La normalización de `tagIds` se valida contra el esquema.
 - **Zod 4:** `z.ZodRawShape` es de solo lectura. Un esquema dinámico se construye con
@@ -152,6 +164,10 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   (`e2e/helpers.ts`). La nota anterior lo achacaba a relanzar sin pausa: **era una suposición y no
   era eso** —volvió a pasar con seis segundos de pausa—. Las siete esperas agotadas de aquel día
   siguen sin explicación; no se han repetido en nueve pasadas completas.
+- **El seed trae dos almacenes activos**, así que en el E2E todos los formularios pintan su
+  selector de almacén y las filas nombran el suyo. Un escenario que cuente desplegables o lea el
+  disponible de un producto del seed lo tiene que saber: ocho productos tienen una cuarta parte
+  en la sucursal.
 - **Una lista que se está cargando por primera vez no se entera de una mutación.** Es un defecto
   de la aplicación, **sin arreglar**, y un E2E puede tropezar con él. `invalidateQueries` no
   cancela una consulta en vuelo que todavía no tiene datos: reutiliza su promesa, y pinta lo
@@ -188,6 +204,11 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   `querySelectorAll` que puede caer en la navegación duplicada.
 - **Un *transport* de pino cuesta caro con el E2E delante**: subió la pasada de 36 a 66 s. Por eso
   `logger.ts` solo usa `pino-pretty` si `process.stdout.isTTY`.
+- **Un test de componentes que se vuelve intermitente al añadir una consulta** puede estar
+  diciendo la verdad. En `T5-14` uno del formulario de venta empezó a fallar dos de cada tres
+  pasadas: la lista de almacenes llegaba un instante después de abrir el diálogo, el padre se
+  repintaba y el `Modal` devolvía el foco al primer campo con el test —y el usuario— escribiendo
+  en otro. Se vio comparando con `git stash`: tres de tres en verde sin el cambio.
 - **Antes de acusar al código de una tarea, comparar con `git stash` en la misma máquina.** Evitó
   dos diagnósticos equivocados y destapó un `pnpm dev` olvidado que falseaba la medición.
 
@@ -335,6 +356,27 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   no puede escribir su URL: solo la pone `PUT /settings/logo`, con lo que devuelve Cloudinary. Meterla
   en el catálogo «por simetría» abre la puerta a que el servidor pida cualquier dirección (`T6-07`).
 
+- **El stock de un producto se escribe en un solo sitio, `shared/lib/stock.ts`** (`T5-14`,
+  [ADR 0010](adr/0010-stock-total-desnormalizado.md)). Vive en dos lugares —lo que hay en cada
+  almacén y el total del producto, que se conserva porque el panel lo lee de todo el catálogo— y
+  esas funciones escriben los dos. Un `product.update({ stock })` en un servicio no llega lejos:
+  la base no confirma una transacción en la que el total no sea la suma. **Quitar `products.stock`
+  «porque es redundante» multiplica por 5–8 las consultas del panel**, medido.
+- **El mínimo, su aviso, la reposición y el coste medio son del producto entero, no del almacén**
+  (`T5-14`, decisión del 2026-10-10). Lo disponible y lo comprometido sí son del almacén: una
+  venta no puede prometer lo que hay en otro local. Que una sucursal se quede a cero con la
+  central llena no avisa a nadie, y es a propósito; cambiarlo es otra tarea.
+- **Quien no dice almacén opera sobre el predeterminado** (`T5-14`), en la API (`almacenParaOperar`)
+  y en la interfaz (`useAlmacenDeOperacion`). Es lo que hace que la API anterior siga valiendo y
+  que, **con un solo almacén activo, ninguna pantalla pinte nada de almacenes**
+  (`SelectorDeAlmacen` devuelve `null`). Un selector nuevo que se pinte siempre rompe eso.
+- **`stockAfter` es el total y `warehouseStockAfter`, lo del almacén** (`T5-14`). Una transferencia
+  no cambia el primero, y por eso no es `OUT` + `IN` sino un tipo propio, `TRANSFER`: la rotación
+  y la reposición cuentan salidas, y mover mercancía entre locales no es vender.
+- **`GET /warehouses` no trae cifras, y es a propósito** (`T5-14`). La pide cada formulario; lo que
+  guarda cada almacén cuesta recorrer todos los niveles y tiene su ruta, `/warehouses/summary`.
+- **Cambiar el predeterminado lleva un bloqueo consultivo además de su única sentencia** (`T5-14`).
+  Sin él, dos cambios a la vez dejaban dos predeterminados. Parece redundante y no lo es.
 - **En el mostrador, el precio no lo pone quien vende** (`T6-08`). `POST /sale-orders/counter`
   recibe un producto y una cantidad por línea; el nombre y el precio salen del producto, con su
   fila bloqueada. `counterSaleSchema` no declara `unitPrice` **a propósito**: añadirlo «para un
@@ -426,6 +468,8 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   SKU ya los suman. Bajar es una decisión de producto.
 - **Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA`**: su ancho mínimo deja
   columnas tras un desplazamiento sin barra. Una pantalla de almacén se revisa a 393 px.
+- **El `Modal` no depende de la identidad de `onClose`** (`T5-14`): la guarda en una referencia. Con
+  ella en las dependencias de su efecto, cada repintado del padre devolvía el foco al primer campo.
 - **Un modal puede abrirse encima de otro.** `Modal` lleva una pila: solo el de arriba atiende a
   Escape y al tabulador. Uno nuevo no necesita hacer nada, salvo **quedar fuera del `<form>`** del
   de abajo si lleva el suyo: el portal no corta los eventos de React, y su envío subiría.

@@ -3,6 +3,8 @@ import { z } from "zod";
 /** T5-07 — abrir una sesión: todo el catálogo activo, o una categoría. */
 export const createInventoryCountSchema = z.object({
     categoryId: z.string().uuid().nullable().optional(),
+    // T5-14 — qué almacén se cuenta; sin él, el predeterminado.
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
     note: z.string().trim().max(500).optional(),
 });
 

@@ -11,6 +11,8 @@ export interface CreateProductDto {
     brandId?: string;
     supplierId?: string;
     tagIds?: string[];
+    /** T5-14 — el almacén en el que entra el stock inicial; sin él, el predeterminado. */
+    warehouseId?: string;
 }
 
 export interface UpdateProductDto {
@@ -29,6 +31,8 @@ export interface UpdateProductDto {
     supplierId?: string;
     removeImage?: boolean;
     tagIds?: string[];
+    /** T5-14 — el almacén que absorbe la diferencia si cambia `stock`; sin él, el predeterminado. */
+    warehouseId?: string;
 }
 
 export interface ProductQuery {
@@ -42,6 +46,8 @@ export interface ProductQuery {
     tagId?: string;
     /** T5-10 — `A`, `B` o `C`. C incluye los productos sin ventas en el periodo. */
     abcClass?: string;
+    /** T5-14 — solo los productos con existencias en ese almacén. */
+    warehouseId?: string;
 }
 
 /** T5-08 — `GET /products/labels`. Todo llega como cadena de la query. */
@@ -61,6 +67,8 @@ export interface MovementsQuery {
     type?: string;
     dateFrom?: string;
     dateTo?: string;
+    /** T5-14 — solo los de ese almacén. */
+    warehouseId?: string;
 }
 
 /** T5-01 — el histórico de costes se pagina igual que el de movimientos. */
@@ -79,16 +87,18 @@ export interface ImportProductDto {
     isActive?: boolean;
 }
 
-export type StockMovementType = "IN" | "OUT" | "ADJUSTMENT" | "IMPORT";
-
 export interface CreateManualMovementDto {
     type: "IN" | "OUT" | "ADJUSTMENT";
     quantity: number;
     reason: string;
     note?: string;
+    /** T5-14 — en qué almacén; sin él, en el predeterminado. */
+    warehouseId?: string;
 }
 
 export interface BulkStockDto {
     items: Array<{ productId: string; stock: number }>;
     reason?: string;
+    /** T5-14 — el almacén cuyas existencias se fijan; sin él, el predeterminado. */
+    warehouseId?: string;
 }

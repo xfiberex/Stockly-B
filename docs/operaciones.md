@@ -216,6 +216,38 @@ SELECT
 Sobre los datos del seed antes de T5-06, la migración vinculó **las 4 órdenes a 4 clientes**
 (2026-09-30); todas tenían correo.
 
+**T5-14 — varios almacenes.** La migración crea un almacén, «Principal», y le asigna todo lo que
+ya había: el stock de cada producto, sus movimientos, las órdenes y los conteos. **Se aplica con
+la aplicación parada**: reescribe `stock_movements` entera, con la tabla bloqueada, y sobre
+1,2 millones de movimientos tardó 77 s ([rendimiento.md §15](rendimiento.md)). Después, que el
+total no haya cambiado y que cuadre:
+
+```sql
+-- T5-14: el total de antes es el de los niveles, y ningún producto descuadra
+SELECT
+    (SELECT SUM("stock") FROM "products") AS total,
+    (SELECT SUM("stock") FROM "stock_levels") AS en_almacenes,
+    (SELECT COUNT(*) FROM "products" p
+       LEFT JOIN (SELECT "productId", SUM("stock") AS suma FROM "stock_levels" GROUP BY 1) l ON l."productId" = p."id"
+      WHERE p."stock" <> COALESCE(l.suma, 0)) AS descuadrados,
+    (SELECT COUNT(*) FROM "warehouses" WHERE "isDefault") AS predeterminados;
+```
+
+`total` y `en_almacenes` tienen que coincidir, `descuadrados` ser 0 y `predeterminados`, 1. Medido
+el 2026-10-10: 14 940 100 = 14 940 100 sobre la base de carga, y 975 = 975 sobre la de desarrollo.
+El almacén se puede renombrar después desde la pantalla de almacenes.
+
+**Y no es una migración expansiva: después de aplicarla, volver a la versión anterior de la
+aplicación no funciona.** El código anterior escribe el stock en un solo sitio y movimientos sin
+almacén; la base rechaza las dos cosas —una por el disparador, otra por la columna obligatoria—.
+Partirla en dos despliegues no lo arreglaba: lo que hace incompatible a la versión anterior es
+justo la guarda que se quiere tener. **Revertir este despliegue es restaurar la copia de antes**
+(§4), y por eso aquí el `pnpm db:backup` previo no es una recomendación.
+
+**El disparador que impide el descuadre no lo conoce `schema.prisma`**: vive en el SQL de esa
+migración. Restaurar un volcado lo trae; `prisma db push` contra una base vacía, no. Para saber
+si una base lo tiene: `SELECT tgname FROM pg_trigger WHERE tgname LIKE '%cuadra'` —dos filas—.
+
 ## 7. Trampas ya pagadas
 
 Las cuatro se encontraron montando esto, y las cuatro fallan en silencio o con un mensaje que

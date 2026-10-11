@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto, ponerStock } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -47,7 +47,7 @@ describe("Recepción parcial de órdenes de compra (T5-04)", () => {
     });
 
     const producto = (name: string, stock: number, costPrice?: number) =>
-        prisma.product.create({ data: { name, price: 20, stock, ...(costPrice !== undefined && { costPrice }) } });
+        crearProducto({ data: { name, price: 20, stock, ...(costPrice !== undefined && { costPrice }) } });
 
     const stockDe = async (id: string) => (await prisma.product.findUniqueOrThrow({ where: { id } })).stock;
 
@@ -131,7 +131,7 @@ describe("Recepción parcial de órdenes de compra (T5-04)", () => {
             const p = await producto("Webcam", 0);
             const { id, lineas } = await ordenDe([{ productId: p.id, productName: "Webcam", quantity: 10 }]);
             await recibir(id, [{ itemId: lineas[0]!, quantity: 6 }]);
-            await prisma.product.update({ where: { id: p.id }, data: { stock: 2 } });
+            await ponerStock(p.id, 2);
 
             const res = await cambiarEstado(id, "CANCELLED");
 

@@ -4,7 +4,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { clienteSchema, ordenVentaSchema } from "@/contratos/api";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendLowStockAlertEmail: jest.fn().mockResolvedValue(undefined),
@@ -233,7 +233,7 @@ describe("Vendedor y documento del cliente en la venta (T6-06)", () => {
             for (const sentencia of sentenciasDeDatos()) await prisma.$executeRawUnsafe(sentencia);
         };
 
-        const antigua = async (id: string) => prisma.saleOrder.create({ data: { id, number: await numeroDeVenta() } });
+        const antigua = async (id: string) => prisma.saleOrder.create({ data: { warehouseId: ALMACEN, id, number: await numeroDeVenta() } });
         const rastro = (entityId: string, userEmail: string | null, createdAt: string, extra: Record<string, unknown> = {}) =>
             prisma.auditLog.create({ data: { action: "CREATE", entity: "SaleOrder", entityId, userEmail, createdAt: new Date(createdAt), ...extra } });
 

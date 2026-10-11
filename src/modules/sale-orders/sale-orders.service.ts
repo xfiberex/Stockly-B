@@ -6,6 +6,8 @@ import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
 import { comprometidoPorProducto } from "@/shared/lib/stockComprometido";
+import { bloquearProductos, entrar, nivelesEn, sacar } from "@/shared/lib/stock";
+import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
 import { normalizarCorreo } from "@/shared/lib/correo";
 import { rangoDeDias } from "@/shared/lib/diasDelNegocio";
 import { numeroDeVentaDelFiltro, siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
@@ -16,6 +18,8 @@ import { Prisma } from "@/generated/prisma/client";
 import type { CounterSaleDto, CreateSaleOrderDto, UpdateSaleOrderDto } from "./sale-orders.types";
 
 const ORDER_INCLUDE = {
+    // T5-14 — de qué almacén sale: la interfaz lo nombra junto al número.
+    warehouse: { select: { id: true, name: true } },
     items: {
         include: { product: { select: { id: true, name: true, sku: true } } },
     },
@@ -83,29 +87,33 @@ function pedidoPorProducto(items: Array<{ productId?: string; quantity: number }
  * T5-03 — la primera mitad de una venta: comprobar que cabe en lo **disponible**, stock menos
  * lo comprometido en ventas pendientes. La usan `create` y la venta de mostrador (T6-08).
  *
+ * T5-14 — las dos cifras son **las del almacén de la venta**: lo que hay en otro local no se
+ * puede prometer desde este, y lo comprometido en otro no le resta nada a este.
+ *
  * Se bloquean las filas de los productos **antes** de contar lo comprometido. Sin el bloqueo,
  * dos ventas simultáneas de las mismas unidades leerían el mismo disponible y pasarían las
  * dos. Ordenadas por id, para que dos ventas con productos en distinto orden no se esperen
  * mutuamente. El bloqueo dura lo que la transacción: lo que se lea aquí —el precio, el stock—
  * sigue siendo verdad cuando se escriba la orden.
  */
-async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<string, number>) {
+async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<string, number>, warehouseId: string) {
     const ids = [...pedido.keys()].sort();
     if (ids.length === 0) return [];
 
-    await tx.$queryRaw`SELECT id FROM products WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+    await bloquearProductos(tx, ids);
 
     const productos = await tx.product.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, stock: true, price: true, isActive: true },
+        select: { id: true, name: true, price: true, isActive: true },
     });
-    const comprometido = await comprometidoPorProducto(ids, tx);
+    const enAlmacen = await nivelesEn(tx, warehouseId, ids);
+    const comprometido = await comprometidoPorProducto(ids, tx, warehouseId);
 
     for (const id of ids) {
         const producto = productos.find((p) => p.id === id);
         if (!producto) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
-        const disponible = producto.stock - (comprometido.get(id) ?? 0);
+        const disponible = (enAlmacen.get(id) ?? 0) - (comprometido.get(id) ?? 0);
         const requerido = pedido.get(id)!;
         if (requerido > disponible) {
             throw new HttpError(
@@ -128,58 +136,53 @@ async function reservarDisponible(tx: Prisma.TransactionClient, pedido: Map<stri
  * cierra la ventana entre «comprobar» y «descontar», y si cualquier ítem falla, todo se
  * revierte. Los productos que quedan en su mínimo o por debajo se apuntan en `bajoMinimos`,
  * para avisar **después** del `commit`.
+ *
+ * T5-14 — sale **del almacén de la orden**, y «insuficiente» es que no lo hay en él, aunque
+ * sobre en otro. El mínimo, en cambio, se mira contra el total: es del producto, no del local.
  */
 async function despachar(
     tx: Prisma.TransactionClient,
-    orden: { id: string; number: number },
+    orden: { id: string; number: number; warehouseId: string },
     opciones: { datos?: Prisma.SaleOrderUpdateInput; concepto: string; bajoMinimos: ProductoEnAlerta[] },
 ) {
     const items = await tx.saleOrderItem.findMany({
         where: { saleOrderId: orden.id, productId: { not: null } },
-        include: { product: true },
     });
 
+    // Los productos se bloquean todos antes de tocar ninguno, en orden de id: dos envíos con los
+    // mismos productos en distinto orden no se esperan en cruz. **Las líneas no se reordenan**:
+    // los movimientos salen en el orden de la orden, que es como se leen después.
+    await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
+
     for (const item of items) {
-        if (!item.productId || !item.product) continue;
+        if (!item.productId) continue;
+        const productId = item.productId;
 
-        const res = await tx.product.updateMany({
-            where: { id: item.productId, stock: { gte: item.quantity } },
-            data: { stock: { decrement: item.quantity } },
-        });
-        if (res.count === 0) {
-            throw new HttpError(
-                400,
-                `Stock insuficiente para "${item.product.name}". Disponible: ${item.product.stock}, requerido: ${item.quantity}`,
-                "INSUFFICIENT_STOCK",
-                { producto: item.product.name, disponible: item.product.stock, requerido: item.quantity },
-            );
-        }
-
-        const refreshed = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
-
-        // T5-02 — el coste se congela en el ítem **al enviar**, que es cuando la
-        // mercancía sale. Se lee de `refreshed` y no del `include` de arriba: esa
-        // lectura es anterior al `updateMany` que bloquea la fila, y entre las dos una
-        // recepción podría haber cambiado el coste medio.
-        await tx.saleOrderItem.update({ where: { id: item.id }, data: { unitCost: refreshed.costPrice } });
-
-        await tx.stockMovement.create({
-            data: {
-                productId: item.productId,
+        const movido = await sacar(
+            tx,
+            {
+                productId,
+                warehouseId: orden.warehouseId,
+                cantidad: item.quantity,
                 type: "OUT",
-                delta: -item.quantity,
-                stockAfter: refreshed.stock,
                 note: `${opciones.concepto} #${escribirNumeroDeVenta(orden.number)}`,
             },
-        });
+            (enAlmacen, producto) =>
+                new HttpError(
+                    400,
+                    `Stock insuficiente para "${producto.name}". Disponible: ${enAlmacen}, requerido: ${item.quantity}`,
+                    "INSUFFICIENT_STOCK",
+                    { producto: producto.name, disponible: enAlmacen, requerido: item.quantity },
+                ),
+        );
 
-        if (refreshed.stock <= item.product.minStock) {
-            opciones.bajoMinimos.push({
-                id: item.productId,
-                name: item.product.name,
-                stock: refreshed.stock,
-                minStock: item.product.minStock,
-            });
+        // T5-02 — el coste se congela en el ítem **al enviar**, que es cuando la mercancía
+        // sale. Es el de la fila que `sacar` acaba de escribir y deja bloqueada: una recepción
+        // que cambiara el coste medio a la vez tiene que esperar a que esto termine.
+        await tx.saleOrderItem.update({ where: { id: item.id }, data: { unitCost: movido.costPrice } });
+
+        if (movido.stock <= movido.minStock) {
+            opciones.bajoMinimos.push({ id: productId, name: movido.name, stock: movido.stock, minStock: movido.minStock });
         }
     }
 
@@ -191,7 +194,7 @@ async function despachar(
 }
 
 export const saleOrderService = {
-    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; number?: unknown; from?: unknown; to?: unknown }) {
+    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; number?: unknown; from?: unknown; to?: unknown; warehouseId?: unknown }) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
@@ -205,7 +208,10 @@ export const saleOrderService = {
         const number = numeroDeVentaDelFiltro(query.number);
         const hayRango = Boolean(query.from) || Boolean(query.to);
         const creadas = hayRango ? await rangoDeDias(query, await settingsService.zonaHoraria()) : undefined;
+        // T5-14 — las de un local.
+        const warehouseId = await almacenDelFiltro(query.warehouseId);
         const where = {
+            ...(warehouseId && { warehouseId }),
             ...(statusFilter && { status: statusFilter }),
             ...(customerId && { customerId }),
             ...(number !== undefined && { number }),
@@ -250,13 +256,15 @@ export const saleOrderService = {
      */
     async create(dto: CreateSaleOrderDto, actorEmail?: string) {
         const pedido = pedidoPorProducto(dto.items);
+        // T5-14 — de qué almacén saldrá: el de la petición o el predeterminado.
+        const almacen = await almacenParaOperar(dto.warehouseId);
 
         // T6-05 — la tasa vigente **ahora**, que se congela en cada línea como `unitPrice`. Los
         // importes no vienen en `dto`: se calculan al responder, de lo que queda guardado.
         const taxRate = await settingsService.tasaDeImpuesto();
 
         const orden = await prisma.$transaction(async (tx) => {
-            await reservarDisponible(tx, pedido);
+            await reservarDisponible(tx, pedido, almacen.id);
 
             const cliente = await clienteDeLaVenta(tx, dto);
 
@@ -267,6 +275,7 @@ export const saleOrderService = {
             return tx.saleOrder.create({
                 data: {
                     number,
+                    warehouseId: almacen.id,
                     customerId: cliente?.id ?? null,
                     // La instantánea: lo que diga la venta y, si calla, lo que diga el cliente.
                     customerName: dto.customerName ?? cliente?.name,
@@ -311,10 +320,11 @@ export const saleOrderService = {
     async ventaDeMostrador(dto: CounterSaleDto, actorEmail?: string) {
         const pedido = pedidoPorProducto(dto.items);
         const taxRate = await settingsService.tasaDeImpuesto();
+        const almacen = await almacenParaOperar(dto.warehouseId);
         const bajoMinimos: ProductoEnAlerta[] = [];
 
         const orden = await prisma.$transaction(async (tx) => {
-            const productos = new Map((await reservarDisponible(tx, pedido)).map((p) => [p.id, p]));
+            const productos = new Map((await reservarDisponible(tx, pedido, almacen.id)).map((p) => [p.id, p]));
 
             const inactivo = [...productos.values()].find((p) => !p.isActive);
             if (inactivo) {
@@ -329,6 +339,7 @@ export const saleOrderService = {
             const creada = await tx.saleOrder.create({
                 data: {
                     number,
+                    warehouseId: almacen.id,
                     customerId: cliente?.id ?? null,
                     customerName: dto.customerName ?? cliente?.name,
                     customerEmail: dto.customerEmail ?? cliente?.email,
@@ -400,26 +411,24 @@ export const saleOrderService = {
         // y cambio de estado en UNA sola transacción, simétrica al envío.
         if (beingCancelled) {
             const cancelada = await prisma.$transaction(async (tx) => {
+                // T5-14 — la mercancía vuelve al almacén del que salió, y tiene que seguir
+                // activo: devolverla a uno desactivado la dejaría donde nadie puede venderla.
+                const almacen = await almacenParaOperar(existing.warehouseId, tx);
+
                 const items = await tx.saleOrderItem.findMany({
                     where: { saleOrderId: id, productId: { not: null } },
                 });
+                await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
 
                 for (const item of items) {
                     if (!item.productId) continue;
 
-                    const product = await tx.product.update({
-                        where: { id: item.productId },
-                        data: { stock: { increment: item.quantity } },
-                    });
-
-                    await tx.stockMovement.create({
-                        data: {
-                            productId: item.productId,
-                            type: "IN",
-                            delta: item.quantity,
-                            stockAfter: product.stock,
-                            note: `Cancelación de orden de venta #${escribirNumeroDeVenta(existing.number)}`,
-                        },
+                    await entrar(tx, {
+                        productId: item.productId,
+                        warehouseId: almacen.id,
+                        cantidad: item.quantity,
+                        type: "IN",
+                        note: `Cancelación de orden de venta #${escribirNumeroDeVenta(existing.number)}`,
                     });
                 }
 
@@ -519,6 +528,8 @@ export const saleOrderService = {
                         taxRate: item.taxRate === null ? "" : item.taxRate.toNumber(),
                         taxLine: linea.tax.toNumber(),
                         totalLineWithTax: linea.total.toNumber(),
+                        // T5-14: de que almacen salio. Al final, para no mover las columnas que ya habia.
+                        warehouseName: o.warehouse.name,
                     };
                 }),
             );

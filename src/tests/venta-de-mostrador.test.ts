@@ -5,7 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { MAXIMO_DE_LINEAS_DE_MOSTRADOR, PERMISOS, ordenVentaSchema, puede, rolSchema, totalesPrevistos, type RutaConPermiso } from "@/contratos/api";
 import { totalesDeLinea } from "@/shared/lib/totalesDeVenta";
 import { esperarAlertasEnVuelo } from "@/shared/lib/stockAlerts";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto, ponerStock } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendLowStockAlertEmail: jest.fn().mockResolvedValue(undefined),
@@ -45,8 +45,8 @@ describe("Venta de mostrador y rol de vendedor (T6-08)", () => {
         await cleanDb();
         vendedor = getAuthCookie((await createUser({ email: "vendedora@example.com", role: "SELLER" })).id);
         admin = getAuthCookie((await createUser({ email: "admin@example.com", role: "ADMIN" })).id);
-        teclado = await prisma.product.create({ data: { name: "Teclado", price: 50, costPrice: 30.1234, stock: 10, minStock: 2 } });
-        raton = await prisma.product.create({ data: { name: "Ratón", price: 25.5, costPrice: 12, stock: 4, minStock: 1 } });
+        teclado = await crearProducto({ data: { name: "Teclado", price: 50, costPrice: 30.1234, stock: 10, minStock: 2 } });
+        raton = await crearProducto({ data: { name: "Ratón", price: 25.5, costPrice: 12, stock: 4, minStock: 1 } });
     });
 
     afterAll(async () => {
@@ -232,7 +232,7 @@ describe("Venta de mostrador y rol de vendedor (T6-08)", () => {
         });
 
         it("dos ventas simultáneas de la última unidad dejan una hecha y otra rechazada", async () => {
-            await prisma.product.update({ where: { id: raton.id }, data: { stock: 1 } });
+            await ponerStock(raton.id, 1);
             const otra = getAuthCookie((await createUser({ email: "otra@example.com", role: "SELLER" })).id);
 
             const respuestas = await Promise.all([

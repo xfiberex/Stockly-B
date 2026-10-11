@@ -99,7 +99,7 @@ nueva hay que llevarla también ahí**:
 ```bash
 createdb Stockly_test                                           # o CREATE DATABASE desde psql
 psql -d Stockly_test -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
-DATABASE_URL=postgresql://…/Stockly_test pnpm exec prisma db push
+DATABASE_URL=postgresql://…/Stockly_test pnpm exec prisma migrate deploy   # en una base recién creada sí funciona
 ```
 
 Lo que puede fallar aquí, en [CONTEXTO.md §4](CONTEXTO.md).

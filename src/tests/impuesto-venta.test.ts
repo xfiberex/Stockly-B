@@ -5,7 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { conTotales, totalesDeLinea } from "@/shared/lib/totalesDeVenta";
 import { reunirDatosDelResumen } from "@/shared/lib/resumenSemanal";
 import { esTasaDeImpuestoValida, ordenVentaSchema } from "@/contratos/api";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendLowStockAlertEmail: jest.fn().mockResolvedValue(undefined),
@@ -171,7 +171,7 @@ describe("Impuesto en la venta (T6-05)", () => {
 
         it("enviar y cancelar devuelven los mismos importes", async () => {
             await tasa(18);
-            const producto = await prisma.product.create({ data: { name: "Lámpara", price: 100, stock: 5 } });
+            const producto = await crearProducto({ data: { name: "Lámpara", price: 100, stock: 5 } });
             const { body } = await vender([{ productId: producto.id, productName: "Lámpara", quantity: 3, unitPrice: 100 }]);
 
             const enviada = await request(app).post(`${VENTAS}/${body.data.id}/ship`).set("Cookie", cookie);
@@ -184,7 +184,7 @@ describe("Impuesto en la venta (T6-05)", () => {
         it("una orden anterior, con sus líneas sin tasa, se lee sin impuesto", async () => {
             await tasa(18);
             const antigua = await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), items: { create: [{ productName: "De antes", quantity: 2, unitPrice: 50 }] } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), items: { create: [{ productName: "De antes", quantity: 2, unitPrice: 50 }] } },
             });
 
             const orden = await leer(antigua.id);
@@ -212,7 +212,7 @@ describe("Impuesto en la venta (T6-05)", () => {
             await prisma.stockMovement.deleteMany();
             await prisma.product.deleteMany();
             await tasa(porcentaje);
-            const producto = await prisma.product.create({ data: { name: "Taladro", price: 100, stock: 10, costPrice: 60 } });
+            const producto = await crearProducto({ data: { name: "Taladro", price: 100, stock: 10, costPrice: 60 } });
             const { body } = await vender([{ productId: producto.id, productName: "Taladro", quantity: 3, unitPrice: 100 }]);
             await request(app).post(`${VENTAS}/${body.data.id}/ship`).set("Cookie", cookie).expect(200);
             expect(body.data.tax).toBe((3 * porcentaje).toFixed(2));
@@ -256,14 +256,14 @@ describe("Impuesto en la venta (T6-05)", () => {
             const json = await request(app).get(`${VENTAS}/export`).set("Cookie", cookie);
 
             const [cabecera, fila] = csv.text.replace(/^﻿/, "").trim().split("\n");
-            expect(cabecera!.split(",").slice(-5)).toEqual(["unitPrice", "totalLine", "taxRate", "taxLine", "totalLineWithTax"]);
-            expect(fila!.split(",").slice(-5)).toEqual(["100", "300", "18", "54", "354"]);
+            expect(cabecera!.split(",").slice(-6)).toEqual(["unitPrice", "totalLine", "taxRate", "taxLine", "totalLineWithTax", "warehouseName"]);
+            expect(fila!.split(",").slice(-6)).toEqual(["100", "300", "18", "54", "354", "Principal"]);
             expect(json.body.data[0]).toMatchObject({ totalLine: 300, taxRate: 18, taxLine: 54, totalLineWithTax: 354 });
         });
 
         it("una línea sin tasa sale con la tasa vacía, no con un 0 que no tuvo", async () => {
             await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), items: { create: [{ productName: "De antes", quantity: 2, unitPrice: 50 }] } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), items: { create: [{ productName: "De antes", quantity: 2, unitPrice: 50 }] } },
             });
 
             const json = await request(app).get(`${VENTAS}/export`).set("Cookie", cookie);

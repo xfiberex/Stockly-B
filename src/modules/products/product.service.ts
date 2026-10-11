@@ -4,6 +4,8 @@ import { uploadToCloudinary, deleteFromCloudinary } from "@/shared/middlewares/u
 import { dispararAlertaStock } from "@/shared/lib/stockAlerts";
 import { mismoCoste } from "@/shared/lib/costeMedio";
 import { conDisponible } from "@/shared/lib/stockComprometido";
+import { altaConStock, entrar, fijar, sacar, type Movido } from "@/shared/lib/stock";
+import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { filtroDeEnum } from "@/shared/lib/enums";
@@ -19,7 +21,6 @@ import type {
     CostHistoryQuery,
     LabelsQuery,
     ImportProductDto,
-    StockMovementType,
     CreateManualMovementDto,
     BulkStockDto,
 } from "@/modules/products/product.types";
@@ -35,8 +36,10 @@ import type {
  * Una fecha ilegible **se rechaza, no se ignora**: mismo criterio que `filtroDeEnum`. Un
  * filtro que no se aplica devuelve de más y nadie se entera.
  */
-function whereDeMovimientos(productId: string, query: MovementsQuery) {
+async function whereDeMovimientos(productId: string, query: MovementsQuery) {
     const type = filtroDeEnum($Enums.StockMovementType, query.type, "type");
+    // T5-14 — los de un almacén.
+    const warehouseId = await almacenDelFiltro(query.warehouseId);
     const desde = fechaDeFiltro(query.dateFrom, "dateFrom");
     const hasta = fechaDeFiltro(query.dateTo, "dateTo");
 
@@ -45,6 +48,7 @@ function whereDeMovimientos(productId: string, query: MovementsQuery) {
     return {
         productId,
         ...(type && { type }),
+        ...(warehouseId && { warehouseId }),
         ...((desde || hasta) && {
             createdAt: { ...(desde && { gte: desde }), ...(hasta && { lt: hasta }) },
         }),
@@ -182,22 +186,16 @@ function conClaseAbc<T extends { abc: { abcClass: $Enums.AbcClass } | null }>(pr
 
 const CON_CLASE_ABC = { ...PRODUCT_INCLUDE, abc: { select: { abcClass: true } } } as const;
 
-async function recordMovement(
-    productId: string,
-    type: StockMovementType,
-    delta: number,
-    stockAfter: number,
-    note?: string,
-) {
-    if (delta === 0) return;
-    await prisma.stockMovement.create({
-        data: { productId, type, delta, stockAfter, note },
-    });
+/** El error de una salida que no cabe en lo que hay: el mismo para la manual y para la edición. */
+function stockNoPuedeQuedarNegativo(): HttpError {
+    return new HttpError(400, "El stock no puede quedar negativo", "STOCK_CANNOT_BE_NEGATIVE");
 }
 
 export const productService = {
     async getProducts(query: ProductQuery) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
+
+        const warehouseId = await almacenDelFiltro(query.warehouseId);
 
         const isActiveFilter =
             query.isActive === "false" ? false
@@ -212,6 +210,9 @@ export const productService = {
             ...(query.supplierId && { supplierId: query.supplierId }),
             ...(query.tagId && { tags: { some: { id: query.tagId } } }),
             ...whereDeClaseAbc(query.abcClass),
+            // T5-14 — lo que **hay** en un almacén: los productos con existencias en él. En el
+            // `where`, como todo filtro (T4-15).
+            ...(warehouseId && { stockLevels: { some: { warehouseId, stock: { gt: 0 } } } }),
         };
 
         // T5-10 — la clase sale de una caché que se rehace sola; si toca, en segundo plano.
@@ -329,29 +330,37 @@ export const productService = {
         const stock = dto.stock !== undefined ? parseInt(String(dto.stock), 10) : 0;
         const minStock = dto.minStock !== undefined ? parseInt(String(dto.minStock), 10) : 0;
 
-        const product = await prisma.product.create({
-            data: {
-                name: dto.name,
-                description: dto.description,
-                sku: dto.sku || null,
-                barcode: dto.barcode ?? null,
-                price: dto.price !== undefined ? parseFloat(String(dto.price)) : 0,
-                costPrice: dto.costPrice ?? null,
-                stock,
-                minStock,
-                categoryId: dto.categoryId ?? null,
-                brandId: dto.brandId ?? null,
-                supplierId: dto.supplierId ?? null,
-                imageUrl,
-                imagePublicId,
-                ...(dto.tagIds?.length && { tags: { connect: dto.tagIds.map((id) => ({ id })) } }),
-            },
-            include: PRODUCT_INCLUDE,
+        // T5-14 — el stock inicial entra en un almacén: el de la petición o el predeterminado.
+        const almacen = stock > 0 ? await almacenParaOperar(dto.warehouseId) : null;
+
+        // El producto nace con su stock, y en la misma transacción se le pone el nivel y el
+        // movimiento que lo explican: sin los dos, la base no confirma el alta.
+        return prisma.$transaction(async (tx) => {
+            const product = await tx.product.create({
+                data: {
+                    name: dto.name,
+                    description: dto.description,
+                    sku: dto.sku || null,
+                    barcode: dto.barcode ?? null,
+                    price: dto.price !== undefined ? parseFloat(String(dto.price)) : 0,
+                    costPrice: dto.costPrice ?? null,
+                    stock,
+                    minStock,
+                    categoryId: dto.categoryId ?? null,
+                    brandId: dto.brandId ?? null,
+                    supplierId: dto.supplierId ?? null,
+                    imageUrl,
+                    imagePublicId,
+                    ...(dto.tagIds?.length && { tags: { connect: dto.tagIds.map((id) => ({ id })) } }),
+                },
+                include: PRODUCT_INCLUDE,
+            });
+
+            if (almacen) {
+                await altaConStock(tx, { warehouseId: almacen.id, type: "IN", note: "Stock inicial", productos: [{ id: product.id, stock }] });
+            }
+            return product;
         }).catch(traducirUnicidad);
-
-        await recordMovement(product.id, "IN", stock, stock, "Stock inicial");
-
-        return product;
     },
 
     async update(id: string, dto: UpdateProductDto, file?: Express.Multer.File) {
@@ -384,9 +393,15 @@ export const productService = {
             ? { tags: { set: dto.tagIds.map((tid) => ({ id: tid })) } }
             : {};
 
+        // T5-14 — `stock` en esta ruta es **el total**, como lo es en la respuesta: lo que cambia
+        // es la diferencia con el total que hay, y esa diferencia entra en —o sale de— un
+        // almacén, el de la petición o el predeterminado. Así, reenviar el formulario sin tocar
+        // el campo no mueve nada aunque el producto esté repartido en varios locales; si `stock`
+        // fijara el nivel de un almacén, ese mismo reenvío sumaría al total lo de los demás.
         const hasStockChange = dto.stock !== undefined;
         const newStock = hasStockChange ? parseInt(String(dto.stock), 10) : undefined;
-        const stockDelta = hasStockChange ? newStock! - existing.stock : 0;
+        const almacen = hasStockChange && newStock !== existing.stock ? await almacenParaOperar(dto.warehouseId) : null;
+        let movido: Movido | null = null;
 
         // Producto, historial de precio y movimiento de stock se escriben en una sola
         // transacción para que nunca queden inconsistentes entre sí.
@@ -400,7 +415,6 @@ export const productService = {
                     ...(dto.barcode !== undefined && { barcode: dto.barcode }),
                     ...(newPrice !== undefined && { price: newPrice }),
                     ...(costChanged && { costPrice: dto.costPrice }),
-                    ...(hasStockChange && { stock: newStock }),
                     ...(dto.minStock !== undefined && { minStock: parseInt(String(dto.minStock), 10) }),
                     ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
                     ...(dto.brandId !== undefined && { brandId: dto.brandId }),
@@ -424,23 +438,23 @@ export const productService = {
                 });
             }
 
-            if (hasStockChange && stockDelta !== 0) {
-                await tx.stockMovement.create({
-                    data: {
-                        productId: id,
-                        type: stockDelta >= 0 ? "IN" : "OUT",
-                        delta: stockDelta,
-                        stockAfter: newStock!,
-                        note: "Ajuste manual",
-                    },
-                });
+            // La diferencia se calcula contra el total de la fila que el `update` de arriba
+            // acaba de devolver y deja bloqueada, no contra la lectura de antes de la transacción.
+            const diferencia = almacen ? newStock! - product.stock : 0;
+            if (almacen && diferencia !== 0) {
+                const movimiento = { productId: id, warehouseId: almacen.id, cantidad: Math.abs(diferencia), note: "Ajuste manual" };
+                movido = diferencia > 0
+                    ? await entrar(tx, { ...movimiento, type: "IN" })
+                    : await sacar(tx, { ...movimiento, type: "OUT" }, stockNoPuedeQuedarNegativo);
+                product.stock = movido.stock;
             }
 
             return product;
         }).catch(traducirUnicidad);
 
-        if (hasStockChange && stockDelta < 0) {
-            dispararAlertaStock({ id: updated.id, name: updated.name, stock: newStock!, minStock: updated.minStock });
+        const resultado = movido as Movido | null;
+        if (resultado && resultado.delta < 0) {
+            dispararAlertaStock({ id: updated.id, name: updated.name, stock: resultado.stock, minStock: updated.minStock });
         }
 
         return updated;
@@ -522,9 +536,11 @@ export const productService = {
         const errors: Array<{ row: number; error: string }> = [];
         let created = 0;
 
-        const [categories, brands] = await Promise.all([
+        const [categories, brands, almacen] = await Promise.all([
             prisma.category.findMany({ select: { id: true, name: true } }),
             prisma.brand.findMany({ select: { id: true, name: true } }),
+            // T5-14 — el archivo no dice almacén: todo lo importado entra en el predeterminado.
+            almacenParaOperar(undefined),
         ]);
         const categoryMap = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
         const brandMap = new Map(brands.map((b) => [b.name.toLowerCase(), b.id]));
@@ -544,40 +560,33 @@ export const productService = {
             const lote = products.slice(i, i + TAM_LOTE);
 
             try {
-                const creados = await prisma.product.createManyAndReturn({
-                    data: lote.map(filaDeProducto),
-                    select: { id: true, stock: true },
+                // Los productos, sus niveles y sus movimientos: tres sentencias para el lote, en
+                // una transacción. El `stock` sale de la fila devuelta y no del índice, así que
+                // no depende del orden en que Postgres devuelva lo insertado.
+                const creados = await prisma.$transaction(async (tx) => {
+                    const filas = await tx.product.createManyAndReturn({
+                        data: lote.map(filaDeProducto),
+                        select: { id: true, stock: true },
+                    });
+                    await altaConStock(tx, { warehouseId: almacen.id, type: "IMPORT", note: "Importación masiva", productos: filas });
+                    return filas;
                 });
-
-                // Los movimientos, también en una sola sentencia. El `stock` sale de la
-                // fila devuelta y no del índice, así que no depende del orden en que
-                // Postgres devuelva lo insertado.
-                const movimientos = creados
-                    .filter((p) => p.stock !== 0)
-                    .map((p) => ({
-                        productId: p.id,
-                        type: "IMPORT" as StockMovementType,
-                        delta: p.stock,
-                        stockAfter: p.stock,
-                        note: "Importación masiva",
-                    }));
-                if (movimientos.length > 0) {
-                    await prisma.stockMovement.createMany({ data: movimientos });
-                }
 
                 created += creados.length;
             } catch {
-                // `createMany` es **una** sentencia: o entra el lote entero o no entra
-                // nada, así que reintentar fila a fila no puede duplicar lo ya insertado.
+                // El lote va en **una** transacción: o entra entero o no entra nada, así
+                // que reintentar fila a fila no puede duplicar lo ya insertado.
                 // Se hace solo para poder decir *qué* fila falló, que es lo que el
                 // usuario necesita para corregir su archivo; el camino rápido se queda
                 // para el caso normal, que es que el archivo esté bien.
                 const resultados = await Promise.allSettled(
                     lote.map(async (dto) => {
                         const fila = filaDeProducto(dto);
-                        const product = await prisma.product.create({ data: fila });
-                        await recordMovement(product.id, "IMPORT", fila.stock, fila.stock, "Importación masiva");
-                        return product;
+                        return prisma.$transaction(async (tx) => {
+                            const product = await tx.product.create({ data: fila });
+                            await altaConStock(tx, { warehouseId: almacen.id, type: "IMPORT", note: "Importación masiva", productos: [product] });
+                            return product;
+                        });
                     }),
                 );
 
@@ -621,7 +630,7 @@ export const productService = {
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 50 });
-        const where = whereDeMovimientos(productId, query);
+        const where = await whereDeMovimientos(productId, query);
 
         const [movements, total] = await prisma.$transaction([
             prisma.stockMovement.findMany({
@@ -648,7 +657,7 @@ export const productService = {
     async contarMovimientosParaExportar(productId: string, query: MovementsQuery = {}) {
         const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
-        return prisma.stockMovement.count({ where: whereDeMovimientos(productId, query) });
+        return prisma.stockMovement.count({ where: await whereDeMovimientos(productId, query) });
     },
 
     /**
@@ -664,7 +673,7 @@ export const productService = {
         });
         if (!product) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
-        const where = whereDeMovimientos(productId, query);
+        const where = await whereDeMovimientos(productId, query);
         let cursor: string | undefined;
 
         for (;;) {
@@ -673,6 +682,7 @@ export const productService = {
                 take: TAM_LOTE_EXPORTACION,
                 ...(cursor && { cursor: { id: cursor }, skip: 1 }),
                 orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                include: { warehouse: { select: { name: true } } },
             });
 
             if (pagina.length === 0) return;
@@ -684,6 +694,10 @@ export const productService = {
                 stockAfter: m.stockAfter,
                 note: m.note ?? "",
                 createdAt: m.createdAt.toISOString(),
+                // T5-14 — dónde ocurrió y lo que quedó allí. Al final, para no mover las
+                // columnas que ya había.
+                warehouseName: m.warehouse.name,
+                warehouseStockAfter: m.warehouseStockAfter,
             }));
             if (pagina.length < TAM_LOTE_EXPORTACION) return;
             cursor = pagina[pagina.length - 1]!.id;
@@ -696,83 +710,48 @@ export const productService = {
         if (!product.isActive) throw new HttpError(400, "No se puede registrar movimientos en un producto inactivo", "INACTIVE_PRODUCT_MOVEMENT");
 
         const note = dto.note ? `${dto.reason} — ${dto.note}` : dto.reason;
+        // T5-14 — en qué almacén: el de la petición o el predeterminado.
+        const almacen = await almacenParaOperar(dto.warehouseId);
+        const movimiento = { productId, warehouseId: almacen.id, cantidad: dto.quantity, type: dto.type, note };
 
-        // Transacción interactiva: el ajuste de stock y su movimiento son atómicos.
-        // Para OUT se usa un decremento condicional (stock >= cantidad) que evita la
-        // race condition de leer-calcular-escribir bajo peticiones concurrentes.
-        const newStock = await prisma.$transaction(async (tx) => {
-            let resultingStock: number;
-            let delta: number;
-
-            if (dto.type === "ADJUSTMENT") {
-                const updated = await tx.product.update({
-                    where: { id: productId },
-                    data: { stock: dto.quantity },
-                });
-                resultingStock = updated.stock;
-                delta = updated.stock - product.stock;
-            } else if (dto.type === "OUT") {
-                const res = await tx.product.updateMany({
-                    where: { id: productId, stock: { gte: dto.quantity } },
-                    data: { stock: { decrement: dto.quantity } },
-                });
-                if (res.count === 0) throw new HttpError(400, "El stock no puede quedar negativo", "STOCK_CANNOT_BE_NEGATIVE");
-                const refreshed = await tx.product.findUniqueOrThrow({ where: { id: productId } });
-                resultingStock = refreshed.stock;
-                delta = -dto.quantity;
-            } else {
-                const updated = await tx.product.update({
-                    where: { id: productId },
-                    data: { stock: { increment: dto.quantity } },
-                });
-                resultingStock = updated.stock;
-                delta = dto.quantity;
-            }
-
-            await tx.stockMovement.create({
-                data: { productId, type: dto.type, delta, stockAfter: resultingStock, note },
-            });
-
-            return resultingStock;
+        // El ajuste de stock y su movimiento son atómicos. Para `OUT`, un decremento condicional
+        // sobre el nivel del almacén (ADR 0001); `ADJUSTMENT` deja **ese almacén** en la cifra,
+        // no el total: se ajusta lo que se ha contado, y se cuenta un sitio.
+        const movido = await prisma.$transaction((tx) => {
+            if (dto.type === "ADJUSTMENT") return fijar(tx, movimiento);
+            if (dto.type === "OUT") return sacar(tx, movimiento, stockNoPuedeQuedarNegativo);
+            return entrar(tx, movimiento);
         });
 
-        // Solo alerta si el stock disminuyó respecto al valor previo.
-        if (newStock < product.stock) {
-            dispararAlertaStock({ id: productId, name: product.name, stock: newStock, minStock: product.minStock });
+        // Solo alerta si el stock disminuyó. El mínimo se compara con el total.
+        if (movido.delta < 0) {
+            dispararAlertaStock({ id: productId, name: product.name, stock: movido.stock, minStock: product.minStock });
         }
 
         return prisma.product.findUnique({ where: { id: productId }, include: PRODUCT_INCLUDE });
     },
 
+    /**
+     * T5-14 — cada cifra es lo que tiene que quedar **en el almacén** de la petición (o en el
+     * predeterminado), como en un `ADJUSTMENT` a mano: es la pantalla con la que se corrige el
+     * inventario de un sitio.
+     */
     async bulkUpdateStock(dto: BulkStockDto) {
         const results: Array<{ productId: string; success: boolean; error?: string }> = [];
+        const almacen = await almacenParaOperar(dto.warehouseId);
+        const note = dto.reason ?? "Ajuste masivo de inventario";
 
         await Promise.all(
             dto.items.map(async ({ productId, stock }) => {
                 try {
-                    const note = dto.reason ?? "Ajuste masivo de inventario";
-
                     // Lee, ajusta y registra el movimiento dentro de una única transacción
                     // para mantener stock y movimiento consistentes ante concurrencia.
-                    const outcome = await prisma.$transaction(async (tx) => {
-                        const product = await tx.product.findUnique({ where: { id: productId } });
-                        if (!product) return null;
+                    const movido = await prisma.$transaction((tx) =>
+                        fijar(tx, { productId, warehouseId: almacen.id, cantidad: stock, type: "ADJUSTMENT", note }),
+                    );
 
-                        const delta = stock - product.stock;
-                        await tx.product.update({ where: { id: productId }, data: { stock } });
-                        await tx.stockMovement.create({
-                            data: { productId, type: "ADJUSTMENT", delta, stockAfter: stock, note },
-                        });
-                        return { name: product.name, minStock: product.minStock, delta };
-                    });
-
-                    if (!outcome) {
-                        results.push({ productId, success: false, error: "Producto no encontrado" });
-                        return;
-                    }
-
-                    if (outcome.delta < 0) {
-                        dispararAlertaStock({ id: productId, name: outcome.name, stock, minStock: outcome.minStock });
+                    if (movido.delta < 0) {
+                        dispararAlertaStock({ id: productId, name: movido.name, stock: movido.stock, minStock: movido.minStock });
                     }
 
                     results.push({ productId, success: true });

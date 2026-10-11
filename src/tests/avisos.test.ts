@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 import { avisosSchema, avisosSinLeerSchema } from "@/contratos/api";
 import { notificationsService } from "@/modules/notifications/notifications.service";
 
@@ -71,7 +71,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
     // ─────────────────────────────────────────────────────────────────────────
     describe("Stock bajo", () => {
         it("bajar de mínimo avisa a cada administrador activo, aunque el correo esté desactivado", async () => {
-            const producto = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+            const producto = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
             await salida(producto.id, 2, almacen.cookie);
 
@@ -94,7 +94,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
 
         it("con el correo activado salen las dos cosas", async () => {
             await prisma.appSetting.create({ data: { key: "lowStockAlertEnabled", value: "true" } });
-            const producto = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+            const producto = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
             await salida(producto.id, 2, ana.cookie);
 
@@ -103,7 +103,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         });
 
         it("quedarse por encima del mínimo no avisa", async () => {
-            const producto = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 10, minStock: 5 } });
+            const producto = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 10, minStock: 5 } });
 
             await salida(producto.id, 2, ana.cookie);
 
@@ -111,7 +111,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         });
 
         it("el mismo producto que vuelve a bajar no apila otro aviso: reabre el suyo con la cifra nueva", async () => {
-            const producto = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+            const producto = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
             await salida(producto.id, 2, ana.cookie);
             const [primero] = await avisosDe(ana.id);
@@ -130,7 +130,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         it("la fecha del aviso es la de ahora, no la de ahora en la zona del servidor de la base", async () => {
             // El aviso se inserta con SQL, y un `now()` a secas en una columna sin zona guarda
             // la hora local de la sesión de PostgreSQL: en Santo Domingo, cuatro horas menos.
-            const producto = await prisma.product.create({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
+            const producto = await crearProducto({ data: { name: "Cable HDMI", price: 10, stock: 6, minStock: 5 } });
 
             const antes = Date.now();
             await salida(producto.id, 2, ana.cookie);
@@ -144,9 +144,9 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
     // ─────────────────────────────────────────────────────────────────────────
     describe("Venta que no se puede enviar", () => {
         async function ventaSinStock() {
-            const producto = await prisma.product.create({ data: { name: "Teclado", price: 30, stock: 3, minStock: 0 } });
+            const producto = await crearProducto({ data: { name: "Teclado", price: 30, stock: 3, minStock: 0 } });
             const orden = await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
             });
             return { producto, orden };
         }
@@ -184,9 +184,9 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         });
 
         it("una venta que sí se envía no deja este aviso", async () => {
-            const producto = await prisma.product.create({ data: { name: "Teclado", price: 30, stock: 9, minStock: 0 } });
+            const producto = await crearProducto({ data: { name: "Teclado", price: 30, stock: 9, minStock: 0 } });
             const orden = await prisma.saleOrder.create({
-                data: { number: await numeroDeVenta(), items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(), items: { create: [{ productId: producto.id, productName: "Teclado", quantity: 5, unitPrice: 30 }] } },
             });
 
             await request(app).post(`/api/v1/sale-orders/${orden.id}/ship`).set("Cookie", almacen.cookie).expect(200);
@@ -205,15 +205,15 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
             const rapido = await prisma.supplier.create({ data: { name: "Rápido SA", leadTimeDays: 3 } });
             const sinPlazo = await prisma.supplier.create({ data: { name: "Sin Plazo SL" } });
 
-            const atrasada = await prisma.purchaseOrder.create({ data: { supplierId: rapido.id, createdAt: hace(10) } });
+            const atrasada = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, createdAt: hace(10) } });
             const parcial = await prisma.purchaseOrder.create({
-                data: { supplierId: sinPlazo.id, status: "PARTIALLY_RECEIVED", createdAt: hace(10) },
+                data: { warehouseId: ALMACEN, supplierId: sinPlazo.id, status: "PARTIALLY_RECEIVED", createdAt: hace(10) },
             });
-            const sinProveedor = await prisma.purchaseOrder.create({ data: { createdAt: hace(10) } });
+            const sinProveedor = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: hace(10) } });
             // Las que no: dentro de plazo, recibida y cancelada.
-            await prisma.purchaseOrder.create({ data: { supplierId: rapido.id, createdAt: hace(2) } });
-            await prisma.purchaseOrder.create({ data: { supplierId: rapido.id, status: "RECEIVED", createdAt: hace(10) } });
-            await prisma.purchaseOrder.create({ data: { supplierId: rapido.id, status: "CANCELLED", createdAt: hace(10) } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, createdAt: hace(2) } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, status: "RECEIVED", createdAt: hace(10) } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, status: "CANCELLED", createdAt: hace(10) } });
 
             await notificationsService.mantener(AHORA);
 
@@ -234,7 +234,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         it("el día en que vence todavía no está atrasada, y el día se cuenta en la zona del negocio", async () => {
             const proveedor = await prisma.supplier.create({ data: { name: "Rápido SA", leadTimeDays: 5 } });
             // Las 02:00 UTC del 20 son las 22:00 del **19** en Santo Domingo: vence el 24, no el 25.
-            await prisma.purchaseOrder.create({ data: { supplierId: proveedor.id, createdAt: new Date("2026-09-20T02:00:00Z") } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: proveedor.id, createdAt: new Date("2026-09-20T02:00:00Z") } });
 
             // Todavía día 24 en Santo Domingo —aunque ya sea 25 en UTC—.
             await notificationsService.mantener(new Date("2026-09-25T03:00:00Z"));
@@ -247,7 +247,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         });
 
         it("repetirlo no duplica el aviso ni reabre el que ya se leyó", async () => {
-            await prisma.purchaseOrder.create({ data: { createdAt: hace(20) } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: hace(20) } });
 
             await notificationsService.mantener(AHORA);
             await request(app).post(`${BASE}/read-all`).set("Cookie", ana.cookie).expect(200);
@@ -260,13 +260,13 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         });
 
         it("la consulta del contador hace el mantenimiento, pero no en cada consulta", async () => {
-            await prisma.purchaseOrder.create({ data: { createdAt: new Date(Date.now() - 30 * DIA) } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: new Date(Date.now() - 30 * DIA) } });
 
             const primera = await request(app).get(`${BASE}/unread-count`).set("Cookie", ana.cookie);
             expect(primera.body.data).toEqual({ unread: 1 });
 
             // Otra orden atrasada, y otra consulta dentro de la pausa: aún no se ha mirado.
-            await prisma.purchaseOrder.create({ data: { createdAt: new Date(Date.now() - 30 * DIA) } });
+            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: new Date(Date.now() - 30 * DIA) } });
             const segunda = await request(app).get(`${BASE}/unread-count`).set("Cookie", ana.cookie);
             expect(segunda.body.data).toEqual({ unread: 1 });
 

@@ -129,6 +129,14 @@ paso("categorías, marcas y proveedores", () => {
           FROM generate_series(1, ${CATALOGOS}) i`);
 });
 
+// T5-14 — tres almacenes. El predeterminado lo crea la propia migración; aquí se añaden dos
+// sucursales, porque con uno solo `stock_levels` tendría una fila por producto y ni el filtro
+// por almacén ni el desglose se parecerían a los de un negocio con varios locales.
+paso("almacenes", () => {
+    psql(`INSERT INTO warehouses (id, name, "isDefault", "isActive", "createdAt", "updatedAt")
+          SELECT gen_random_uuid()::text, 'Sucursal '||i, false, true, now(), now() FROM generate_series(1, 2) i`);
+});
+
 paso(`${PRODUCTOS.toLocaleString("es")} productos`, () => {
     // **Al azar y no con `i % 20`, y esto costó una medición entera.** La primera versión
     // sacaba la categoría de `i % 20` y el estado de `(i % 20) <> 0`: dos atributos del
@@ -140,6 +148,10 @@ paso(`${PRODUCTOS.toLocaleString("es")} productos`, () => {
     //
     // `setseed` deja el reparto reproducible: dos siembras dan el mismo conjunto.
     psql(`
+        -- T5-14 — los productos y sus niveles van en **una transacción**: la base comprueba al
+        -- confirmar que el stock de cada producto es la suma de sus almacenes, y un producto
+        -- con stock y sin niveles no pasa.
+        BEGIN;
         SELECT setseed(0.42);
 
         WITH c AS (SELECT array_agg(id) a FROM categories),
@@ -162,7 +174,24 @@ paso(`${PRODUCTOS.toLocaleString("es")} productos`, () => {
                random() > 0.05,
                now() - (i || ' minutes')::interval,
                now()
-        FROM generate_series(1, ${PRODUCTOS}) i, c, b, s`);
+        FROM generate_series(1, ${PRODUCTOS}) i, c, b, s;
+
+        -- El 25 % y el 15 % del stock, a las dos sucursales; el resto, al predeterminado. Sin
+        -- filas a cero: la tabla es dispersa.
+        INSERT INTO stock_levels (id, "productId", "warehouseId", stock)
+        SELECT gen_random_uuid()::text, p.id, w.id, v.s
+        FROM products p
+        CROSS JOIN LATERAL (VALUES ('Sucursal 1', (p.stock * 0.25)::int), ('Sucursal 2', (p.stock * 0.15)::int)) v(almacen, s)
+        JOIN warehouses w ON w.name = v.almacen
+        WHERE v.s > 0;
+
+        INSERT INTO stock_levels (id, "productId", "warehouseId", stock)
+        SELECT gen_random_uuid()::text, p.id, w.id, p.stock - COALESCE(l.s, 0)
+        FROM products p
+        JOIN warehouses w ON w."isDefault"
+        LEFT JOIN (SELECT "productId", SUM(stock) s FROM stock_levels GROUP BY 1) l ON l."productId" = p.id
+        WHERE p.stock - COALESCE(l.s, 0) <> 0;
+        COMMIT;`);
 });
 
 paso(`${MOVIMIENTOS.toLocaleString("es")} movimientos`, () => {
@@ -172,16 +201,20 @@ paso(`${MOVIMIENTOS.toLocaleString("es")} movimientos`, () => {
     psql(`
         SELECT setseed(0.17);
 
-        WITH p AS (SELECT array_agg(id) a, count(*) n FROM products)
-        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt")
+        WITH p AS (SELECT array_agg(id) a, count(*) n FROM products),
+             w AS (SELECT array_agg(id ORDER BY "isDefault" DESC, name) a FROM warehouses)
+        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt", "warehouseId", "warehouseStockAfter")
         SELECT gen_random_uuid()::text,
                p.a[1 + floor(random() * p.n)::int],
                (ARRAY['IN','OUT','ADJUSTMENT','IMPORT']::"StockMovementType"[])[1 + (i % 4)],
                CASE WHEN i % 2 = 0 THEN (i % 50) + 1 ELSE -((i % 50) + 1) END,
                (i % 300),
                NULL,
-               now() - ((i % 1051200) || ' minutes')::interval
-        FROM generate_series(1, ${MOVIMIENTOS}) i, p`);
+               now() - ((i % 1051200) || ' minutes')::interval,
+               -- T5-14 — seis de cada diez, en el predeterminado; el resto, en las sucursales.
+               w.a[CASE WHEN i % 10 < 6 THEN 1 WHEN i % 10 < 8 THEN 2 ELSE 3 END],
+               (i % 300)
+        FROM generate_series(1, ${MOVIMIENTOS}) i, p, w`);
 });
 
 paso(`${PRECIOS.toLocaleString("es")} cambios de precio`, () => {
@@ -221,14 +254,16 @@ paso(`producto caliente (${CALIENTE.toLocaleString("es")} movimientos)`, () => {
         UPDATE products SET name = 'Producto caliente', sku = 'SKU-CALIENTE'
         WHERE id = (SELECT id FROM products WHERE "isActive" ORDER BY "createdAt" LIMIT 1);
 
-        WITH p AS (SELECT id FROM products WHERE sku = 'SKU-CALIENTE')
-        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt")
+        WITH p AS (SELECT id FROM products WHERE sku = 'SKU-CALIENTE'),
+             w AS (SELECT id FROM warehouses WHERE "isDefault")
+        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt", "warehouseId", "warehouseStockAfter")
         SELECT gen_random_uuid()::text, p.id,
                (ARRAY['IN','OUT']::"StockMovementType"[])[1 + (i % 2)],
                CASE WHEN i % 2 = 0 THEN 1 ELSE -1 END,
                (i % 300), NULL,
-               now() - ((i % 1051200) || ' minutes')::interval
-        FROM generate_series(1, ${CALIENTE}) i, p`);
+               now() - ((i % 1051200) || ' minutes')::interval,
+               w.id, (i % 300)
+        FROM generate_series(1, ${CALIENTE}) i, p, w`);
 });
 
 // ── Costes, ventas y compras (T5-09) ─────────────────────────────────────────
@@ -269,11 +304,13 @@ paso(`${VENTAS.toLocaleString("es")} órdenes de venta (${(VENTAS * 2).toLocaleS
 
         -- T6-04 — el correlativo es obligatorio. Va por orden de creación, como lo numeraría la
         -- aplicación, y el contador se deja en el último para que la serie pueda seguir.
-        INSERT INTO sale_orders (id, number, status, "customerName", "shippedAt", "createdAt", "updatedAt")
-        SELECT id, row_number() OVER (ORDER BY fecha, id), status, 'Cliente '||(i % 5000),
-               CASE WHEN status <> 'PENDING' THEN fecha END,
-               fecha - interval '1 day', fecha
-        FROM ordenes;
+        -- T5-14 — cada venta sale de un almacén: seis de cada diez, del predeterminado.
+        INSERT INTO sale_orders (id, number, status, "customerName", "shippedAt", "createdAt", "updatedAt", "warehouseId")
+        SELECT o.id, row_number() OVER (ORDER BY o.fecha, o.id), o.status, 'Cliente '||(o.i % 5000),
+               CASE WHEN o.status <> 'PENDING' THEN o.fecha END,
+               o.fecha - interval '1 day', o.fecha,
+               w.a[CASE WHEN o.i % 10 < 6 THEN 1 WHEN o.i % 10 < 8 THEN 2 ELSE 3 END]
+        FROM ordenes o, (SELECT array_agg(id ORDER BY "isDefault" DESC, name) a FROM warehouses) w;
 
         INSERT INTO counters (key, value) SELECT 'saleOrder', count(*) FROM ordenes
         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
@@ -311,9 +348,9 @@ paso(`${COMPRAS.toLocaleString("es")} órdenes de compra (${(COMPRAS * 3).toLoca
                    now() - (floor(random() * 525600)::int || ' minutes')::interval AS fecha
             FROM generate_series(1, ${COMPRAS}) i;
 
-        INSERT INTO purchase_orders (id, "supplierId", status, "createdAt", "updatedAt")
-        SELECT c.id, s.a[1 + (c.i % ${CATALOGOS})], c.status, c.fecha, c.fecha
-        FROM compras c, (SELECT array_agg(id) a FROM suppliers) s;
+        INSERT INTO purchase_orders (id, "supplierId", status, "createdAt", "updatedAt", "warehouseId")
+        SELECT c.id, s.a[1 + (c.i % ${CATALOGOS})], c.status, c.fecha, c.fecha, w.id
+        FROM compras c, (SELECT array_agg(id) a FROM suppliers) s, (SELECT id FROM warehouses WHERE "isDefault") w;
 
         CREATE TEMP TABLE lineas AS
             SELECT gen_random_uuid()::text AS id, x.orden, x.status, x.fecha, x.cantidad, x.dos_entregas, n.id AS producto, n.name,
@@ -332,12 +369,13 @@ paso(`${COMPRAS.toLocaleString("es")} órdenes de compra (${(COMPRAS * 3).toLoca
         SELECT id, orden, producto, name, cantidad, recibida, precio, fecha FROM lineas;
 
         -- Cada entrega, una entrada enlazada a su línea, con la nota que escribe la recepción.
-        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt", "purchaseOrderItemId")
+        INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt", "purchaseOrderItemId", "warehouseId", "warehouseStockAfter")
         SELECT gen_random_uuid()::text, l.producto, 'IN', e.unidades, 0,
                'Orden de compra #'||left(l.orden, 8),
                LEAST(now(), l.fecha + (e.dias || ' days')::interval),
-               l.id
+               l.id, w.id, 0
         FROM lineas l
+        CROSS JOIN (SELECT id FROM warehouses WHERE "isDefault") w
         CROSS JOIN LATERAL (VALUES
             (CASE WHEN l.dos_entregas THEN l.recibida - l.recibida / 2 ELSE l.recibida END, 3),
             (CASE WHEN l.dos_entregas THEN l.recibida / 2 ELSE 0 END, 20)

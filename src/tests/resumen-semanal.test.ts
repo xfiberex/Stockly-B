@@ -1,6 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 import { env } from "@/config/env";
-import { cleanDb, createUser, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, numeroDeVenta, ALMACEN, crearProductos } from "./helpers";
 
 /**
  * T5-11 — el resumen semanal por correo.
@@ -52,7 +52,7 @@ const admin = (email: string, idioma: "ES" | "EN" = "ES") => createUser({ email,
 
 async function venta(status: "PENDING" | "SHIPPED" | "CANCELLED", shippedAt: string | null, items: Array<[string, number, number]>, createdAt = "2026-09-15T12:00:00Z") {
     return prisma.saleOrder.create({
-        data: { number: await numeroDeVenta(),
+        data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
             status,
             customerName: "Cliente Confidencial",
             shippedAt: shippedAt ? new Date(shippedAt) : null,
@@ -268,7 +268,7 @@ describe("Lo que cuenta el resumen", () => {
         const antigua = await venta("PENDING", null, [["Cable", 2, 7.5]], "2026-08-01T12:00:00Z");
         await venta("PENDING", null, [["Cable", 1, 7.5]], "2026-09-29T12:00:00Z");
 
-        await prisma.product.createMany({
+        await crearProductos({
             data: [
                 { name: "Agotado", price: 1, stock: 0, minStock: 5 },
                 { name: "Justo", price: 1, stock: 3, minStock: 3 },
@@ -279,12 +279,12 @@ describe("Lo que cuenta el resumen", () => {
 
         // Plazo del proveedor, 3 días: pedida el 20, debía llegar el 23; el 30 lleva 7 de retraso.
         const proveedor = await prisma.supplier.create({ data: { name: "Lento S.A.", leadTimeDays: 3 } });
-        const tarde = await prisma.purchaseOrder.create({ data: { supplierId: proveedor.id, createdAt: new Date("2026-09-20T16:00:00Z") } });
+        const tarde = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: proveedor.id, createdAt: new Date("2026-09-20T16:00:00Z") } });
         // Sin proveedor: el plazo por defecto de Configuración, 7 días. Pedida el 10, 13 de retraso.
-        const sinProveedor = await prisma.purchaseOrder.create({ data: { status: "PARTIALLY_RECEIVED", createdAt: new Date("2026-09-10T16:00:00Z") } });
+        const sinProveedor = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, status: "PARTIALLY_RECEIVED", createdAt: new Date("2026-09-10T16:00:00Z") } });
         // Dentro de plazo, y una recibida hace meses: ninguna de las dos.
-        await prisma.purchaseOrder.create({ data: { createdAt: new Date("2026-09-25T16:00:00Z") } });
-        await prisma.purchaseOrder.create({ data: { status: "RECEIVED", createdAt: new Date("2026-01-10T16:00:00Z") } });
+        await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: new Date("2026-09-25T16:00:00Z") } });
+        await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, status: "RECEIVED", createdAt: new Date("2026-01-10T16:00:00Z") } });
 
         const datos = await reunirDatosDelResumen(SEMANA, ZONA, "2026-09-30");
 
@@ -311,7 +311,7 @@ describe("Lo que cuenta el resumen", () => {
         await admin("ana@stockly.test");
         await venta("SHIPPED", "2026-09-24T12:00:00Z", [["<script>alert(1)</script>", 2, 1234.5]]);
         const pendiente = await venta("PENDING", null, [["Cable", 1, 10]]);
-        await prisma.product.createMany({
+        await crearProductos({
             data: Array.from({ length: 12 }, (_, i) => ({ name: `Bajo ${String(i).padStart(2, "0")}`, price: 1, stock: 0, minStock: 1 })),
         });
 

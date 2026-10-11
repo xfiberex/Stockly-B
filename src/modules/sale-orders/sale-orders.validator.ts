@@ -16,6 +16,8 @@ export const createSaleOrderSchema = z.object({
     customerPhone: z.string().trim().max(30).optional(),
     customerDocument: documentoSchema.optional(),
     notes: z.string().trim().max(1000).optional(),
+    // T5-14 — opcional: sin él, la venta sale del almacén predeterminado.
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
     items: z.array(itemSchema).min(1, "Se requiere al menos un ítem"),
 });
 
@@ -30,6 +32,7 @@ export const counterSaleSchema = z.object({
     customerEmail: z.email("Correo del cliente inválido").optional(),
     customerPhone: z.string().trim().max(30).optional(),
     customerDocument: documentoSchema.optional(),
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
     items: z
         .array(
             z.object({

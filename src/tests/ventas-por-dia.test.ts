@@ -3,7 +3,7 @@ import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
 import { haceDias, masVendidoEntre, ventasPorDia } from "@/shared/lib/ventasEnviadas";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN } from "./helpers";
 
 /**
  * T6-09 — las ventas por día y lo más vendido del panel.
@@ -30,7 +30,7 @@ type Linea = [nombre: string, cantidad: number, precio: number, impuesto?: numbe
 
 async function venta(status: "PENDING" | "SHIPPED" | "CANCELLED", shippedAt: string | Date | null, lineas: Linea[]) {
     return prisma.saleOrder.create({
-        data: {
+        data: { warehouseId: ALMACEN,
             number: await numeroDeVenta(),
             status,
             shippedAt: shippedAt ? new Date(shippedAt) : null,

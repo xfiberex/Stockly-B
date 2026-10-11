@@ -79,6 +79,8 @@ export const createProductSchema = z.object({
     brandId: uuidOptional,
     supplierId: uuidOptional,
     tagIds: tagIdsOptional,
+    // T5-14 — a qué almacén va el stock inicial. Como los demás, `""` es «no lo dice».
+    warehouseId: uuidOptional,
 });
 
 export const updateProductSchema = z.object({
@@ -95,6 +97,8 @@ export const updateProductSchema = z.object({
     supplierId: uuidOptional,
     tagIds: tagIdsOptional,
     removeImage: z.string().optional(),
+    // T5-14 — el almacén que absorbe la diferencia de `stock`.
+    warehouseId: uuidOptional,
 });
 
 export const createManualMovementSchema = z.object({
@@ -102,6 +106,7 @@ export const createManualMovementSchema = z.object({
     quantity: z.number().int().positive("La cantidad debe ser mayor a 0"),
     reason: z.string().trim().min(1, "El motivo es obligatorio").max(200),
     note: z.string().trim().max(500).optional(),
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
 });
 
 export const bulkStockSchema = z.object({
@@ -114,4 +119,5 @@ export const bulkStockSchema = z.object({
         )
         .min(1, "Se requiere al menos un producto"),
     reason: z.string().trim().max(200).optional(),
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
 });

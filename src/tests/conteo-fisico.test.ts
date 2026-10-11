@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto, ponerStock } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -46,7 +46,7 @@ describe("Conteo físico de inventario (T5-07)", () => {
     });
 
     const producto = (name: string, stock: number, extra: { categoryId?: string; costPrice?: number; isActive?: boolean } = {}) =>
-        prisma.product.create({ data: { name, price: 20, stock, ...extra } });
+        crearProducto({ data: { name, price: 20, stock, ...extra } });
 
     const stockDe = async (id: string) => (await prisma.product.findUniqueOrThrow({ where: { id } })).stock;
 
@@ -122,7 +122,7 @@ describe("Conteo físico de inventario (T5-07)", () => {
             await anotar(id, [{ productId: p.id, countedQuantity: 8 }]);
 
             // Salen 3 después de contar: el stock baja a 7 por su lado.
-            await prisma.product.update({ where: { id: p.id }, data: { stock: 7 } });
+            await ponerStock(p.id, 7);
 
             await cerrar(id);
 
@@ -135,7 +135,7 @@ describe("Conteo físico de inventario (T5-07)", () => {
             const { id } = await abrir();
             await anotar(id, [{ productId: p.id, countedQuantity: 8 }]);
             // Llega mercancía y se vuelve a contar el estante con ella dentro.
-            await prisma.product.update({ where: { id: p.id }, data: { stock: 15 } });
+            await ponerStock(p.id, 15);
 
             const res = await anotar(id, [{ productId: p.id, countedQuantity: 13 }]);
 
@@ -152,7 +152,7 @@ describe("Conteo físico de inventario (T5-07)", () => {
                 { productId: otro.id, countedQuantity: 6 },
             ]);
             // Se contaron 8 de 10 y luego salieron 9: con −2 quedaría en −1.
-            await prisma.product.update({ where: { id: p.id }, data: { stock: 1 } });
+            await ponerStock(p.id, 1);
 
             const res = await cerrar(id);
 

@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -158,7 +158,7 @@ describe("Suppliers API", () => {
     describe("DELETE /suppliers/:id", () => {
         it("200: elimina proveedor y pone supplierId=null en productos", async () => {
             const supplier = await prisma.supplier.create({ data: { name: "A eliminar" } });
-            const product = await prisma.product.create({
+            const product = await crearProducto({
                 data: { name: "Prod con proveedor", price: 10, stock: 1, supplierId: supplier.id },
             });
 

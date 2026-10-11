@@ -3,7 +3,7 @@ import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
 import { abcService, periodoAbc, VIGENCIA_ABC_MS } from "@/modules/reports/reports.abc";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -53,7 +53,7 @@ describe("Clasificación ABC (T5-10)", () => {
         await cleanDb();
     });
 
-    const producto = (name: string) => prisma.product.create({ data: { name, price: 1, stock: 100 } });
+    const producto = (name: string) => crearProducto({ data: { name, price: 1, stock: 100 } });
 
     /** Una venta de una línea: `importe` unidades a 1 €, para que las cifras se lean directas. */
     const venta = async (
@@ -62,7 +62,7 @@ describe("Clasificación ABC (T5-10)", () => {
         { status = "SHIPPED", shippedAt = enElPeriodo }: { status?: "SHIPPED" | "PENDING" | "CANCELLED"; shippedAt?: Date } = {},
     ) =>
         prisma.saleOrder.create({
-            data: { number: await numeroDeVenta(),
+            data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
                 status,
                 shippedAt: status === "PENDING" ? null : shippedAt,
                 items: { create: [{ productId, productName: "x", quantity: importe, unitPrice: 1 }] },

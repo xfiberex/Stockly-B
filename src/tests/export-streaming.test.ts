@@ -5,7 +5,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { buildCsv } from "@/shared/lib/csv";
 import { enviarExportacion, MAX_FILAS_EXPORTACION, TAM_LOTE_EXPORTACION, BOM } from "@/shared/lib/exportacion";
 import { HttpError } from "@/shared/lib/httpError";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto, crearProductos } from "./helpers";
 
 // T2-05: las tres exportaciones cargaban su tabla entera y `buildCsv` concatenaba el
 // archivo completo en una cadena antes de enviarlo. Ahora el servicio entrega lotes por
@@ -37,10 +37,10 @@ describe("Exportación en streaming (T2-05)", () => {
 
     it("el CSV es idéntico al que producía `buildCsv` sobre el conjunto completo", async () => {
         const categoria = await prisma.category.create({ data: { name: "T205-Cat" } });
-        await prisma.product.create({
+        await crearProducto({
             data: { name: "T205-uno", description: "con, coma", price: 10.5, stock: 3, minStock: 1, categoryId: categoria.id },
         });
-        await prisma.product.create({
+        await crearProducto({
             // Empieza por `=`: la protección contra inyección de fórmulas tiene que
             // seguir aplicándose ahora que el escapado ocurre fila a fila.
             data: { name: "=T205-dos", description: 'comillas "dobles"', price: 2, stock: 0, minStock: 0 },
@@ -77,7 +77,7 @@ describe("Exportación en streaming (T2-05)", () => {
     });
 
     it("el JSON conserva el sobre de la API aunque se transmita por partes", async () => {
-        await prisma.product.create({ data: { name: "T205-json", price: 7, stock: 2, minStock: 0 } });
+        await crearProducto({ data: { name: "T205-json", price: 7, stock: 2, minStock: 0 } });
 
         const res = await request(app).get(`${BASE}/export`).set("Cookie", cookie);
 
@@ -94,7 +94,7 @@ describe("Exportación en streaming (T2-05)", () => {
     it("cruza varios lotes sin repetir ni perder filas", async () => {
         // Un lote y medio: es donde vive el fallo clásico de la paginación por cursor.
         const N = TAM_LOTE_EXPORTACION + 100;
-        await prisma.product.createMany({
+        await crearProductos({
             data: Array.from({ length: N }, (_, i) => ({
                 name: `T205-lote-${String(i).padStart(4, "0")}`,
                 price: 1 + i,
@@ -121,7 +121,7 @@ describe("Exportación en streaming (T2-05)", () => {
         // darse, que es justo lo que no queremos que dependa de la suerte.
         const N = TAM_LOTE_EXPORTACION + 100;
         const instante = new Date("2026-01-01T00:00:00.000Z");
-        await prisma.product.createMany({
+        await crearProductos({
             data: Array.from({ length: N }, (_, i) => ({
                 name: `T205-empate-${String(i).padStart(4, "0")}`,
                 price: 1,
@@ -156,7 +156,7 @@ describe("Codificación del CSV exportado (T2-34)", () => {
     });
 
     it("declara `charset=utf-8` y empieza por la marca de orden de bytes", async () => {
-        const producto = await prisma.product.create({
+        const producto = await crearProducto({
             data: { name: "T234-Cámara réflex", description: "Ñandú, acentuación", price: 10, stock: 1, minStock: 0 },
         });
 
@@ -171,11 +171,11 @@ describe("Codificación del CSV exportado (T2-34)", () => {
     });
 
     it("el CSV de movimientos de un producto recibe el mismo trato", async () => {
-        const producto = await prisma.product.create({
+        const producto = await crearProducto({
             data: { name: "T234-con-movimientos", price: 10, stock: 5, minStock: 0 },
         });
         await prisma.stockMovement.create({
-            data: { productId: producto.id, type: "IN", delta: 5, stockAfter: 5, note: "Importación" },
+            data: { productId: producto.id, type: "IN", delta: 5, stockAfter: 5, warehouseId: ALMACEN, warehouseStockAfter: 5, note: "Importación" },
         });
 
         const res = await request(app)

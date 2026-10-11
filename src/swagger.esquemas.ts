@@ -29,6 +29,8 @@
  * peticiones se generan con `io: "input"`; las respuestas, con la salida.
  */
 
+import { createWarehouseSchema, updateWarehouseSchema } from "@/modules/warehouses/warehouses.validator";
+import { createStockTransferSchema } from "@/modules/stock-transfers/stock-transfers.validator";
 import { z } from "zod";
 import * as contrato from "@/contratos/api";
 import { createProductSchema, importProductsSchema } from "@/modules/products/product.validator";
@@ -79,6 +81,10 @@ const RESPUESTAS = {
     AbcSummary: contrato.resumenAbcSchema,
     InventoryCount: contrato.conteoSchema,
     InventoryCountLine: contrato.lineaConteoSchema,
+    Warehouse: contrato.almacenSchema,
+    WarehouseWithFigures: contrato.almacenConCifrasSchema,
+    StockTransfer: contrato.transferenciaSchema,
+    StockTransferDetail: contrato.transferenciaConLineasSchema,
     PaginationMeta: contrato.metaPaginacionSchema,
     Error: contrato.errorSchema,
 } as const;
@@ -93,6 +99,9 @@ const PETICIONES = {
     ReorderSuggestionsRequest: generarDesdeSugerenciasSchema,
     InventoryCountCreate: createInventoryCountSchema,
     InventoryCountLinesRequest: recordInventoryCountLinesSchema,
+    WarehouseCreate: createWarehouseSchema,
+    WarehouseUpdate: updateWarehouseSchema,
+    StockTransferCreate: createStockTransferSchema,
     CustomerWrite: createCustomerSchema,
 } as const;
 

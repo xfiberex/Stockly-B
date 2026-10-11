@@ -51,7 +51,8 @@ Debe terminar con **exit 0**. Lo que conviene saber de sus pasos:
   `FRONTEND_URL`. Sin las de Cloudinary o SMTP el servidor arranca y solo esa función responde 503.
 - **La base `Stockly_test` al día.** Los tests nunca tocan la de desarrollo, pero `verify` tampoco
   migra la de tests: tras cada migración nueva,
-  `DATABASE_URL=<la de Stockly_test> pnpm exec prisma db push`
+  `DATABASE_URL=<la de Stockly_test> pnpm exec prisma db execute --file prisma/migrations/<carpeta>/migration.sql`
+  —no `db push`, que no trae lo que solo vive en el SQL de una migración—
   ([docs/CONTEXTO.md §4](docs/CONTEXTO.md)).
 
 ### El E2E

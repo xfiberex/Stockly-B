@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto } from "./helpers";
 
 /**
  * T4-15 — `GET /products/:id/movements`, paginado y filtrado en la base.
@@ -36,7 +36,7 @@ describe("Histórico de un producto, paginado (T4-15)", () => {
         const admin = await createUser({ email: "mov_admin@example.com", role: "ADMIN" });
         cookie = getAuthCookie(admin.id);
 
-        const product = await prisma.product.create({
+        const product = await crearProducto({
             data: { name: "Producto con histórico", price: 10, stock: 500, minStock: 5 },
         });
         productId = product.id;
@@ -49,7 +49,7 @@ describe("Histórico de un producto, paginado (T4-15)", () => {
                 productId,
                 type: i % 2 === 0 ? ("IN" as const) : ("OUT" as const),
                 delta: i % 2 === 0 ? 1 : -1,
-                stockAfter: 500,
+                stockAfter: 500, warehouseId: ALMACEN, warehouseStockAfter: 500,
                 note: `mov ${i}`,
                 createdAt: new Date(i < TOTAL / 2 ? "2026-01-15T10:00:00.000Z" : "2026-03-20T10:00:00.000Z"),
             })),

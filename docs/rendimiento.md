@@ -4,7 +4,7 @@ Pruebas de carga y medición de consultas sobre un conjunto de datos representat
 La auditoría del 2026-08-04 **no midió nada**: sus hallazgos de base de datos salían de leer
 el esquema. Esto es lo que pasa al ejecutarlos.
 
-**Fechas:** 2026-08-11 (§1–§4, T4-08), 2026-08-12 (§5–§6, T4-15 y T4-16) y del 2026-09-13 al 2026-09-29 (§8–§11, las consultas del Tier 5). **Máquina:** Windows 11, PostgreSQL 17.10 local (puerto 5433), backend
+**Fechas:** 2026-08-11 (§1–§4, T4-08), 2026-08-12 (§5–§6, T4-15 y T4-16), del 2026-09-13 al 2026-09-29 (§8–§11, las consultas del Tier 5) y 2026-10-10 (§15, T5-14, con la carga sostenida repetida por primera vez desde agosto). **Máquina:** Windows 11, PostgreSQL 17.10 local (puerto 5433), backend
 compilado (`dist/`) contra esa base. Los números absolutos son de este equipo; lo que viaja
 entre máquinas son las proporciones y los planes.
 
@@ -553,3 +553,115 @@ añadirlas; es una fila más de la carga sostenida que sigue sin repetirse.
 Para medir hubo que **arreglar `load/sembrar.js`**: desde `T6-04` insertaba ventas sin `number`,
 que es obligatorio, y la siembra fallaba a medias. Ahora numera por fecha y deja el contador en
 el último.
+
+---
+
+## 15. T5-14 — varios almacenes, y la carga sostenida repetida
+
+Medido el 2026-10-10. Tres cosas: la decisión previa de la ficha, las consultas nuevas y la
+prueba de carga, **antes y después** del cambio.
+
+### La decisión previa: ¿`products.stock` se mantiene o desaparece?
+
+La tabla y la decisión están en el [ADR 0010](adr/0010-stock-total-desnormalizado.md). En corto:
+derivar el stock de `stock_levels` multiplica por 5–8 las cuatro consultas del panel que leen el
+catálogo entero y las manda a disco; conservarlo cuesta 0,2 ms más por movimiento. Se conserva.
+
+Se midió sobre `Stockly_carga` con tres almacenes creados a mano —el stock de cada producto
+repartido al 60, 25 y 15 %, 297 665 niveles— y cada consulta en sus dos formas, comprobando que
+daban las mismas cifras.
+
+### La migración, sobre 1,2 millones de movimientos
+
+`prisma migrate deploy` de la migración de T5-14 sobre la base de carga: **77 s**. Casi todo es
+reescribir `stock_movements` —cada fila recibe su almacén y su saldo de almacén— y
+`sale_orders`. El total antes y después: 14 940 100 unidades, y ni un producto cuyo stock no
+sea la suma de sus niveles.
+
+### Las consultas nuevas
+
+Sobre `Stockly_carga` resembrada con el generador ya adaptado —tres almacenes, 297 665
+niveles—, mejor de cinco pasadas con `EXPLAIN (ANALYZE, BUFFERS)`, `work_mem` de fábrica:
+
+| Consulta | Tiempo | Plan | ¿A disco? |
+|---|---:|---|---|
+| Niveles de una página del catálogo (10 productos) | 0,14 ms | `Bitmap Index Scan` por `(productId, warehouseId)` | no |
+| Niveles de una página de 100 | 0,80 ms | ídem | no |
+| Comprometido por almacén, página de 10 | 0,87 ms | `Nested Loop` desde las líneas de esos productos | no |
+| Comprometido por almacén, página de 100 | 9,16 ms | ídem | no |
+| Catálogo filtrado por almacén, página 1 | 0,12 ms | `Index Scan` por `createdAt` + sonda al nivel | no |
+| Catálogo filtrado por almacén, recuento | 91,7 ms | `Hash Join` en paralelo | no |
+| Ventas de un almacén, página 1 | 0,02 ms | `sale_orders_warehouseId_createdAt_idx` | no |
+| Ventas de un almacén, recuento | 8,1 ms | `Index Only Scan` | no |
+| ¿Le quedan existencias a un almacén? (al desactivarlo) | 22,1 ms | `Bitmap Heap Scan` por `warehouseId` | no |
+| **Lo que guarda cada almacén** (`GET /warehouses/summary`) | **201 ms** | agrega los 297 665 niveles | no |
+
+**La última fila cambió el diseño.** La primera versión devolvía esas cifras en
+`GET /warehouses`, que es la lista que pide **cada formulario** para pintar su selector: 200 ms
+de agregado en casi todas las pantallas para saber cómo se llaman tres almacenes. Ahora la
+lista va sin cifras, y las cifras tienen su ruta, que solo pide la pantalla de almacenes.
+
+Estas cifras se tomaron con otra carga en la máquina —la suite del frontend corriendo—: valen
+para el orden de magnitud y para el plan, no al milisegundo.
+
+### La carga sostenida: antes y después
+
+Es la primera vez que se repite `pnpm carga:ejecutar` desde agosto (§6). Para compararlo en la
+misma máquina y el mismo día se sembraron **dos bases** —`Stockly_carga_antes`, con el código y
+las migraciones anteriores a T5-14, y `Stockly_carga`, con los de ahora— y se lanzó la prueba
+dos veces contra cada una, alternando el orden.
+
+| | Antes (dos pasadas) | Después (dos pasadas) |
+|---|---:|---:|
+| Rendimiento | 19,4 · 20,1 req/s | 19,3 · 18,7 req/s |
+| Dashboard, media · p(95) | 1,50 · 2,18 s — 1,51 · 2,31 s | 1,38 · 2,04 s — 1,36 · 2,14 s |
+| Catálogo, media · p(95) | 166 · 887 ms — 154 · 712 ms | 180 · 674 ms — 193 · 718 ms |
+| **Escritura, media · p(95)** | 324 ms · 1,14 s — 353 ms · 1,12 s | **391 ms · 1,33 s — 428 ms · 1,34 s** |
+| Histórico, media · p(95) | 118 · 448 ms — 103 · 445 ms | 132 · 428 ms — 218 · 960 ms |
+| Histórico grande, media · p(95) | 79 · 260 ms — 68 · 224 ms | 107 · 435 ms — 163 · 818 ms |
+| Errores | 0 % | 0 % |
+
+**Lo que cambia con T5-14:** la escritura sube un **21 %** de media (339 → 410 ms) y un 18 % en
+p(95). Es lo esperable: un movimiento era una escritura y ahora son dos y una comprobación, más
+la lectura del almacén predeterminado. El rendimiento global baja un 4 %. Los dos históricos
+salen peor en las dos pasadas de «después», pero con una dispersión —428 y 960 ms de p(95)— que
+no deja atribuirlo: la consulta es la misma, con tres columnas más por fila.
+
+**Con el servidor sin saturar, no se nota.** Las mismas rutas, una petición detrás de otra
+(500 escrituras y 200 lecturas de cada una, dos rondas): registrar un movimiento tarda 15 ms
+de mediana antes y después, con p(95) de 17,2–17,5 ms antes y 17,8–18,5 ms después; el catálogo,
+15,6 ms; el panel, 300 ms. La resolución del reloj en esta máquina es de unos 15 ms, así que
+no se ve nada por debajo. **El 21 % de la tabla es el coste del cambio amplificado por la cola**
+que forma el panel.
+
+### El hallazgo: la prueba ya no cumplía sus umbrales antes de esta tarea
+
+**La columna «antes» incumple cuatro de sus cinco umbrales**, con el código anterior a T5-14:
+
+| Umbral | Límite | Antes de T5-14 | Tras T4-16 (§6) |
+|---|---:|---:|---:|
+| Dashboard p(95) | 2 s | **2,18 – 2,31 s** | 337 ms |
+| Escritura p(95) | 1 s | **1,12 – 1,14 s** | 280 ms |
+| Catálogo p(95) | 500 ms | **712 – 887 ms** | 128 ms |
+| Histórico p(95) | 300 ms | **445 – 448 ms** | 254 ms |
+| Rendimiento | — | 19,4 – 20,1 req/s | 90,8 req/s |
+
+El panel pasó de 337 ms a más de 2 s y arrastra a todo lo demás, que es lo mismo que §6 contó al
+revés. Entre aquella medición y esta, `getSummary` ganó las consultas de margen (T5-02), las de
+ventas por día y más vendidos (T6-09) y otras; cada una se midió sola al entrar, con su
+`EXPLAIN`, y ninguna ordena en disco —pero **juntas y con diez usuarios a la vez saturan la
+base**, y eso solo lo ve esta prueba, que no se había vuelto a lanzar. Una petición suelta al
+panel tarda hoy 300 ms; diez a la vez, 1,5 s de media.
+
+No es de T5-14 y no se arregla aquí: es el cabo que el ROADMAP llevaba como «la carga sostenida
+no se ha repetido», y ahora tiene cifra. **Salvedad:** el proyecto se trabaja en dos equipos y
+la tabla de §6 no dice en cuál se midió; si fue en el otro, parte de la diferencia es de la
+máquina. La comparación de arriba —antes y después de T5-14— sí es de la misma máquina y la
+misma hora.
+
+### Repetirlo
+
+`pnpm carga:sembrar` ya siembra tres almacenes y reparte el stock entre ellos; los productos y
+sus niveles van en una transacción, porque la base comprueba el cuadre al confirmar. La base de
+«antes» no se puede rehacer con el árbol actual —necesita el generador y las migraciones del
+commit anterior a T5-14—, y se borró al terminar.

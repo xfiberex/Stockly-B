@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto, crearProductos } from "./helpers";
 import { updateProductSchema } from "@/modules/products/product.validator";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
@@ -131,7 +131,7 @@ describe("Products API", () => {
             const perifericos = await prisma.category.create({ data: { name: "Periféricos" } });
             const audio = await prisma.category.create({ data: { name: "Audio" } });
 
-            await prisma.product.createMany({
+            await crearProductos({
                 data: [
                     { name: "Teclado Mecánico", price: 89.99, stock: 30, categoryId: perifericos.id, isActive: true },
                     { name: "Mouse Gamer", price: 45.0, stock: 50, categoryId: perifericos.id, isActive: true },
@@ -199,7 +199,7 @@ describe("Products API", () => {
         let productId: string;
 
         beforeAll(async () => {
-            const p = await prisma.product.create({
+            const p = await crearProducto({
                 data: { name: "Producto para buscar por ID", price: 99, stock: 5, categoryId },
             });
             productId = p.id;
@@ -229,7 +229,7 @@ describe("Products API", () => {
         let productId: string;
 
         beforeEach(async () => {
-            const p = await prisma.product.create({
+            const p = await crearProducto({
                 data: { name: "Para actualizar", price: 100, stock: 10, categoryId },
             });
             productId = p.id;
@@ -270,7 +270,7 @@ describe("Products API", () => {
         let productId: string;
 
         beforeEach(async () => {
-            const p = await prisma.product.create({
+            const p = await crearProducto({
                 data: { name: "Para eliminar", price: 50, stock: 5, categoryId, isActive: true },
             });
             productId = p.id;
@@ -439,7 +439,7 @@ describe("Products API", () => {
         let inactiveId: string;
 
         beforeEach(async () => {
-            const p = await prisma.product.create({
+            const p = await crearProducto({
                 data: { name: "Para restaurar", price: 50, stock: 5, categoryId, isActive: false },
             });
             inactiveId = p.id;
@@ -455,7 +455,7 @@ describe("Products API", () => {
         });
 
         it("400: producto ya activo", async () => {
-            const active = await prisma.product.create({
+            const active = await crearProducto({
                 data: { name: "Ya activo", price: 50, stock: 5, categoryId, isActive: true },
             });
 

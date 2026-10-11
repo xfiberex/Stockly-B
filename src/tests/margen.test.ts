@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -63,8 +63,8 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
 
     describe("Valor del inventario", () => {
         it("da el valor a coste y el margen potencial solo sobre los productos con coste", async () => {
-            await prisma.product.create({ data: { name: "Con coste", price: 10, stock: 5, costPrice: 6 } });
-            await prisma.product.create({ data: { name: "Sin coste", price: 100, stock: 2 } });
+            await crearProducto({ data: { name: "Con coste", price: 10, stock: 5, costPrice: 6 } });
+            await crearProducto({ data: { name: "Sin coste", price: 100, stock: 2 } });
 
             const { totals } = await resumen();
 
@@ -76,14 +76,14 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("un producto sin coste y sin stock no cuenta como «sin coste»: no le falta nada", async () => {
-            await prisma.product.create({ data: { name: "Agotado sin coste", price: 50, stock: 0 } });
+            await crearProducto({ data: { name: "Agotado sin coste", price: 50, stock: 0 } });
 
             expect((await resumen()).totals.productsWithoutCost).toBe(0);
         });
 
         it("los inactivos no cuentan en ninguna de las cifras nuevas", async () => {
-            await prisma.product.create({ data: { name: "Inactivo", price: 10, stock: 9, costPrice: 1, isActive: false } });
-            await prisma.product.create({ data: { name: "Inactivo sin coste", price: 10, stock: 9, isActive: false } });
+            await crearProducto({ data: { name: "Inactivo", price: 10, stock: 9, costPrice: 1, isActive: false } });
+            await crearProducto({ data: { name: "Inactivo sin coste", price: 10, stock: 9, isActive: false } });
 
             const { totals } = await resumen();
 
@@ -95,7 +95,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
 
     describe("Congelar el coste al enviar", () => {
         it("el envío guarda el coste del momento y la fecha de envío", async () => {
-            const p = await prisma.product.create({ data: { name: "Teclado", price: 30, stock: 10, costPrice: 18.5 } });
+            const p = await crearProducto({ data: { name: "Teclado", price: 30, stock: 10, costPrice: 18.5 } });
 
             const id = await venderYEnviar([{ productId: p.id, productName: "Teclado", quantity: 2, unitPrice: 30 }]);
 
@@ -105,7 +105,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("una venta pendiente no congela nada: el coste se fija al enviar, no al crear", async () => {
-            const p = await prisma.product.create({ data: { name: "Ratón", price: 15, stock: 10, costPrice: 7 } });
+            const p = await crearProducto({ data: { name: "Ratón", price: 15, stock: 10, costPrice: 7 } });
 
             const creada = await request(app)
                 .post(VENTAS)
@@ -118,7 +118,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("el criterio: una venta enviada conserva su margen aunque después cambie el coste", async () => {
-            const p = await prisma.product.create({ data: { name: "Monitor", price: 200, stock: 10, costPrice: 120 } });
+            const p = await crearProducto({ data: { name: "Monitor", price: 200, stock: 10, costPrice: 120 } });
             await venderYEnviar([{ productId: p.id, productName: "Monitor", quantity: 3, unitPrice: 200 }]);
 
             const antes = (await resumen()).margin;
@@ -133,8 +133,8 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
 
     describe("Margen realizado", () => {
         it("lo vendido sin coste no suma como coste cero: queda fuera y se informa aparte", async () => {
-            const conCoste = await prisma.product.create({ data: { name: "Con coste", price: 50, stock: 10, costPrice: 30 } });
-            const sinCoste = await prisma.product.create({ data: { name: "Sin coste", price: 80, stock: 10 } });
+            const conCoste = await crearProducto({ data: { name: "Con coste", price: 50, stock: 10, costPrice: 30 } });
+            const sinCoste = await crearProducto({ data: { name: "Sin coste", price: 80, stock: 10 } });
 
             await venderYEnviar([
                 { productId: conCoste.id, productName: "Con coste", quantity: 1, unitPrice: 50 },
@@ -150,7 +150,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("una venta enviada y cancelada después no cuenta", async () => {
-            const p = await prisma.product.create({ data: { name: "Hub", price: 40, stock: 10, costPrice: 25 } });
+            const p = await crearProducto({ data: { name: "Hub", price: 40, stock: 10, costPrice: 25 } });
             const id = await venderYEnviar([{ productId: p.id, productName: "Hub", quantity: 2, unitPrice: 40 }]);
 
             await request(app).patch(`${VENTAS}/${id}`).set("Cookie", cookie).send({ status: "CANCELLED" });
@@ -160,7 +160,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("cuenta por fecha de envío y deja fuera lo enviado hace más de 30 días", async () => {
-            const p = await prisma.product.create({ data: { name: "Cable", price: 10, stock: 50, costPrice: 4 } });
+            const p = await crearProducto({ data: { name: "Cable", price: 10, stock: 50, costPrice: 4 } });
             const reciente = await venderYEnviar([{ productId: p.id, productName: "Cable", quantity: 1, unitPrice: 10 }]);
             const antigua = await venderYEnviar([{ productId: p.id, productName: "Cable", quantity: 5, unitPrice: 10 }]);
 
@@ -176,8 +176,8 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
 
         it("desglosa por categoría actual, sin categoría como null, de más a menos margen", async () => {
             const audio = await prisma.category.create({ data: { name: "Audio" } });
-            const auriculares = await prisma.product.create({ data: { name: "Auriculares", price: 100, stock: 10, costPrice: 40, categoryId: audio.id } });
-            const suelto = await prisma.product.create({ data: { name: "Suelto", price: 20, stock: 10, costPrice: 15 } });
+            const auriculares = await crearProducto({ data: { name: "Auriculares", price: 100, stock: 10, costPrice: 40, categoryId: audio.id } });
+            const suelto = await crearProducto({ data: { name: "Suelto", price: 20, stock: 10, costPrice: 15 } });
 
             await venderYEnviar([
                 { productId: auriculares.id, productName: "Auriculares", quantity: 1, unitPrice: 100 },
@@ -193,9 +193,9 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("el top de productos ordena por margen en importe, no en porcentaje, y admite margen negativo", async () => {
-            const grande = await prisma.product.create({ data: { name: "Poco %, mucho importe", price: 1000, stock: 10, costPrice: 900 } });
-            const pequeno = await prisma.product.create({ data: { name: "Mucho %, poco importe", price: 10, stock: 10, costPrice: 1 } });
-            const perdida = await prisma.product.create({ data: { name: "Con pérdida", price: 10, stock: 10, costPrice: 12 } });
+            const grande = await crearProducto({ data: { name: "Poco %, mucho importe", price: 1000, stock: 10, costPrice: 900 } });
+            const pequeno = await crearProducto({ data: { name: "Mucho %, poco importe", price: 10, stock: 10, costPrice: 1 } });
+            const perdida = await crearProducto({ data: { name: "Con pérdida", price: 10, stock: 10, costPrice: 12 } });
 
             await venderYEnviar([
                 { productId: pequeno.id, productName: "Mucho %, poco importe", quantity: 1, unitPrice: 10 },
@@ -213,7 +213,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("agrupa por producto las ventas de varias órdenes y cuenta las unidades", async () => {
-            const p = await prisma.product.create({ data: { name: "Batería", price: 25, stock: 20, costPrice: 10 } });
+            const p = await crearProducto({ data: { name: "Batería", price: 25, stock: 20, costPrice: 10 } });
             await venderYEnviar([{ productId: p.id, productName: "Batería", quantity: 2, unitPrice: 25 }]);
             await venderYEnviar([{ productId: p.id, productName: "Batería", quantity: 3, unitPrice: 20 }]);
 
@@ -222,7 +222,7 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
         });
 
         it("el PDF se genera con la sección de margen", async () => {
-            const p = await prisma.product.create({ data: { name: "Tablet", price: 300, stock: 5, costPrice: 210 } });
+            const p = await crearProducto({ data: { name: "Tablet", price: 300, stock: 5, costPrice: 210 } });
             await venderYEnviar([{ productId: p.id, productName: "Tablet", quantity: 1, unitPrice: 300 }]);
 
             const res = await request(app)

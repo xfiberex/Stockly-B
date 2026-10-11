@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto } from "./helpers";
 
 const BASE = "/api/v1/reports";
 
@@ -14,12 +14,12 @@ describe("Reports API", () => {
         userCookie = getAuthCookie(user.id);
 
         // p1: valor 50, con una salida reciente (para métricas de rotación)
-        const p1 = await prisma.product.create({ data: { name: "Disco SSD", price: 5, stock: 10, minStock: 0 } });
+        const p1 = await crearProducto({ data: { name: "Disco SSD", price: 5, stock: 10, minStock: 0 } });
         // p2: valor 20, en stock bajo (stock <= minStock)
-        await prisma.product.create({ data: { name: "RAM", price: 20, stock: 1, minStock: 5 } });
+        await crearProducto({ data: { name: "RAM", price: 20, stock: 1, minStock: 5 } });
 
         await prisma.stockMovement.create({
-            data: { productId: p1.id, type: "OUT", delta: -3, stockAfter: 7, note: "venta de prueba" },
+            data: { productId: p1.id, type: "OUT", delta: -3, stockAfter: 7, warehouseId: ALMACEN, warehouseStockAfter: 7, note: "venta de prueba" },
         });
     });
 
@@ -87,7 +87,7 @@ describe("Reports API", () => {
 
         it("las categorías vienen ordenadas por valor descendente", async () => {
             const categoria = await prisma.category.create({ data: { name: "T202-Cara" } });
-            const caro = await prisma.product.create({
+            const caro = await crearProducto({
                 data: { name: "T202-caro", price: 1000, stock: 5, minStock: 0, categoryId: categoria.id },
             });
 
@@ -104,7 +104,7 @@ describe("Reports API", () => {
         });
 
         it("los productos inactivos no cuentan para el valor ni para el desglose", async () => {
-            const inactivo = await prisma.product.create({
+            const inactivo = await crearProducto({
                 data: { name: "T202-inactivo", price: 999, stock: 99, minStock: 500, isActive: false },
             });
 

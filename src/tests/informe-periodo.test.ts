@@ -3,7 +3,7 @@ import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
 import { mesesDe, periodoDeAtajo, resolverPeriodo } from "@/modules/reports/reports.periodo";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -57,12 +57,12 @@ describe("Informes por periodo (T5-09)", () => {
     };
 
     const producto = (name: string, extra: { categoryId?: string } = {}) =>
-        prisma.product.create({ data: { name, price: 20, stock: 100, ...extra } });
+        crearProducto({ data: { name, price: 20, stock: 100, ...extra } });
 
     /** Una venta enviada en `shippedAt`, directamente en la base para fijar el instante exacto. */
     async function venta(shippedAt: string, items: Array<{ productId?: string; productName: string; quantity: number; unitPrice: number }>, status: "SHIPPED" | "CANCELLED" | "PENDING" = "SHIPPED") {
         return prisma.saleOrder.create({
-            data: { number: await numeroDeVenta(), status, shippedAt: status === "PENDING" ? null : new Date(shippedAt), items: { create: items } },
+            data: { warehouseId: ALMACEN, number: await numeroDeVenta(), status, shippedAt: status === "PENDING" ? null : new Date(shippedAt), items: { create: items } },
         });
     }
 
@@ -434,8 +434,8 @@ describe("Informes por periodo (T5-09)", () => {
             const unMinutoAntes = new Date(primerInstante.getTime() - 60_000);
             await prisma.stockMovement.createMany({
                 data: [
-                    { productId: p.id, type: "ADJUSTMENT", delta: 1, stockAfter: 1, createdAt: primerInstante },
-                    { productId: p.id, type: "ADJUSTMENT", delta: 1, stockAfter: 2, createdAt: unMinutoAntes },
+                    { productId: p.id, type: "ADJUSTMENT", delta: 1, stockAfter: 1, warehouseId: ALMACEN, warehouseStockAfter: 1, createdAt: primerInstante },
+                    { productId: p.id, type: "ADJUSTMENT", delta: 1, stockAfter: 2, warehouseId: ALMACEN, warehouseStockAfter: 2, createdAt: unMinutoAntes },
                 ],
             });
 

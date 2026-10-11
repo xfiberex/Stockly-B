@@ -4,10 +4,14 @@ import { HttpError } from "@/shared/lib/httpError";
 import { parsePagination } from "@/shared/lib/pagination";
 import { TAM_LOTE_EXPORTACION } from "@/shared/lib/exportacion";
 import { costeMedioTrasRecepcion, mismoCoste } from "@/shared/lib/costeMedio";
+import { bloquearProductos, entrar, sacar } from "@/shared/lib/stock";
+import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
 import type { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 const ORDER_INCLUDE = {
     supplier: { select: { id: true, name: true } },
+    // T5-14 — a qué almacén entra lo que se reciba.
+    warehouse: { select: { id: true, name: true } },
     items: {
         include: { product: { select: { id: true, name: true, sku: true } } },
     },
@@ -39,8 +43,17 @@ async function bloquearOrden(tx: Tx, id: string) {
  * Mete en el inventario lo recibido de cada línea: suma `receivedQuantity`, y en las ligadas a
  * un producto, el stock, el movimiento `IN` y el coste medio (T5-01) **con la cantidad
  * recibida**, no con la pedida. Las líneas escritas a mano solo cuentan para cerrar la orden.
+ *
+ * T5-14 — entra **en el almacén de la orden**. El coste medio, en cambio, sigue siendo uno por
+ * producto y se pondera con el stock de todos los almacenes: lo que costó una unidad no
+ * depende de en qué local esté.
  */
-async function registrarEntradas(tx: Tx, purchaseOrderId: string, lineas: Array<{ item: PurchaseOrderItem; cantidad: number }>) {
+async function registrarEntradas(tx: Tx, orden: { id: string; warehouseId: string }, lineas: Array<{ item: PurchaseOrderItem; cantidad: number }>) {
+    const purchaseOrderId = orden.id;
+    // Todos los productos, bloqueados antes de tocar ninguno y en orden de id: dos recepciones
+    // con los mismos productos en distinto orden no se esperan en cruz.
+    await bloquearProductos(tx, lineas.flatMap(({ item }) => (item.productId ? [item.productId] : [])));
+
     for (const { item, cantidad } of lineas) {
         await tx.purchaseOrderItem.update({
             where: { id: item.id },
@@ -49,15 +62,20 @@ async function registrarEntradas(tx: Tx, purchaseOrderId: string, lineas: Array<
 
         if (!item.productId) continue;
 
-        const product = await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: cantidad } },
+        const product = await entrar(tx, {
+            productId: item.productId,
+            warehouseId: orden.warehouseId,
+            cantidad,
+            type: "IN",
+            note: `Orden de compra #${purchaseOrderId.slice(0, 8)}`,
+            // T5-09 — fecha esta recepción para el informe de compras por periodo.
+            purchaseOrderItemId: item.id,
         });
 
-        // T5-01 — el coste se lee de la fila que devuelve el `update`, no de una
-        // lectura previa. Ese `update` ya tiene la fila bloqueada hasta el final de la
-        // transacción, así que dos recepciones simultáneas del mismo producto no
-        // pueden promediar las dos sobre el mismo coste de partida: la segunda espera.
+        // T5-01 — el coste se lee de la fila que devuelve `entrar`, no de una lectura previa.
+        // Esa escritura ya tiene la fila bloqueada hasta el final de la transacción, así que
+        // dos recepciones simultáneas del mismo producto no pueden promediar las dos sobre el
+        // mismo coste de partida: la segunda espera.
         const stockAntes = product.stock - cantidad;
         const costeNuevo = costeMedioTrasRecepcion(stockAntes, product.costPrice, cantidad, item.unitPrice);
 
@@ -73,29 +91,19 @@ async function registrarEntradas(tx: Tx, purchaseOrderId: string, lineas: Array<
                 },
             });
         }
-
-        await tx.stockMovement.create({
-            data: {
-                productId: item.productId,
-                type: "IN",
-                delta: cantidad,
-                stockAfter: product.stock,
-                note: `Orden de compra #${purchaseOrderId.slice(0, 8)}`,
-                // T5-09 — fecha esta recepción para el informe de compras por periodo.
-                purchaseOrderItemId: item.id,
-            },
-        });
     }
 }
 
 export const purchaseOrderService = {
     // Era la única lista de la API sin techo: traía todas las órdenes con el detalle
     // completo de cada ítem. Mismo contrato `{ data, meta }` que las de venta.
-    async getAll(query: { page?: string; limit?: string; status?: string } = {}) {
+    async getAll(query: { page?: string; limit?: string; status?: string; warehouseId?: unknown } = {}) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
-        const where = statusFilter ? { status: statusFilter } : {};
+        // T5-14 — las de un almacén.
+        const warehouseId = await almacenDelFiltro(query.warehouseId);
+        const where = { ...(statusFilter && { status: statusFilter }), ...(warehouseId && { warehouseId }) };
 
         const [orders, total] = await prisma.$transaction([
             prisma.purchaseOrder.findMany({
@@ -118,8 +126,12 @@ export const purchaseOrderService = {
     },
 
     async create(dto: CreatePurchaseOrderDto) {
+        // T5-14 — a qué almacén entrará: el de la petición o el predeterminado.
+        const almacen = await almacenParaOperar(dto.warehouseId);
+
         return prisma.purchaseOrder.create({
             data: {
+                warehouseId: almacen.id,
                 supplierId: dto.supplierId ?? null,
                 notes: dto.notes,
                 items: {
@@ -161,7 +173,7 @@ export const purchaseOrderService = {
                 const lineas = orden.items
                     .filter((item) => item.receivedQuantity < item.quantity)
                     .map((item) => ({ item, cantidad: item.quantity - item.receivedQuantity }));
-                await registrarEntradas(tx, id, lineas);
+                await registrarEntradas(tx, orden, lineas);
 
                 return tx.purchaseOrder.update({
                     where: { id },
@@ -178,6 +190,9 @@ export const purchaseOrderService = {
             // T5-04 — **lo que entró es `receivedQuantity`, no `quantity`.** Cancelar una orden
             // recibida a medias retirando lo pedido sacaría unidades que nunca llegaron.
             //
+            // T5-14 — se retira **del almacén al que entró**. Si esas unidades se transfirieron
+            // a otro, aquí ya no están, y es el mismo caso que si se hubieran vendido.
+            //
             // T5-01 — **el coste medio no se toca al cancelar**, y es una decisión, no un olvido
             // (anotada en la ficha). Deshacer una media ponderada solo es exacto si no hubo otra
             // recepción ni un ajuste manual entre medias; dejarlo como está es siempre válido, y
@@ -185,36 +200,31 @@ export const purchaseOrderService = {
             if (dto.status === "CANCELLED" && conRecepcion) {
                 const items = await tx.purchaseOrderItem.findMany({
                     where: { purchaseOrderId: id, productId: { not: null }, receivedQuantity: { gt: 0 } },
-                    include: { product: true },
                 });
+                // Todos los productos, bloqueados antes de tocar ninguno y en orden de id.
+                await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
 
                 for (const item of items) {
-                    if (!item.productId || !item.product) continue;
+                    if (!item.productId) continue;
                     const retirar = item.receivedQuantity;
 
-                    const res = await tx.product.updateMany({
-                        where: { id: item.productId, stock: { gte: retirar } },
-                        data: { stock: { decrement: retirar } },
-                    });
-                    if (res.count === 0) {
-                        throw new HttpError(
-                            400,
-                            `No se puede cancelar: las unidades recibidas de "${item.product.name}" ya se consumieron. Disponible: ${item.product.stock}, requerido: ${retirar}`,
-                            "CANNOT_CANCEL_UNITS_CONSUMED",
-                            { producto: item.product.name, disponible: item.product.stock, requerido: retirar },
-                        );
-                    }
-
-                    const refreshed = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
-                    await tx.stockMovement.create({
-                        data: {
+                    await sacar(
+                        tx,
+                        {
                             productId: item.productId,
+                            warehouseId: orden.warehouseId,
+                            cantidad: retirar,
                             type: "OUT",
-                            delta: -retirar,
-                            stockAfter: refreshed.stock,
                             note: `Cancelación de orden de compra #${id.slice(0, 8)}`,
                         },
-                    });
+                        (enAlmacen, producto) =>
+                            new HttpError(
+                                400,
+                                `No se puede cancelar: las unidades recibidas de "${producto.name}" ya se consumieron. Disponible: ${enAlmacen}, requerido: ${retirar}`,
+                                "CANNOT_CANCEL_UNITS_CONSUMED",
+                                { producto: producto.name, disponible: enAlmacen, requerido: retirar },
+                            ),
+                    );
                 }
 
                 return tx.purchaseOrder.update({
@@ -262,7 +272,7 @@ export const purchaseOrderService = {
                 return { item, cantidad: linea.quantity };
             });
 
-            await registrarEntradas(tx, id, lineas);
+            await registrarEntradas(tx, orden, lineas);
 
             const recibidoAhora = new Map(lineas.map((l) => [l.item.id, l.cantidad]));
             const completa = orden.items.every((item) => item.receivedQuantity + (recibidoAhora.get(item.id) ?? 0) === item.quantity);
@@ -305,6 +315,7 @@ export const purchaseOrderService = {
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 include: {
                     supplier: { select: { name: true } },
+                    warehouse: { select: { name: true } },
                     items: { include: { product: { select: { sku: true } } } },
                 },
             });
@@ -322,6 +333,8 @@ export const purchaseOrderService = {
                     quantity: item.quantity,
                     unitPrice: Number(item.unitPrice),
                     totalLine: item.quantity * Number(item.unitPrice),
+                    // T5-14 — a qué almacén entra. Al final, para no mover las columnas que ya había.
+                    warehouseName: o.warehouse.name,
                 })),
             );
 

@@ -10,6 +10,8 @@ const itemSchema = z.object({
 export const createPurchaseOrderSchema = z.object({
     supplierId: z.string().uuid().optional(),
     notes: z.string().trim().max(1000).optional(),
+    // T5-14 — opcional: sin él, la compra entra en el almacén predeterminado.
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
     items: z.array(itemSchema).min(1, "Se requiere al menos un ítem"),
 });
 
@@ -42,6 +44,7 @@ export const receivePurchaseOrderSchema = z.object({
  * con el de venta (ver `reposicion.service.ts`).
  */
 export const generarDesdeSugerenciasSchema = z.object({
+    warehouseId: z.string().uuid("Almacén inválido").optional(),
     items: z
         .array(
             z.object({

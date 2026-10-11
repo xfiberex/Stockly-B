@@ -4,11 +4,12 @@ import { prisma } from "../src/shared/lib/prisma";
 import { hashPassword } from "../src/shared/lib/hash";
 import { digitoDeControlGtin } from "../src/contratos/api";
 import { CONTADOR_DE_VENTAS } from "../src/shared/lib/numeroDeVenta";
+import { transferir } from "../src/shared/lib/stock";
 import { categoriesData } from "./data/categories";
 import { brandsData } from "./data/brands";
 import { suppliersData } from "./data/suppliers";
 import { productsData } from "./data/products";
-import type { $Enums, Product, User } from "../src/generated/prisma/client";
+import type { $Enums, Product, User, Warehouse } from "../src/generated/prisma/client";
 
 // ─── Azar reproducible ────────────────────────────────────────────────────────
 //
@@ -65,13 +66,20 @@ async function limpiar(): Promise<void> {
     await prisma.priceHistory.deleteMany();
     await prisma.costHistory.deleteMany();
     await prisma.stockMovement.deleteMany();
+    // T5-14 — después de sus movimientos, que apuntan a ellas.
+    await prisma.stockTransfer.deleteMany();
     // T5-07 — las líneas caen con su sesión (Cascade).
     await prisma.inventoryCount.deleteMany();
     await prisma.auditLog.deleteMany();
     // T5-10 — `product_abc` cae con sus productos (Cascade); la fila del cálculo no, y sin
     // borrarla la caché se daría por vigente con una tabla vacía.
     await prisma.abcCalculation.deleteMany();
+    // T5-14 — `stock_levels` cae con sus productos (Cascade). **No se borra antes y aparte**: con
+    // los productos todavía ahí, la base rechazaría dejarlos con un total que ya no suman sus
+    // niveles (el disparador `stock_cuadra`).
     await prisma.product.deleteMany();
+    // T5-14 — los almacenes, cuando ya no les apunta nada: ni órdenes, ni conteos, ni niveles.
+    await prisma.warehouse.deleteMany();
     await prisma.tag.deleteMany();
     await prisma.category.deleteMany();
     await prisma.brand.deleteMany();
@@ -214,16 +222,38 @@ function codigoDeBarrasDe(i: number): string | undefined {
     return cuerpo + digitoDeControlGtin(cuerpo);
 }
 
+// ─── Almacenes (T5-14) ────────────────────────────────────────────────────────
+
+/**
+ * Dos locales: el predeterminado, donde nace todo el stock del catálogo, y una sucursal que
+ * recibe parte por transferencia (`sembrarTransferencia`). Con uno solo, las pantallas esconden
+ * todo lo que habla de almacenes y no habría nada que enseñar.
+ */
+async function sembrarAlmacenes(): Promise<{ principal: Warehouse; sucursal: Warehouse }> {
+    const principal = await prisma.warehouse.create({
+        data: { name: "Tienda Central", address: "Av. Winston Churchill 1099, Santo Domingo", isDefault: true },
+    });
+    const sucursal = await prisma.warehouse.create({
+        data: { name: "Sucursal Santiago", address: "Calle del Sol 45, Santiago de los Caballeros" },
+    });
+    console.log("  - 2 almacenes creados (Tienda Central, predeterminado, y Sucursal Santiago)");
+    return { principal, sucursal };
+}
+
 async function sembrarProductos(
     categorias: Map<string, string>,
     marcas: Map<string, string>,
     proveedores: Map<string, string>,
     etiquetas: Map<string, string>,
+    principal: Warehouse,
 ): Promise<Product[]> {
     const creados = await Promise.all(
         productsData.map((p, i) =>
             prisma.product.create({
                 data: {
+                    // T5-14 — el producto nace con su stock **y con su nivel**, en la misma
+                    // sentencia: la base no confirma un total que no sumen sus almacenes.
+                    ...(p.stock !== 0 && { stockLevels: { create: { warehouseId: principal.id, stock: p.stock } } }),
                     name: p.name,
                     description: p.description,
                     sku: p.sku,
@@ -610,6 +640,7 @@ async function sembrarOrdenesDeCompra(
     porSku: Map<string, Product>,
     proveedores: Map<string, string>,
     libro: LibroMayor,
+    principal: Warehouse,
 ): Promise<number> {
     let items = 0;
 
@@ -644,6 +675,7 @@ async function sembrarOrdenesDeCompra(
 
         await prisma.purchaseOrder.create({
             data: {
+                warehouseId: principal.id,
                 supplierId: exigir(proveedores, orden.proveedor, "proveedor"),
                 status: orden.status,
                 notes: orden.notes,
@@ -703,6 +735,7 @@ async function sembrarOrdenesDeVenta(
     porSku: Map<string, Product>,
     costes: Map<string, string>,
     libro: LibroMayor,
+    principal: Warehouse,
 ): Promise<number> {
     let items = 0;
 
@@ -745,6 +778,7 @@ async function sembrarOrdenesDeVenta(
         await prisma.saleOrder.create({
             data: {
                 number: indice + 1,
+                warehouse: { connect: { id: principal.id } },
                 status: orden.status,
                 ...(email && {
                     customer: {
@@ -892,26 +926,78 @@ function exigir(mapa: Map<string, string>, clave: string, que: string): string {
  * este seed es un libro mayor que tiene que cerrar exactamente en el stock del catálogo. Así se
  * puede probar la revisión y el cierre desde la interfaz.
  */
-async function sembrarConteo(productos: Product[]): Promise<void> {
+/**
+ * T5-14 — una transferencia a la sucursal, **con el código de producción** (`transferir`) y no
+ * con filas escritas a mano: así sus dos movimientos por producto, sus saldos y los niveles
+ * salen como los dejaría la aplicación. Va después del libro mayor —es lo último que pasó— y
+ * no lo descuadra: una transferencia no cambia el total de ningún producto.
+ *
+ * Se lleva una cuarta parte de los ocho productos activos con más existencias.
+ */
+async function sembrarTransferencia(productos: Product[], principal: Warehouse, sucursal: Warehouse): Promise<number> {
+    const elegidos = productos
+        .filter((p) => p.isActive && p.stock >= 12)
+        .sort((a, b) => b.stock - a.stock || a.id.localeCompare(b.id))
+        .slice(0, 8)
+        .sort((a, b) => a.id.localeCompare(b.id));
+
+    await prisma.$transaction(async (tx) => {
+        const transferencia = await tx.stockTransfer.create({
+            data: {
+                fromWarehouseId: principal.id,
+                toWarehouseId: sucursal.id,
+                note: "Surtido inicial de la sucursal",
+                createdByEmail: "almacen@stockly.app",
+            },
+        });
+        for (const p of elegidos) {
+            await transferir(
+                tx,
+                {
+                    productId: p.id,
+                    fromWarehouseId: principal.id,
+                    toWarehouseId: sucursal.id,
+                    cantidad: Math.trunc(p.stock / 4),
+                    transferId: transferencia.id,
+                    note: `Transferencia #${transferencia.id.slice(0, 8).toUpperCase()}: ${principal.name} → ${sucursal.name}`,
+                },
+                () => new Error(`El seed quiso transferir más ${p.sku ?? p.name} del que hay`) as never,
+            );
+        }
+    });
+
+    console.log(`  - 1 transferencia a la sucursal (${elegidos.length} productos)`);
+    return elegidos.length;
+}
+
+async function sembrarConteo(productos: Product[], principal: Warehouse): Promise<void> {
     const porCategoria = new Map<string, Product[]>();
     for (const p of productos) {
         if (!p.isActive || !p.categoryId) continue;
         porCategoria.set(p.categoryId, [...(porCategoria.get(p.categoryId) ?? []), p]);
     }
     const [categoryId, suyos] = [...porCategoria.entries()].sort((a, b) => b[1].length - a[1].length)[0]!;
-    const [cuadra, falta] = suyos.filter((p) => p.stock > 0);
+    // T5-14 — el conteo es de la Tienda Central, y el esperado de cada línea es lo que hay **en
+    // ella**, que tras la transferencia ya no es el total de todos los productos.
+    const enPrincipal = new Map(
+        (await prisma.stockLevel.findMany({ where: { warehouseId: principal.id }, select: { productId: true, stock: true } }))
+            .map((n) => [n.productId, n.stock]),
+    );
+    const hay = (p: Product) => enPrincipal.get(p.id) ?? 0;
+    const [cuadra, falta] = suyos.filter((p) => hay(p) > 0);
 
     const ahora = new Date();
     await prisma.inventoryCount.create({
         data: {
+            warehouseId: principal.id,
             categoryId,
             note: "Recuento trimestral del pasillo 2",
             createdByEmail: "almacen@stockly.app",
             lines: {
                 create: suyos.map((p) => ({
                     productId: p.id,
-                    ...(p.id === cuadra!.id && { countedQuantity: p.stock, expectedQuantity: p.stock, countedAt: ahora, countedByEmail: "almacen@stockly.app" }),
-                    ...(p.id === falta!.id && { countedQuantity: p.stock - 1, expectedQuantity: p.stock, countedAt: ahora, countedByEmail: "almacen@stockly.app" }),
+                    ...(p.id === cuadra!.id && { countedQuantity: hay(p), expectedQuantity: hay(p), countedAt: ahora, countedByEmail: "almacen@stockly.app" }),
+                    ...(p.id === falta!.id && { countedQuantity: hay(p) - 1, expectedQuantity: hay(p), countedAt: ahora, countedByEmail: "almacen@stockly.app" }),
                 })),
             },
         },
@@ -929,25 +1015,30 @@ async function main(): Promise<void> {
     const marcas = await sembrarMarcas();
     const proveedores = await sembrarProveedores();
     const etiquetas = await sembrarEtiquetas();
-    const productos = await sembrarProductos(categorias, marcas, proveedores, etiquetas);
+    const { principal, sucursal } = await sembrarAlmacenes();
+    const productos = await sembrarProductos(categorias, marcas, proveedores, etiquetas, principal);
 
     const porSku = new Map(productos.flatMap((p) => (p.sku ? [[p.sku, p] as const] : [])));
 
     // Las órdenes van antes que los movimientos: son las que los generan.
     const libro = new LibroMayor();
-    await sembrarOrdenesDeCompra(porSku, proveedores, libro);
+    await sembrarOrdenesDeCompra(porSku, proveedores, libro, principal);
     const costes = await sembrarCostes(porSku);
     const conCoste = costes.size;
-    await sembrarOrdenesDeVenta(porSku, costes, libro);
+    await sembrarOrdenesDeVenta(porSku, costes, libro, principal);
     anotarMovimientosSueltos(libro, productos);
 
-    const movimientos = libro.cerrar(productos);
+    // T5-14 — todo el libro ocurre en la Tienda Central, donde nace el stock: lo que quedó en
+    // ella tras cada movimiento es lo que quedó en total.
+    const movimientos = libro.cerrar(productos).map((m) => ({ ...m, warehouseId: principal.id, warehouseStockAfter: m.stockAfter }));
     await prisma.stockMovement.createMany({ data: movimientos });
     console.log(`  - ${movimientos.length} movimientos de stock creados`);
 
+    await sembrarTransferencia(productos, principal, sucursal);
+
     await sembrarHistorialDePrecios(productos);
     await sembrarAuditoria(usuarios, productos);
-    await sembrarConteo(productos);
+    await sembrarConteo(productos, principal);
 
     // `app_settings` se deja vacía a propósito: `SETTINGS_CATALOG` ya define el valor por
     // defecto de cada ajuste y la tabla solo guarda lo que alguien haya cambiado. Sembrar
@@ -964,6 +1055,7 @@ async function main(): Promise<void> {
     Marcas              ${marcas.size}
     Proveedores         ${proveedores.size}
     Etiquetas           ${etiquetas.size}
+    Almacenes           2  (Tienda Central y Sucursal Santiago)
     Productos           ${productos.length}  (${bajos.length} bajo minimo, 2 descontinuados)
     Ordenes de compra   ${ordenesDeCompra.length}
     Con coste medio     ${conCoste}  (el resto, sin coste conocido)

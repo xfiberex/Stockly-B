@@ -60,6 +60,7 @@ describe("Contrato entre Swagger y el validador de productos", () => {
             brandId: "22222222-2222-4222-8222-222222222222",
             supplierId: "33333333-3333-4333-8333-333333333333",
             tagIds: ["44444444-4444-4444-8444-444444444444"],
+            warehouseId: "55555555-5555-4555-8555-555555555555",
         };
 
         // Si se documenta un campo nuevo sin añadirlo aquí, el test lo señala.
@@ -73,7 +74,7 @@ describe("Contrato entre Swagger y el validador de productos", () => {
         const parametros = (spec.paths["/products"].get.parameters as Array<{ name: string }>).map((p) => p.name);
 
         expect(parametros).toEqual(
-            expect.arrayContaining(["page", "limit", "search", "categoryId", "brandId", "supplierId", "tagId", "isActive"]),
+            expect.arrayContaining(["page", "limit", "search", "categoryId", "brandId", "supplierId", "tagId", "isActive", "warehouseId"]),
         );
         // `category` (por nombre) nunca existió en el servicio.
         expect(parametros).not.toContain("category");

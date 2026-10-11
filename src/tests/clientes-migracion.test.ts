@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, numeroDeVenta } from "./helpers";
+import { cleanDb, numeroDeVenta, ALMACEN } from "./helpers";
 
 /**
  * T5-06 — la migración que agrupa las órdenes que ya existían.
@@ -28,7 +28,7 @@ function sentenciasDeDatos(): string[] {
 
 async function orden(email: string | null, nombre: string | null, telefono: string | null, dias: number) {
     return prisma.saleOrder.create({
-        data: { number: await numeroDeVenta(),
+        data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
             customerEmail: email,
             customerName: nombre,
             customerPhone: telefono,

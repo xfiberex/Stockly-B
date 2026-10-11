@@ -18,6 +18,7 @@ evidente es la equivocada. Si algo se hizo de la forma obvia, no necesita una en
 | [0007](0007-i18n-propio.md) | La internacionalización se hace con un motor propio, no con `i18next` | Aceptada |
 | [0008](0008-integracion-continua.md) | Integración continua: la misma puerta, también en GitHub | Aceptada |
 | [0009](0009-licencia-agpl.md) | Licencia: GNU AGPL v3, no MIT | Aceptada |
+| [0010](0010-stock-total-desnormalizado.md) | `Product.stock` se conserva como total de los almacenes, y la base lo comprueba | Aceptada |
 
 ## Formato
 

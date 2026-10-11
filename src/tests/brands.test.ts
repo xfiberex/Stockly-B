@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -129,7 +129,7 @@ describe("Brands API", () => {
     describe("DELETE /brands/:id", () => {
         it("200: elimina marca y pone brandId=null en productos", async () => {
             const brand = await prisma.brand.create({ data: { name: "A eliminar" } });
-            const product = await prisma.product.create({
+            const product = await crearProducto({
                 data: { name: "Prod con marca", price: 10, stock: 1, brandId: brand.id },
             });
 

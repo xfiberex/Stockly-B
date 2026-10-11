@@ -53,6 +53,7 @@ Stockly-B/
     │   ├── auth · users · settings · audit-logs · notifications
     │   ├── products · categories · brands · suppliers · tags
     │   ├── purchase-orders · sale-orders · customers · inventory-counts
+    │   ├── warehouses · stock-transfers
     │   └── reports
     ├── routes/index.ts            # Montaje de los módulos y sondas (`health`, `ready`, `metrics`)
     ├── shared/
@@ -169,6 +170,8 @@ qué botones enseñar.
 | `/sale-orders` | `GET /` · `/:id` · `/:id/receipt` | `POST /:id/ship` | `POST /` · `PATCH /:id` · `DELETE /:id` · `GET /export` |
 | `/customers` | `GET /` · `/:id` | — | `POST /` · `PUT /:id` · `DELETE /:id` |
 | `/inventory-counts` | `GET /` · `/:id` · `/:id/lines` | `POST /` · `PATCH /:id/lines` · `POST /:id/close` · `POST /:id/cancel` | — |
+| `/warehouses` | `GET /` · `/summary` | — | `POST /` · `PUT /:id` · `PATCH /:id/default` · `/:id/activate` · `/:id/deactivate` |
+| `/stock-transfers` | `GET /` · `/:id` | `POST /` | — |
 | `/reports` | `GET /` · `/period` · `/abc` | — | — |
 | `/notifications` | `GET /` · `/unread-count` · `POST /read-all` · `POST /:id/read` — siempre los propios | — | — |
 | `/users` | — | — | `GET /` · `/:id` · `POST /` (invitar) · `PATCH /:id/role` · `/:id/activate` · `/:id/deactivate` |

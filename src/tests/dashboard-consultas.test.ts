@@ -2,7 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto } from "./helpers";
 
 /**
  * T4-16 — las consultas del dashboard.
@@ -32,10 +32,10 @@ const BASE = "/api/v1/reports";
 
 /** Un producto con `salidas` unidades de OUT en los últimos 30 días. */
 async function productoConSalidas(nombre: string, salidas: number, isActive = true) {
-    const p = await prisma.product.create({ data: { name: nombre, price: 10, stock: 100, minStock: 5, isActive } });
+    const p = await crearProducto({ data: { name: nombre, price: 10, stock: 100, minStock: 5, isActive } });
     if (salidas > 0) {
         await prisma.stockMovement.create({
-            data: { productId: p.id, type: "OUT", delta: -salidas, stockAfter: 100, createdAt: new Date() },
+            data: { productId: p.id, type: "OUT", delta: -salidas, stockAfter: 100, warehouseId: ALMACEN, warehouseStockAfter: 100, createdAt: new Date() },
         });
     }
     return p;
@@ -144,13 +144,13 @@ describe("Consultas del dashboard (T4-16)", () => {
     });
 
     it("un movimiento fuera de la ventana de 6 meses no aparece", async () => {
-        const viejo = await prisma.product.create({ data: { name: "Antiguo", price: 1, stock: 1 } });
+        const viejo = await crearProducto({ data: { name: "Antiguo", price: 1, stock: 1 } });
         await prisma.stockMovement.create({
             data: {
                 productId: viejo.id,
                 type: "IN",
                 delta: 7,
-                stockAfter: 1,
+                stockAfter: 1, warehouseId: ALMACEN, warehouseStockAfter: 1,
                 createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
             },
         });

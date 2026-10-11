@@ -4,7 +4,7 @@ import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { MONTAJES } from "@/routes";
 import { PERMISOS, rolSchema, type RutaConPermiso } from "@/contratos/api";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto } from "./helpers";
 import type { $Enums } from "@/generated/prisma/client";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
@@ -119,7 +119,7 @@ describe("Permisos por rol (T5-13)", () => {
         });
 
         it("recibe la orden de compra: suma el stock y queda en la auditoría a su nombre", async () => {
-            const producto = await prisma.product.create({ data: { name: "Cable", price: 10, stock: 0 } });
+            const producto = await crearProducto({ data: { name: "Cable", price: 10, stock: 0 } });
             const orden = await request(app)
                 .post("/api/v1/purchase-orders")
                 .set("Cookie", galletas.ADMIN)
@@ -139,7 +139,7 @@ describe("Permisos por rol (T5-13)", () => {
         });
 
         it("cambiar el precio de un producto es 403 y el precio no cambia", async () => {
-            const producto = await prisma.product.create({ data: { name: "Ratón", price: 25, stock: 3 } });
+            const producto = await crearProducto({ data: { name: "Ratón", price: 25, stock: 3 } });
 
             const res = await request(app)
                 .put(`/api/v1/products/${producto.id}`)
@@ -152,7 +152,7 @@ describe("Permisos por rol (T5-13)", () => {
         });
 
         it("tampoco puede cancelar la compra que recibió: el PATCH sigue siendo de ADMIN", async () => {
-            const orden = await prisma.purchaseOrder.create({ data: { items: { create: [{ productName: "X", quantity: 1, unitPrice: 1 }] } } });
+            const orden = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, items: { create: [{ productName: "X", quantity: 1, unitPrice: 1 }] } } });
 
             const res = await request(app)
                 .patch(`/api/v1/purchase-orders/${orden.id}`)
@@ -174,7 +174,7 @@ describe("Permisos por rol (T5-13)", () => {
         });
 
         async function ventaDe(cantidad: number) {
-            const producto = await prisma.product.create({ data: { name: "Monitor", price: 100, stock: 5 } });
+            const producto = await crearProducto({ data: { name: "Monitor", price: 100, stock: 5 } });
             const venta = await request(app)
                 .post("/api/v1/sale-orders")
                 .set("Cookie", galletas.ADMIN)

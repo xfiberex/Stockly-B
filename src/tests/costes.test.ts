@@ -2,7 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { costeMedioTrasRecepcion, mismoCoste } from "@/shared/lib/costeMedio";
-import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -103,7 +103,7 @@ describe("Coste medio en la API (T5-01)", () => {
 
     describe("Recepción de compras", () => {
         it("recibir 10 a 5 sobre 10 que costaron 3 deja el coste en 4, con su fila de histórico", async () => {
-            const producto = await prisma.product.create({ data: { name: "Monitor", price: 20, stock: 10, costPrice: 3 } });
+            const producto = await crearProducto({ data: { name: "Monitor", price: 20, stock: 10, costPrice: 3 } });
 
             const ordenId = await recibir([{ productId: producto.id, productName: "Monitor", quantity: 10, unitPrice: 5 }]);
 
@@ -120,7 +120,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("un producto sin coste lo toma de su primera recepción, aunque ya tuviera stock", async () => {
-            const producto = await prisma.product.create({ data: { name: "Cable", price: 9, stock: 40 } });
+            const producto = await crearProducto({ data: { name: "Cable", price: 9, stock: 40 } });
             expect(await costeDe(producto.id)).toBeNull();
 
             await recibir([{ productId: producto.id, productName: "Cable", quantity: 10, unitPrice: 2.5 }]);
@@ -131,7 +131,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("con el stock a cero, la recepción fija el coste sin arrastrar el anterior", async () => {
-            const producto = await prisma.product.create({ data: { name: "Hub", price: 30, stock: 0, costPrice: 100 } });
+            const producto = await crearProducto({ data: { name: "Hub", price: 30, stock: 0, costPrice: 100 } });
 
             await recibir([{ productId: producto.id, productName: "Hub", quantity: 4, unitPrice: 12 }]);
 
@@ -139,7 +139,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("el mismo producto dos veces en una orden promedia en orden, línea a línea", async () => {
-            const producto = await prisma.product.create({ data: { name: "Disco", price: 80, stock: 0 } });
+            const producto = await crearProducto({ data: { name: "Disco", price: 80, stock: 0 } });
 
             await recibir([
                 { productId: producto.id, productName: "Disco", quantity: 10, unitPrice: 10 },
@@ -152,7 +152,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("si la media no cambia, no se escribe histórico", async () => {
-            const producto = await prisma.product.create({ data: { name: "Funda", price: 15, stock: 5, costPrice: 6 } });
+            const producto = await crearProducto({ data: { name: "Funda", price: 15, stock: 5, costPrice: 6 } });
 
             await recibir([{ productId: producto.id, productName: "Funda", quantity: 5, unitPrice: 6 }]);
 
@@ -161,7 +161,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("un ítem escrito a mano, sin producto, no toca ningún coste", async () => {
-            const producto = await prisma.product.create({ data: { name: "Lámpara", price: 25, stock: 3, costPrice: 10 } });
+            const producto = await crearProducto({ data: { name: "Lámpara", price: 25, stock: 3, costPrice: 10 } });
 
             await recibir([{ productName: "Algo sin catálogo", quantity: 7, unitPrice: 99 }]);
 
@@ -170,7 +170,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("cancelar una orden recibida retira el stock pero deja el coste como está (decisión de T5-01)", async () => {
-            const producto = await prisma.product.create({ data: { name: "Webcam", price: 50, stock: 10, costPrice: 3 } });
+            const producto = await crearProducto({ data: { name: "Webcam", price: 50, stock: 10, costPrice: 3 } });
             const ordenId = await recibir([{ productId: producto.id, productName: "Webcam", quantity: 10, unitPrice: 5 }]);
             expect(await costeDe(producto.id)).toBe("4");
 
@@ -205,7 +205,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("editarlo deja una fila MANUAL; reenviar el mismo valor no deja otra", async () => {
-            const producto = await prisma.product.create({ data: { name: "Tablet", price: 400, stock: 2, costPrice: 250 } });
+            const producto = await crearProducto({ data: { name: "Tablet", price: 400, stock: 2, costPrice: 250 } });
 
             const cambio = await request(app).put(`${PRODUCTOS}/${producto.id}`).set("Cookie", adminCookie).send({ costPrice: "260" });
             expect(cambio.status).toBe(200);
@@ -222,7 +222,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("al editar, la cadena vacía quita el coste y una clave ausente no lo toca", async () => {
-            const producto = await prisma.product.create({ data: { name: "Router", price: 60, costPrice: 35 } });
+            const producto = await crearProducto({ data: { name: "Router", price: 60, costPrice: 35 } });
 
             await request(app).put(`${PRODUCTOS}/${producto.id}`).set("Cookie", adminCookie).send({ name: "Router AX" });
             expect(await costeDe(producto.id)).toBe("35");
@@ -236,7 +236,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("422 con un coste negativo", async () => {
-            const producto = await prisma.product.create({ data: { name: "Altavoz", price: 45 } });
+            const producto = await crearProducto({ data: { name: "Altavoz", price: 45 } });
 
             const res = await request(app).put(`${PRODUCTOS}/${producto.id}`).set("Cookie", adminCookie).send({ costPrice: "-1" });
 
@@ -246,7 +246,7 @@ describe("Coste medio en la API (T5-01)", () => {
         });
 
         it("403: un USER no puede cambiar el coste", async () => {
-            const producto = await prisma.product.create({ data: { name: "Micro", price: 70, costPrice: 40 } });
+            const producto = await crearProducto({ data: { name: "Micro", price: 70, costPrice: 40 } });
 
             const res = await request(app).put(`${PRODUCTOS}/${producto.id}`).set("Cookie", userCookie).send({ costPrice: "1" });
 
@@ -257,7 +257,7 @@ describe("Coste medio en la API (T5-01)", () => {
 
     describe("GET /products/:id/cost-history", () => {
         it("pagina del más reciente al más antiguo", async () => {
-            const producto = await prisma.product.create({ data: { name: "Portátil", price: 900 } });
+            const producto = await crearProducto({ data: { name: "Portátil", price: 900 } });
             for (const [i, coste] of ["500", "510", "520"].entries()) {
                 await prisma.costHistory.create({
                     data: {

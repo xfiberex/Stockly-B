@@ -10,6 +10,8 @@ export interface PurchaseOrderItemDto {
 export interface CreatePurchaseOrderDto {
     supplierId?: string;
     notes?: string;
+    /** T5-14 — a qué almacén entra lo recibido; sin él, al predeterminado. No se cambia después. */
+    warehouseId?: string;
     items: PurchaseOrderItemDto[];
 }
 
@@ -29,5 +31,7 @@ export interface ReceivePurchaseOrderDto {
  * decide quien revisa; el proveedor no viaja, sale del producto.
  */
 export interface GenerarDesdeSugerenciasDto {
+    /** T5-14 — el almacén de todas las órdenes que salgan; sin él, el predeterminado. */
+    warehouseId?: string;
     items: Array<{ productId: string; quantity: number; unitPrice: number }>;
 }

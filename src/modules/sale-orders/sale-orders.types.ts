@@ -16,6 +16,8 @@ export interface CreateSaleOrderDto {
     /** T6-06 — sin él, se copia el del cliente vinculado. */
     customerDocument?: string;
     notes?: string;
+    /** T5-14 — de qué almacén sale; sin él, del predeterminado. No se cambia después. */
+    warehouseId?: string;
     items: SaleOrderItemDto[];
 }
 
@@ -29,6 +31,8 @@ export interface CounterSaleDto {
     customerEmail?: string;
     customerPhone?: string;
     customerDocument?: string;
+    /** T5-14 — el local en el que está el mostrador; sin él, el predeterminado. */
+    warehouseId?: string;
     items: Array<{ productId: string; quantity: number }>;
 }
 

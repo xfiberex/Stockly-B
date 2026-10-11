@@ -139,6 +139,19 @@ export const PERMISOS = {
     "PATCH /inventory-counts/:id/lines": ALMACEN,
     "POST /inventory-counts/:id/close": ALMACEN,
     "POST /inventory-counts/:id/cancel": ALMACEN,
+    // Almacenes (T5-14): los ve cualquiera —toda operación de stock dice en cuál ocurre—; darlos de
+    // alta, renombrarlos, desactivarlos o cambiar el predeterminado es configuración del negocio.
+    "GET /warehouses": TODOS,
+    "GET /warehouses/summary": TODOS,
+    "POST /warehouses": SOLO_ADMIN,
+    "PUT /warehouses/:id": SOLO_ADMIN,
+    "PATCH /warehouses/:id/default": SOLO_ADMIN,
+    "PATCH /warehouses/:id/activate": SOLO_ADMIN,
+    "PATCH /warehouses/:id/deactivate": SOLO_ADMIN,
+    // Transferencias (T5-14): mover mercancía entre almacenes es mover stock, y eso es del almacén.
+    "GET /stock-transfers": TODOS,
+    "GET /stock-transfers/:id": TODOS,
+    "POST /stock-transfers": ALMACEN,
     // Informes
     "GET /reports": TODOS,
     "GET /reports/period": TODOS,
@@ -183,7 +196,12 @@ export function puede(rol: z.infer<typeof rolSchema> | undefined, ruta: RutaConP
 export const idiomaSchema = z.enum(["ES", "EN"]);
 export const estadoOrdenCompraSchema = z.enum(["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"]);
 export const estadoOrdenVentaSchema = z.enum(["PENDING", "SHIPPED", "CANCELLED"]);
-export const tipoMovimientoSchema = z.enum(["IN", "OUT", "ADJUSTMENT", "IMPORT"]);
+/**
+ * T5-14 — `TRANSFER` son las dos mitades de una transferencia entre almacenes: la del origen
+ * lleva `delta` negativo y la del destino, positivo. No es `OUT` + `IN` a propósito: la rotación
+ * y la reposición cuentan salidas, y pasar mercancía de un local a otro no es vender.
+ */
+export const tipoMovimientoSchema = z.enum(["IN", "OUT", "ADJUSTMENT", "IMPORT", "TRANSFER"]);
 /** T5-01 — de dónde sale un cambio de coste: una recepción de compra o una edición a mano. */
 export const origenCosteSchema = z.enum(["PURCHASE_RECEIPT", "MANUAL"]);
 /** T5-10 — clase ABC por facturación. C es también la de los productos sin ventas. */
@@ -196,11 +214,15 @@ export const accionAuditoriaSchema = z.enum([
     "COUNT_CLOSE", "COUNT_CANCEL",
     // T6-08 — una venta de mostrador.
     "SALE_COUNTER",
+    // T5-14 — una transferencia entre almacenes.
+    "STOCK_TRANSFER",
 ]);
 
 export const entidadAuditoriaSchema = z.enum([
     "Product", "PurchaseOrder", "SaleOrder", "User", "Tag", "Category", "Brand", "Supplier",
     "InventoryCount", "Customer",
+    // T5-14
+    "Warehouse", "StockTransfer",
 ]);
 
 // ─────────────────────── Primitivas del cable ───────────────────────
@@ -393,6 +415,8 @@ export const CODIGOS_DE_ERROR = [
     "CODE_TOO_LONG_FOR_LABEL",
     "RECEIPT_EXCEEDS_PENDING",
     "STOCK_CANNOT_BE_NEGATIVE",
+    // T5-14 — una transferencia con el mismo almacén en los dos extremos no mueve nada.
+    "TRANSFER_SAME_WAREHOUSE",
     // 401 / 403 — quién eres y qué se te permite
     "ACCOUNT_DISABLED",
     "EMAIL_NOT_CONFIRMED",
@@ -414,9 +438,13 @@ export const CODIGOS_DE_ERROR = [
     "PURCHASE_ORDER_NOT_FOUND",
     "ROUTE_NOT_FOUND",
     "SALE_ORDER_NOT_FOUND",
+    // T5-14
+    "STOCK_TRANSFER_NOT_FOUND",
     "SUPPLIER_NOT_FOUND",
     "TAG_NOT_FOUND",
     "USER_NOT_FOUND",
+    // T5-14
+    "WAREHOUSE_NOT_FOUND",
     // 409 — colisiones de unicidad
     // T5-08 — el código de barras o el SKU ya es de otro producto. El SKU daba **500** hasta
     // entonces: nadie traducía el error de unicidad de la base.
@@ -430,6 +458,7 @@ export const CODIGOS_DE_ERROR = [
     "SKU_EXISTS",
     "SUPPLIER_EMAIL_EXISTS",
     "TAG_NAME_EXISTS",
+    "WAREHOUSE_NAME_EXISTS",
     // 409 — el estado del inventario no admite la petición
     "INSUFFICIENT_AVAILABLE_STOCK",
     // T6-08 — se quiso vender en el mostrador un producto descatalogado.
@@ -439,6 +468,13 @@ export const CODIGOS_DE_ERROR = [
     "PRODUCTS_IN_OPEN_COUNT",
     // T6-07 — se pidió el comprobante de una orden que no se ha enviado: todavía no es una venta.
     "SALE_ORDER_NOT_SHIPPED",
+    // T5-14 — el almacén está desactivado y no admite operaciones nuevas.
+    "WAREHOUSE_INACTIVE",
+    // T5-14 — no se desactiva el predeterminado, ni uno con existencias, ni uno con órdenes o
+    // conteos sin terminar: lo que guarda o espera se quedaría sin sitio.
+    "DEFAULT_WAREHOUSE_REQUIRED",
+    "WAREHOUSE_NOT_EMPTY",
+    "WAREHOUSE_HAS_PENDING",
     // 413 / 422 — el cuerpo o el archivo
     "EXPORT_TOO_LARGE",
     // T6-03 — `PUT /settings/logo` sin archivo: en un producto la imagen es opcional; aquí es la petición.
@@ -563,6 +599,10 @@ export const productoSchema = z.object({
      * sabe. Quien sume valores a coste tiene que decidir qué hace con él, no tratarlo como 0.
      */
     costPrice: importeSchema.nullable(),
+    /**
+     * T5-14 — **el total de todos los almacenes**. Lo que hay en cada uno llega en
+     * `stockLevels`, en las respuestas que lo traen. El mínimo es también del total.
+     */
     stock: z.number(),
     minStock: z.number(),
     imageUrl: z.string().nullable(),
@@ -579,6 +619,28 @@ export const productoSchema = z.object({
     updatedAt: fechaSchema,
 });
 
+/** T5-14 — lo que hay de un producto en un almacén: lo físico, lo comprometido y lo vendible. */
+export const nivelDeStockSchema = z.object({
+    warehouseId: z.string(),
+    stock: z.number(),
+    committedStock: z.number(),
+    availableStock: z.number(),
+});
+
+/**
+ * T5-14 — el nivel de un producto en un almacén, con ceros si no viene: `stockLevels` es
+ * disperso, y quien haga `find` a mano tiene que acordarse de que `undefined` es cero.
+ */
+export function nivelEn(
+    producto: { stockLevels?: ReadonlyArray<z.infer<typeof nivelDeStockSchema>> },
+    warehouseId: string,
+): z.infer<typeof nivelDeStockSchema> {
+    return (
+        producto.stockLevels?.find((n) => n.warehouseId === warehouseId) ??
+        { warehouseId, stock: 0, committedStock: 0, availableStock: 0 }
+    );
+}
+
 /**
  * T5-03 — `GET /products` y `GET /products/:id` traen además lo comprometido en ventas
  * pendientes y el disponible (`stock − comprometido`). El resto de respuestas con producto
@@ -591,6 +653,12 @@ export const productoConDisponibleSchema = productoSchema.extend({
     committedStock: z.number(),
     availableStock: z.number(),
     abcClass: claseAbcSchema,
+    /**
+     * T5-14 — el mismo desglose, almacén a almacén. **Disperso**: solo vienen los almacenes
+     * donde el producto tiene existencias o algo comprometido; el que falta está a cero, y para
+     * leerlo está `nivelEn`. Las tres cifras de arriba son la suma de estas.
+     */
+    stockLevels: z.array(nivelDeStockSchema),
 });
 
 export const movimientoStockSchema = z.object({
@@ -598,7 +666,13 @@ export const movimientoStockSchema = z.object({
     productId: z.string(),
     type: tipoMovimientoSchema,
     delta: z.number(),
+    /** El **total** del producto tras el movimiento. Una transferencia no lo cambia. */
     stockAfter: z.number(),
+    /** T5-14 — en qué almacén ocurrió y lo que quedó **en él**. */
+    warehouseId: z.string(),
+    warehouseStockAfter: z.number(),
+    /** T5-14 — la transferencia que lo originó; `null` en todos los demás. */
+    transferId: z.string().nullable(),
     note: z.string().nullable(),
     createdAt: fechaSchema,
 });
@@ -785,6 +859,9 @@ export const ordenVentaSchema = z.object({
      */
     number: z.number(),
     status: estadoOrdenVentaSchema,
+    /** T5-14 — de qué almacén sale: el que se descuenta al enviar. No se cambia después de crearla. */
+    warehouseId: z.string(),
+    warehouse: referenciaSchema,
     /**
      * T5-06 — el cliente vinculado, o `null`: la venta no tenía correo, o su cliente se borró.
      * Los tres campos de abajo son la **instantánea** de a quién se vendió, y no cambian al
@@ -939,6 +1016,9 @@ export const ordenCompraSchema = z.object({
     supplierId: z.string().nullable(),
     supplier: referenciaSchema.nullable(),
     status: estadoOrdenCompraSchema,
+    /** T5-14 — a qué almacén entra lo recibido. No se cambia después de crearla. */
+    warehouseId: z.string(),
+    warehouse: referenciaSchema,
     notes: z.string().nullable(),
     items: z.array(itemOrdenCompraSchema),
     createdAt: fechaSchema,
@@ -1016,6 +1096,8 @@ export const conteoSchema = z.object({
     id: z.string(),
     status: estadoConteoSchema,
     note: z.string().nullable(),
+    /** T5-14 — el almacén que se cuenta: el esperado de cada línea es lo que hay en él. */
+    warehouse: referenciaSchema,
     category: z.object({ id: z.string(), name: z.string() }).nullable(),
     createdByEmail: z.string().nullable(),
     closedByEmail: z.string().nullable(),
@@ -1047,6 +1129,68 @@ export const lineaConteoSchema = z.object({
 export const lineasConteoSchema = z.object({
     data: z.array(lineaConteoSchema),
     meta: metaPaginacionSchema,
+});
+
+// ─────────────────────── Almacenes (T5-14) ───────────────────────
+
+/** Un almacén: una sucursal, una bodega, cualquier sitio que guarde stock por separado. */
+export const almacenSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    address: z.string().nullable(),
+    /** El que usa una operación que no dice cuál. Siempre hay uno, y solo uno. */
+    isDefault: z.boolean(),
+    /** Uno inactivo conserva su historia y no admite operaciones nuevas. */
+    isActive: z.boolean(),
+    createdAt: fechaSchema,
+    updatedAt: fechaSchema,
+});
+
+/**
+ * `GET /warehouses/summary` — cada almacén con lo que guarda. Va aparte de `GET /warehouses`,
+ * que es la lista que pide cada formulario para su selector: estas cifras recorren todos los
+ * niveles del catálogo (unos 200 ms con 100 000 productos, rendimiento.md §15) y no tienen por
+ * qué pagarse para saber cómo se llaman los almacenes. `costValue` suma solo los productos con
+ * coste conocido, como el valor a coste del panel (T5-02); los que no lo tienen se cuentan
+ * aparte, en `unitsWithoutCost`, en vez de sumar cero sin decirlo.
+ */
+export const almacenConCifrasSchema = almacenSchema.extend({
+    products: z.number(),
+    units: z.number(),
+    costValue: z.number(),
+    unitsWithoutCost: z.number(),
+});
+
+/** Cuántas líneas admite una transferencia: como el mostrador, una petición no es un inventario. */
+export const MAXIMO_DE_LINEAS_DE_TRANSFERENCIA = 100;
+
+/**
+ * Una transferencia en el listado. No tiene estado: la mercancía sale del origen y entra en el
+ * destino en la misma operación. `lines` es cuántos productos llevó y `units`, cuántas unidades.
+ */
+export const transferenciaSchema = z.object({
+    id: z.string(),
+    fromWarehouse: referenciaSchema,
+    toWarehouse: referenciaSchema,
+    note: z.string().nullable(),
+    createdByEmail: z.string().nullable(),
+    createdAt: fechaSchema,
+    lines: z.number(),
+    units: z.number(),
+});
+
+/** Una línea: el producto, cuánto se movió y lo que quedó en cada extremo. */
+export const lineaDeTransferenciaSchema = z.object({
+    productId: z.string(),
+    name: z.string(),
+    sku: z.string().nullable(),
+    quantity: z.number(),
+    fromStockAfter: z.number(),
+    toStockAfter: z.number(),
+});
+
+export const transferenciaConLineasSchema = transferenciaSchema.extend({
+    items: z.array(lineaDeTransferenciaSchema),
 });
 
 // ─────────────────────── Usuarios y sesión ───────────────────────
@@ -1406,6 +1550,13 @@ export type ResumenConteo = z.infer<typeof resumenConteoSchema>;
 export type Conteo = z.infer<typeof conteoSchema>;
 export type LineaConteo = z.infer<typeof lineaConteoSchema>;
 export type LineasConteo = z.infer<typeof lineasConteoSchema>;
+
+export type NivelDeStock = z.infer<typeof nivelDeStockSchema>;
+export type Almacen = z.infer<typeof almacenSchema>;
+export type AlmacenConCifras = z.infer<typeof almacenConCifrasSchema>;
+export type Transferencia = z.infer<typeof transferenciaSchema>;
+export type LineaDeTransferencia = z.infer<typeof lineaDeTransferenciaSchema>;
+export type TransferenciaConLineas = z.infer<typeof transferenciaConLineasSchema>;
 
 export type Usuario = z.infer<typeof usuarioSchema>;
 export type Perfil = z.infer<typeof perfilSchema>;

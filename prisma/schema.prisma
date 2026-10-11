@@ -47,6 +47,11 @@ enum StockMovementType {
   OUT
   ADJUSTMENT
   IMPORT
+  // T5-14 — las dos mitades de una transferencia entre almacenes: una con `delta` negativo en el
+  // origen y otra con el mismo en positivo en el destino. Tipo propio y no `OUT` + `IN` a
+  // propósito: la rotación, la reposición y el gráfico del panel cuentan las salidas, y mover
+  // mercancía de un local a otro no es vender.
+  TRANSFER
 }
 
 // T3-02 — los tres que la conversión a enums de 2026-06-01 dejó fuera.
@@ -102,6 +107,8 @@ enum AuditAction {
   COUNT_CANCEL
   // T6-08 — una venta de mostrador: creada y enviada en la misma operación.
   SALE_COUNTER
+  // T5-14
+  STOCK_TRANSFER
 }
 
 enum AuditEntity {
@@ -115,6 +122,9 @@ enum AuditEntity {
   Supplier
   InventoryCount
   Customer
+  // T5-14
+  Warehouse
+  StockTransfer
 }
 
 model Category {
@@ -172,6 +182,11 @@ model Product {
   // Cuatro decimales y no dos, como `price`: una media se recalcula en cada recepción y
   // redondear cada vez a céntimos acumula el error compra tras compra.
   costPrice     Decimal?             @db.Decimal(12, 4)
+  // T5-14 — **el total de todos los almacenes**, y no la fuente de verdad: lo que hay en cada
+  // uno está en `stock_levels`. Se conserva porque el panel, el stock bajo y la reposición lo
+  // leen de 100 000 productos a la vez, y derivarlo los multiplicaba por 5–12 (ADR 0010). Solo
+  // lo escribe `shared/lib/stock.ts`, y la base no deja confirmar una transacción en la que no
+  // sea la suma de sus niveles (el disparador `stock_cuadra` de la migración).
   stock         Int                  @default(0)
   minStock      Int                  @default(0)
   categoryId    String?
@@ -193,6 +208,7 @@ model Product {
   countLines    InventoryCountLine[]
   tags          Tag[]
   abc           ProductAbc?
+  stockLevels   StockLevel[]
 
   // PostgreSQL no indexa las claves foráneas por sí solo: sin esto, filtrar por
   // categoría, marca o proveedor recorre la tabla entera.
@@ -277,6 +293,9 @@ model PurchaseOrder {
   supplierId  String?
   supplier    Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   status      PurchaseOrderStatus @default(PENDING)
+  // T5-14 — a qué almacén entra lo que se reciba, y de cuál se retira si se cancela.
+  warehouseId String
+  warehouse   Warehouse           @relation(fields: [warehouseId], references: [id])
   notes       String?
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
@@ -314,7 +333,17 @@ model StockMovement {
   product             Product            @relation(fields: [productId], references: [id])
   type                StockMovementType
   delta               Int // positivo = entrada, negativo = salida
-  stockAfter          Int // stock resultante tras el movimiento
+  // El **total** del producto tras el movimiento, como siempre. Una transferencia no lo cambia:
+  // sus dos mitades llevan el mismo.
+  stockAfter          Int
+  // T5-14 — en qué almacén ocurrió, y lo que quedó **en ese almacén**. En los movimientos
+  // anteriores a los almacenes, todos del que la migración creó, las dos cifras coinciden.
+  warehouseId         String
+  warehouse           Warehouse          @relation(fields: [warehouseId], references: [id])
+  warehouseStockAfter Int
+  // T5-14 — la transferencia a la que pertenece: es lo que enlaza la salida con su entrada.
+  transferId          String?
+  transfer            StockTransfer?     @relation(fields: [transferId], references: [id], onDelete: SetNull)
   note                String?
   createdAt           DateTime           @default(now())
   // T5-09 — la línea de compra que recibió esta entrada. Es lo que fecha cada recepción, también
@@ -330,6 +359,8 @@ model StockMovement {
   // Sin él, borrar una línea de compra recorre la tabla de movimientos entera para poner a
   // `null` las entradas que apuntan a ella.
   @@index([purchaseOrderItemId])
+  // Las líneas de una transferencia se leen por ella; casi todas las filas lo tienen a `null`.
+  @@index([transferId])
   @@map("stock_movements")
 }
 
@@ -445,6 +476,10 @@ model SaleOrder {
   // nunca quien llama. Es interno: borrar una orden pendiente deja un hueco, y se acepta.
   number        Int             @unique
   status        SaleOrderStatus @default(PENDING)
+  // T5-14 — de qué almacén sale. Lo comprometido de una venta pendiente lo es **en él**, y es
+  // el que se descuenta al enviar y al que vuelve la mercancía si se cancela.
+  warehouseId   String
+  warehouse     Warehouse       @relation(fields: [warehouseId], references: [id])
   // T5-06 — opcional: una venta sin correo no se vincula a nadie, y borrar el cliente deja
   // sus órdenes sin él, no las borra.
   customerId    String?
@@ -479,6 +514,8 @@ model SaleOrder {
   // tres índices de arriba empiezan por otra columna: sobre 330 000 órdenes era un recorrido
   // secuencial con ordenación (33 ms) y con este son 0,01 ms (rendimiento.md §13).
   @@index([createdAt])
+  // T5-14 — las ventas de un local, de la más reciente a la más antigua.
+  @@index([warehouseId, createdAt])
   @@map("sale_orders")
 }
 
@@ -526,6 +563,10 @@ model InventoryCount {
   id             String               @id @default(uuid())
   status         InventoryCountStatus @default(OPEN)
   note           String?
+  // T5-14 — se cuenta **un** almacén: el esperado de cada línea es lo que hay en él, y el
+  // ajuste del cierre se le aplica a él.
+  warehouseId    String
+  warehouse      Warehouse            @relation(fields: [warehouseId], references: [id])
   // El filtro con el que se abrió: `null` es todo el catálogo activo.
   categoryId     String?
   category       Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -623,4 +664,74 @@ model Notification {
   // La purga de los leídos hace más de 90 días.
   @@index([readAt])
   @@map("notifications")
+}
+
+// ─── T5-14 — Varios almacenes ──────────────────────────────────────────────────
+//
+// El caso de uso: **varias sucursales** que venden y reciben cada una lo suyo y se pasan
+// mercancía. El stock deja de ser un número por producto y pasa a ser uno por producto y
+// almacén; `products.stock` sigue existiendo como total (ADR 0010).
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  address   String?
+  // El que se usa cuando una operación no dice cuál. **Siempre hay uno y solo uno**: la
+  // migración lo crea, y `warehousesService.hacerPredeterminado` lo cambia con una única
+  // sentencia y con los cambios puestos en fila, así que no hay instante con dos ni con ninguno.
+  isDefault Boolean  @default(false)
+  // Uno inactivo conserva su historia, pero no admite operaciones nuevas. Para desactivarlo
+  // tiene que estar vacío y sin nada pendiente.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  levels          StockLevel[]
+  movements       StockMovement[]
+  saleOrders      SaleOrder[]
+  purchaseOrders  PurchaseOrder[]
+  inventoryCounts InventoryCount[]
+  transfersOut    StockTransfer[]  @relation("origen")
+  transfersIn     StockTransfer[]  @relation("destino")
+
+  @@map("warehouses")
+}
+
+// Lo que hay de un producto en un almacén. **Dispersa**: sin fila es cero, así que un catálogo
+// de 100 000 productos no son 100 000 filas por almacén nuevo.
+//
+// La clave es un `id` propio y no `(productId, warehouseId)` pensando en `T5-15`: con lotes el
+// nivel pasa a ser `(producto, almacén, lote)`, y eso será una columna y un índice único más
+// ancho, no rehacer la tabla ni lo que apunte a ella.
+model StockLevel {
+  id          String    @id @default(uuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  stock       Int       @default(0)
+
+  @@unique([productId, warehouseId])
+  // El stock de un almacén entero: su valor, y si se puede desactivar.
+  @@index([warehouseId])
+  @@map("stock_levels")
+}
+
+// Una transferencia: la cabecera de sus movimientos. No tiene líneas propias —son los
+// movimientos `TRANSFER` que apuntan a ella, dos por producto— ni estado: la mercancía sale de
+// un almacén y entra en el otro en la misma transacción, sin «en tránsito».
+model StockTransfer {
+  id              String          @id @default(uuid())
+  fromWarehouseId String
+  fromWarehouse   Warehouse       @relation("origen", fields: [fromWarehouseId], references: [id])
+  toWarehouseId   String
+  toWarehouse     Warehouse       @relation("destino", fields: [toWarehouseId], references: [id])
+  note            String?
+  // El correo y no una clave foránea, como en las ventas y los conteos.
+  createdByEmail  String?
+  createdAt       DateTime        @default(now())
+  movements       StockMovement[]
+
+  @@index([createdAt])
+  @@map("stock_transfers")
 }
