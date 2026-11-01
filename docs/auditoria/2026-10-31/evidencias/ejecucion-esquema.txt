@@ -1,0 +1,18 @@
+# Esquema real de stockly_auditoria tras migrate deploy · 2026-11-01T16:16Z
+## Disparadores (no internos)
+products_stock_cuadra | products | deferrable=true | initdeferred=true
+stock_levels_cuadra | stock_levels | deferrable=true | initdeferred=true
+## Índice de niveles
+CREATE UNIQUE INDEX "stock_levels_productId_warehouseId_lotId_key" ON public.stock_levels USING btree ("productId", "warehouseId", "lotId") NULLS NOT DISTINCT
+## counters
+{"key":"saleOrder","value":6}
+## CHECK en toda la base
+0
+## Disparador diferido: UPDATE products SET stock = stock + 1 y COMMIT
+BEGIN
+UPDATE 1
+ERROR:  El stock del producto 9194e2b7-9299-4bab-8cec-585bc618ffc9 (36) no es la suma de sus almacenes (35)
+CONTEXTO:  función PL/pgSQL stock_cuadra() en la línea 23 en RAISE
+## Migraciones aplicadas
+## Migraciones aplicadas
+32 aplicadas, 0 sin terminar, ultima: 20261010180000_t5_15_lotes_y_caducidad

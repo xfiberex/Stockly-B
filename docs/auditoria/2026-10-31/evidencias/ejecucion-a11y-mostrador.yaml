@@ -1,0 +1,19 @@
+- main:
+  - heading "Mostrador" [level=1]
+  - paragraph: Busca o escanea cada producto. Al registrar la venta, el stock se descuenta en el momento.
+  - text: Vendes desde
+  - combobox "Vendes desde":
+    - option "Tienda Central" [selected]
+    - option "Sucursal Santiago"
+  - text: Producto
+  - combobox "Producto"
+  - button "Escanear"
+  - region "Productos de la venta":
+    - heading "Productos de la venta" [level=2]
+    - paragraph: Todavía no hay productos en esta venta.
+  - text: Cliente existente
+  - combobox "Cliente existente"
+  - paragraph: Opcional. Sin cliente, la venta no queda a nombre de nadie.
+  - term: Total
+  - definition: $0.00
+  - button "Registrar venta" [disabled]

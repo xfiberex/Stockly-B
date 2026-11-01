@@ -1,0 +1,88 @@
+{
+  "fecha": "2026-11-01T16:55:34.966Z",
+  "navegador": "Chromium de Playwright 1.61.1, headless, es-ES, 1280×800",
+  "langDelDocumento": "es",
+  "producto": "del seed, con existencias (nombre omitido)",
+  "tabulacionHastaElComboboxProducto": [
+    "a «Saltar al contenido principal»",
+    "button «Avisos» (sin indicador de foco visible)",
+    "button «Sofía Peña — menú de usuario» (sin indicador de foco visible)",
+    "a «Dashboard» (sin indicador de foco visible)",
+    "a «Mostrador» (sin indicador de foco visible)",
+    "a «Productos» (sin indicador de foco visible)",
+    "a «Categorías» (sin indicador de foco visible)",
+    "a «Marcas» (sin indicador de foco visible)",
+    "a «Proveedores» (sin indicador de foco visible)",
+    "a «Etiquetas» (sin indicador de foco visible)",
+    "a «Compra» (sin indicador de foco visible)",
+    "a «Venta» (sin indicador de foco visible)",
+    "a «Clientes» (sin indicador de foco visible)",
+    "a «Conteos físicos» (sin indicador de foco visible)",
+    "a «Transferencias» (sin indicador de foco visible)",
+    "a «Caducidades» (sin indicador de foco visible)",
+    "a «Almacenes» (sin indicador de foco visible)",
+    "a «Reportes» (sin indicador de foco visible)",
+    "select «Vendes desde»",
+    "combobox «Producto»"
+  ],
+  "anadirLinea": {
+    "comboboxAbierto": {
+      "expanded": "true",
+      "controls": true,
+      "activedescendant": "_r_2_-opcion-0"
+    },
+    "activedescendantTrasFlecha": "sí",
+    "focoTrasElegir": "combobox «Producto»",
+    "regionesVivasAntes": [
+      "aria-live=polite: «Mostrador»",
+      "aria-live=polite: «»",
+      "aria-live=polite: «Total $0.00»",
+      "aria-live=polite: «»"
+    ],
+    "regionesVivasDespues": [
+      "aria-live=polite: «Mostrador»",
+      "aria-live=polite: «»",
+      "aria-live=polite: «Total $185.00»",
+      "aria-live=polite: «»"
+    ]
+  },
+  "tabulacionHastaRegistrar": [
+    "button «Escanear»",
+    "button «Quitar Jamón cocido 200 g de la venta»",
+    "input «Cantidad de Jamón cocido 200 g»",
+    "button «Una unidad más de Jamón cocido 200 g»",
+    "combobox «Cliente existente»",
+    "button «Registrar venta»"
+  ],
+  "registrar": {
+    "elementosRoleStatusAntes": 0,
+    "focoTrasRegistrar": "body",
+    "regionesVivas": [
+      "aria-live=polite: «Mostrador»",
+      "aria-live=polite: «»",
+      "status: «Venta #000010 registrada $185.00»",
+      "aria-live=polite: «»"
+    ]
+  },
+  "nuevaVenta": {
+    "tabsDesdeElFocoAnterior": 20,
+    "ultimoFoco": "button «Nueva venta»",
+    "focoTrasNuevaVenta": "button «Escanear»"
+  },
+  "escaner": {
+    "focoInicialYTabs": [
+      "button «Cerrar»",
+      "button «Hacer o elegir una foto»",
+      "input «O escríbelo»",
+      "button «Cerrar»",
+      "button «Hacer o elegir una foto»",
+      "input «O escríbelo»",
+      "button «Cerrar»",
+      "button «Hacer o elegir una foto»",
+      "input «O escríbelo»"
+    ],
+    "dialogosAbiertosTrasEscape": 0,
+    "focoTrasCerrar": "button «Escanear»"
+  },
+  "transferencias": []
+}

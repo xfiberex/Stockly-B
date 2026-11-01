@@ -2,10 +2,14 @@
 
 La fuente de verdad del **trabajo pendiente** de los dos repositorios. Cada tarea tiene un
 identificador `T{tier}-{nº}` que se cita en commits y documentos:
-`fix(T0-01): resolver alias de rutas en el build de producción`.
+`fix(T0-01): resolver alias de rutas en el build de producción`. Desde la re-auditoría del
+2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
+cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
-> **Estado al 2026-10-10: 139 de 139 cerradas.** No queda ninguna tarea abierta: `T5-15`, la
-> última del Tier 5, se cerró el 2026-10-10. Lo que sigue sin hacerse está en «Sin tarea».
+> **Estado al 2026-11-01: 6 tareas abiertas** (`AUD-001` a `AUD-006`), de la re-auditoría del
+> 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)). Una es Crítico y bloquea el primer
+> despliegue. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
+> sigue sin hacerse y no es un defecto está en «Sin tarea».
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
 > se **descartó sin ejecutarse**: el listón de accesibilidad del proyecto es teclado más árbol de
@@ -55,8 +59,26 @@ grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
 
 ## Tareas abiertas
 
-*Ninguna.* Las 139 están cerradas. Una tarea nueva se abre con su ficha, como dice «Una tarea
-nueva», más abajo.
+Las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
+severidad, y dentro de cada tier van en el orden en que conviene atacarlas. Las observaciones
+de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
+en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
+ficha, como dice «Una tarea nueva», más abajo.
+
+<!-- indice:inicio -->
+**Última actualización:** 2026-11-01 · **Siguiente ID libre:** AUD-007 · **Último informe:** [2026-10-31](auditoria/2026-10-31/INFORME.md)
+
+| Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
+|---|---|---|---|
+| 0 · Crítico | 1 | 0 | 1 · 0 · 0 |
+| 1 · Alto | 5 | 0 | 3 · 2 · 0 |
+| 2 · Medio | 0 | 0 | — |
+| 3 · Bajo | 0 | 0 | — |
+| 4 · Propuestas | 0 | 0 | — |
+| **Total** | **6** | **0** | **4 · 2 · 0** |
+
+**Abiertas por área:** Seguridad 4 · QA y testing 1 · Arquitectura 1
+<!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
 
@@ -71,10 +93,106 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 | **El trozo `vendor` del frontend sigue por encima de 250 kB** (346 kB el 2026-10-05). Separar React lo empeora, medido | comentario de `manualChunks` en `Stockly-F/vite.config.ts` |
 | **La fila de la tabla de productos mide 48 px**, no los 36 del perfil denso: bajar exige quitar el SKU o encoger la miniatura | [CONTEXTO.md §6](CONTEXTO.md) |
 | **La clase ABC podría filtrar al abrir un conteo físico**; hoy solo filtra la categoría | — |
-| **La prueba de carga ya no cumple sus umbrales**, y no es de `T5-14`: repetida el 2026-10-10 con el código de antes, el panel da 2,2 s de p(95) (límite, 2 s; eran 337 ms tras `T4-16`) y arrastra a las demás rutas. Son las consultas que `getSummary` ganó en los Tiers 5 y 6, que solas no ordenan en disco y juntas, con diez usuarios, saturan la base. Pide tarea propia | [rendimiento.md §15](rendimiento.md) |
+| **La prueba de carga ya no cumple sus umbrales**, y no es de `T5-14`: repetida el 2026-10-10 con el código de antes, el panel da 2,2 s de p(95) (límite, 2 s; eran 337 ms tras `T4-16`) y arrastra a las demás rutas. Son las consultas que `getSummary` ganó en los Tiers 5 y 6, que solas no ordenan en disco y juntas, con diez usuarios, saturan la base. Pide tarea propia. **Auditoría del 2026-10-31:** Medio tras la verificación independiente (0 % de errores; que el cuello sea el pool y no la CPU no está medido); sin tarea por ser una pasada rápida | [rendimiento.md §15](rendimiento.md) · [informe](auditoria/2026-10-31/INFORME.md) |
 | **Los lotes no tienen retirada, ni se eligen al vender, ni entran por CSV** (`T5-15`). De qué lote salió cada venta está guardado (`sale_order_item_lots`), pero no hay pantalla que liste a quién se vendió un lote; el lote lo elige siempre el orden de caducidad; la importación crea productos sin lotes; y el resumen semanal no habla de caducidades | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
 | **El conteo físico es por producto, no por lote** (`T5-15`): lo que sobra queda «sin lote» y lo que falta sale por orden de caducidad | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
 | **Lo legal que falta antes de tener usuarios reales o de cobrar**: privacidad, plazos de conservación, condiciones, marca | [legal.md §2](legal.md) |
+
+## Tier 0 · Crítico
+
+- [ ] **AUD-001 · Cerrar el registro abierto o recortar lo que lee `USER`: cualquiera que se registre lee los datos personales de todos los clientes**
+  - **Área:** Seguridad · **Severidad:** Crítico · **Esfuerzo:** Bajo
+  - **Ubicación:** `src/modules/auth/auth.routes.ts:19`, `src/modules/auth/auth.service.ts:15-43`, `src/contratos/api.ts:119-129,174`
+  - **Decisión previa:** elegir una de estas tres salidas y anotarla en [CONTEXTO.md](CONTEXTO.md) §6:
+    - cerrar el registro público, con el alta solo por invitación (`POST /users`);
+    - dejarlo con la cuenta nueva sin acceso hasta que un ADMIN la apruebe;
+    - quitar a `USER` los clientes y los datos de cliente de las ventas.
+  - **Qué hacer:** aplicar la salida elegida:
+    - `REGISTRATION_ENABLED`, apagado por defecto, y la página de registro oculta;
+    - o `isActive: false` hasta la aprobación;
+    - o `GET /customers*` y los campos `customer*` de las ventas solo para quien vende o administra.
+
+    En cualquier caso, actualizar `legal.md` §2.1 y `permisos.test.ts`.
+  - **Criterio de aceptación:** se cumple una de las dos condiciones, y un test de integración la fija:
+    - una cuenta recién registrada y verificada recibe 403 en `GET /customers`, `GET /sale-orders` y `GET /reports`;
+    - o `POST /auth/register` responde 404 o 403 con el interruptor apagado.
+  - **Depende de:** la decisión previa. Para cerrarse, `pnpm verify` en verde (AUD-006 y AUD-004).
+  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md) · reproducido en ejecución
+
+## Tier 1 · Alto
+
+- [ ] **AUD-006 · Hacer relativa al reloj la venta de `moneda.test.ts`, que tiene en rojo `pnpm verify` del backend desde el 2026-10-24**
+  - **Área:** QA y testing · **Severidad:** Alto · **Esfuerzo:** Bajo
+  - **Ubicación:** `src/tests/moneda.test.ts:163-168,216`; origen en `src/modules/reports/reports.service.ts:77,98`
+  - **Qué hacer:**
+    - una venta enviada con `shippedAt` relativo a `Date.now()` para la sección de margen del PDF, como `margen.test.ts:169`;
+    - la del 2026-09-24 se queda para el informe por periodo;
+    - no bajar el umbral del `8`.
+  - **Criterio de aceptación:** `moneda.test.ts` pasa con el reloj del sistema un año por delante y 60 días por detrás, y sigue exigiendo más de 8 importes con `RD$`.
+  - **Depende de:** ninguna
+  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md)
+
+- [ ] **AUD-004 · Subir `body-parser` a 2.4.0 (GHSA-27r3-jxmh-p828) y devolver a verde el paso `auditoria` de los dos repositorios**
+  - **Área:** Seguridad · **Severidad:** Alto · **Esfuerzo:** Bajo
+  - **Ubicación:** `package.json` (transitiva de `express`), `src/app.ts:66-68`
+  - **Qué hacer:**
+    - `pnpm update body-parser`, o `express` a `^5.3.0`. Si no basta, un `override` con su condición de retirada ([dependencias.md](dependencias.md) §2);
+    - en la misma tanda, `pnpm update zod multer` en el backend y `pnpm update zod vite follow-redirects` en el frontend (observaciones del informe).
+  - **Criterio de aceptación:** `pnpm why body-parser` da 2.4.0 o posterior, GHSA-27r3-jxmh-p828 ya no sale en `pnpm audit --prod`, y `pnpm run auditoria` sale con 0 en los dos repositorios.
+  - **Depende de:** ninguna
+  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md)
+
+- [ ] **AUD-005 · Máquina de estados de las ventas bajo bloqueo: hoy dos envíos o dos cancelaciones simultáneos mueven el stock dos veces, y `PATCH` acepta `SHIPPED → PENDING`**
+  - **Área:** Arquitectura · **Severidad:** Alto · **Esfuerzo:** Medio
+  - **Ubicación:** `src/modules/sale-orders/sale-orders.service.ts:181-236,418-536`, `src/modules/sale-orders/sale-orders.validator.ts:21,56`
+  - **Qué hacer:**
+    - `update` y `delete` en una sola transacción que empiece con `SELECT … FOR UPDATE` de la orden, como `bloquearOrden` en compras;
+    - transiciones válidas en un solo sitio, con `INVALID_STATUS_TRANSITION` (409) dado de alta en `CODIGOS_DE_ERROR` con sus traducciones;
+    - en el mismo cambio, un `.max()` en `items` de `POST /sale-orders`.
+  - **Criterio de aceptación:** tests con la carrera forzada, con la técnica de `recepcion-parcial.test.ts:300`, que comprueben que:
+    - dos envíos simultáneos de la misma orden dan un 200 y un 400, con el stock descontado una vez y una fila por línea en `sale_order_item_lots`;
+    - dos cancelaciones de una enviada devuelven el stock una vez;
+    - `PATCH { status: "PENDING" }` sobre una `SHIPPED` da 409 y no mueve nada.
+  - **Depende de:** ninguna. Para cerrarse, `pnpm verify` en verde (AUD-006 y AUD-004).
+  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md) · reproducido en ejecución
+
+- [ ] **AUD-002 · `trust proxy` configurable para que los limitadores cuenten por cliente y no por nginx**
+  - **Área:** Seguridad · **Severidad:** Alto · **Esfuerzo:** Bajo
+  - **Ubicación:** `src/app.ts:16-84`, `src/shared/middlewares/rateLimiter.middleware.ts:27-69`, `Stockly-F/nginx.conf:34-41`
+  - **Qué hacer:**
+    - `app.set("trust proxy", <saltos>)` desde `TRUST_PROXY`, con el número de proxies del despliegue (1 con nginx) y nunca `true`;
+    - un test con `X-Forwarded-For`;
+    - corregir `README.md:235`;
+    - opcional: limitar también el login por correo.
+  - **Criterio de aceptación:** con nginx delante, 10 logins fallidos desde una IP no bloquean el login desde otra, y un test lo comprueba.
+  - **Depende de:** ninguna. Para cerrarse, `pnpm verify` en verde (AUD-006 y AUD-004).
+  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md) · reproducido en ejecución
+
+- [ ] **AUD-003 · Guarda de entorno en el seed y un comando propio para el primer ADMIN: el despliegue documentado deja administradores con contraseña pública**
+  - **Área:** Seguridad · **Severidad:** Alto · **Esfuerzo:** Medio
+  - **Ubicación:** `prisma/seed.ts:70-150,1147-1151`, `README.md:244-260`, `docs/README-proyecto.md:89-90`, `docs/CONTEXTO.md:272`
+  - **Qué hacer:**
+    - el seed aborta con `NODE_ENV=production` o con una base que no sea local, salvo con `--forzar`;
+    - un comando `admin:crear` (o variables `ADMIN_EMAIL` y `ADMIN_PASSWORD`) que cree solo el primer ADMIN, sin vaciar nada;
+    - README, `README-proyecto.md`, [operaciones.md](operaciones.md) y [CONTEXTO.md](CONTEXTO.md) explican el despliegue con ese comando.
+  - **Criterio de aceptación:**
+    - con `NODE_ENV=production`, `pnpm db:seed` aborta sin tocar la base;
+    - el comando del primer ADMIN tiene test y está documentado;
+    - ningún documento de despliegue manda ejecutar el seed de demostración.
+  - **Depende de:** ninguna. Para cerrarse, `pnpm verify` en verde (AUD-006 y AUD-004).
+  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md)
+
+## Tier 2 · Medio
+
+Sin tareas abiertas. Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en su [informe](auditoria/2026-10-31/INFORME.md), sin tarea.
+
+## Tier 3 · Bajo
+
+Sin tareas abiertas.
+
+## Tier 4 · Propuestas
+
+Sin tareas abiertas.
 
 ---
 

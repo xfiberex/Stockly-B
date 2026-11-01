@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-10-10
+# Contexto de trabajo — al 2026-11-01
 
 Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
 trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
@@ -56,9 +56,28 @@ Medido el 2026-10-10 en este equipo, con `pnpm verify` y el E2E:
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
 
-**Tareas: 139 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
+**Re-auditoría del 2026-10-31** ([informe](auditoria/2026-10-31/INFORME.md), veredicto
+*bloqueado*): seis tareas abiertas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md). Una es
+Crítico: el registro abierto deja leer los datos personales de todos los clientes. La tabla de
+arriba ya no vale tal cual:
+
+- `pnpm verify` del backend falla desde el 2026-10-24, por un test que depende del reloj
+  (`AUD-006`);
+- el paso `auditoria` de los dos repositorios falla por avisos publicados después del 2026-10-11
+  (`AUD-004`).
+
+Medido el 2026-10-31 y el 2026-11-01:
+
+- backend: 1.651 de 1.652 tests, con cobertura de sentencias del 97,15 %;
+- frontend: 910 tests (+1 omitido);
+- E2E: 39 pasados y 3 omitidos sobre una base aislada (con la salvedad de §4).
+
+El punto de control de la auditoría, para retomarla, es
+[auditoria/2026-10-31/trabajo/progreso.md](auditoria/2026-10-31/trabajo/progreso.md).
+
+**Tareas `T`: 139 de 139.** Los Tiers 0 a 4 —la remediación de la auditoría del 2026-08-04— están
 cerrados, y el Tier 5, funcionalidad de negocio, también: su última tarea, `T5-15` (lotes y
-caducidad), se cerró el 2026-10-10. No queda ninguna abierta. El Tier 6 —el mostrador y el
+caducidad), se cerró el 2026-10-10. No quedó ninguna abierta hasta la re-auditoría. El Tier 6 —el mostrador y el
 documento de venta: lo que SistemaVenta hace y Stockly no— se abrió el 2026-10-05 con diez tareas
 y está cerrado; las tres decisiones de producto que lo gobernaron están al principio de ese tier, en
 el índice de cerradas del ROADMAP.
@@ -214,6 +233,12 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   en otro. Se vio comparando con `git stash`: tres de tres en verde sin el cambio.
 - **Antes de acusar al código de una tarea, comparar con `git stash` en la misma máquina.** Evitó
   dos diagnósticos equivocados y destapó un `pnpm dev` olvidado que falseaba la medición.
+- **En Windows, la pasada completa en paralelo contra el servidor de desarrollo puede caer sin
+  ningún defecto detrás** (re-auditoría, 2026-11-01).
+  - Fallaron 8 de 39 escenarios: esperas de 5 s con el `main` vacío (la ruta diferida no llegó a
+    pintarse), un `ERR_NETWORK_IO_SUSPENDED` y un contexto del navegador perdido.
+  - Los 8 pasaron al repetirlos con `--last-failed`; los tres últimos, solo con `--workers=1`.
+  - Antes de buscar el defecto, repetir en serie.
 
 ### Tests de componentes (Vitest y jsdom)
 
@@ -264,6 +289,14 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
 
 ## 5. Cosas que dependen de ti, no del código
 
+- **Decidir qué pasa con el registro público** (`AUD-001`; bloquea el primer despliegue). Tres
+  salidas:
+  - cerrarlo y dejar el alta solo por invitación;
+  - dejarlo, con aprobación de un ADMIN;
+  - quitar a `USER` los clientes y los datos de cliente de las ventas.
+
+  Hoy, cualquiera que confirme un correo propio lee la agenda completa de clientes, con su
+  documento de identidad. La decisión se anota en §6.
 - **Activar el alias de búsqueda en cada clon.** `.agents/` y `.claude/` se versionan a propósito
   y son la mayoría de los archivos rastreados; sin el alias, buscar en el código devuelve sobre
   todo documentación de tooling. Una vez por repositorio:
@@ -271,7 +304,9 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   `git buscar-archivos X`.
 - **En un despliegue nuevo nadie es administrador hasta ejecutar `pnpm db:seed`.** El registro
   público crea siempre usuarios `USER`. Para promover a alguien, `PATCH /api/v1/users/:id/role`
-  desde una cuenta que ya sea ADMIN.
+  desde una cuenta que ya sea ADMIN. **Ojo, hasta cerrar `AUD-003`:** ese seed vacía la base
+  entera y deja dos ADMIN con la contraseña pública del README. Solo en una base vacía, y cambiando
+  o borrando las cuentas de demostración en el acto.
 - **El ensayo de restauración es mensual y lleva sin anotarse desde el 2026-08-12**
   ([operaciones.md §5](operaciones.md)). Una copia que no se ha restaurado no es una copia.
 - **No hay ninguna versión publicada.** Los repositorios están sin etiquetar y sus `package.json`
