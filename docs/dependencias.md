@@ -30,15 +30,17 @@ de desarrollo. `pnpm audit` mira el registro de npm y nada más.
 
 **Un árbol limpio no se queda limpio solo.** Sin tocar una dependencia, `verify` amaneció en rojo
 el 2026-09-13 —diez avisos altos, dos semanas— y otra vez el 2026-09-30, en los dos repositorios.
-El patrón que salió de ahí:
+La tercera la encontró la re-auditoría del 2026-10-31 —`body-parser`, `zod`, `multer` y
+`follow-redirects`, todos con arreglo en su rango— y la cerró `AUD-004`. El patrón que salió de ahí:
 
 1. **Directa, y hay arreglo en la misma versión mayor:** se sube. Así se resolvieron `multer` y
    `axios`.
 2. **Directa, y la rama actual no recibe el arreglo:** salto de mayor, leyendo antes qué rompe.
    `nodemailer` pasó de la 9 a la 10 porque su única ruptura era exigir Node 20, y el proyecto usa
    22; `smtp-tls.test.ts` ejercita el transporte real, sin mock.
-3. **Transitiva con un rango que ya admite la versión corregida:** `pnpm update <paquete>`. Fue el
-   caso de `ip-address`.
+3. **Transitiva con un rango que ya admite la versión corregida:** `pnpm update --depth 100
+   <paquete>`. Fue el caso de `ip-address`, y en `AUD-004` el de `body-parser`. **Sin `--depth`,
+   pnpm 12 no la mueve y no avisa**; y `--depth Infinity` lo rechaza: tiene que ser un número.
 4. **Transitiva que su dueño fija a versión exacta:** `overrides` en `pnpm-workspace.yaml`. Subir
    al dueño no sirve si la versión nueva la sigue fijando.
 5. **No tomar una versión publicada hace horas.** Es justo lo que la cadena de suministro

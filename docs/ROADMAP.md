@@ -6,9 +6,10 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
-> **Estado al 2026-11-01: 5 tareas abiertas** (`AUD-001` a `AUD-005`), de la re-auditoría del
-> 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)); `AUD-006` se cerró el mismo día. Una
-> es Crítico y bloquea el primer despliegue. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
+> **Estado al 2026-11-01: 4 tareas abiertas** (`AUD-001`, `AUD-002`, `AUD-003` y `AUD-005`), de
+> la re-auditoría del 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)); `AUD-006` y
+> `AUD-004` se cerraron el mismo día, y `pnpm verify` vuelve a estar en verde en los dos
+> repositorios. Una es Crítico y bloquea el primer despliegue. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
 > sigue sin hacerse y no es un defecto está en «Sin tarea».
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
@@ -53,15 +54,15 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 5
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 1
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 4
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 2
 ```
 
 ---
 
 ## Tareas abiertas
 
-Las cinco que quedan de las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
+Las cuatro que quedan de las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
 severidad, y dentro de cada tier van en el orden en que conviene atacarlas. Las observaciones
 de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
 en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
@@ -73,13 +74,13 @@ ficha, como dice «Una tarea nueva», más abajo.
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 1 | 0 | 1 · 0 · 0 |
-| 1 · Alto | 4 | 1 | 2 · 2 · 0 |
+| 1 · Alto | 3 | 2 | 1 · 2 · 0 |
 | 2 · Medio | 0 | 0 | — |
 | 3 · Bajo | 0 | 0 | — |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **5** | **1** | **3 · 2 · 0** |
+| **Total** | **4** | **2** | **2 · 2 · 0** |
 
-**Abiertas por área:** Seguridad 4 · Arquitectura 1
+**Abiertas por área:** Seguridad 3 · Arquitectura 1
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -122,16 +123,6 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
   - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md) · reproducido en ejecución
 
 ## Tier 1 · Alto
-
-- [ ] **AUD-004 · Subir `body-parser` a 2.4.0 (GHSA-27r3-jxmh-p828) y devolver a verde el paso `auditoria` de los dos repositorios**
-  - **Área:** Seguridad · **Severidad:** Alto · **Esfuerzo:** Bajo
-  - **Ubicación:** `package.json` (transitiva de `express`), `src/app.ts:66-68`
-  - **Qué hacer:**
-    - `pnpm update body-parser`, o `express` a `^5.3.0`. Si no basta, un `override` con su condición de retirada ([dependencias.md](dependencias.md) §2);
-    - en la misma tanda, `pnpm update zod multer` en el backend y `pnpm update zod vite follow-redirects` en el frontend (observaciones del informe).
-  - **Criterio de aceptación:** `pnpm why body-parser` da 2.4.0 o posterior, GHSA-27r3-jxmh-p828 ya no sale en `pnpm audit --prod`, y `pnpm run auditoria` sale con 0 en los dos repositorios.
-  - **Depende de:** ninguna
-  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md)
 
 - [ ] **AUD-005 · Máquina de estados de las ventas bajo bloqueo: hoy dos envíos o dos cancelaciones simultáneos mueven el stock dos veces, y `PATCH` acepta `SHIPPED → PENDING`**
   - **Área:** Arquitectura · **Severidad:** Alto · **Esfuerzo:** Medio
@@ -420,3 +411,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | ID | Tarea | Cerrada | Nota |
 |---|---|---|---|
 | AUD-006 | La venta de `moneda.test.ts` dependía del reloj y tenía `pnpm verify` del backend en rojo desde el 2026-10-24 | 2026-11-01 | El test del PDF de informes con `RD$` contaba los importes de la sección de margen, cuya ventana son los últimos 30 días del reloj (`DIAS_DE_MARGEN`), con una venta fija del 2026-09-24: salió de la ventana el 2026-10-24 y el recuento bajó de más de 8 a 8. Ahora ese test crea **su propia** venta, enviada ayer respecto a `Date.now()` como en `margen.test.ts`, y la borra al terminar; la del 24 de septiembre se queda para el informe por periodo y el resumen semanal. No va en el `beforeAll` **a propósito**: con el reloj 60 días atrás caería en septiembre de 2026 y cambiaría las cifras de esos dos. El umbral del `8` no se tocó. **Comprobado:** reproducido antes del cambio (8, no > 8); después, 56 de 56; falsificado poniendo la venta 31 días atrás, cae con el mismo 8; `pnpm verify` llega en verde hasta `smoke` —1652 tests, 97,15 % de sentencias— y solo cae `auditoria`, que es `AUD-004`. **Sin comprobar:** el criterio con el reloj del sistema movido un año adelante y 60 días atrás no se ejecutó —cambiar la hora de Windows afecta a la sesión entera—; se razonó: la venta nueva y la ventana del margen se mueven con el mismo reloj, y los otros tests de la moneda usan fechas fijas con su rango explícito (`from`/`to` y `AHORA`). |
+| AUD-004 | Subir `body-parser` a 2.4.0 (GHSA-27r3-jxmh-p828) y devolver a verde el paso `auditoria` de los dos repositorios | 2026-11-01 | **La ficha se quedaba corta:** al cerrarla ya no era un aviso alto sino tres en el backend —`body-parser`, `zod` (GHSA-mrhx-c7xc-m3w5) y `multer` (GHSA-q7qp-rjg7-q26m)— y tres en el frontend —`zod` y dos de `follow-redirects`—, más moderados en los dos. Todos tenían arreglo dentro de su versión mayor (patrón 1 y 3 de [dependencias.md §2](dependencias.md)). **Backend:** `express` 5.3.0, `zod` 4.6.7, `multer` 2.5.0, `nodemailer` 10.3.1 y `express-rate-limit` 8.7.2; `body-parser` 2.4.0, `ip-address` 10.7.5, `qs` 6.17.1 y `fast-uri` 3.1.9 con `pnpm update --depth 100` —**sin `--depth` pnpm 12 no movió `body-parser` y no avisó**, aunque `express` 5.3.0 ya lo admitía—; y los suelos de los `overrides` de `qs` y `fast-uri` suben, porque express sigue pidiendo `qs@^6.16.0`, que admite la vulnerable. **Frontend:** `zod` 4.6.7, `vite` 8.3.5 y `follow-redirects` 1.16.2. Ninguna versión tomada tenía menos de tres días (la más nueva, del 2026-10-29). Vite 8.3 avisaba de que `__dirname` en `vite.config.ts` no valdrá con el cargador nativo de configuración: pasa a `import.meta.dirname`. **El criterio, comprobado:** el lockfile resuelve `body-parser@2.4.0` en sus tres caminos; `pnpm audit --prod` da **0 avisos de cualquier severidad** en los dos repositorios; y `pnpm verify` sale con 0 en los dos —backend 1652 tests y 97,15 %, frontend 910 (+1 omitido) y 80,84 %—, con `auditoria` en «crítica 0, alta 0». E2E completo: 39 pasados y 3 omitidos a la primera. **Sin comprobar:** el ataque del aviso —un cuerpo gzip con bytes de más— no se repitió contra el servidor; la auditoría lo dejó como opcional y el arreglo es la versión. **Fuera de la ficha:** las dependencias de **desarrollo** del frontend siguen con avisos —`undici`, `browserslist`, `brace-expansion`, `vitest`, `minimatch`—, que no van a la imagen ni los mira `auditoria`. |
