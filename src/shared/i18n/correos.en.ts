@@ -17,7 +17,7 @@ export const correosEn: Record<ClaveDeCorreo, string> = {
     "verificacion.asunto": "Verify your account — {marca}",
     "verificacion.preencabezado": "Confirm your {marca} account to get started.",
     "verificacion.titulo": "Verify your account",
-    "verificacion.cuerpo": "Thanks for signing up to {marca}. Confirm your account to start managing your inventory.",
+    "verificacion.cuerpo": "Thanks for signing up to {marca}. Confirm your email; an administrator will then review your account, and we will let you know once it is approved.",
     "verificacion.boton": "Verify account",
     "verificacion.nota": "The link expires in 24 hours. If you did not create this account, you can ignore this email.",
 
@@ -35,6 +35,16 @@ export const correosEn: Record<ClaveDeCorreo, string> = {
     "invitacion.cuerpo": "An administrator created a {marca} account for you. Choose your password to start using it.",
     "invitacion.boton": "Choose my password",
     "invitacion.nota": "The link expires in {dias} days. If it does, use “Forgot your password?” on the sign-in page to get a new one.",
+
+    "aprobacion.asunto": "Your {marca} account is approved",
+    "aprobacion.preencabezado": "You can now sign in to {marca} as {rol}.",
+    "aprobacion.titulo": "Account approved",
+    "aprobacion.cuerpo": "An administrator approved your {marca} account with the <strong>{rol}</strong> role. You can now sign in with the email and password you signed up with.",
+    "aprobacion.boton": "Sign in",
+    "rol.ADMIN": "Administrator",
+    "rol.USER": "Read-only",
+    "rol.WAREHOUSE": "Warehouse",
+    "rol.SELLER": "Seller",
 
     "stock.asunto": "⚠️ Low stock alert: {producto} — {marca}",
     "stock.preencabezado": "{producto} is down to {actual} units (minimum {minimo}).",

@@ -45,22 +45,23 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-11-01 en este equipo, con `pnpm verify` y el E2E, al cerrar `AUD-004`:
+Medido el 2026-11-01 en este equipo, con `pnpm verify` y el E2E, al cerrar `AUD-001`:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1652** en 68 archivos | **910** en 80 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 97.15 % *(suelo 85 %)* | 80.84 % *(suelo 45 %)* |
+| Tests | **1771** en 69 archivos | **922** en 82 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 97.15 % *(suelo 85 %)* | 80.71 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
 
 **Re-auditoría del 2026-10-31** ([informe](auditoria/2026-10-31/INFORME.md), veredicto
-*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); quedan cuatro
-abiertas. Una es Crítico: el registro abierto deja leer los datos personales de todos los
-clientes. Las dos que tenían `verify` en rojo se cerraron el 2026-11-01: el test que dependía del
-reloj (`AUD-006`) y los avisos de dependencias publicados después del 2026-10-11 (`AUD-004`).
+*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); quedan tres
+abiertas, todas Altas. El 2026-11-01 se cerraron la Crítica —el registro abierto daba lectura de
+los datos de todos los clientes; ahora pide aprobación (`AUD-001`)— y las dos que tenían `verify`
+en rojo: el test que dependía del reloj (`AUD-006`) y los avisos de dependencias publicados
+después del 2026-10-11 (`AUD-004`).
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
 
 El punto de control de la auditoría, para retomarla, es
@@ -280,14 +281,9 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
 
 ## 5. Cosas que dependen de ti, no del código
 
-- **Decidir qué pasa con el registro público** (`AUD-001`; bloquea el primer despliegue). Tres
-  salidas:
-  - cerrarlo y dejar el alta solo por invitación;
-  - dejarlo, con aprobación de un ADMIN;
-  - quitar a `USER` los clientes y los datos de cliente de las ventas.
-
-  Hoy, cualquiera que confirme un correo propio lee la agenda completa de clientes, con su
-  documento de identidad. La decisión se anota en §6.
+- **Aprobar solo a quien se conozca.** Desde `AUD-001` el registro público no da acceso: deja la
+  cuenta pendiente y avisa en la campana. Darle un rol es darle lectura de clientes, ventas y
+  costes, así que aprobar a un desconocido devuelve el problema que la tarea cerró.
 - **Activar el alias de búsqueda en cada clon.** `.agents/` y `.claude/` se versionan a propósito
   y son la mayoría de los archivos rastreados; sin el alias, buscar en el código devuelve sobre
   todo documentación de tooling. Una vez por repositorio:
@@ -556,6 +552,20 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   depurar un fallo, ese identificador es lo primero que se pide.
 
 ### Negocio
+
+- **Registrarse no da acceso: deja la cuenta `PENDING` hasta que un ADMIN le asigna un rol**
+  (`AUD-001`, decisión del 2026-11-01). De las tres salidas de la auditoría se eligió el registro
+  con aprobación, y **`USER` se conserva** como rol de solo lectura —«Consulta» en pantalla— para
+  quien solo mira (un dueño, un contable). Cerrar el registro del todo era la salida más barata;
+  se descartó porque se quiere que alguien pueda pedir acceso sin que lo inviten.
+  - `PENDING` **no es un rol**: no está en ningún grupo de `PERMISOS` y `login` lo detiene con
+    `ACCOUNT_PENDING_APPROVAL`. Meterlo en `TODOS` «para que vea algo» deshace la tarea.
+  - **No se asigna** (`rolAsignableSchema`): ni al cambiar un rol ni al invitar. Rechazar es
+    desactivar.
+  - Aprobar es el `updateMany` condicionado a que siga `PENDING`: solo así dos administradores a
+    la vez mandan un correo y no dos.
+  - El aviso sale al **confirmar el correo**, no al registrarse: un registro con un correo ajeno
+    no llega a la campana.
 
 - **Ninguna contraseña viaja por correo, y una cuenta no nace con una vacía.** A quien un
   administrador da de alta (`POST /users`) le llega un enlace para elegirla; la cuenta se crea con

@@ -155,8 +155,9 @@ No dependen del rol. Públicas: `POST /register`, `/login`, `/logout`, `/refresh
 
 ### Rutas por módulo y rol
 
-Hay cuatro roles: `USER` lee, `WAREHOUSE` además recibe, envía y mueve stock, `SELLER` además vende
-en el mostrador, y `ADMIN` hace todo. `SELLER` no tiene columna en la tabla porque solo añade una
+Hay cuatro roles: `USER` lee —en pantalla, «Consulta»—, `WAREHOUSE` además recibe, envía y mueve
+stock, `SELLER` además vende en el mostrador, y `ADMIN` hace todo. Y un quinto valor que no es un
+rol: `PENDING`, el de quien se registró por su cuenta y espera aprobación, que no puede nada. `SELLER` no tiene columna en la tabla porque solo añade una
 ruta a las de «Todos los roles»: `POST /sale-orders/counter`, que comparte con `ADMIN`.
 La tabla es un reflejo de la matriz `PERMISOS` de [`src/contratos/api.ts`](src/contratos/api.ts),
 que es **la única copia que cuenta**: con ella se protege cada ruta y con ella decide el frontend
@@ -231,7 +232,7 @@ qué botones enseñar.
 | Sesión | Access token de 15 min en cookie `httpOnly`; refresh token rotativo y hasheado, con detección de reuso: presentar uno ya rotado cierra la familia entera |
 | Roles | Matriz `PERMISOS` del contrato; `permisos.test.ts` recorre todas las rutas con cada rol |
 | Contraseñas | `bcryptjs` con 12 rondas. Restablecerla revoca las sesiones |
-| Cuentas | Una cuenta desactivada pierde el acceso en la siguiente petición. El registro público crea siempre `USER`; con otro rol solo se entra por invitación de un `ADMIN`, que manda un enlace y nunca una contraseña |
+| Cuentas | Una cuenta desactivada pierde el acceso en la siguiente petición. El registro público crea la cuenta **sin rol** (`PENDING`): confirmado el correo, avisa a los `ADMIN` en la campana y no entra hasta que uno le asigne un rol, que es aprobarla y le manda un correo (AUD-001). La otra vía es la invitación de un `ADMIN`, que ya lleva su rol y manda un enlace, nunca una contraseña |
 | Límite de peticiones | 100 cada 15 min por IP; 10 en login y recuperación; 5 por hora en registro |
 | Correo | STARTTLS obligatorio: un servidor sin cifrado aborta el envío |
 | Subidas | Imágenes validadas por sus *magic bytes*, no solo por el `Content-Type` |
@@ -254,6 +255,7 @@ físico abierto. Los movimientos **cuadran con el stock** de cada producto.
 | USER | `laura@stockly.app` | `User1234!` |
 | WAREHOUSE | `almacen@stockly.app` | `Almacen1234!` |
 | SELLER | `vendedor@stockly.app` | `Vendedor1234!` |
+| PENDING | `pendiente@stockly.app` | `Pendiente1234!` — no entra: espera a que un ADMIN le dé rol, y su aviso está en la campana |
 
 > **El administrador inicial sale de aquí.** En un despliegue nuevo hay que ejecutar el seed —o
 > promover a alguien con `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN—, porque

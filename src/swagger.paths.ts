@@ -9,6 +9,8 @@
  * copiado a mano, la quinta se olvida de un código de respuesta y nadie lo nota.
  */
 
+import { rolAsignableSchema, rolSchema } from "@/contratos/api";
+
 type Operacion = Record<string, unknown>;
 type Ruta = Record<string, Operacion>;
 
@@ -780,7 +782,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
             parameters: [
                 ...PARAMS_PAGINA,
                 { name: "search", in: "query", schema: { type: "string" }, description: "Busca en nombre y correo (índice de trigramas, T2-09)" },
-                { name: "role", in: "query", schema: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE", "SELLER"] } },
+                { name: "role", in: "query", schema: { type: "string", enum: rolSchema.options }, description: "`PENDING`: cuentas registradas que esperan aprobación (AUD-001)" },
                 { name: "isActive", in: "query", schema: { type: "string", enum: ["true", "false"] } },
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/User"), "Listado paginado"), "403": ERROR("Requiere rol ADMIN") },
@@ -794,7 +796,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 properties: {
                     name: { type: "string", maxLength: 80 },
                     email: { type: "string", format: "email" },
-                    role: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE", "SELLER"] },
+                    role: { type: "string", enum: rolAsignableSchema.options },
                 },
             } } } },
             responses: {
@@ -813,7 +815,8 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/users/{id}/role": {
         patch: {
             tags: ["Users"], summary: "Cambiar el rol (ADMIN)", parameters: [PARAM_ID],
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["role"], properties: { role: { type: "string", enum: ["ADMIN", "USER", "WAREHOUSE", "SELLER"] } } } } } },
+            description: "Queda en la auditoría como `USER_ROLE_CHANGE`. Dar el primer rol a una cuenta `PENDING` es **aprobarla** (AUD-001): su aviso sale de las campanas y la persona recibe un correo, que no deshace nada si falla. `PENDING` no se puede asignar.",
+            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["role"], properties: { role: { type: "string", enum: rolAsignableSchema.options } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/User" }, "Rol actualizado"),
                 "400": ERROR("No puedes cambiar tu propio rol"), "403": ERROR("Requiere rol ADMIN"), "404": ERROR("No encontrado"),

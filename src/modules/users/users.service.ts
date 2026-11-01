@@ -5,7 +5,10 @@ import { filtroDeEnum } from "@/shared/lib/enums";
 import { $Enums, Prisma } from "@/generated/prisma/client";
 import { hashPassword } from "@/shared/lib/hash";
 import { generateToken } from "@/shared/lib/tokens";
-import { requireSmtp, sendInvitationEmail } from "@/shared/lib/nodemailer";
+import { requireSmtp, sendAccountApprovedEmail, sendInvitationEmail } from "@/shared/lib/nodemailer";
+import { logger } from "@/shared/lib/logger";
+import { notificationsService } from "@/modules/notifications/notifications.service";
+import type { RolAsignable } from "@/contratos/api";
 import type { Idioma } from "@/shared/i18n/correos";
 
 /**
@@ -26,6 +29,23 @@ const USER_SELECT = {
     createdAt: true,
     updatedAt: true,
 } as const;
+
+/**
+ * AUD-001 — lo que sigue a aprobar una cuenta: su aviso sale de todas las campanas y la persona
+ * recibe un correo. El correo se **espera** —es uno, y lo pide un administrador— pero no
+ * deshace nada si falla, ni si el SMTP no está configurado: la cuenta ya puede entrar, y quien
+ * la aprobó puede decírselo por otra vía. El fallo queda en el registro.
+ */
+async function alAprobar(user: { id: string; email: string; name: string }, role: RolAsignable) {
+    await notificationsService.retirarAvisoDeCuentaPendiente(user.id);
+
+    const { idioma } = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { idioma: true } });
+    try {
+        await sendAccountApprovedEmail(user.email, user.name, role, idioma);
+    } catch (err) {
+        logger.warn({ err, userId: user.id }, "No se pudo enviar el correo de cuenta aprobada");
+    }
+}
 
 export const usersService = {
     async getAll(query: { page?: string; limit?: string; search?: string; role?: string; isActive?: string }) {
@@ -63,7 +83,7 @@ export const usersService = {
      * token de restablecimiento, con otra caducidad, y `resetPassword` verifica la cuenta al
      * usarlo: abrirlo demuestra que el buzón es suyo.
      */
-    async invite(datos: { name: string; email: string; role: $Enums.Role }, idioma: Idioma) {
+    async invite(datos: { name: string; email: string; role: RolAsignable }, idioma: Idioma) {
         // Antes de crear nada: una cuenta creada y sin correo no se podría volver a invitar.
         requireSmtp();
 
@@ -107,11 +127,27 @@ export const usersService = {
         return user;
     },
 
-    async updateRole(id: string, role: $Enums.Role, requesterId: string) {
+    /**
+     * Cambia el rol y devuelve el que tenía, para la auditoría.
+     *
+     * AUD-001 — **aprobar es esto**: dar el primer rol a una cuenta `PENDING`. Esa transición se
+     * hace con un `updateMany` condicionado a que siga pendiente, así que si dos administradores
+     * la aprueban a la vez solo uno la aprueba —y manda el correo—; el otro solo cambia el rol.
+     */
+    async updateRole(id: string, role: RolAsignable, requesterId: string) {
         if (id === requesterId) throw new HttpError(400, "No puedes cambiar tu propio rol", "CANNOT_CHANGE_OWN_ROLE");
-        const user = await prisma.user.findUnique({ where: { id } });
-        if (!user) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
-        return prisma.user.update({ where: { id }, data: { role }, select: USER_SELECT });
+        const antes = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+        if (!antes) throw new HttpError(404, "Usuario no encontrado", "USER_NOT_FOUND");
+
+        const aprobada =
+            antes.role === "PENDING" &&
+            (await prisma.user.updateMany({ where: { id, role: "PENDING" }, data: { role } })).count === 1;
+        const user = aprobada
+            ? await prisma.user.findUniqueOrThrow({ where: { id }, select: USER_SELECT })
+            : await prisma.user.update({ where: { id }, data: { role }, select: USER_SELECT });
+
+        if (aprobada) await alAprobar(user, role);
+        return { user, rolAnterior: antes.role, aprobada };
     },
 
     async setActive(id: string, isActive: boolean, requesterId: string) {
@@ -126,6 +162,12 @@ export const usersService = {
             data.refreshExpires = null;
         }
 
-        return prisma.user.update({ where: { id }, data, select: USER_SELECT });
+        const actualizada = await prisma.user.update({ where: { id }, data, select: USER_SELECT });
+
+        // AUD-001 — desactivar una cuenta pendiente es rechazarla: su aviso ya no pide nada.
+        if (!isActive && actualizada.role === "PENDING") {
+            await notificationsService.retirarAvisoDeCuentaPendiente(id);
+        }
+        return actualizada;
     },
 };

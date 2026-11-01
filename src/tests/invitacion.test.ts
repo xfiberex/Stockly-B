@@ -188,13 +188,13 @@ describe("Alta de usuarios por invitación (T6-10)", () => {
             expect(res.status).toBe(401);
         });
 
-        it("el registro público sigue creando solo USER, aunque pida otro rol", async () => {
+        it("el registro público crea la cuenta sin rol (AUD-001), aunque pida uno", async () => {
             const res = await request(app)
                 .post(`${AUTH}/register`)
                 .send({ name: "Lista", email: "lista@example.com", password: CLAVE, role: "ADMIN" });
 
             expect(res.status).toBe(201);
-            expect((await prisma.user.findUniqueOrThrow({ where: { email: "lista@example.com" } })).role).toBe("USER");
+            expect((await prisma.user.findUniqueOrThrow({ where: { email: "lista@example.com" } })).role).toBe("PENDING");
         });
     });
 

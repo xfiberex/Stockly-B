@@ -22,7 +22,8 @@ export const correosEs = {
     "verificacion.asunto": "Verifica tu cuenta — {marca}",
     "verificacion.preencabezado": "Confirma tu cuenta de {marca} para empezar.",
     "verificacion.titulo": "Verifica tu cuenta",
-    "verificacion.cuerpo": "Gracias por registrarte en {marca}. Confirma tu cuenta para empezar a gestionar tu inventario.",
+    // AUD-001 — confirmar no basta para entrar: después un administrador tiene que aprobarla.
+    "verificacion.cuerpo": "Gracias por registrarte en {marca}. Confirma tu correo; después, un administrador revisará tu cuenta y te avisaremos cuando esté aprobada.",
     "verificacion.boton": "Verificar cuenta",
     "verificacion.nota": "El enlace expira en 24 horas. Si no creaste esta cuenta, puedes ignorar este correo.",
 
@@ -41,6 +42,19 @@ export const correosEs = {
     "invitacion.cuerpo": "Un administrador te ha creado una cuenta en {marca}. Elige tu contraseña para empezar a usarla.",
     "invitacion.boton": "Elegir mi contraseña",
     "invitacion.nota": "El enlace expira en {dias} días. Si caduca, usa «¿Olvidaste tu contraseña?» en la página de inicio de sesión para recibir otro.",
+
+    // ── Cuenta aprobada (AUD-001) ────────────────────────────────────────────
+    "aprobacion.asunto": "Tu cuenta de {marca} está aprobada",
+    "aprobacion.preencabezado": "Ya puedes iniciar sesión en {marca} como {rol}.",
+    "aprobacion.titulo": "Cuenta aprobada",
+    "aprobacion.cuerpo": "Un administrador ha aprobado tu cuenta en {marca} con el rol <strong>{rol}</strong>. Ya puedes iniciar sesión con el correo y la contraseña con los que te registraste.",
+    "aprobacion.boton": "Iniciar sesión",
+    // El nombre de cada rol, como lo enseña la pantalla de Usuarios. `PENDING` no está: nadie
+    // recibe este correo sin rol.
+    "rol.ADMIN": "Administrador",
+    "rol.USER": "Consulta",
+    "rol.WAREHOUSE": "Almacén",
+    "rol.SELLER": "Vendedor",
 
     // ── Alerta de bajo stock ─────────────────────────────────────────────────
     "stock.asunto": "⚠️ Alerta de bajo stock: {producto} — {marca}",

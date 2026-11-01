@@ -147,8 +147,32 @@ async function sembrarUsuarios(): Promise<User[]> {
                 isVerified: true,
             },
         }),
+        // AUD-001 — se registró por su cuenta, confirmó el correo y espera a que un administrador
+        // le dé rol: no puede entrar. Para ver la cuenta pendiente en Usuarios y su aviso.
+        prisma.user.create({
+            data: {
+                name: "Diego Castro",
+                email: "pendiente@stockly.app",
+                password: await hashPassword("Pendiente1234!"),
+                role: "PENDING",
+                isVerified: true,
+            },
+        }),
     ]);
-    console.log(`  - ${usuarios.length} usuarios creados`);
+
+    // Su aviso, en la campana de cada administrador: lo que habría dejado la confirmación del correo.
+    const pendiente = usuarios.find((u) => u.role === "PENDING")!;
+    const administradores = usuarios.filter((u) => u.role === "ADMIN");
+    await prisma.notification.createMany({
+        data: administradores.map((admin) => ({
+            userId: admin.id,
+            type: "USER_PENDING" as const,
+            entityId: pendiente.id,
+            data: { name: pendiente.name, email: pendiente.email },
+        })),
+    });
+
+    console.log(`  - ${usuarios.length} usuarios creados (1 pendiente de aprobación)`);
     return usuarios;
 }
 
@@ -1149,6 +1173,7 @@ async function main(): Promise<void> {
     laura@stockly.app    User1234!    (USER, correos en ingles)
     almacen@stockly.app  Almacen1234!  (WAREHOUSE)
     vendedor@stockly.app Vendedor1234! (SELLER)
+    pendiente@stockly.app Pendiente1234! (PENDING: no entra hasta que un ADMIN le de rol)
 `);
 }
 

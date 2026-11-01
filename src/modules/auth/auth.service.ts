@@ -4,7 +4,22 @@ import { hashPassword, comparePassword } from "@/shared/lib/hash";
 import { generateToken, hashToken } from "@/shared/lib/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/shared/lib/nodemailer";
 import { auditService } from "@/modules/audit-logs";
+import { notificationsService } from "@/modules/notifications/notifications.service";
+import { logger } from "@/shared/lib/logger";
 import type { Idioma } from "@/shared/i18n/correos";
+
+/**
+ * AUD-001 — la cuenta acaba de demostrar que el buzón es suyo y sigue sin rol: los
+ * administradores tienen que enterarse de que hay alguien esperando. Si el aviso falla, la
+ * verificación ya está hecha y no se deshace; queda en el registro, y la cuenta sigue
+ * apareciendo como pendiente en Usuarios.
+ */
+async function avisarSiEsperaAprobacion(cuenta: { id: string; name: string; email: string; role: string }) {
+    if (cuenta.role !== "PENDING") return;
+    await notificationsService.avisarCuentaPendiente(cuenta).catch((err: unknown) => {
+        logger.warn({ err, userId: cuenta.id }, "No se pudo avisar de una cuenta pendiente de aprobación");
+    });
+}
 
 export const authService = {
     /**
@@ -20,7 +35,11 @@ export const authService = {
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-        // El registro público SIEMPRE crea usuarios con rol USER. Antes el primero
+        // AUD-001 — el registro público crea la cuenta **sin rol** (`PENDING`): no entra hasta
+        // que un administrador le asigna uno desde Usuarios. Con `USER`, cualquiera que
+        // confirmara un correo propio leía la agenda de clientes, las ventas y los costes.
+        //
+        // Antes de eso ya se había quitado otra cosa: el primero
         // se convertía en ADMIN, lo que en un despliegue sin seed regalaba el panel
         // de administración al primer visitante que pasara por la página de registro
         // — y con una carrera de propina: dos registros simultáneos leían ambos
@@ -32,7 +51,7 @@ export const authService = {
                 name,
                 email,
                 password: hashed,
-                role: "USER",
+                role: "PENDING",
                 idioma,
                 verifyToken: hash,
                 verifyExpires: expires,
@@ -54,6 +73,8 @@ export const authService = {
             where: { id: user.id },
             data: { isVerified: true, verifyToken: null, verifyExpires: null },
         });
+
+        await avisarSiEsperaAprobacion(user);
     },
 
     async resendVerification(email: string) {
@@ -82,6 +103,11 @@ export const authService = {
 
         if (!user.isActive) throw new HttpError(403, "Tu cuenta ha sido desactivada. Contacta al administrador", "ACCOUNT_DISABLED");
         if (!user.isVerified) throw new HttpError(403, "Confirma tu correo antes de iniciar sesión", "EMAIL_NOT_CONFIRMED");
+        // AUD-001 — después del correo: quien no lo ha confirmado tiene algo que hacer él; quien
+        // ya lo confirmó solo puede esperar al administrador.
+        if (user.role === "PENDING") {
+            throw new HttpError(403, "Tu cuenta está pendiente de que un administrador la apruebe", "ACCOUNT_PENDING_APPROVAL");
+        }
 
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -220,6 +246,9 @@ export const authService = {
                 refreshExpires: null,
             },
         });
+
+        // AUD-001 — si esto es lo que la verificó, es aquí donde empieza a esperar aprobación.
+        if (!user.isVerified) await avisarSiEsperaAprobacion(user);
     },
 
     async getById(id: string) {

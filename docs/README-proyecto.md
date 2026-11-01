@@ -86,7 +86,8 @@ pnpm dev               # http://localhost:5173
 ```
 
 Tras el seed, el administrador es `admin@stockly.app` / `Admin1234!`; el resto de cuentas, en el
-[README del backend](../README.md#seed). **El registro público crea siempre usuarios `USER`**: en
+[README del backend](../README.md#seed). **El registro público crea cuentas sin rol**, que un ADMIN
+tiene que aprobar (AUD-001): en
 un despliegue nuevo nadie es administrador hasta ejecutar el seed o hasta que un ADMIN promueva a
 alguien.
 

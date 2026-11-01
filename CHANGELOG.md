@@ -266,6 +266,13 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Seguridad
 
+- **El registro público ya no da acceso** (`AUD-001`): cualquiera que confirmara un correo propio
+  quedaba como `USER` y leía la agenda de clientes —con su documento de identidad—, todas las
+  ventas y los costes. Ahora la cuenta nace **pendiente**: no puede iniciar sesión, los
+  administradores reciben un aviso en la campana cuando confirma su correo, y la aprueban desde
+  **Usuarios** eligiéndole un rol. Entonces le llega un correo. Rechazar es desactivarla. En
+  pantalla, el rol `USER` pasa a llamarse **Consulta**, que es lo que hace: leer. Y cambiar un rol
+  queda por fin en la auditoría (`USER_ROLE_CHANGE`).
 - **Dependencias al día ante avisos publicados** (2026-09-28 y 2026-09-30): `axios` 1.20,
   `nodemailer` 10, `multer` 2.4 y `overrides` para cuatro transitivas. pnpm pasa a 12.4.1. El
   patrón, en [docs/dependencias.md §2](docs/dependencias.md). El 2026-10-06, `proxy-addr` 2.0.8

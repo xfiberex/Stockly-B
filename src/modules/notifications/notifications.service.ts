@@ -117,6 +117,23 @@ export const notificationsService = {
     },
 
     /**
+     * AUD-001 — alguien se registró, confirmó su correo y espera a que le den un rol. Antes de
+     * confirmar no se avisa: un registro con un correo ajeno no llegaría nunca a la campana.
+     */
+    async avisarCuentaPendiente(cuenta: { id: string; name: string; email: string }): Promise<void> {
+        await avisarAAdministradores("USER_PENDING", cuenta.id, { name: cuenta.name, email: cuenta.email });
+    },
+
+    /**
+     * AUD-001 — la cuenta ya no espera: la aprobaron o la desactivaron. El aviso se **borra** de
+     * todas las campanas, también de las que no lo habían leído: ya no hay nada que hacer con él,
+     * y dejarlo invitaría a un segundo administrador a aprobar lo que ya está aprobado.
+     */
+    async retirarAvisoDeCuentaPendiente(cuentaId: string): Promise<void> {
+        await prisma.notification.deleteMany({ where: { type: "USER_PENDING", entityId: cuentaId } });
+    },
+
+    /**
      * Lo que no dispara ninguna petición: avisar de las compras que pasaron su plazo y purgar
      * los avisos leídos hace más de 90 días.
      *

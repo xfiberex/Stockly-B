@@ -11,7 +11,7 @@ import {
     emailTable,
 } from "@/shared/lib/emailTemplates";
 import { formatearImporte } from "@/shared/lib/moneda";
-import { escribirNumeroDeVenta } from "@/contratos/api";
+import { escribirNumeroDeVenta, type RolAsignable } from "@/contratos/api";
 import type { DatosDelResumen } from "@/shared/lib/resumenSemanal";
 import {
     traducirCorreo,
@@ -149,6 +149,35 @@ export async function sendInvitationEmail(to: string, name: string, token: strin
         html: renderEmail({
             preheader: t("invitacion.preencabezado"),
             heading: t("invitacion.titulo"),
+            bodyHtml,
+            idioma,
+        }),
+    });
+}
+
+/**
+ * AUD-001 — a quien se registró por su cuenta, cuando un administrador le da su primer rol. No
+ * lleva enlace con token: la contraseña ya la eligió al registrarse, así que el botón va al
+ * inicio de sesión.
+ */
+export async function sendAccountApprovedEmail(to: string, name: string, rol: RolAsignable, idioma: Idioma) {
+    requireSmtp();
+    const url = `${env.frontendUrl}/auth/login`;
+    const t = traductorDeCorreo(idioma);
+    const nombreDelRol = t(`rol.${rol}` as const);
+
+    const bodyHtml =
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(name) })) +
+        emailParagraph(t("aprobacion.cuerpo", { rol: nombreDelRol })) +
+        emailButton(url, t("aprobacion.boton"));
+
+    await transporter.sendMail({
+        from: env.smtp.from,
+        to,
+        subject: t("aprobacion.asunto"),
+        html: renderEmail({
+            preheader: t("aprobacion.preencabezado", { rol: nombreDelRol }),
+            heading: t("aprobacion.titulo"),
             bodyHtml,
             idioma,
         }),

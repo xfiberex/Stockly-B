@@ -34,7 +34,8 @@ monta una empresa con el código, es esa empresa.
 
 | Dato | Dónde | Observaciones |
 |---|---|---|
-| Nombre, correo, idioma y hash de la contraseña de cada usuario | `users` | Un usuario **no se borra**: solo se desactiva (`PATCH /users/:id/deactivate`) |
+| Nombre, correo, idioma y hash de la contraseña de cada usuario | `users` | Un usuario **no se borra**: solo se desactiva (`PATCH /users/:id/deactivate`). Tampoco quien se registró y nadie aprobó: rechazarlo es desactivarlo, y su fila se queda |
+| **Quién puede leer los datos de clientes y ventas** | La matriz `PERMISOS` del contrato | Cualquier rol con sesión: `ADMIN`, `USER`, `WAREHOUSE` y `SELLER`. **Ninguno se obtiene registrándose** (AUD-001): el registro público deja la cuenta sin rol (`PENDING`), que no lee nada y no puede iniciar sesión, hasta que un `ADMIN` le asigna uno. Antes, registrarse y confirmar un correo propio daba `USER` y con él la agenda de clientes entera. Quien opere el despliegue decide a quién aprueba: **aprobar a alguien es darle acceso a esos datos** |
 | Correo de quien hizo cada operación | `audit_logs.userEmail`, `inventory_counts.createdByEmail` / `closedByEmail`, `inventory_count_lines.countedByEmail`, `sale_orders.createdByEmail` (T6-06) | Se guardan como texto y no como clave foránea **a propósito**, para que el registro sobreviva al usuario. Nada los purga |
 | Nombre, correo, teléfono, **documento de identidad o fiscal** y notas de cada cliente | `customers` (T5-06; `document`, T6-06) | Se crea al darlo de alta o al vender con un correo nuevo. **Se puede borrar**, pero sus órdenes conservan la instantánea de la fila siguiente |
 | Nombre, correo, teléfono y **documento** del cliente de un pedido de venta | `sale_orders.customerName` / `customerEmail` / `customerPhone` / `customerDocument` (T6-06) | Opcionales. Pueden ser de una persona física. Es la instantánea de a quién se vendió: no cambia al editar ni al borrar el cliente |

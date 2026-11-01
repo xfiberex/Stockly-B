@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { usersService } from "./users.service";
-import type { $Enums } from "@/generated/prisma/client";
+import type { RolAsignable } from "@/contratos/api";
 import { auditService } from "@/modules/audit-logs";
 import { idiomaDePeticion } from "@/shared/lib/idiomaDePeticion";
 
@@ -14,7 +14,7 @@ export const usersController = {
 
     async invite(req: Request, res: Response, next: NextFunction) {
         try {
-            const { name, email, role } = req.body as { name: string; email: string; role: $Enums.Role };
+            const { name, email, role } = req.body as { name: string; email: string; role: RolAsignable };
             // De la persona invitada no se conoce ningún idioma: va el de quien la invita, y se
             // corrige solo en su primer inicio de sesión (T4-12).
             const user = await usersService.invite({ name, email, role }, idiomaDePeticion(req));
@@ -32,11 +32,20 @@ export const usersController = {
 
     async updateRole(req: Request<{ id: string }>, res: Response, next: NextFunction) {
         try {
-            // El `rolSchema` de la ruta ya lo garantiza; el cast solo
-            // traslada esa garantía al tipo, que desde T3-02 es el enum de Prisma.
-            const { role } = req.body as { role: $Enums.Role };
-            const user = await usersService.updateRole(req.params.id, role, req.userId!);
-            res.json({ success: true, message: "Rol actualizado exitosamente", data: user });
+            // El `rolAsignableSchema` de la ruta ya lo garantiza; el cast solo traslada esa
+            // garantía al tipo.
+            const { role } = req.body as { role: RolAsignable };
+            const { user, rolAnterior, aprobada } = await usersService.updateRole(req.params.id, role, req.userId!);
+            // AUD-001 — cambiar un rol cambia permisos, y no dejaba rastro aunque
+            // `USER_ROLE_CHANGE` existía desde T3-02. Una aprobación es el mismo cambio, desde
+            // `PENDING`, y lo dice.
+            await auditService.log({ userId: req.userId, userEmail: req.userEmail }, "USER_ROLE_CHANGE", "User", user.id, {
+                email: user.email,
+                de: rolAnterior,
+                a: role,
+                ...(aprobada && { aprobada: true }),
+            });
+            res.json({ success: true, message: aprobada ? "Cuenta aprobada" : "Rol actualizado exitosamente", data: user });
         } catch (error) { next(error); }
     },
 

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "@/shared/middlewares/validate.middleware";
 import { requireAuth, permitir } from "@/shared/middlewares/auth.middleware";
-import { rolSchema } from "@/contratos/api";
+import { rolAsignableSchema } from "@/contratos/api";
 import { usersController } from "./users.controller";
 import { invitarUsuarioSchema } from "./users.validator";
 
@@ -18,8 +18,9 @@ usersRouter.patch(
     "/:id/role",
     permitir("PATCH /users/:id/role"),
     // T5-13 — los roles salen del contrato, que vigila un test contra el enum de la base: con
-    // la lista escrita aquí, `WAREHOUSE` existía y no se podía asignar.
-    validate(z.object({ role: rolSchema })),
+    // la lista escrita aquí, `WAREHOUSE` existía y no se podía asignar. AUD-001: los
+    // asignables, sin `PENDING`; devolver a alguien a «sin rol» es desactivarlo.
+    validate(z.object({ role: rolAsignableSchema })),
     usersController.updateRole,
 );
 usersRouter.patch("/:id/activate", permitir("PATCH /users/:id/activate"), usersController.activate);

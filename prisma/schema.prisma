@@ -69,6 +69,10 @@ enum Role {
   WAREHOUSE
   // T6-08 — quien atiende el mostrador: vende en un paso y lee lo que lee USER.
   SELLER
+  // AUD-001 — **todavía sin rol**: quien se registra por su cuenta espera aquí a que un
+  // administrador le asigne uno. No está en ningún grupo de `PERMISOS`, así que no puede nada,
+  // y `login` lo detiene antes. No se asigna: aprobar es pasar de aquí a un rol de verdad.
+  PENDING
 }
 
 // T4-12 — el idioma en el que se le escribe a este usuario.
@@ -378,7 +382,8 @@ model User {
   name                 String
   email                String    @unique
   password             String
-  role                 Role      @default(USER)
+  // AUD-001 — sin rol por defecto: una cuenta creada sin decir cuál no puede nada.
+  role                 Role      @default(PENDING)
   // Por defecto español: es el idioma de referencia del catálogo, y una cuenta creada por
   // seed o por migración no tiene ningún navegador detrás del que deducirlo (T4-12).
   idioma               Idioma    @default(ES)
@@ -667,6 +672,8 @@ enum NotificationType {
   PURCHASE_OVERDUE
   // T5-15 — un lote con existencias entra en el plazo de aviso de caducidad.
   LOT_EXPIRING
+  // AUD-001 — alguien se registró, confirmó su correo y espera a que le den un rol.
+  USER_PENDING
 }
 
 model Notification {

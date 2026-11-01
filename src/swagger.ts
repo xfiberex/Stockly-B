@@ -39,7 +39,7 @@ export const spec = {
                 tags: ["Auth"], summary: "Registrar usuario",
                 security: [],
                 requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["name", "email", "password"], properties: { name: { type: "string" }, email: { type: "string", format: "email" }, password: { type: "string", minLength: 8 } } } } } },
-                responses: { "201": { description: "Registro exitoso. Se envía email de verificación." }, "409": { description: "El correo ya está registrado" } },
+                responses: { "201": { description: "Registro exitoso. Se envía email de verificación. La cuenta nace sin rol (`PENDING`) y no entra hasta que un ADMIN le asigne uno (AUD-001)." }, "409": { description: "El correo ya está registrado" } },
             },
         },
         "/auth/verify-email": {
@@ -55,7 +55,7 @@ export const spec = {
                 tags: ["Auth"], summary: "Iniciar sesión",
                 security: [],
                 requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "password"], properties: { email: { type: "string", format: "email" }, password: { type: "string" } } } } } },
-                responses: { "200": { description: "Login exitoso. Establece cookie de sesión.", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/User" } } } } } }, "401": { description: "Credenciales inválidas" } },
+                responses: { "200": { description: "Login exitoso. Establece cookie de sesión.", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/User" } } } } } }, "401": { description: "Credenciales inválidas" }, "403": { description: "Cuenta desactivada (`ACCOUNT_DISABLED`), sin confirmar (`EMAIL_NOT_CONFIRMED`) o pendiente de aprobación (`ACCOUNT_PENDING_APPROVAL`)" } },
             },
         },
         "/auth/logout": {

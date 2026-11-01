@@ -31,10 +31,18 @@ import { z } from "zod";
 // ─────────────────────────── Enums ───────────────────────────
 // Espejo de `prisma/schema.prisma`, vigilado por `contratos.test.ts`.
 
-export const rolSchema = z.enum(["ADMIN", "USER", "WAREHOUSE", "SELLER"]);
+export const rolSchema = z.enum(["ADMIN", "USER", "WAREHOUSE", "SELLER", "PENDING"]);
+
+/**
+ * AUD-001 — los roles que un administrador puede dar, al cambiar el de alguien o al invitar.
+ * `PENDING` no es uno: es no tener rol todavía, y solo lo pone el registro público. Aprobar una
+ * cuenta es pasarla de ahí a uno de estos.
+ */
+export const rolAsignableSchema = rolSchema.exclude(["PENDING"]);
 
 // ─────────────────────── Permisos (T5-13) ───────────────────────
 
+/** AUD-001 — `PENDING` no está en ningún grupo **a propósito**: sin rol no se puede nada. */
 const TODOS = ["ADMIN", "USER", "WAREHOUSE", "SELLER"] as const;
 const SOLO_ADMIN = ["ADMIN"] as const;
 const ALMACEN = ["ADMIN", "WAREHOUSE"] as const;
@@ -428,6 +436,8 @@ export const CODIGOS_DE_ERROR = [
     "TRANSFER_SAME_WAREHOUSE",
     // 401 / 403 — quién eres y qué se te permite
     "ACCOUNT_DISABLED",
+    // AUD-001 — la cuenta se registró por su cuenta y ningún administrador le ha dado rol aún.
+    "ACCOUNT_PENDING_APPROVAL",
     "EMAIL_NOT_CONFIRMED",
     // T5-13 — el rol no alcanza para esa ruta (`PERMISOS`).
     "FORBIDDEN",
@@ -1082,7 +1092,7 @@ export const fichaClienteSchema = clienteSchema.extend({ summary: resumenCliente
 
 // ─────────────────────── Avisos (T5-12) ───────────────────────
 
-export const tipoDeAvisoSchema = z.enum(["LOW_STOCK", "SALE_UNSHIPPABLE", "PURCHASE_OVERDUE", "LOT_EXPIRING"]);
+export const tipoDeAvisoSchema = z.enum(["LOW_STOCK", "SALE_UNSHIPPABLE", "PURCHASE_OVERDUE", "LOT_EXPIRING", "USER_PENDING"]);
 
 /**
  * `entityId` es de qué habla el aviso —el producto, la venta o la compra, según el tipo—, y
@@ -1139,6 +1149,15 @@ export const avisoSchema = z.discriminatedUnion("type", [
          * lote; `units` es lo que quedaba de él, en todos los almacenes, al avisar.
          */
         data: z.object({ productName: z.string(), lotCode: z.string(), expiresAt: z.string(), units: z.number() }),
+    }),
+    z.object({
+        ...camposDeAviso,
+        type: z.literal("USER_PENDING"),
+        /**
+         * AUD-001 — alguien se registró, confirmó su correo y espera rol. `entityId` es la cuenta.
+         * El aviso se borra de todas las campanas cuando la aprueban o la desactivan.
+         */
+        data: z.object({ name: z.string(), email: z.string() }),
     }),
 ]);
 
@@ -1652,6 +1671,7 @@ export const resumenAbcSchema = z.object({
 // cambia con él y `tsc` señala cada uso que dejó de encajar.
 
 export type Rol = z.infer<typeof rolSchema>;
+export type RolAsignable = z.infer<typeof rolAsignableSchema>;
 export type IdiomaDeCorreo = z.infer<typeof idiomaSchema>;
 export type EstadoOrdenCompra = z.infer<typeof estadoOrdenCompraSchema>;
 export type EstadoOrdenVenta = z.infer<typeof estadoOrdenVentaSchema>;

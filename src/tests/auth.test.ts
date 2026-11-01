@@ -55,8 +55,9 @@ describe("Auth API", () => {
             const total = await prisma.user.count();
             expect(total).toBe(1); // es realmente el primero
 
+            // AUD-001 — y tampoco ningún otro: nace sin rol, esperando aprobación.
             const primero = await prisma.user.findUnique({ where: { email: "ana@example.com" } });
-            expect(primero?.role).toBe("USER");
+            expect(primero?.role).toBe("PENDING");
         });
 
         it("409: email ya registrado", async () => {
