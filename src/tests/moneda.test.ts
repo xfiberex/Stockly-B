@@ -163,8 +163,9 @@ describe("Cambiar el símbolo a RD$ cambia todos los importes que salen del serv
         const producto = await crearProducto({
             data: { name: "Taladro", sku: "TAL-01", price: 1234.5, costPrice: 800, stock: 4, minStock: 1, categoryId: categoria.id },
         });
-        // Enviada el jueves 24 de septiembre de 2026: entra en el margen, en julio-septiembre y
-        // en la semana que resume el comando el miércoles 30.
+        // Enviada el jueves 24 de septiembre de 2026: entra en julio-septiembre y en la semana que
+        // resume el comando el miércoles 30. En el margen ya no (AUD-006): su ventana son los
+        // últimos 30 días del reloj, y esa venta salió de ella el 2026-10-24.
         await prisma.saleOrder.create({
             data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
                 status: "SHIPPED",
@@ -206,15 +207,32 @@ describe("Cambiar el símbolo a RD$ cambia todos los importes que salen del serv
 
         it("con RD$, todos sus importes lo llevan: los de las tablas y los de los KPI", async () => {
             await conRD();
+            // AUD-006 — una venta de ayer, relativa al reloj como en `margen.test.ts`, para que la
+            // sección de margen tenga importes que escribir. Solo vive en este test: con el
+            // reloj atrasado caería en septiembre y cambiaría las cifras del periodo y del resumen.
+            const { id: productId } = await prisma.product.findFirstOrThrow({ where: { sku: "TAL-01" } });
+            const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const reciente = await prisma.saleOrder.create({
+                data: { warehouseId: ALMACEN, number: await numeroDeVenta(),
+                    status: "SHIPPED",
+                    shippedAt: ayer,
+                    createdAt: ayer,
+                    items: { create: [{ productId, productName: "Taladro", quantity: 1, unitPrice: 1234.5, unitCost: 800 }] },
+                },
+            });
 
-            const res = await descargar("/api/v1/reports?format=pdf");
+            try {
+                const res = await descargar("/api/v1/reports?format=pdf");
 
-            expect(res.status).toBe(200);
-            // El valor del stock en la tabla (4 × 1234.50) y, sin céntimos, en el KPI.
-            expect(escrito()).toContain("RD$4,938.00");
-            expect(escrito()).toContain("RD$4,938");
-            expect(importes().length).toBeGreaterThan(8);
-            expect(importes().filter((t) => DOLAR_SUELTO.test(t))).toEqual([]);
+                expect(res.status).toBe(200);
+                // El valor del stock en la tabla (4 × 1234.50) y, sin céntimos, en el KPI.
+                expect(escrito()).toContain("RD$4,938.00");
+                expect(escrito()).toContain("RD$4,938");
+                expect(importes().length).toBeGreaterThan(8);
+                expect(importes().filter((t) => DOLAR_SUELTO.test(t))).toEqual([]);
+            } finally {
+                await prisma.saleOrder.delete({ where: { id: reciente.id } });
+            }
         });
 
         it("el informe por periodo, también", async () => {

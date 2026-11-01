@@ -6,9 +6,9 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
-> **Estado al 2026-11-01: 6 tareas abiertas** (`AUD-001` a `AUD-006`), de la re-auditoría del
-> 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)). Una es Crítico y bloquea el primer
-> despliegue. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
+> **Estado al 2026-11-01: 5 tareas abiertas** (`AUD-001` a `AUD-005`), de la re-auditoría del
+> 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)); `AUD-006` se cerró el mismo día. Una
+> es Crítico y bloquea el primer despliegue. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
 > sigue sin hacerse y no es un defecto está en «Sin tarea».
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
@@ -53,13 +53,15 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 5
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 1
 ```
 
 ---
 
 ## Tareas abiertas
 
-Las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
+Las cinco que quedan de las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
 severidad, y dentro de cada tier van en el orden en que conviene atacarlas. Las observaciones
 de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
 en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
@@ -71,13 +73,13 @@ ficha, como dice «Una tarea nueva», más abajo.
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 1 | 0 | 1 · 0 · 0 |
-| 1 · Alto | 5 | 0 | 3 · 2 · 0 |
+| 1 · Alto | 4 | 1 | 2 · 2 · 0 |
 | 2 · Medio | 0 | 0 | — |
 | 3 · Bajo | 0 | 0 | — |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **6** | **0** | **4 · 2 · 0** |
+| **Total** | **5** | **1** | **3 · 2 · 0** |
 
-**Abiertas por área:** Seguridad 4 · QA y testing 1 · Arquitectura 1
+**Abiertas por área:** Seguridad 4 · Arquitectura 1
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -120,17 +122,6 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
   - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md) · reproducido en ejecución
 
 ## Tier 1 · Alto
-
-- [ ] **AUD-006 · Hacer relativa al reloj la venta de `moneda.test.ts`, que tiene en rojo `pnpm verify` del backend desde el 2026-10-24**
-  - **Área:** QA y testing · **Severidad:** Alto · **Esfuerzo:** Bajo
-  - **Ubicación:** `src/tests/moneda.test.ts:163-168,216`; origen en `src/modules/reports/reports.service.ts:77,98`
-  - **Qué hacer:**
-    - una venta enviada con `shippedAt` relativo a `Date.now()` para la sección de margen del PDF, como `margen.test.ts:169`;
-    - la del 2026-09-24 se queda para el informe por periodo;
-    - no bajar el umbral del `8`.
-  - **Criterio de aceptación:** `moneda.test.ts` pasa con el reloj del sistema un año por delante y 60 días por detrás, y sigue exigiendo más de 8 importes con `RD$`.
-  - **Depende de:** ninguna
-  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md)
 
 - [ ] **AUD-004 · Subir `body-parser` a 2.4.0 (GHSA-27r3-jxmh-p828) y devolver a verde el paso `auditoria` de los dos repositorios**
   - **Área:** Seguridad · **Severidad:** Alto · **Esfuerzo:** Bajo
@@ -421,3 +412,11 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | T6-08 | Venta de mostrador y rol de vendedor | 2026-10-08 | **La matriz, primero, y es la propuesta de la ficha:** `SELLER` entra en `TODOS` —lee lo que lee `USER`— y en un grupo nuevo, `MOSTRADOR`, con `ADMIN`, para una sola ruta. Un test lo fija: lo único que tiene y un `USER` no es `POST /sale-orders/counter`. **La venta de un paso:** `POST /sale-orders/counter` crea la orden y la deja enviada en **una transacción**. Cada línea es un producto y una cantidad; **el nombre y el precio los pone el producto**, leídos con su fila ya bloqueada, y el validador ni siquiera declara `unitPrice`. No hay líneas escritas a mano ni productos descatalogados (409 `INACTIVE_PRODUCT_SALE`). **El servicio, partido en sus dos mitades:** `reservarDisponible` —bloquear y comprobar lo disponible— la comparten `create` y el mostrador; `despachar` —descontar, congelar el coste, escribir el movimiento y marcar enviada— la comparten el envío y el mostrador. Se extrajo, no se copió: `update` se queda sin sesenta líneas. El movimiento dice «Venta de mostrador #000123»; la auditoría, `SALE_COUNTER`; el aviso de stock bajo sale después del `commit`. Migración: un valor en `Role` y otro en `AuditAction`. **La pantalla:** `/counter`, la segunda del menú para quien puede vender, guardada **por permiso** (`requirePermiso`, nuevo en `ProtectedRoute`). Una columna, sin tabla: buscar o escanear, un producto por línea con su − y su +, el disponible, un cliente opcional y lo que se va a cobrar; después, el número, el importe que devolvió la venta y el comprobante. **Una decisión de T6-05 se revierte a sabiendas:** `GET /settings/business` trae ahora `taxRate`, la tasa vigente. Sin ella el mostrador no podía decir cuánto cobrar **antes** de registrar la venta. La previsión la hace `totalesPrevistos`, en el contrato y en céntimos enteros; un test la compara con `totalesDeLinea` sobre 528 combinaciones de precio, cantidad y tasa. Lo que la pantalla enseña después de vender es lo del servidor. **El criterio, comprobado:** un `SELLER` vende dos productos y el stock baja, hay dos `OUT`, la orden está enviada con `unitCost` a cuatro decimales y el comprobante se descarga; 403 al crear una pendiente, al cancelar y al cambiar un precio, y la interfaz no le pone ninguno de los tres botones; un `unitPrice` de 0,01 en el cuerpo no cambia la línea; pedir de más es 409 y no queda ni orden, ni movimientos, ni cliente, ni número gastado; dos ventas a la vez de la última unidad dan 201 y 409 —y diez de un producto con cuatro, cuatro y seis, con los números del 1 al 4—. `permisos.test.ts` recorre el rol solo. Falsificado: 62 roturas, 59 caídas a la primera; dos pasaban por tests míos flojos —la cantidad a 0 se rechazaba por otro campo, y nada miraba que la ruta llevara su guardia— y se corrigieron; la tercera es equivalente: `checkLowStockAlert` vuelve a mirar el mínimo. E2E en los dos proyectos, con la cuenta nueva del seed (`vendedor@stockly.app`): busca dos productos, se pasa de lo disponible y corrige, registra, descarga el comprobante y lee en él las dos líneas; stock y movimientos, por la API; los tres 403, y el 409 sin mover nada; ni «Nueva orden», ni cancelar, ni editar el producto; `/settings` lo devuelve al panel, y el almacén no entra en `/counter`. Vista a 393 y a 1280 px. **Sin comprobar:** el escáner con cámara en el mostrador —el E2E busca por nombre; el escáner lo prueban los tests de componente con el lector simulado—, y el uso con un móvil de verdad en la mano. **A saber:** el mostrador no admite un cliente nuevo ni un documento escrito en el momento, solo elegir uno que ya exista —la API sí los admite—; no hay descuentos ni forma de pago, que no pedía la ficha; el disponible de una línea es el de cuando se añadió el producto, y si otro vende entretanto se entera al registrar, con el 409; y la previsión usa la tasa que el navegador leyó al entrar: si un administrador la cambia con el mostrador abierto, lo previsto y lo cobrado difieren hasta recargar. |
 | T6-09 | Ventas por día y productos más vendidos en el panel | 2026-10-10 | `GET /reports` trae dos campos nuevos: `salesByDay` —hoy y los seis días anteriores del negocio, **siempre siete**, con los vacíos a cero— y `topSold`, los cinco más vendidos por unidades. «Lo más vendido» es una sola consulta (`shared/lib/ventasEnviadas.ts`) que comparten el panel y el resumen semanal. El criterio, en 11 tests del backend y 4 del panel, falsificados: trece roturas, trece caídas; y en el navegador, en escritorio y a 393 px. El `EXPLAIN` de las dos consultas sobre 330 000 órdenes, en [rendimiento.md §14](rendimiento.md): 105 y 79 ms, por el índice `(status, shippedAt)` y sin ordenar en disco. **Las ventas por día no agrupan por una expresión**: un `LATERAL` por día, como los movimientos por mes de `T4-16`; gana por poco —105 ms frente a 118— y se eligió por no depender de una estimación sin estadísticas. **Un error mío que cazaron los tests, no la revisión:** `generate_series` con argumentos `date` devuelve `timestamptz` en la zona de la sesión, y la venta de las 23:30 cambiaba de día; cayeron cuatro. **La ficha no decía dos cosas:** que `load/sembrar.js` estaba roto desde `T6-04` —insertaba ventas sin `number`— y hubo que arreglarlo para medir; y que en el móvil el eje escondía tres de las siete etiquetas. El gráfico lleva al lado una lista oculta con las mismas cifras, para quien no lo ve. **Sin medir:** el panel entero bajo carga sostenida con las dos consultas nuevas. Una de cuatro pasadas del E2E falló en el primer login, con el equipo saturado; las dos siguientes, limpias |
 | T6-10 | Alta de usuarios por invitación | 2026-10-10 | `POST /users`, solo de `ADMIN`: crea la cuenta con su rol y manda un enlace para elegir la contraseña; **ninguna contraseña viaja por correo**. El enlace es el token de restablecimiento, con 7 días de caducidad, y lleva a la página de `reset-password`, que con `invitacion=1` dice «elige» en vez de «restablece». El criterio, en 24 tests del backend —con el enlace sacado del correo que se habría enviado, no de un mock— y 8 del frontend, falsificados: diecisiete roturas, diecisiete caídas. **Poner la contraseña con un token válido verifica la cuenta**, también la de quien se registró, no confirmó y restablece: ha demostrado lo mismo por otro correo; decidido a sabiendas y con su test. **La ficha no decía qué pasa si el envío falla** con el SMTP configurado: la cuenta se retira y se devuelve el error, para que la invitación se pueda repetir. El correo se espera, a diferencia de los avisos del ADR 0004: aquí es la única forma de entrar. **Sin comprobar:** el recorrido entero en un navegador con un buzón de verdad —el E2E no tiene buzón y el `.env` de desarrollo envía correo real—; en el navegador se vieron el formulario y la página de la contraseña, en escritorio y a 393 px, sin enviar nada. No hay ruta para reenviar una invitación: caducada, «olvidé mi contraseña» hace el mismo papel. Una de dos pasadas del E2E falló en el primer login de cuatro tests, como en `T6-09`; la siguiente, limpia |
+
+### Re-auditoría del 2026-10-31
+
+*Las tareas `AUD-NNN` salen del [informe](auditoria/2026-10-31/INFORME.md); su ficha completa queda en el historial de git de este documento.*
+
+| ID | Tarea | Cerrada | Nota |
+|---|---|---|---|
+| AUD-006 | La venta de `moneda.test.ts` dependía del reloj y tenía `pnpm verify` del backend en rojo desde el 2026-10-24 | 2026-11-01 | El test del PDF de informes con `RD$` contaba los importes de la sección de margen, cuya ventana son los últimos 30 días del reloj (`DIAS_DE_MARGEN`), con una venta fija del 2026-09-24: salió de la ventana el 2026-10-24 y el recuento bajó de más de 8 a 8. Ahora ese test crea **su propia** venta, enviada ayer respecto a `Date.now()` como en `margen.test.ts`, y la borra al terminar; la del 24 de septiembre se queda para el informe por periodo y el resumen semanal. No va en el `beforeAll` **a propósito**: con el reloj 60 días atrás caería en septiembre de 2026 y cambiaría las cifras de esos dos. El umbral del `8` no se tocó. **Comprobado:** reproducido antes del cambio (8, no > 8); después, 56 de 56; falsificado poniendo la venta 31 días atrás, cae con el mismo 8; `pnpm verify` llega en verde hasta `smoke` —1652 tests, 97,15 % de sentencias— y solo cae `auditoria`, que es `AUD-004`. **Sin comprobar:** el criterio con el reloj del sistema movido un año adelante y 60 días atrás no se ejecutó —cambiar la hora de Windows afecta a la sesión entera—; se razonó: la venta nueva y la ventana del margen se mueven con el mismo reloj, y los otros tests de la moneda usan fechas fijas con su rango explícito (`from`/`to` y `AHORA`). |

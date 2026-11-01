@@ -57,18 +57,18 @@ Medido el 2026-10-10 en este equipo, con `pnpm verify` y el E2E:
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
 
 **Re-auditoría del 2026-10-31** ([informe](auditoria/2026-10-31/INFORME.md), veredicto
-*bloqueado*): seis tareas abiertas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md). Una es
-Crítico: el registro abierto deja leer los datos personales de todos los clientes. La tabla de
-arriba ya no vale tal cual:
+*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); quedan cinco
+abiertas. Una es Crítico: el registro abierto deja leer los datos personales de todos los
+clientes. La tabla de arriba ya no vale tal cual:
 
-- `pnpm verify` del backend falla desde el 2026-10-24, por un test que depende del reloj
-  (`AUD-006`);
 - el paso `auditoria` de los dos repositorios falla por avisos publicados después del 2026-10-11
-  (`AUD-004`).
+  (`AUD-004`); hasta cerrarla, `pnpm verify` sale en rojo aunque todo lo demás pase;
+- el test que dependía del reloj y tumbaba la suite del backend desde el 2026-10-24 está
+  arreglado (`AUD-006`, 2026-11-01).
 
 Medido el 2026-10-31 y el 2026-11-01:
 
-- backend: 1.651 de 1.652 tests, con cobertura de sentencias del 97,15 %;
+- backend: 1.652 de 1.652 tests tras `AUD-006`, con cobertura de sentencias del 97,15 %;
 - frontend: 910 tests (+1 omitido);
 - E2E: 39 pasados y 3 omitidos sobre una base aislada (con la salvedad de §4).
 

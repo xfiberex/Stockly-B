@@ -206,6 +206,9 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- `pnpm verify` del backend estaba en rojo desde el 2026-10-24: un test de la moneda contaba los
+  importes del margen con una venta de fecha fija, que se salió de la ventana de 30 días. Ahora
+  crea una venta de ayer, relativa al reloj (`AUD-006`).
 - `pnpm carga:sembrar` fallaba a medias desde `T6-04`: sembraba las ventas sin su número, que es
   obligatorio. Ahora las numera por fecha y deja el contador en la última (`T6-09`).
 - Subir una imagen de más de 2 MB, de un tipo no admitido o en un campo equivocado respondía 500,
