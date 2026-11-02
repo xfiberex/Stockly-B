@@ -128,7 +128,9 @@ docker compose up -d --build
 ```
 
 Levanta PostgreSQL, el backend y el frontend tras nginx —que sirve la SPA y hace de proxy de
-`/api`, así que hay un solo origen— en `http://localhost:8080`. Un servicio `migrate` aplica las
+`/api`, así que hay un solo origen— en `http://localhost:8080`. El backend lleva `TRUST_PROXY=1`
+para que los limitadores cuenten por cliente y no por nginx, y su 3000 solo se publica en
+`127.0.0.1`; `docker-compose.prod.yml` lo cierra del todo (AUD-002). Un servicio `migrate` aplica las
 migraciones y termina; el backend no arranca hasta que sale bien. **La pila no se siembra sola**:
 sin `pnpm db:seed` el login responde 401 y parece un fallo de credenciales.
 

@@ -77,8 +77,10 @@ services:
       dockerfile: Dockerfile
     container_name: stockly_backend
     restart: unless-stopped
+    # AUD-002: solo desde esta máquina. Con `TRUST_PROXY=1`, quien llegue al 3000 sin pasar
+    # por nginx escribe él mismo el último salto de `X-Forwarded-For` y elige su IP.
     ports:
-      - "${BACKEND_HOST_PORT:-3000}:3000"
+      - "127.0.0.1:${BACKEND_HOST_PORT:-3000}:3000"
     env_file:
       - ./.env
     environment:
@@ -86,6 +88,9 @@ services:
       # donde cambiar la contraseña y uno se quede atrás.
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-Stockly}
       NODE_ENV: production
+      # AUD-002: nginx es el único proxy delante. Sin esto, los limitadores ven a nginx como
+      # único cliente y un solo contador para todos.
+      TRUST_PROXY: "1"
       # T2-28: nginx sirve frontend y API desde el mismo origen, así que las cookies no
       # necesitan `SameSite=None` —que además obligaría a `Secure` y por tanto a TLS,
       # que esta pila local no tiene—. En un despliegue real detrás de HTTPS se quitan

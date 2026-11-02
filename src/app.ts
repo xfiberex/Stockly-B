@@ -15,6 +15,10 @@ import { registerSwagger } from "@/swagger";
 
 const app = express();
 
+// AUD-002 — de dónde sale `req.ip`, y con él la clave de los limitadores. Detrás de nginx
+// hace falta `TRUST_PROXY=1`; sin la variable se usa la dirección del socket (ver `env.ts`).
+app.set("trust proxy", env.trustProxy);
+
 /** Ruta tal y como la pidió el cliente, antes de que el router la reescriba. */
 const rutaPedida = (req: { url?: string; originalUrl?: string }) => req.originalUrl ?? req.url;
 

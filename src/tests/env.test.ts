@@ -73,6 +73,12 @@ describe("validateEnv", () => {
         expect(() => validateEnv()).toThrow(/PORT/);
     });
 
+    // AUD-002: `true` confiaría en un X-Forwarded-For que escribe el cliente. Mejor no arrancar.
+    it("lanza con TRUST_PROXY=true", () => {
+        process.env["TRUST_PROXY"] = "true";
+        expect(() => validateEnv()).toThrow(/TRUST_PROXY/);
+    });
+
     // T1-26: Cloudinary y SMTP dejan de ser obligatorias para arrancar. El README
     // decía que eran opcionales y `validateEnv()` las exigía: era un bloqueador real
     // de puesta en marcha desde un checkout limpio.

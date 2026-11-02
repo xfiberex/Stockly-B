@@ -53,6 +53,28 @@ export function durationToMs(value: string): number {
     return amount * factor;
 }
 
+/**
+ * AUD-002 — cuántos proxies hay delante del backend: el valor de `trust proxy` de Express.
+ *
+ * Sin él, `req.ip` es quien abre el socket, que detrás de nginx es siempre nginx: los
+ * limitadores llevaban un solo contador para todos los clientes, y 10 logins fallidos de
+ * cualquiera bloqueaban el de todo el comercio. Con `1`, la IP sale del último salto de
+ * `X-Forwarded-For`, el que escribe nginx.
+ *
+ * Solo un número de saltos. `true` confiaría en la cabecera entera, que la escribe el
+ * cliente: bastaría con cambiarla en cada petición para no gastar nunca el cupo.
+ */
+export function parseTrustProxy(value: string | undefined): number {
+    if (value === undefined || value.trim() === "") return 0;
+    if (!/^\d+$/.test(value.trim())) {
+        throw new Error(
+            `❌ TRUST_PROXY debe ser el número de proxies delante del backend (1 con nginx), no "${value}". ` +
+                "`true` no vale: dejaría a cualquiera falsificar su IP con X-Forwarded-For.",
+        );
+    }
+    return Number.parseInt(value, 10);
+}
+
 const ES_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i;
 
 /**
@@ -111,6 +133,7 @@ export function validateEnv(): void {
 
     parsePort(process.env["PORT"], "PORT", 3000);
     parsePort(process.env["SMTP_PORT"], "SMTP_PORT", 587);
+    parseTrustProxy(process.env["TRUST_PROXY"]);
 
     avisarSiPareceDesplegadoSinProduccion();
 
@@ -130,6 +153,8 @@ export const env = {
     nodeEnv: process.env.NODE_ENV ?? "development",
     // Techo global de peticiones por IP cada 15 min. Configurable para el E2E.
     rateLimitMax: Number.parseInt(process.env.RATE_LIMIT_MAX ?? "", 10) || 100,
+    // Proxies delante del backend (AUD-002). `0` sin la variable: el backend publicado a pelo.
+    trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
     // Nivel de log (T2-10). En los tests el valor por defecto es `silent` para no
     // ensuciar la salida del suite; los que comprueban el log lo suben a mano.
     logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "test" ? "silent" : "info"),

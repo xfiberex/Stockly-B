@@ -271,6 +271,11 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Seguridad
 
+- **Los límites de peticiones cuentan por cliente detrás de nginx** (`AUD-002`): el backend solo
+  veía a nginx, así que todos compartían un contador y 10 logins fallidos de cualquiera dejaban
+  sin acceso al comercio entero durante 15 minutos. Nueva variable `TRUST_PROXY`, que el compose
+  pone a `1`; solo admite un número, y `true` no arranca. El 3000 del backend queda publicado solo
+  en `127.0.0.1`, y la superposición de producción lo cierra.
 - **El registro público ya no da acceso** (`AUD-001`): cualquiera que confirmara un correo propio
   quedaba como `USER` y leía la agenda de clientes —con su documento de identidad—, todas las
   ventas y los costes. Ahora la cuenta nace **pendiente**: no puede iniciar sesión, los

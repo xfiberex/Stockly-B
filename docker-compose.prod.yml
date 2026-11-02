@@ -10,7 +10,8 @@
 #      hay forma de desplegar con `postgres`/`postgres` por descuido.
 #   2. **Cierra el puerto de la base**. En desarrollo se publica para poder conectarse con
 #      un cliente; en producción, exponer PostgreSQL al host es superficie regalada — el
-#      backend le habla por la red interna del compose, que no sale de la máquina.
+#      backend le habla por la red interna del compose, que no sale de la máquina. Lo
+#      mismo con el 3000 del backend: se entra por nginx (AUD-002).
 
 services:
 
@@ -32,3 +33,7 @@ services:
       # Si se despliega sin este archivo de superposición, fijar la variable a mano; el
       # backend avisa por consola al arrancar cuando detecta que falta (`config/env.ts`).
       NODE_ENV: production
+    # AUD-002 — el 3000 se cierra como el 5432: en producción solo se entra por nginx. Con
+    # `TRUST_PROXY=1`, un 3000 publicado deja elegir la IP con `X-Forwarded-For` y saltarse
+    # los limitadores.
+    ports: !reset []

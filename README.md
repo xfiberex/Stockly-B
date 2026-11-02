@@ -90,6 +90,7 @@ cp .env.example .env
 | `METRICS_TOKEN` | Protege `GET /api/v1/metrics`. **Sin él, en producción responde 404** | Solo con métricas |
 | `ALERTA_5XX_HABILITADA` · `_UMBRAL` · `_VENTANA_MIN` · `_ENFRIAMIENTO_MIN` | Aviso por pico de 5xx: `true` · `5` · `5` · `30` | No |
 | `RATE_LIMIT_MAX` · `AUTH_RATE_LIMIT_MAX` | Peticiones por IP cada 15 min: `100` y `10`. El E2E los sube | No |
+| `TRUST_PROXY` | Proxies delante del backend: `1` detrás de nginx (el compose ya lo pone). Sin ella, la IP es la del socket. Solo un número: `true` no arranca | Detrás de un proxy |
 | `EXPORT_MAX_ROWS` | Tope de filas de una exportación: `100000` | No |
 | `LOG_LEVEL` | `info`; en `test`, `silent` | No |
 | `COOKIE_SECURE` · `COOKIE_SAMESITE` | Por defecto `true` y `none` en producción, `false` y `lax` fuera | No |
@@ -233,7 +234,7 @@ qué botones enseñar.
 | Roles | Matriz `PERMISOS` del contrato; `permisos.test.ts` recorre todas las rutas con cada rol |
 | Contraseñas | `bcryptjs` con 12 rondas. Restablecerla revoca las sesiones |
 | Cuentas | Una cuenta desactivada pierde el acceso en la siguiente petición. El registro público crea la cuenta **sin rol** (`PENDING`): confirmado el correo, avisa a los `ADMIN` en la campana y no entra hasta que uno le asigne un rol, que es aprobarla y le manda un correo (AUD-001). La otra vía es la invitación de un `ADMIN`, que ya lleva su rol y manda un enlace, nunca una contraseña |
-| Límite de peticiones | 100 cada 15 min por IP; 10 en login y recuperación; 5 por hora en registro |
+| Límite de peticiones | 100 cada 15 min por IP; 10 en login y recuperación; 5 por hora en registro. Detrás de nginx, la IP es la del cliente solo con `TRUST_PROXY=1`: sin ella, todos comparten el contador de nginx. Por eso en producción el 3000 no se publica: quien llegara directo elegiría su IP con `X-Forwarded-For` (AUD-002) |
 | Correo | STARTTLS obligatorio: un servidor sin cifrado aborta el envío |
 | Subidas | Imágenes validadas por sus *magic bytes*, no solo por el `Content-Type` |
 | Errores | Las respuestas no filtran rutas del sistema de archivos, en ningún entorno |
