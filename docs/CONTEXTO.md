@@ -45,14 +45,14 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-11-02 en este equipo: el frontend con `pnpm verify` al cerrar `AUD-005`; el backend
-y el E2E, al cerrar `AUD-003`:
+Medido el 2026-11-02 en este equipo: el backend con `pnpm verify` al cerrar `AUD-003`; el frontend
+y el E2E, al cerrar `AUD-007`:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1820** en 72 archivos | **926** en 84 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 97.12 % *(suelo 85 %)* | 80.86 % *(suelo 45 %)* |
+| Tests | **1820** en 72 archivos | **947** en 88 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 97.12 % *(suelo 85 %)* | 81.08 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
@@ -66,7 +66,8 @@ el test que dependía del reloj (`AUD-006`) y los avisos de dependencias publica
 (`AUD-005`), los limitadores, que detrás de nginx contaban a todos como uno (`AUD-002`), y el
 seed, que el despliegue mandaba ejecutar: ahora se niega fuera de una base local y el primer
 administrador sale de `admin:crear` (`AUD-003`). El veredicto *bloqueado* era de antes de las
-correcciones; no se ha vuelto a auditar.
+correcciones; no se ha vuelto a auditar. El mismo día, fuera de la auditoría, las pantallas de
+datos pasaron a cargar con esqueleto sin que la pantalla salte (`AUD-007`).
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
 
 El punto de control de la auditoría, para retomarla, es
@@ -534,6 +535,12 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   de abajo si lleva el suyo: el portal no corta los eventos de React, y su envío subiría.
 - **Lo que se despliega dentro de un diálogo se trae a la vista** (`scrollIntoView`): el cuerpo
   del `Modal` tiene scroll propio y recorta lo que cuelgue de una fila baja.
+- **Una pantalla de datos carga con esqueleto, y medida** (`AUD-007`, design-system.md §8). El
+  esqueleto a secas **empeoró** Productos de 0.05 a 0.34 de CLS: lo que llega tarde encima de la
+  tabla —una leyenda, un filtro que sale según los datos— empuja diez filas grises en vez de un
+  spinner. Antes de dar una pantalla nueva por buena, se mide con la red y la CPU ralentizadas; si
+  un filtro sale según los datos, la lista espera con `esperando`. El spinner grande solo va donde
+  no hay forma que anticipar, y `cargas.test.ts` lo vigila.
 
 ### Accesibilidad
 

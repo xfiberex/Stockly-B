@@ -150,6 +150,11 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Las pantallas de datos cargan con esqueleto** (`AUD-007`): mientras llegan los datos, las
+  tablas, listas y paneles enseñan su forma en gris en vez de un círculo girando, y la pantalla ya
+  no salta cuando aparecen. La carga de Ventas en el móvil, la que más saltaba, queda quieta. Los
+  botones y lo pequeño siguen con spinner. Y los dos anuncian «Cargando…» al lector de pantalla,
+  que antes no oía nada.
 - **Restablecer la contraseña verifica la cuenta** (`T6-10`): quien usa el enlace de «olvidé mi
   contraseña» ha demostrado que el buzón es suyo, así que una cuenta que no había confirmado su
   correo queda confirmada al poner la contraseña nueva.
