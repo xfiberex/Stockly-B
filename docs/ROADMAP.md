@@ -6,10 +6,10 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
-> **Estado al 2026-11-01: 3 tareas abiertas** (`AUD-002`, `AUD-003` y `AUD-005`), de la
-> re-auditoría del 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)). `AUD-006`, `AUD-004`
-> y `AUD-001` —la Crítica— se cerraron el mismo día, y `pnpm verify` está en verde en los dos
-> repositorios. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
+> **Estado al 2026-11-02: 2 tareas abiertas** (`AUD-002` y `AUD-003`), de la re-auditoría del
+> 2026-10-31 ([informe](auditoria/2026-10-31/INFORME.md)). `AUD-006`, `AUD-004` y `AUD-001` —la
+> Crítica— se cerraron el 2026-11-01 y `AUD-005` el 2026-11-02; `pnpm verify` está en verde en
+> los dos repositorios. Las 139 `T` siguen cerradas: `T5-15`, la última, se cerró el 2026-10-10. Lo que
 > sigue sin hacerse y no es un defecto está en «Sin tarea».
 >
 > **Cerrada no quiere decir comprobada del todo.** `T4-17`, el recorrido con lector de pantalla,
@@ -54,33 +54,33 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 3
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 3
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 2
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 4
 ```
 
 ---
 
 ## Tareas abiertas
 
-Las tres que quedan de las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
+Las dos que quedan de las seis de la re-auditoría del 2026-10-31, en los Tiers 0 a 4 de más abajo. El tier lo da la
 severidad, y dentro de cada tier van en el orden en que conviene atacarlas. Las observaciones
 de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
 en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-01 · **Siguiente ID libre:** AUD-007 · **Último informe:** [2026-10-31](auditoria/2026-10-31/INFORME.md)
+**Última actualización:** 2026-11-02 · **Siguiente ID libre:** AUD-007 · **Último informe:** [2026-10-31](auditoria/2026-10-31/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
-| 1 · Alto | 3 | 2 | 1 · 2 · 0 |
+| 1 · Alto | 2 | 3 | 1 · 1 · 0 |
 | 2 · Medio | 0 | 0 | — |
 | 3 · Bajo | 0 | 0 | — |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **3** | **3** | **1 · 2 · 0** |
+| **Total** | **2** | **4** | **1 · 1 · 0** |
 
-**Abiertas por área:** Seguridad 2 · Arquitectura 1
+**Abiertas por área:** Seguridad 2
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -106,20 +106,6 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 *Ninguna abierta.*
 
 ## Tier 1 · Alto
-
-- [ ] **AUD-005 · Máquina de estados de las ventas bajo bloqueo: hoy dos envíos o dos cancelaciones simultáneos mueven el stock dos veces, y `PATCH` acepta `SHIPPED → PENDING`**
-  - **Área:** Arquitectura · **Severidad:** Alto · **Esfuerzo:** Medio
-  - **Ubicación:** `src/modules/sale-orders/sale-orders.service.ts:181-236,418-536`, `src/modules/sale-orders/sale-orders.validator.ts:21,56`
-  - **Qué hacer:**
-    - `update` y `delete` en una sola transacción que empiece con `SELECT … FOR UPDATE` de la orden, como `bloquearOrden` en compras;
-    - transiciones válidas en un solo sitio, con `INVALID_STATUS_TRANSITION` (409) dado de alta en `CODIGOS_DE_ERROR` con sus traducciones;
-    - en el mismo cambio, un `.max()` en `items` de `POST /sale-orders`.
-  - **Criterio de aceptación:** tests con la carrera forzada, con la técnica de `recepcion-parcial.test.ts:300`, que comprueben que:
-    - dos envíos simultáneos de la misma orden dan un 200 y un 400, con el stock descontado una vez y una fila por línea en `sale_order_item_lots`;
-    - dos cancelaciones de una enviada devuelven el stock una vez;
-    - `PATCH { status: "PENDING" }` sobre una `SHIPPED` da 409 y no mueve nada.
-  - **Depende de:** ninguna. Para cerrarse, `pnpm verify` en verde (AUD-006 y AUD-004).
-  - **Origen:** auditoría 2026-10-31 · [informe](auditoria/2026-10-31/INFORME.md) · reproducido en ejecución
 
 - [ ] **AUD-002 · `trust proxy` configurable para que los limitadores cuenten por cliente y no por nginx**
   - **Área:** Seguridad · **Severidad:** Alto · **Esfuerzo:** Bajo
@@ -396,3 +382,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | AUD-006 | La venta de `moneda.test.ts` dependía del reloj y tenía `pnpm verify` del backend en rojo desde el 2026-10-24 | 2026-11-01 | El test del PDF de informes con `RD$` contaba los importes de la sección de margen, cuya ventana son los últimos 30 días del reloj (`DIAS_DE_MARGEN`), con una venta fija del 2026-09-24: salió de la ventana el 2026-10-24 y el recuento bajó de más de 8 a 8. Ahora ese test crea **su propia** venta, enviada ayer respecto a `Date.now()` como en `margen.test.ts`, y la borra al terminar; la del 24 de septiembre se queda para el informe por periodo y el resumen semanal. No va en el `beforeAll` **a propósito**: con el reloj 60 días atrás caería en septiembre de 2026 y cambiaría las cifras de esos dos. El umbral del `8` no se tocó. **Comprobado:** reproducido antes del cambio (8, no > 8); después, 56 de 56; falsificado poniendo la venta 31 días atrás, cae con el mismo 8; `pnpm verify` llega en verde hasta `smoke` —1652 tests, 97,15 % de sentencias— y solo cae `auditoria`, que es `AUD-004`. **Sin comprobar:** el criterio con el reloj del sistema movido un año adelante y 60 días atrás no se ejecutó —cambiar la hora de Windows afecta a la sesión entera—; se razonó: la venta nueva y la ventana del margen se mueven con el mismo reloj, y los otros tests de la moneda usan fechas fijas con su rango explícito (`from`/`to` y `AHORA`). |
 | AUD-004 | Subir `body-parser` a 2.4.0 (GHSA-27r3-jxmh-p828) y devolver a verde el paso `auditoria` de los dos repositorios | 2026-11-01 | **La ficha se quedaba corta:** al cerrarla ya no era un aviso alto sino tres en el backend —`body-parser`, `zod` (GHSA-mrhx-c7xc-m3w5) y `multer` (GHSA-q7qp-rjg7-q26m)— y tres en el frontend —`zod` y dos de `follow-redirects`—, más moderados en los dos. Todos tenían arreglo dentro de su versión mayor (patrón 1 y 3 de [dependencias.md §2](dependencias.md)). **Backend:** `express` 5.3.0, `zod` 4.6.7, `multer` 2.5.0, `nodemailer` 10.3.1 y `express-rate-limit` 8.7.2; `body-parser` 2.4.0, `ip-address` 10.7.5, `qs` 6.17.1 y `fast-uri` 3.1.9 con `pnpm update --depth 100` —**sin `--depth` pnpm 12 no movió `body-parser` y no avisó**, aunque `express` 5.3.0 ya lo admitía—; y los suelos de los `overrides` de `qs` y `fast-uri` suben, porque express sigue pidiendo `qs@^6.16.0`, que admite la vulnerable. **Frontend:** `zod` 4.6.7, `vite` 8.3.5 y `follow-redirects` 1.16.2. Ninguna versión tomada tenía menos de tres días (la más nueva, del 2026-10-29). Vite 8.3 avisaba de que `__dirname` en `vite.config.ts` no valdrá con el cargador nativo de configuración: pasa a `import.meta.dirname`. **El criterio, comprobado:** el lockfile resuelve `body-parser@2.4.0` en sus tres caminos; `pnpm audit --prod` da **0 avisos de cualquier severidad** en los dos repositorios; y `pnpm verify` sale con 0 en los dos —backend 1652 tests y 97,15 %, frontend 910 (+1 omitido) y 80,84 %—, con `auditoria` en «crítica 0, alta 0». E2E completo: 39 pasados y 3 omitidos a la primera. **Sin comprobar:** el ataque del aviso —un cuerpo gzip con bytes de más— no se repitió contra el servidor; la auditoría lo dejó como opcional y el arreglo es la versión. **Fuera de la ficha:** las dependencias de **desarrollo** del frontend siguen con avisos —`undici`, `browserslist`, `brace-expansion`, `vitest`, `minimatch`—, que no van a la imagen ni los mira `auditoria`. |
 | AUD-001 | El registro abierto daba a cualquiera una cuenta `USER` que leía los datos personales de todos los clientes | 2026-11-01 | **La decisión previa, tomada el 2026-11-01:** registro **con aprobación**, y `USER` se conserva como rol de solo lectura —«Consulta» en pantalla—. Anotada en [CONTEXTO.md §6](CONTEXTO.md). **La ficha proponía `isActive: false` hasta aprobar, y no se hizo así:** «desactivada» ya significa otra cosa —la cuenta que un ADMIN dio de baja—, y no se habrían podido distinguir. Lo que hay es un valor nuevo de `Role`, **`PENDING`**, que no está en ningún grupo de `PERMISOS`: el registro lo pone, `login` lo detiene con `ACCOUNT_PENDING_APPROVAL` (después de `EMAIL_NOT_CONFIRMED`), y es el valor por defecto de la columna. **No se asigna** (`rolAsignableSchema`, en el contrato): ni al cambiar un rol ni al invitar; rechazar es desactivar. Al **confirmar el correo** —o al confirmarlo restableciendo la contraseña— cada ADMIN activo recibe el aviso `USER_PENDING` en la campana, que lleva a Usuarios ya filtrado (`?role=PENDING`). **Aprobar es dar el primer rol** desde Usuarios, donde la fila pendiente tiene «Aprobar como…»: un `updateMany` condicionado a que siga `PENDING`, para que dos administradores a la vez manden un correo y no dos; el aviso sale de todas las campanas y la persona recibe un correo en su idioma con el rol y un botón al inicio de sesión. El correo se espera pero **no deshace la aprobación si falla**, ni si no hay SMTP. Dos migraciones —el valor nuevo de un enum no se puede usar en la transacción que lo crea—, **expansivas**: el código anterior sigue funcionando contra la base migrada. Seed: `pendiente@stockly.app` con su aviso. **De paso:** cambiar un rol no dejaba rastro, aunque `USER_ROLE_CHANGE` existía desde T3-02; ahora sí, con `de`, `a` y `aprobada`. Y los enums de rol de Swagger, escritos a mano, salen del contrato. **El criterio, comprobado:** una cuenta registrada y confirmada no puede iniciar sesión, y con una sesión firmada a mano recibe 403 `FORBIDDEN` en `GET /customers`, `GET /sale-orders` y `GET /reports` (`registro-con-aprobacion.test.ts`, 22 tests); `permisos.test.ts` recorre además todas las rutas con `PENDING`. Falsificado: 29 roturas —17 en el backend y 12 en el frontend—. En el backend, 15 caídas a la primera y 2 tras reforzar: restablecer la contraseña de una cuenta ya confirmada reabría el aviso en todas las campanas, y la carrera de dos aprobaciones no se cruzaba nunca en el punto exacto —se fuerza con la lectura simulada—. En el frontend, 11 a la primera y 1 equivalente: quitar la guarda de «Aprobar como…», que no puede volver a elegirse. `pnpm verify` en verde en los dos: 1771 tests y 97,15 % en el backend, 922 y 80,71 % en el frontend; E2E, 39 pasados y 3 omitidos con el seed nuevo. **En el navegador**, a 1280 y a 393 px: el login de la cuenta pendiente enseña el mensaje; el admin ve el aviso, lo sigue y llega a Usuarios filtrado; la aprueba como Consulta y desaparece de las pendientes; por la API entra (200), la auditoría dice `PENDING → USER`, aprobada, y no le quedan avisos. **Lo que solo vio el navegador:** el enlace del aviso apuntaba a `/users` y la pantalla está en `/admin/users` —el test comprobaba la misma ruta equivocada que escribí—; corregido. **Sin comprobar:** el correo de aprobación con un buzón real —el `.env` de desarrollo envía correo de verdad y `stockly.app` no es nuestro, así que se aprobó con el SMTP vacío—; a 393 px, aprobar exige desplazar la tabla, como ya pasaba con el cambio de rol; y nada con lector de pantalla. **A saber:** una cuenta pendiente que nadie aprueba ni rechaza se queda para siempre; no hay ruta para borrar usuarios. |
+| AUD-005 | Máquina de estados de las ventas bajo bloqueo: dos envíos o dos cancelaciones simultáneos movían el stock dos veces, y `PATCH` aceptaba `SHIPPED → PENDING` | 2026-11-02 | `update` leía la orden **fuera** de cualquier transacción y decidía con lo leído; bloquear los productos dentro de `despachar` no bastaba, porque las dos peticiones ya habían leído «pendiente» antes de esperar por ellos. Ahora `update` y `delete` son una transacción que empieza con `bloquearVenta` —`SELECT … FOR UPDATE` de la orden, como `bloquearOrden` en compras— y lee, decide y aplica dentro. Las transiciones están en un solo sitio, `TRANSICIONES` (`PENDING → SHIPPED | CANCELLED`, `SHIPPED → CANCELLED`); fuera de ellas, **409 `INVALID_STATUS_TRANSITION`**, con su traducción. Los dos casos que ya tenían código lo conservan —`ORDER_ALREADY_SHIPPED` y `CANNOT_MODIFY_CANCELLED_ORDER`, 400—, porque la interfaz ya los traduce y el criterio pedía el 400. Una enviada **sigue pudiéndose editar sin cambiar de estado** (datos del cliente y notas): es como se atiende la supresión del documento (T6-06). La cancelación de una enviada sale a `devolverEnviada`, junto a `despachar`, con el mismo cuerpo. Y `MAXIMO_DE_LINEAS_DE_VENTA` = 100 en el contrato, con su `.max()` en `POST /sale-orders`. En la interfaz: «Agregar ítem» se deshabilita en el tope y escanear de más lo dice; y un cambio de estado o un envío **rechazado vuelve a pedir la lista**, para que no quede en pantalla el estado viejo. **El criterio, comprobado** (`estados-de-venta.test.ts`, 8 tests, con la carrera forzada como en `recepcion-parcial.test.ts`: una transacción del test retiene la orden **y sus productos** mientras llegan las dos peticiones): dos envíos dan 200 y 400, el stock baja una vez y hay una fila de `sale_order_item_lots` por línea; dos cancelaciones devuelven el stock una vez; `PATCH { status: "PENDING" }` sobre una enviada da 409 y no mueve nada, tampoco las notas que venían en el mismo cuerpo. Además: un borrado que llega con el envío en curso espera y responde 400; 100 líneas se aceptan y 101 dan 422. Falsificado: 11 roturas —7 en el backend y 4 en el frontend—, 11 caídas; en el frontend, una tras añadir su test (escanear con todas las líneas ocupadas) y otra que el guion de falsificación aplicó mal y se repitió a mano. `pnpm verify` en verde en los dos: 1779 tests y 97,15 % en el backend, 926 y 80,86 % en el frontend; E2E, 39 pasados y 3 omitidos. **Sin comprobar:** no se miró en el navegador —el cambio de la interfaz es un botón deshabilitado y un aviso, cubiertos por test—; el tope del formulario se prueba con el valor bajado a 3, porque pintar 100 líneas en jsdom tarda 25 s. **A saber:** la transacción del envío espera ahora por la orden además de por los productos; con dos personas enviando la misma orden, la segunda tarda lo que la primera. |

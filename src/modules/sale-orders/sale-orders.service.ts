@@ -105,6 +105,46 @@ async function clienteDeLaVenta(
     });
 }
 
+/**
+ * AUD-005 — a qué estado puede pasar una venta desde cada uno. **Es el único sitio que lo dice.**
+ *
+ * Una enviada solo se cancela: volver a pendiente dejaría fuera del almacén unas unidades que
+ * la orden ya no explica, y enviarla otra vez las descontaría dos veces. Una cancelada no va a
+ * ninguna parte. Antes no había lista: `PATCH { status: "PENDING" }` sobre una enviada se
+ * aceptaba y no devolvía nada.
+ */
+const TRANSICIONES: Record<$Enums.SaleOrderStatus, readonly $Enums.SaleOrderStatus[]> = {
+    PENDING: ["SHIPPED", "CANCELLED"],
+    SHIPPED: ["CANCELLED"],
+    CANCELLED: [],
+};
+
+/**
+ * Si se puede pasar de `desde` a `hasta`. Sin `hasta`, o pendiente a pendiente, no hay cambio
+ * de estado: es una edición de datos. Los dos casos con código propio desde antes lo conservan,
+ * porque la interfaz ya los traduce: lo cancelado no se toca, y lo enviado no se envía otra vez.
+ */
+function comprobarTransicion(desde: $Enums.SaleOrderStatus, hasta: $Enums.SaleOrderStatus | undefined) {
+    if (desde === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada", "CANNOT_MODIFY_CANCELLED_ORDER");
+    if (hasta === undefined || (desde === "PENDING" && hasta === "PENDING")) return;
+    if (desde === "SHIPPED" && hasta === "SHIPPED") throw new HttpError(400, "La orden ya fue enviada", "ORDER_ALREADY_SHIPPED");
+    if (!TRANSICIONES[desde].includes(hasta)) {
+        throw new HttpError(409, `Una orden ${desde} no puede pasar a ${hasta}`, "INVALID_STATUS_TRANSITION", { desde, hasta });
+    }
+}
+
+/**
+ * AUD-005 — la orden, **bloqueada** hasta el final de la transacción. Es lo primero que hace
+ * todo lo que cambia su estado: sin esto, dos envíos simultáneos leían los dos «pendiente» y
+ * descontaban el stock dos veces, y dos cancelaciones lo devolvían dos veces. Con él, el
+ * segundo espera, lee lo que dejó el primero y lo rechaza. Como `bloquearOrden` en compras.
+ */
+async function bloquearVenta(tx: Prisma.TransactionClient, id: string) {
+    const filas = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM sale_orders WHERE id = ${id} FOR UPDATE`;
+    if (filas.length === 0) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
+    return tx.saleOrder.findUniqueOrThrow({ where: { id } });
+}
+
 /** Cuánto se pide de cada producto, **sumando las líneas**: dos de 3 sobre 5 disponibles son 6. */
 function pedidoPorProducto(items: Array<{ productId?: string; quantity: number }>): Map<string, number> {
     const pedido = new Map<string, number>();
@@ -231,6 +271,57 @@ async function despachar(
     return tx.saleOrder.update({
         where: { id: orden.id },
         data: { ...opciones.datos, status: "SHIPPED", shippedAt: new Date() },
+        include: ORDER_INCLUDE,
+    });
+}
+
+/**
+ * Lo contrario de `despachar`: cancelar una orden **ya enviada**. Reposición de stock,
+ * movimientos compensatorios y cambio de estado en la misma transacción, con la orden ya
+ * bloqueada por quien llama (AUD-005).
+ */
+async function devolverEnviada(
+    tx: Prisma.TransactionClient,
+    orden: { id: string; number: number; warehouseId: string },
+    datos: Prisma.SaleOrderUpdateInput,
+) {
+    // T5-14 — la mercancía vuelve al almacén del que salió, y tiene que seguir
+    // activo: devolverla a uno desactivado la dejaría donde nadie puede venderla.
+    const almacen = await almacenParaOperar(orden.warehouseId, tx);
+
+    const items = await tx.saleOrderItem.findMany({
+        where: { saleOrderId: orden.id, productId: { not: null } },
+        include: { lots: { select: { lotId: true, quantity: true } } },
+    });
+    await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
+
+    for (const item of items) {
+        if (!item.productId) continue;
+
+        // T5-15 — cada unidad vuelve **al lote del que salió**, aunque mientras tanto
+        // haya caducado: devolverla a otro la haría pasar por lo que no es. Lo que
+        // salió sin lote vuelve sin lote.
+        const deLotes = item.lots.reduce((suma, l) => suma + l.quantity, 0);
+        const devoluciones = [
+            ...item.lots.map((l) => ({ lotId: l.lotId as string | null, cantidad: l.quantity })),
+            { lotId: null, cantidad: item.quantity - deLotes },
+        ].filter((d) => d.cantidad > 0);
+
+        for (const devolucion of devoluciones) {
+            await entrar(tx, {
+                productId: item.productId,
+                warehouseId: almacen.id,
+                cantidad: devolucion.cantidad,
+                lotId: devolucion.lotId,
+                type: "IN",
+                note: `Cancelación de orden de venta #${escribirNumeroDeVenta(orden.number)}`,
+            });
+        }
+    }
+
+    return tx.saleOrder.update({
+        where: { id: orden.id },
+        data: { ...datos, status: "CANCELLED" },
         include: ORDER_INCLUDE,
     });
 }
@@ -414,20 +505,14 @@ export const saleOrderService = {
         return aRespuesta(orden);
     },
 
-    /** `actorId` es quien hace el cambio: si el envío falla por stock, es a quien **no** se avisa (T5-12). */
+    /**
+     * `actorId` es quien hace el cambio: si el envío falla por stock, es a quien **no** se avisa (T5-12).
+     *
+     * AUD-005 — **todo** ocurre en una transacción que empieza bloqueando la orden: leer su
+     * estado, decidir qué transición es y aplicarla. Antes se leía fuera y se decidía con lo
+     * leído, así que dos peticiones a la vez enviaban o cancelaban las dos.
+     */
     async update(id: string, dto: UpdateSaleOrderDto, actorId?: string) {
-        const existing = await prisma.saleOrder.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
-        if (existing.status === "CANCELLED") throw new HttpError(400, "No se puede modificar una orden cancelada", "CANNOT_MODIFY_CANCELLED_ORDER");
-        if (existing.status === "SHIPPED" && dto.status === "SHIPPED") {
-            throw new HttpError(400, "La orden ya fue enviada", "ORDER_ALREADY_SHIPPED");
-        }
-
-        if (dto.customerId) {
-            const cliente = await prisma.customer.findUnique({ where: { id: dto.customerId } });
-            if (!cliente) throw clienteNoEncontrado();
-        }
-
         const customerData = {
             // T5-06 — cambiar el vínculo no toca la instantánea: son dos cosas distintas.
             ...(dto.customerId !== undefined && { customerId: dto.customerId }),
@@ -438,79 +523,42 @@ export const saleOrderService = {
             ...(dto.notes !== undefined && { notes: dto.notes }),
         };
 
-        const beingShipped = existing.status !== "SHIPPED" && dto.status === "SHIPPED";
-        // Cancelar una orden ya enviada debe devolver al inventario lo que salió con ella.
-        const beingCancelled = existing.status === "SHIPPED" && dto.status === "CANCELLED";
+        const lowStockTargets: ProductoEnAlerta[] = [];
+        // Fuera de la transacción: lee ajustes, y solo hace falta para enviar.
+        const hoy = dto.status === "SHIPPED" ? await hoyDelNegocio() : undefined;
+        // Para el aviso de venta sin stock, que se da después de deshacer la transacción.
+        let numero: number | undefined;
 
-        // Sin envío ni cancelación de un envío: actualización simple de campos / estado.
-        if (!beingShipped && !beingCancelled) {
-            return aRespuesta(await prisma.saleOrder.update({
+        const updated = await prisma.$transaction(async (tx) => {
+            const existing = await bloquearVenta(tx, id);
+            numero = existing.number;
+            comprobarTransicion(existing.status, dto.status);
+
+            if (dto.customerId) {
+                const cliente = await tx.customer.findUnique({ where: { id: dto.customerId } });
+                if (!cliente) throw clienteNoEncontrado();
+            }
+
+            // Envío: verificación de stock, descuento, movimientos y cambio de estado (`despachar`).
+            if (existing.status === "PENDING" && dto.status === "SHIPPED") {
+                return despachar(tx, existing, { datos: customerData, concepto: "Orden de venta", bajoMinimos: lowStockTargets, hoy: hoy! });
+            }
+            // Cancelar una orden ya enviada devuelve al inventario lo que salió con ella.
+            if (existing.status === "SHIPPED" && dto.status === "CANCELLED") {
+                return devolverEnviada(tx, existing, customerData);
+            }
+            // El resto no mueve stock: datos del cliente y notas, o cancelar una pendiente.
+            return tx.saleOrder.update({
                 where: { id },
                 data: { ...customerData, ...(dto.status !== undefined && { status: dto.status }) },
                 include: ORDER_INCLUDE,
-            }));
-        }
-
-        // Cancelación de una orden enviada: reposición de stock, movimientos compensatorios
-        // y cambio de estado en UNA sola transacción, simétrica al envío.
-        if (beingCancelled) {
-            const cancelada = await prisma.$transaction(async (tx) => {
-                // T5-14 — la mercancía vuelve al almacén del que salió, y tiene que seguir
-                // activo: devolverla a uno desactivado la dejaría donde nadie puede venderla.
-                const almacen = await almacenParaOperar(existing.warehouseId, tx);
-
-                const items = await tx.saleOrderItem.findMany({
-                    where: { saleOrderId: id, productId: { not: null } },
-                    include: { lots: { select: { lotId: true, quantity: true } } },
-                });
-                await bloquearProductos(tx, items.flatMap((item) => (item.productId ? [item.productId] : [])));
-
-                for (const item of items) {
-                    if (!item.productId) continue;
-
-                    // T5-15 — cada unidad vuelve **al lote del que salió**, aunque mientras tanto
-                    // haya caducado: devolverla a otro la haría pasar por lo que no es. Lo que
-                    // salió sin lote vuelve sin lote.
-                    const deLotes = item.lots.reduce((suma, l) => suma + l.quantity, 0);
-                    const devoluciones = [
-                        ...item.lots.map((l) => ({ lotId: l.lotId as string | null, cantidad: l.quantity })),
-                        { lotId: null, cantidad: item.quantity - deLotes },
-                    ].filter((d) => d.cantidad > 0);
-
-                    for (const devolucion of devoluciones) {
-                        await entrar(tx, {
-                            productId: item.productId,
-                            warehouseId: almacen.id,
-                            cantidad: devolucion.cantidad,
-                            lotId: devolucion.lotId,
-                            type: "IN",
-                            note: `Cancelación de orden de venta #${escribirNumeroDeVenta(existing.number)}`,
-                        });
-                    }
-                }
-
-                return tx.saleOrder.update({
-                    where: { id },
-                    data: { ...customerData, status: "CANCELLED" },
-                    include: ORDER_INCLUDE,
-                });
             });
-            return aRespuesta(cancelada);
-        }
-
-        // Envío: verificación de stock, descuento, movimientos y cambio de estado ocurren
-        // en UNA sola transacción (`despachar`).
-        const lowStockTargets: ProductoEnAlerta[] = [];
-        const hoy = await hoyDelNegocio();
-
-        const updated = await prisma.$transaction((tx) =>
-            despachar(tx, existing, { datos: customerData, concepto: "Orden de venta", bajoMinimos: lowStockTargets, hoy }),
-        ).catch((error: unknown) => {
+        }).catch((error: unknown) => {
             // T5-12 — fuera de la transacción, que ya se ha deshecho: un aviso creado dentro
             // se habría ido con ella. El error sigue su camino tal cual.
             if (error instanceof HttpError && error.code === "INSUFFICIENT_STOCK" && error.params) {
                 dispararAvisoDeVentaSinStock(id, {
-                    orderNumber: existing.number,
+                    orderNumber: numero!,
                     productName: String(error.params.producto),
                     available: Number(error.params.disponible),
                     required: Number(error.params.requerido),
@@ -527,12 +575,13 @@ export const saleOrderService = {
         return aRespuesta(updated);
     },
 
+    /** AUD-005 — con la orden bloqueada, como `update`: un envío a la vez no la deja borrar enviada. */
     async delete(id: string) {
-        const existing = await prisma.saleOrder.findUnique({ where: { id } });
-        if (!existing) throw new HttpError(404, "Orden de venta no encontrada", "SALE_ORDER_NOT_FOUND");
-        if (existing.status === "SHIPPED") throw new HttpError(400, "No se puede eliminar una orden ya enviada", "CANNOT_DELETE_SHIPPED_ORDER");
-
-        await prisma.saleOrder.delete({ where: { id } });
+        await prisma.$transaction(async (tx) => {
+            const existing = await bloquearVenta(tx, id);
+            if (existing.status === "SHIPPED") throw new HttpError(400, "No se puede eliminar una orden ya enviada", "CANNOT_DELETE_SHIPPED_ORDER");
+            await tx.saleOrder.delete({ where: { id } });
+        });
     },
 
     /**

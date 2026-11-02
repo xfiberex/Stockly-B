@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { documentoSchema } from "@/modules/customers/customers.validator";
-import { MAXIMO_DE_LINEAS_DE_MOSTRADOR } from "@/contratos/api";
+import { MAXIMO_DE_LINEAS_DE_MOSTRADOR, MAXIMO_DE_LINEAS_DE_VENTA } from "@/contratos/api";
 
 const itemSchema = z.object({
     productId: z.string().uuid().optional(),
@@ -18,7 +18,10 @@ export const createSaleOrderSchema = z.object({
     notes: z.string().trim().max(1000).optional(),
     // T5-14 — opcional: sin él, la venta sale del almacén predeterminado.
     warehouseId: z.string().uuid("Almacén inválido").optional(),
-    items: z.array(itemSchema).min(1, "Se requiere al menos un ítem"),
+    items: z
+        .array(itemSchema)
+        .min(1, "Se requiere al menos un ítem")
+        .max(MAXIMO_DE_LINEAS_DE_VENTA, `Una orden de venta admite ${MAXIMO_DE_LINEAS_DE_VENTA} líneas como mucho`),
 });
 
 /**

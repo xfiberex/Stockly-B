@@ -206,6 +206,11 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- **Dos envíos o dos cancelaciones a la vez de la misma venta movían el stock dos veces**
+  (`AUD-005`): las dos peticiones leían su estado antes de bloquear nada. Ahora la orden se
+  bloquea primero y la segunda recibe el error del estado que dejó la primera. Además, una venta
+  enviada ya no se puede devolver a pendiente (409), y una orden de venta admite 100 líneas como
+  mucho.
 - `pnpm verify` del backend estaba en rojo desde el 2026-10-24: un test de la moneda contaba los
   importes del margen con una venta de fecha fija, que se salió de la ventana de 30 días. Ahora
   crea una venta de ayer, relativa al reloj (`AUD-006`).

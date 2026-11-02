@@ -45,23 +45,25 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-11-01 en este equipo, con `pnpm verify` y el E2E, al cerrar `AUD-001`:
+Medido el 2026-11-02 en este equipo, con `pnpm verify` y el E2E, al cerrar `AUD-005`:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1771** en 69 archivos | **922** en 82 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 97.15 % *(suelo 85 %)* | 80.71 % *(suelo 45 %)* |
+| Tests | **1779** en 70 archivos | **926** en 84 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 97.15 % *(suelo 85 %)* | 80.86 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
 
 **Re-auditoría del 2026-10-31** ([informe](auditoria/2026-10-31/INFORME.md), veredicto
-*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); quedan tres
-abiertas, todas Altas. El 2026-11-01 se cerraron la Crítica —el registro abierto daba lectura de
-los datos de todos los clientes; ahora pide aprobación (`AUD-001`)— y las dos que tenían `verify`
-en rojo: el test que dependía del reloj (`AUD-006`) y los avisos de dependencias publicados
-después del 2026-10-11 (`AUD-004`).
+*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); quedan dos
+abiertas, las dos Altas y de seguridad del despliegue: `trust proxy` (`AUD-002`) y el seed
+(`AUD-003`). El 2026-11-01 se cerraron la Crítica —el registro abierto daba lectura de los datos
+de todos los clientes; ahora pide aprobación (`AUD-001`)— y las dos que tenían `verify` en rojo:
+el test que dependía del reloj (`AUD-006`) y los avisos de dependencias publicados después del
+2026-10-11 (`AUD-004`). El 2026-11-02, las ventas enviadas o canceladas dos veces a la vez
+(`AUD-005`).
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
 
 El punto de control de la auditoría, para retomarla, es
@@ -432,6 +434,12 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
 - **Vender son dos mitades, y cada una vive en un solo sitio** (`T6-08`): `reservarDisponible`
   y `despachar`, en `sale-orders.service.ts`. `create`, el envío y el mostrador las combinan. Una
   ruta nueva que venda las llama; no las copia.
+- **Cambiar el estado de una venta empieza por bloquearla** (`AUD-005`): `bloquearVenta`, un
+  `SELECT … FOR UPDATE` de la orden, y todo lo demás —leer su estado, decidir, mover stock— en
+  la misma transacción. Bloquear solo los productos **no basta**: dos envíos leían los dos
+  «pendiente» antes de esperar a los productos y luego descontaban los dos. Qué estado lleva a
+  cuál está en un solo sitio, `TRANSICIONES`; una enviada solo se cancela, y volver a pendiente
+  es 409 `INVALID_STATUS_TRANSITION`. Un cambio de estado nuevo pasa por las dos cosas.
 - **`GET /settings/business` trae la tasa vigente, y solo sirve para prever** (`T6-08`). T6-05
   la dejó fuera para que ninguna pantalla sumara por su cuenta; el mostrador la necesita para
   decir cuánto cobrar antes de que la venta exista. La cuenta la hace `totalesPrevistos`, en el

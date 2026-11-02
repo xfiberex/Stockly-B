@@ -463,12 +463,13 @@ export const rutasAdicionales: Record<string, Ruta> = {
         },
         patch: {
             tags: ["Sale Orders"], summary: "Actualizar o cambiar de estado",
-            description: "Pasar a `SHIPPED` **descuenta stock**; cancelar una ya enviada lo repone (T0-03). La interfaz pide confirmación antes de esa reposición (T2-42).",
+            description: "Pasar a `SHIPPED` **descuenta stock**; cancelar una ya enviada lo repone (T0-03). La interfaz pide confirmación antes de esa reposición (T2-42). Transiciones (AUD-005): `PENDING → SHIPPED | CANCELLED` y `SHIPPED → CANCELLED`; una cancelada no se modifica. La orden se bloquea mientras se aplica, así que dos peticiones a la vez no envían ni cancelan dos veces: la segunda recibe el error del estado que dejó la primera.",
             parameters: [PARAM_ID],
             requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", enum: ["PENDING", "SHIPPED", "CANCELLED"] }, customerId: { type: "string", format: "uuid", nullable: true, description: "T5-06 — `null` desvincula; no cambia los datos de cliente de la orden" }, customerName: { type: "string" }, notes: { type: "string" } } } } } },
             responses: {
                 "200": JSON_OK({ $ref: "#/components/schemas/SaleOrder" }, "Actualizada"),
-                "400": ERROR("Stock insuficiente o transición inválida"), "404": ERROR("No encontrada"),
+                "400": ERROR("Stock insuficiente, orden ya enviada (`ORDER_ALREADY_SHIPPED`) u orden cancelada (`CANNOT_MODIFY_CANCELLED_ORDER`)"), "404": ERROR("No encontrada"),
+                "409": ERROR("Transición no admitida desde el estado actual (`INVALID_STATUS_TRANSITION`), como `SHIPPED → PENDING`"),
             },
         },
         delete: {
