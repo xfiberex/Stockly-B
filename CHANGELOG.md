@@ -271,6 +271,12 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Seguridad
 
+- **El seed se niega fuera de una base local, y el primer administrador tiene su comando**
+  (`AUD-003`): el despliegue documentado mandaba ejecutar `pnpm db:seed`, que vacía la base y deja
+  administradores con la contraseña del README. Ahora el seed sale con error, sin tocar nada, con
+  `NODE_ENV=production` o con una base que no esté en esta máquina (`--forzar` lo salta). El primer
+  ADMIN de una base real se crea con `pnpm admin:crear` —o `node dist/cli/admin-crear.js` en el
+  contenedor—, que no vacía nada y solo funciona mientras no haya ningún ADMIN activo.
 - **Los límites de peticiones cuentan por cliente detrás de nginx** (`AUD-002`): el backend solo
   veía a nginx, así que todos compartían un contador y 10 logins fallidos de cualquiera dejaban
   sin acceso al comercio entero durante 15 minutos. Nueva variable `TRUST_PROXY`, que el compose

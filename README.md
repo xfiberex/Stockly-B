@@ -112,8 +112,9 @@ pnpm check               # Tipos, sin emitir (también de prisma/seed.ts)
 
 pnpm db:migrate          # Crea y aplica migraciones en desarrollo
 pnpm db:generate         # Regenera el cliente de Prisma
-pnpm db:seed             # Siembra datos de ejemplo — vacía la base antes
+pnpm db:seed             # Siembra datos de ejemplo — vacía la base antes. Solo en una base local
 pnpm db:reset            # Recrea la base, migra y siembra
+pnpm admin:crear         # El primer ADMIN de una base real, sin tocar nada más (ADMIN_EMAIL, ADMIN_PASSWORD)
 pnpm db:studio           # Prisma Studio
 pnpm db:backup           # Vuelca la base a backups/, con retención
 pnpm db:restaurar        # Restaura un volcado; por defecto en una base de ensayo
@@ -258,9 +259,25 @@ físico abierto. Los movimientos **cuadran con el stock** de cada producto.
 | SELLER | `vendedor@stockly.app` | `Vendedor1234!` |
 | PENDING | `pendiente@stockly.app` | `Pendiente1234!` — no entra: espera a que un ADMIN le dé rol, y su aviso está en la campana |
 
-> **El administrador inicial sale de aquí.** En un despliegue nuevo hay que ejecutar el seed —o
-> promover a alguien con `PATCH /api/v1/users/:id/role` desde una cuenta que ya sea ADMIN—, porque
-> ningún registro se convierte en administrador por sí solo.
+Son datos de **demostración**, y sus contraseñas están escritas aquí mismo. Por eso el seed **se
+niega** con `NODE_ENV=production` o con una `DATABASE_URL` que no esté en esta máquina, y sale con
+error sin tocar la base (AUD-003). Para una base de demostración en otra máquina,
+`pnpm db:seed -- --forzar`.
+
+### El primer administrador de una base real
+
+Nadie se hace administrador registrándose: el registro deja la cuenta pendiente. En una base recién
+desplegada, el primero lo crea `admin:crear`, que no vacía ni siembra nada y **solo funciona una
+vez**: con un ADMIN activo ya, se niega. Los demás se invitan desde **Usuarios**.
+
+```bash
+ADMIN_EMAIL=duena@comercio.com ADMIN_PASSWORD='…' ADMIN_NAME='Ana Duarte' pnpm admin:crear
+
+# En la pila de Docker, donde no hay tsx:
+docker compose exec -e ADMIN_EMAIL=duena@comercio.com -e ADMIN_PASSWORD='…' backend node dist/cli/admin-crear.js
+```
+
+La contraseña sigue la regla del registro: 8 caracteres, con mayúscula, minúscula y número.
 
 ---
 

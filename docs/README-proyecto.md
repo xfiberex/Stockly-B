@@ -72,7 +72,7 @@ cd Stockly-B
 cp .env.example .env   # bastan 4: DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, FRONTEND_URL
 pnpm install
 pnpm db:migrate
-pnpm db:seed           # sin esto no existe ningún administrador
+pnpm db:seed           # datos de demostración, con sus cuentas; solo en una base local
 pnpm dev               # http://localhost:3000 · Swagger en /api/v1/docs
 ```
 
@@ -87,9 +87,9 @@ pnpm dev               # http://localhost:5173
 
 Tras el seed, el administrador es `admin@stockly.app` / `Admin1234!`; el resto de cuentas, en el
 [README del backend](../README.md#seed). **El registro público crea cuentas sin rol**, que un ADMIN
-tiene que aprobar (AUD-001): en
-un despliegue nuevo nadie es administrador hasta ejecutar el seed o hasta que un ADMIN promueva a
-alguien.
+tiene que aprobar (AUD-001). En una base real **no se siembra**: el seed se niega fuera de una base
+local, y el primer administrador sale de `pnpm admin:crear` (AUD-003,
+[README del backend](../README.md#el-primer-administrador-de-una-base-real)).
 
 ### 4. La base de tests, una vez
 
@@ -131,8 +131,16 @@ Levanta PostgreSQL, el backend y el frontend tras nginx —que sirve la SPA y ha
 `/api`, así que hay un solo origen— en `http://localhost:8080`. El backend lleva `TRUST_PROXY=1`
 para que los limitadores cuenten por cliente y no por nginx, y su 3000 solo se publica en
 `127.0.0.1`; `docker-compose.prod.yml` lo cierra del todo (AUD-002). Un servicio `migrate` aplica las
-migraciones y termina; el backend no arranca hasta que sale bien. **La pila no se siembra sola**:
-sin `pnpm db:seed` el login responde 401 y parece un fallo de credenciales.
+migraciones y termina; el backend no arranca hasta que sale bien. **La pila arranca sin ninguna
+cuenta**, y el login responde 401 como si fallaran las credenciales. El primer administrador se
+crea dentro del contenedor, una vez:
+
+```bash
+docker compose exec -e ADMIN_EMAIL=duena@comercio.com -e ADMIN_PASSWORD='…' backend node dist/cli/admin-crear.js
+```
+
+El seed de demostración **no** va aquí: vacía la base, deja cuentas con contraseñas públicas, y con
+`NODE_ENV=production` se niega (AUD-003). Detalle en [operaciones.md §11](operaciones.md).
 
 Swagger **no se monta con `NODE_ENV=production`**. Copias de seguridad, alertas y reversión, en
 [operaciones.md](operaciones.md).

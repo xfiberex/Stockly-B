@@ -2,7 +2,8 @@
 
 > Lo que hay que hacer **cuando algo ya ha pasado** —enterarse (§8), recuperar la base de datos
 > (§3–§5) y deshacer un despliegue (§6)—, más dos cosas que se mantienen desde fuera del código: la
-> versión de PostgreSQL (§9) y el resumen semanal (§10). El arranque normal está en
+> versión de PostgreSQL (§9) y el resumen semanal (§10). Y cómo se estrena una base, con su primer
+> administrador (§11). El arranque normal está en
 > [README-proyecto.md](README-proyecto.md); la puerta de calidad, en
 > [CONTRIBUTING.md](../CONTRIBUTING.md).
 >
@@ -523,3 +524,34 @@ muere a medias deja la semana reclamada **15 minutos**, y después cualquier otr
 **Programarlo a diario no manda un correo diario**: los seis días restantes sale con «ya se envió».
 Es la forma barata de que una semana en la que el servidor estuvo apagado el lunes no se quede sin
 resumen.
+
+---
+
+## 11. Estrenar una base: el primer administrador (AUD-003)
+
+Una base recién migrada no tiene ninguna cuenta, y registrarse no da acceso: el registro deja la
+cuenta pendiente hasta que un ADMIN la apruebe. El primero se crea desde la consola del servidor,
+**una sola vez**:
+
+```bash
+# Con la pila en contenedores, donde no hay `tsx`:
+docker compose exec -e ADMIN_EMAIL=duena@comercio.com -e ADMIN_PASSWORD='…' -e ADMIN_NAME='Ana Duarte' \
+  backend node dist/cli/admin-crear.js
+
+# Sin contenedores, desde Stockly-B y con el `.env` del servidor:
+ADMIN_EMAIL=duena@comercio.com ADMIN_PASSWORD='…' pnpm admin:crear
+```
+
+| Situación | Qué hace | Sale con |
+|---|---|---|
+| No hay ningún ADMIN activo | Lo crea verificado, y queda en la auditoría como `CREATE` de `User` sin actor | 0 |
+| Ya hay un ADMIN activo | Nada. Dice cuál: los demás se invitan desde **Usuarios** | 1 |
+| El correo ya tiene cuenta | Nada. Si es la de alguien que se registró, que la apruebe el ADMIN, una vez creado | 1 |
+| Falta una variable o la contraseña no cumple la regla del registro | Nada, y dice qué falla | 1 |
+
+No vacía ni siembra nada. La contraseña escrita en la línea de comandos queda en el historial del
+terminal: conviene cambiarla desde **Mi perfil** en el primer inicio de sesión.
+
+**El seed no es para esto.** `pnpm db:seed` vacía la base y crea cuentas cuyas contraseñas están en
+el README. Con `NODE_ENV=production`, o con una `DATABASE_URL` que no sea de esta máquina, se niega y
+sale con 1 sin tocar nada. `pnpm db:seed -- --forzar` lo salta: solo para una base de demostración.

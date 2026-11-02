@@ -45,25 +45,28 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-11-02 en este equipo, con `pnpm verify` y el E2E, al cerrar `AUD-005`; el backend,
-otra vez al cerrar `AUD-002`:
+Medido el 2026-11-02 en este equipo: el frontend con `pnpm verify` al cerrar `AUD-005`; el backend
+y el E2E, al cerrar `AUD-003`:
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1793** en 71 archivos | **926** en 84 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 97.16 % *(suelo 85 %)* | 80.86 % *(suelo 45 %)* |
+| Tests | **1820** en 72 archivos | **926** en 84 archivos *(+1 omitido)* |
+| Cobertura de sentencias | 97.12 % *(suelo 85 %)* | 80.86 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
 
 **Re-auditoría del 2026-10-31** ([informe](auditoria/2026-10-31/INFORME.md), veredicto
-*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); queda una
-abierta, Alta y de seguridad del despliegue: el seed (`AUD-003`). El 2026-11-01 se cerraron la Crítica —el registro abierto daba lectura de los datos
+*bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); **todas cerradas**.
+El 2026-11-01 se cerraron la Crítica —el registro abierto daba lectura de los datos
 de todos los clientes; ahora pide aprobación (`AUD-001`)— y las dos que tenían `verify` en rojo:
 el test que dependía del reloj (`AUD-006`) y los avisos de dependencias publicados después del
 2026-10-11 (`AUD-004`). El 2026-11-02, las ventas enviadas o canceladas dos veces a la vez
-(`AUD-005`) y los limitadores, que detrás de nginx contaban a todos como uno (`AUD-002`).
+(`AUD-005`), los limitadores, que detrás de nginx contaban a todos como uno (`AUD-002`), y el
+seed, que el despliegue mandaba ejecutar: ahora se niega fuera de una base local y el primer
+administrador sale de `admin:crear` (`AUD-003`). El veredicto *bloqueado* era de antes de las
+correcciones; no se ha vuelto a auditar.
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
 
 El punto de control de la auditoría, para retomarla, es
@@ -262,8 +265,9 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   un PostgreSQL local en el 5432, el del compose se publica ahí sin error y `localhost:5432` sigue
   llegando al local. Síntoma: `AuthenticationFailed` contra una base que Docker da por sana. Para
   eso está `POSTGRES_HOST_PORT`.
-- **La pila del compose no se siembra sola.** El servicio `migrate` aplica las migraciones, pero
-  nadie ejecuta el seed: el login responde 401 y parece un fallo de credenciales.
+- **La pila del compose arranca sin ninguna cuenta.** El servicio `migrate` aplica las
+  migraciones y nada más: el login responde 401 y parece un fallo de credenciales. El primer
+  administrador, con `admin:crear` dentro del contenedor ([operaciones.md §11](operaciones.md)).
 - **Docker crea como directorio vacío el origen de un *bind mount* que no existe**, y la pila de
   observabilidad levanta con el objetivo caído ([operaciones.md §8](operaciones.md)).
 
@@ -291,11 +295,10 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   todo documentación de tooling. Una vez por repositorio:
   `git config --local include.path ../.gitconfig-stockly`. Después, `git buscar X` y
   `git buscar-archivos X`.
-- **En un despliegue nuevo nadie es administrador hasta ejecutar `pnpm db:seed`.** El registro
-  público crea siempre usuarios `USER`. Para promover a alguien, `PATCH /api/v1/users/:id/role`
-  desde una cuenta que ya sea ADMIN. **Ojo, hasta cerrar `AUD-003`:** ese seed vacía la base
-  entera y deja dos ADMIN con la contraseña pública del README. Solo en una base vacía, y cambiando
-  o borrando las cuentas de demostración en el acto.
+- **En un despliegue nuevo, el primer administrador lo creas tú, con `admin:crear`** (`AUD-003`,
+  [operaciones.md §11](operaciones.md)). Sirve una vez: con un ADMIN activo se niega. El seed **no**
+  es para esto —vacía la base y deja cuentas con la contraseña del README— y fuera de una base
+  local se niega; `--forzar` lo salta, y eso es decisión tuya.
 - **El ensayo de restauración es mensual y lleva sin anotarse desde el 2026-08-12**
   ([operaciones.md §5](operaciones.md)). Una copia que no se ha restaurado no es una copia.
 - **No hay ninguna versión publicada.** Los repositorios están sin etiquetar y sus `package.json`

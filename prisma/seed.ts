@@ -6,6 +6,7 @@ import { codigoDeLotePorDefecto, digitoDeControlGtin } from "../src/contratos/ap
 import { ZONA_HORARIA_POR_DEFECTO, hoyEn } from "../src/shared/lib/zonaHoraria";
 import { CONTADOR_DE_VENTAS } from "../src/shared/lib/numeroDeVenta";
 import { transferir } from "../src/shared/lib/stock";
+import { FORZAR, motivoParaNoSembrar } from "../src/shared/lib/guardaDelSeed";
 import { categoriesData } from "./data/categories";
 import { brandsData } from "./data/brands";
 import { suppliersData } from "./data/suppliers";
@@ -1109,6 +1110,14 @@ async function sembrarConteo(productos: Product[], principal: Warehouse): Promis
 }
 
 async function main(): Promise<void> {
+    // AUD-003 — antes de tocar nada. Una base de verdad se estrena con `pnpm admin:crear`.
+    const motivo = motivoParaNoSembrar({ nodeEnv: process.env.NODE_ENV, databaseUrl: process.env.DATABASE_URL, argv: process.argv });
+    if (motivo) {
+        console.error(`\n❌ No se siembra: ${motivo}\n   Para el primer administrador de una base real: pnpm admin:crear.\n   Si de verdad es una base de demostración: pnpm db:seed -- ${FORZAR}\n`);
+        process.exitCode = 1;
+        return;
+    }
+
     console.log("\nSembrando la base de Stockly...\n");
 
     await limpiar();
