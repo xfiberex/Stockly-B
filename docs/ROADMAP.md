@@ -177,13 +177,30 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
        barras horizontales de una medida, y «Distribución»), y en el panel es análisis, no lo
        pendiente de hoy. Se llega por «Ver reporte completo», en el bloque de importes. Visto a
        1440 y 390 px.
-  - **Falta**, en este orden:
-    5. `quieter` de las tarjetas: fondos azul y verde decorativos (choca con «el color comunica
-       estado», design-system §1); la tarjeta «Stock bajo» repite ahora la fila del bloque; sombra
-       `shadow-raised`; el choque `bg-surface` / `bg-warning-surface/30` de la tarjeta resaltada.
-    6. `clarify`: el H1 dice «Dashboard» en inglés (`ruta.dashboard`), el subtítulo no dice nada y
-       el margen potencial no aclara que solo cuenta productos con coste.
-    7. `polish`, y **volver a pasar `/impeccable critique`** para medir contra el 23/40.
+    5. `quieter` (2026-11-04) — **las cuatro tarjetas de colores pasan a una franja neutra de
+       tres recuentos** (total, activos, categorías): sin fondos azul, verde y ámbar para cifras
+       que no son estados (design-system, «el color comunica estado»). Fuera la tarjeta «Stock
+       bajo», que repetía la primera fila de «Necesita atención», y con ella el choque
+       `bg-surface` / `bg-warning-surface/30`. Fuera el dólar sobre verde del bloque de importes,
+       la sombra de «Necesita atención» —la única tarjeta del panel con ella; la jerarquía la da
+       su sitio— y la sombra al pasar el ratón por las cifras, que ahora subrayan la etiqueta como
+       cualquier enlace. Importes en semibold, no en negrita. Visto a 1440 en claro y en oscuro y
+       a 390, con las tres cifras alineadas aunque una etiqueta parta en dos líneas.
+    6. `clarify` (2026-11-04) — **«Panel», no «Dashboard»** (`ruta.dashboard` en español; en
+       inglés sigue «Dashboard»): cambia el título, la pestaña, el menú y lo que anuncia el lector
+       de pantalla; tests y E2E actualizados. **Fuera el subtítulo «Resumen general del
+       inventario»**, que no decía nada: queda solo «Actualizado a las HH:MM». **El margen
+       potencial dice qué cuenta** —«Venta menos coste, solo de los productos con coste»—, porque
+       no sale de restar las otras dos cifras: la de venta incluye los productos sin coste
+       (`reports.service.ts`, `potentialMargin = costedSaleValue − inventoryCostValue`).
+    7. `polish` (2026-11-04) — recorrido entero por rol (ADMIN a 1440 y 390, WAREHOUSE a 390,
+       SELLER a 1440), con teclado y en claro y oscuro. Arreglado: el margen interior de los
+       bloques, que mezclaba 20 y 24 px y dejaba las cifras 4 px a la izquierda de los títulos
+       (ahora `p-5 sm:p-6` en todos, medido: 289 px a 1440 y 37 a 390); y las sombras del panel
+       del vendedor, que se habían quedado tras el paso 5. `pnpm verify` en verde: 977 tests, 1
+       omitido.
+  - **Falta:** **volver a pasar `/impeccable critique`** para medir contra el 23/40. Se dejó para
+    otra sesión a petición del propietario.
   - **Comprobado en el navegador el 2026-11-04**, a 500 px y con `RATE_LIMIT_MAX=1000` solo para
     la sesión ([CONTEXTO.md](CONTEXTO.md) §4, «El navegador en desarrollo»). Los cuatro paneles ya
     se habían visto con las cuentas del seed el 2026-11-03.
