@@ -8,9 +8,9 @@ cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
 > **Estado al 2026-11-04: tres tareas abiertas, una de ellas a medias.** El 2026-11-03 una crítica
 > de diseño del panel principal (con el plugin Impeccable; 23/40) abrió `AUD-008`, el rediseño del
-> panel, y al hacerlo salieron `AUD-009` y `AUD-010`. **`AUD-008` está a medias en la rama
-> `feat/panel-principal` de los dos repositorios, sin fusionar en `main`**: su ficha dice qué pasos
-> están hechos y cuáles faltan. Lo de abajo es el estado anterior.
+> panel, y al hacerlo salieron `AUD-009` y `AUD-010`. **`AUD-008` está a medias, ya en `main`
+> en los dos repositorios** (la rama `feat/panel-principal` se fusionó y se borró el 2026-11-04): su
+> ficha dice qué pasos están hechos y cuáles faltan. Lo de abajo es el estado anterior.
 >
 > **Estado al 2026-11-02: ninguna tarea abierta.** Las seis de la re-auditoría del 2026-10-31
 > ([informe](auditoria/2026-10-31/INFORME.md)) están cerradas: `AUD-006`, `AUD-004` y `AUD-001` —la
@@ -150,9 +150,11 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
   - **Origen:** `/impeccable critique` del panel, con dos revisiones independientes (diseño y
     detector). El informe está en `Stockly-F/.impeccable/critique/`; `Stockly-F/PRODUCT.md` es la
     ficha de producto que lee Impeccable. Puntuación: 23/40 (aceptable), tres P1 y dos P2.
-  - **Dónde está el trabajo:** rama **`feat/panel-principal`** en `Stockly-F` (el código) y en
-    `Stockly-B` (esta documentación), **sin fusionar**. `pnpm verify` del frontend, en verde en la
-    rama el 2026-11-04 (cifras en el commit).
+  - **Dónde está el trabajo:** en **`main`** de `Stockly-F` (el código) y de `Stockly-B` (esta
+    documentación). Se hizo en la rama `feat/panel-principal`, fusionada sin conflictos (avance
+    directo) y borrada el 2026-11-04. `pnpm verify` del frontend, en verde en la rama el
+    2026-11-04 (cifras en el commit); tras la fusión, 969 tests en verde, 1 omitido, y `tsc -b`
+    limpio.
   - **Hecho** (2026-11-03 y 04, un paso de Impeccable cada vez):
     1. `layout` — **«Necesita atención» arriba** (`AtencionDeHoy.tsx`): filas fijas con su cifra y
        su acción —stock bajo o agotado, lotes caducados o por caducar, conteos abiertos, compras

@@ -70,10 +70,10 @@ correcciones; no se ha vuelto a auditar. El mismo día, fuera de la auditoría, 
 datos pasaron a cargar con esqueleto sin que la pantalla salte (`AUD-007`).
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
 
-**Trabajo a medias, el 2026-11-04: el rediseño del panel principal (`AUD-008`), en la rama
-`feat/panel-principal` de los dos repositorios, sin fusionar.** Para retomarlo en otra máquina:
-`git fetch` y `git switch feat/panel-principal` en `Stockly-F` (el código) y en `Stockly-B` (estos
-documentos), y seguir por el paso 4 de la ficha de `AUD-008` en el [ROADMAP](ROADMAP.md). Se trabaja
+**Trabajo a medias, el 2026-11-04: el rediseño del panel principal (`AUD-008`), ya en `main` de
+los dos repositorios** (la rama `feat/panel-principal` se fusionó y se borró ese día). Para
+retomarlo en otra máquina: `git switch main` y `git pull` en `Stockly-F` (el código) y en
+`Stockly-B` (estos documentos), y seguir por el paso 4 de la ficha de `AUD-008` en el [ROADMAP](ROADMAP.md). Se trabaja
 con el plugin **Impeccable** de Claude Code (`/impeccable <comando> <qué>`, en el chat, no en la
 terminal); su contexto está en `Stockly-F/PRODUCT.md` y la crítica de partida (23/40), en
 `Stockly-F/.impeccable/critique/`. De ahí salieron también `AUD-009` (los importes de `/reports`

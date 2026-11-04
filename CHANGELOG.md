@@ -151,7 +151,7 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 ### Cambiado
 
 - **El panel principal empieza por lo que hay que hacer hoy, y cada rol ve el suyo** (`AUD-008`,
-  a medias, en la rama `feat/panel-principal`): arriba, «Necesita atención» con stock bajo o
+  a medias): arriba, «Necesita atención» con stock bajo o
   agotado, lotes caducados o por caducar, conteos abiertos, compras por recibir y ventas por
   enviar, cada uno con su cifra y su acción, y la lista de lo que hay que reponer primero. El
   almacén ve caducidades y conteos y nada de dinero; quien consulta, compras y ventas sin los
