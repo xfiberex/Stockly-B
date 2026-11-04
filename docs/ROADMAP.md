@@ -181,11 +181,21 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
     6. `clarify`: el H1 dice «Dashboard» en inglés (`ruta.dashboard`), el subtítulo no dice nada y
        el margen potencial no aclara que solo cuenta productos con coste.
     7. `polish`, y **volver a pasar `/impeccable critique`** para medir contra el 23/40.
-  - **Sin comprobar todavía en el navegador:** el aviso de error y la línea de la hora (paso 3), y
-    la lista de «Mis ventas de hoy» con ventas reales. Los cuatro paneles **sí** se vieron con las
-    cuentas del seed el 2026-11-03 (SELLER a 1440, WAREHOUSE a 390, USER a 1440 en oscuro, ADMIN a
-    1440 y 390). Lo que lo impidió es el limitador global ([CONTEXTO.md](CONTEXTO.md) §4, «El
-    navegador en desarrollo»).
+  - **Comprobado en el navegador el 2026-11-04**, a 500 px y con `RATE_LIMIT_MAX=1000` solo para
+    la sesión ([CONTEXTO.md](CONTEXTO.md) §4, «El navegador en desarrollo»). Los cuatro paneles ya
+    se habían visto con las cuentas del seed el 2026-11-03.
+    - «Mis ventas de hoy» con ventas reales del mostrador: vacía, con una venta de SELLER, y sin la
+      de ADMIN del mismo día (el filtro por `createdByEmail` funciona).
+    - La línea de la hora, y los dos errores, provocados redirigiendo `/reports` a un puerto
+      cerrado: el de la primera carga y el de una actualización con datos ya en pantalla; con
+      «Reintentar» el panel vuelve entero.
+    - Lo que salió y se arregló ese día: el aviso de actualización decía «12:17 p.m..» (doble
+      punto) y no se anunciaba (ahora va en una región `status` siempre montada); un fallo de
+      `/reports` escondía también «Necesita atención», cuyas otras cifras no dependen de él (ahora
+      se queda, con la fila de stock «no disponible»); el título de la pestaña en el login se
+      quedaba en el de la última pantalla con sesión; y la cantidad del mostrador se exponía con
+      un máximo de 0 (ahora `max` es lo disponible). `pnpm verify` del frontend en verde: 973
+      tests, 1 omitido.
   - **Criterio de aceptación:** los pasos 4 a 7 hechos; `pnpm verify` del frontend en verde; la
     crítica repetida en la banda «buena» (28/40 o más) y sin P1; y la rama fusionada en `main`.
   - **Dependencias:** ninguna. `AUD-009` y `AUD-010` salieron de aquí, pero no la bloquean.
