@@ -150,6 +150,14 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **El panel principal empieza por lo que hay que hacer hoy, y cada rol ve el suyo** (`AUD-008`,
+  a medias, en la rama `feat/panel-principal`): arriba, «Necesita atención» con stock bajo o
+  agotado, lotes caducados o por caducar, conteos abiertos, compras por recibir y ventas por
+  enviar, cada uno con su cifra y su acción, y la lista de lo que hay que reponer primero. El
+  almacén ve caducidades y conteos y nada de dinero; quien consulta, compras y ventas sin los
+  importes del negocio; el vendedor, un panel propio con «Ir a mostrador» y sus ventas de hoy. Si
+  el panel no se puede cargar lo dice y deja reintentar —antes se quedaba cargando para siempre—,
+  y dice a qué hora son los datos.
 - **Las pantallas de datos cargan con esqueleto** (`AUD-007`): mientras llegan los datos, las
   tablas, listas y paneles enseñan su forma en gris en vez de un círculo girando, y la pantalla ya
   no salta cuando aparecen. La carga de Ventas en el móvil, la que más saltaba, queda quieta. Los

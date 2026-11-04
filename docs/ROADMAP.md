@@ -6,6 +6,12 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-04: tres tareas abiertas, una de ellas a medias.** El 2026-11-03 una crítica
+> de diseño del panel principal (con el plugin Impeccable; 23/40) abrió `AUD-008`, el rediseño del
+> panel, y al hacerlo salieron `AUD-009` y `AUD-010`. **`AUD-008` está a medias en la rama
+> `feat/panel-principal` de los dos repositorios, sin fusionar en `main`**: su ficha dice qué pasos
+> están hechos y cuáles faltan. Lo de abajo es el estado anterior.
+>
 > **Estado al 2026-11-02: ninguna tarea abierta.** Las seis de la re-auditoría del 2026-10-31
 > ([informe](auditoria/2026-10-31/INFORME.md)) están cerradas: `AUD-006`, `AUD-004` y `AUD-001` —la
 > Crítica— el 2026-11-01, y `AUD-005`, `AUD-002` y `AUD-003` el 2026-11-02. El mismo día se abrió y
@@ -55,34 +61,35 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 2
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 4
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 3
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 7
 ```
 
 ---
 
 ## Tareas abiertas
 
-Ninguna: las seis de la re-auditoría del 2026-10-31 están cerradas. Cuando haya, van en los Tiers 0
-a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
+Tres, abiertas el 2026-11-03 y 2026-11-04 a raíz de la crítica de diseño del panel principal:
+`AUD-009` (Tier 2), y `AUD-008` y `AUD-010` (Tier 3). Las seis de la re-auditoría del 2026-10-31
+están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
 atacarlas. Las observaciones
 de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
 en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-02 · **Siguiente ID libre:** AUD-008 · **Último informe:** [2026-10-31](auditoria/2026-10-31/INFORME.md)
+**Última actualización:** 2026-11-04 · **Siguiente ID libre:** AUD-011 · **Último informe:** [2026-10-31](auditoria/2026-10-31/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
-| 2 · Medio | 0 | 0 | — |
-| 3 · Bajo | 0 | 1 | — |
+| 2 · Medio | 1 | 0 | Bajo |
+| 3 · Bajo | 2 | 1 | Medio · Medio |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **0** | **7** | **—** |
+| **Total** | **3** | **7** | **1 · 2 · 0** |
 
-**Abiertas por área:** ninguna
+**Abiertas por área:** Diseño 1 (`AUD-008`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -113,11 +120,92 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 
 ## Tier 2 · Medio
 
-Sin tareas abiertas. Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en su [informe](auditoria/2026-10-31/INFORME.md), sin tarea.
+- [ ] **AUD-009 · `GET /reports` entrega los importes del negocio a todos los roles, aunque el panel ya solo se los enseña a ADMIN**
+  - **Área:** Seguridad · **Severidad:** Medio · **Esfuerzo:** Bajo
+  - **Origen:** `AUD-008`, paso 2 (un panel por rol). El panel dejó de pintar el valor a coste, el
+    valor a precio de venta, el margen potencial y el valor por categoría a USER, WAREHOUSE y SELLER
+    —SELLER ni siquiera pide `/reports`—, pero **ocultar no es proteger**: la ruta está en `TODOS`
+    en `PERMISOS`, y cualquiera con sesión los lee llamándola.
+  - **Ubicación:** `src/contratos/api.ts` (`PERMISOS`, `"GET /reports"`),
+    `src/modules/reports/reports.service.ts` (`getSummary`: `totals.inventoryCostValue`,
+    `inventoryValue`, `potentialMargin`, `stockByCategory[].value`, `margin`, `topByValue`).
+  - **Decisión previa:** qué importes ve cada rol. Lo aplicado en el panel —**solo ADMIN** ve
+    importes— es la propuesta; falta que el propietario la confirme y anotarla en
+    [CONTEXTO.md](CONTEXTO.md) §6. Ojo: **Informes** (`/reports` en la interfaz) también los enseña
+    hoy a USER y WAREHOUSE, y no se tocó.
+  - **Qué hacer:** según la decisión, o quitar esos campos de la respuesta para quien no es ADMIN
+    (mismo endpoint, respuesta recortada y declarada en el contrato), o sacar `GET /reports` de
+    `TODOS`. En cualquier caso, Informes tiene que dejar de pedir lo que no recibirá.
+  - **Criterio de aceptación:** con sesión de SELLER y de WAREHOUSE, `GET /reports` no trae ninguno
+    de esos importes (o da 403), fijado en `permisos.test.ts` o un test propio; ADMIN los sigue
+    recibiendo; Informes no rompe con ningún rol.
+  - **Dependencias:** ninguna; conviene hacerla junto con `AUD-010`, que toca la misma respuesta.
+
+Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en su [informe](auditoria/2026-10-31/INFORME.md), sin tarea.
 
 ## Tier 3 · Bajo
 
-Sin tareas abiertas.
+- [ ] **AUD-008 · Panel principal: lo pendiente primero, un panel por rol y sin estados rotos (crítica de diseño del 2026-11-03, 23/40)** — **a medias**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** `/impeccable critique` del panel, con dos revisiones independientes (diseño y
+    detector). El informe está en `Stockly-F/.impeccable/critique/`; `Stockly-F/PRODUCT.md` es la
+    ficha de producto que lee Impeccable. Puntuación: 23/40 (aceptable), tres P1 y dos P2.
+  - **Dónde está el trabajo:** rama **`feat/panel-principal`** en `Stockly-F` (el código) y en
+    `Stockly-B` (esta documentación), **sin fusionar**. `pnpm verify` del frontend, en verde en la
+    rama el 2026-11-04 (cifras en el commit).
+  - **Hecho** (2026-11-03 y 04, un paso de Impeccable cada vez):
+    1. `layout` — **«Necesita atención» arriba** (`AtencionDeHoy.tsx`): filas fijas con su cifra y
+       su acción —stock bajo o agotado, lotes caducados o por caducar, conteos abiertos, compras
+       por recibir, ventas por enviar— y «Reponer primero» con el nivel de `NIVEL_STOCK`. Una fila
+       a cero se queda atenuada (el bloque no salta al cargar); en móvil la fila entera es el
+       enlace. Se quitaron la alerta del final y el enlace suelto «Gestionar productos».
+    2. `adapt` — **un panel por rol** (tabla `PANEL` en `DashboardPage.tsx`): ADMIN todo; USER sin
+       importes ni gráfico por categoría; WAREHOUSE sin dinero ni ventas, con caducidades y conteos;
+       SELLER con su propio `PanelDeVendedor` («Ir a mostrador» y sus ventas de hoy, filtradas por
+       `createdByEmail` en el cliente) y **sin pedir `/reports`**. Cada rol solo pide sus cifras
+       (`enabled`).
+    3. `harden` — **error de carga con «Reintentar»** (`shared/components/ErrorDeCarga.tsx`, nuevo,
+       `role="alert"`): antes una consulta fallida dejaba el esqueleto para siempre. Si falla una
+       actualización, los datos se quedan y se avisa de que son los de antes. «Actualizado a las
+       HH:MM» en el subtítulo. Cifras grandes que parten la línea. Caché de 30 s en las consultas
+       nuevas del panel.
+  - **Falta**, en este orden:
+    4. `distill` del gráfico «Stock y valor por categoría»: doble eje sin leyenda, eje derecho que
+       pinta «$0k», 3 de 9 categorías a 390 px y sin alternativa para lector de pantalla. Barras
+       horizontales de una sola medida con lista `sr-only`, o llevarlo a Informes.
+    5. `quieter` de las tarjetas: fondos azul y verde decorativos (choca con «el color comunica
+       estado», design-system §1); la tarjeta «Stock bajo» repite ahora la fila del bloque; sombra
+       `shadow-raised`; el choque `bg-surface` / `bg-warning-surface/30` de la tarjeta resaltada.
+    6. `clarify`: el H1 dice «Dashboard» en inglés (`ruta.dashboard`), el subtítulo no dice nada y
+       el margen potencial no aclara que solo cuenta productos con coste.
+    7. `polish`, y **volver a pasar `/impeccable critique`** para medir contra el 23/40.
+  - **Sin comprobar todavía en el navegador:** el aviso de error y la línea de la hora (paso 3), y
+    la lista de «Mis ventas de hoy» con ventas reales. Los cuatro paneles **sí** se vieron con las
+    cuentas del seed el 2026-11-03 (SELLER a 1440, WAREHOUSE a 390, USER a 1440 en oscuro, ADMIN a
+    1440 y 390). Lo que lo impidió es el limitador global ([CONTEXTO.md](CONTEXTO.md) §4, «El
+    navegador en desarrollo»).
+  - **Criterio de aceptación:** los pasos 4 a 7 hechos; `pnpm verify` del frontend en verde; la
+    crítica repetida en la banda «buena» (28/40 o más) y sin P1; y la rama fusionada en `main`.
+  - **Dependencias:** ninguna. `AUD-009` y `AUD-010` salieron de aquí, pero no la bloquean.
+
+- [ ] **AUD-010 · Los recuentos de «Necesita atención» en `/reports`: el panel de ADMIN pasó de 1 petición a 6**
+  - **Área:** Rendimiento · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** `AUD-008`. Para no tocar el backend, el bloque lee cada recuento de un listado con
+    `limit: 1` y su `meta.total`: caducidades, conteos abiertos, compras `PENDING`, compras
+    `PARTIALLY_RECEIVED` y ventas `PENDING`. Contra el límite global de la API —100 peticiones por
+    IP cada 15 minutos— pesa: con la caché de 30 s, volver al panel no las repite, pero cada carga
+    en frío son seis.
+  - **Ubicación:** `Stockly-F/src/modules/dashboard/hooks/useAtencionDeHoy.ts`;
+    `src/modules/reports/reports.service.ts` (`getSummary`) y `src/contratos/api.ts`.
+  - **Qué hacer:** que el backend devuelva esos cinco recuentos (declarados en el contrato) y que
+    `useAtencionDeHoy` los lea de ahí. **Medir antes**: la prueba de carga del panel ya no cumple
+    sus umbrales (fila de «Sin tarea»), y cinco `COUNT` más en `getSummary` pueden empeorarla; si
+    es así, una ruta propia y ligera es mejor que engordar `/reports`.
+  - **Criterio de aceptación:** el panel de ADMIN hace una petición de datos (dos como mucho) en
+    vez de seis, con las mismas cifras; la prueba de carga no empeora respecto a
+    [rendimiento.md §15](rendimiento.md).
+  - **Dependencias:** después de `AUD-008` (que fija qué filas existen) y junto con `AUD-009`, que
+    recorta la misma respuesta.
 
 ## Tier 4 · Propuestas
 

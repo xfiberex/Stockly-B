@@ -1,4 +1,4 @@
-# Contexto de trabajo — al 2026-11-01
+# Contexto de trabajo — al 2026-11-04
 
 Lo que hace falta saber para retomar Stockly en frío y que no está en el código: el estado, las
 trampas del entorno que ya costaron un fallo y las decisiones que una sesión nueva podría deshacer
@@ -69,6 +69,15 @@ administrador sale de `admin:crear` (`AUD-003`). El veredicto *bloqueado* era de
 correcciones; no se ha vuelto a auditar. El mismo día, fuera de la auditoría, las pantallas de
 datos pasaron a cargar con esqueleto sin que la pantalla salte (`AUD-007`).
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
+
+**Trabajo a medias, el 2026-11-04: el rediseño del panel principal (`AUD-008`), en la rama
+`feat/panel-principal` de los dos repositorios, sin fusionar.** Para retomarlo en otra máquina:
+`git fetch` y `git switch feat/panel-principal` en `Stockly-F` (el código) y en `Stockly-B` (estos
+documentos), y seguir por el paso 4 de la ficha de `AUD-008` en el [ROADMAP](ROADMAP.md). Se trabaja
+con el plugin **Impeccable** de Claude Code (`/impeccable <comando> <qué>`, en el chat, no en la
+terminal); su contexto está en `Stockly-F/PRODUCT.md` y la crítica de partida (23/40), en
+`Stockly-F/.impeccable/critique/`. De ahí salieron también `AUD-009` (los importes de `/reports`
+para todos los roles) y `AUD-010` (los recuentos del panel en una sola petición).
 
 El punto de control de la auditoría, para retomarla, es
 [auditoria/2026-10-31/trabajo/progreso.md](auditoria/2026-10-31/trabajo/progreso.md).
@@ -237,6 +246,20 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
     pintarse), un `ERR_NETWORK_IO_SUSPENDED` y un contexto del navegador perdido.
   - Los 8 pasaron al repetirlos con `--last-failed`; los tres últimos, solo con `--workers=1`.
   - Antes de buscar el defecto, repetir en serie.
+
+### El navegador en desarrollo
+
+- **El límite global de la API se agota revisando pantallas: 100 peticiones por IP cada 15
+  minutos** (`RATE_LIMIT_MAX`, `src/config/env.ts`). En local todas las pestañas son la misma IP, y
+  el panel de ADMIN ya hace seis peticiones de datos al cargar (`AUD-010`). El 2026-11-03 bastaron
+  dos revisiones en paralelo y unos cuantos logins para que **todo**, el login incluido, diera
+  `429 «Demasiadas peticiones, intenta más tarde.»` —ese texto es el del límite global; el del
+  login dice «Demasiadas solicitudes…» y lleva `code: RATE_LIMITED`—. Un reinicio del backend lo
+  libera, pero se vuelve a gastar. Para una sesión larga de revisión, `RATE_LIMIT_MAX=1000` en
+  `Stockly-B/.env` (no está en `.env.example`). **Solo en desarrollo.**
+- **Una pestaña con sesión vale más que un login nuevo.** Cada revisión que entra con su propio
+  contexto aislado hace su login y su carga en frío; abrir el login una vez y navegar en la misma
+  pestaña gasta mucho menos cupo.
 
 ### Tests de componentes (Vitest y jsdom)
 
@@ -541,6 +564,17 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   spinner. Antes de dar una pantalla nueva por buena, se mide con la red y la CPU ralentizadas; si
   un filtro sale según los datos, la lista espera con `esperando`. El spinner grande solo va donde
   no hay forma que anticipar, y `cargas.test.ts` lo vigila.
+
+- **El panel principal es distinto por rol, y la tabla vive en un sitio** (`AUD-008`): `PANEL`, en
+  `DashboardPage.tsx`, dice qué filas de «Necesita atención» y qué secciones ve cada rol, y SELLER
+  tiene su propio `PanelDeVendedor`. **Los importes del negocio son solo de ADMIN** en el panel;
+  que la API los siga dando a todos es `AUD-009`. Un rol desconocido cae en el panel de USER, nunca
+  en el de ADMIN.
+- **Las filas de «Necesita atención» se pintan también a cero**, atenuadas y sin acción: si
+  desaparecieran, el bloque cambiaría de alto al llegar cada cifra y empujaría el resto del panel.
+- **Una consulta que falla y no tiene datos enseña `ErrorDeCarga`** (`shared/components`), con el
+  motivo traducido y «Reintentar». Con datos ya en pantalla no se borran: se avisa de que son los
+  de antes. El esqueleto **no** es el estado de error: quedarse en él para siempre era el defecto.
 
 ### Accesibilidad
 
