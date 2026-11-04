@@ -171,10 +171,13 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
        actualización, los datos se quedan y se avisa de que son los de antes. «Actualizado a las
        HH:MM» en el subtítulo. Cifras grandes que parten la línea. Caché de 30 s en las consultas
        nuevas del panel.
+    4. `distill` (2026-11-04) — **fuera el gráfico «Stock y valor por categoría»**: doble eje sin
+       leyenda, eje derecho en «$0k», 3 de 9 categorías a 390 px y nada para lector de pantalla. No
+       se rehízo: Informes ya da esas dos medidas por separado y bien («Valor por categoría», en
+       barras horizontales de una medida, y «Distribución»), y en el panel es análisis, no lo
+       pendiente de hoy. Se llega por «Ver reporte completo», en el bloque de importes. Visto a
+       1440 y 390 px.
   - **Falta**, en este orden:
-    4. `distill` del gráfico «Stock y valor por categoría»: doble eje sin leyenda, eje derecho que
-       pinta «$0k», 3 de 9 categorías a 390 px y sin alternativa para lector de pantalla. Barras
-       horizontales de una sola medida con lista `sr-only`, o llevarlo a Informes.
     5. `quieter` de las tarjetas: fondos azul y verde decorativos (choca con «el color comunica
        estado», design-system §1); la tarjeta «Stock bajo» repite ahora la fila del bloque; sombra
        `shadow-raised`; el choque `bg-surface` / `bg-warning-surface/30` de la tarjeta resaltada.
