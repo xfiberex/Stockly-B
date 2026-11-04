@@ -199,8 +199,46 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
        (ahora `p-5 sm:p-6` en todos, medido: 289 px a 1440 y 37 a 390); y las sombras del panel
        del vendedor, que se habían quedado tras el paso 5. `pnpm verify` en verde: 977 tests, 1
        omitido.
-  - **Falta:** **volver a pasar `/impeccable critique`** para medir contra el 23/40. Se dejó para
-    otra sesión a petición del propietario.
+  - **Crítica repetida el 2026-11-04: 27/40** (la primera, 23/40), con las mismas dos revisiones
+    independientes; informe en `Stockly-F/.impeccable/critique/2026-11-04T17-50-37Z__…`. Sube,
+    pero no cumple aún el criterio: quedan **dos P1** —los enlaces de «Necesita atención» llegan
+    sin filtro («4 ventas por enviar» abre 28 órdenes) y, sin datos de `/reports`, todo el panel es
+    un esqueleto genérico: al reintentar desaparece «Necesita atención», el foco cae en `<body>` y
+    sus cifras esperan al informe— y tres P2. El detector solo marcó la fuente (Inter, fijada en
+    `PRODUCT.md`), un falso positivo (el logo de las devtools de TanStack Query, solo en
+    desarrollo) y una palabra sola en el aviso de productos sin coste a 390 px.
+  - **Falta** (decidido por el propietario el 2026-11-04: entra todo, también lo menor; primero el
+    reintento; dirección, un panel «de hoy» por rol):
+    8. `harden` — **«Necesita atención» montado desde el principio** (la fila de stock cargando) y
+       el esqueleto solo para los bloques de negocio, con su forma real (`cifras={4}` dibuja
+       tarjetas que ya no existen). El error se queda montado mientras se reintenta
+       (`!data && errorUpdateCount > 0`: TanStack v5 vuelve a `pending` al reintentar sin datos) y
+       el foco vuelve al botón; el reintento en línea, con `aria-busy`, blanco de 44 px y que pida
+       también las cifras de atención. Lo mismo en `PanelDeVendedor`. «Mis ventas de hoy» pide las
+       100 primeras ventas del día de todos los vendedores y filtra en el cliente: con más de 100,
+       el resumen se queda corto sin avisar. Encabezado para el bloque de importes y el texto
+       visible en el nombre accesible de las filas en móvil (WCAG 2.5.3).
+    9. `shape` — **un panel «de hoy» por rol**: para WAREHOUSE y USER, «Necesita atención» es el
+       panel —con «Escanear», las cifras de su almacén y el detalle de lotes y compras vencidas que
+       ya da la campana— y el resumen de negocio pasa a Informes (con la decisión de `AUD-009`).
+       **Enlaces que llegan filtrados**: filtros en la URL de ventas, compras, conteos, caducidades
+       y productos, y el mismo recuento al llegar. Las cifras que piden actuar, las más grandes
+       (hoy 20 px frente a los 24 de las que solo se leen). Para SELLER, ventas que se abren
+       (reimprimir el comprobante) y «Ver todas las ventas» filtrado por vendedor y día.
+    10. `clarify` — **cifras exactas**: «12 Categorías» cuenta «Sin categoría» (hay 11); «Reponer
+        primero» ordena por stock absoluto y, con `minStock` a 0 por defecto, los agotados sin
+        mínimo tapan las faltas reales; «No disponible» visible, en tono de aviso. Textos: «Ir al
+        mostrador», «Total de productos», la hora sin cero delante, el punto final de `en.ts`, un
+        solo nombre para «Ver informe», «Ver reporte completo» y «Reportes», y el aviso de
+        productos sin coste más corto y con enlace.
+    11. `adapt` — **el botón «Ir a mostrador»** sube 174 px al llegar las ventas y en tableta
+        táctil mide 40 px (`md:min-h-9` de `clasesDeBoton.ts` gana a `min-h-12`): fijo, y la
+        altura por tipo de puntero, no por ancho.
+    12. `polish` — **el gráfico de ventas**: ejes a 2,94:1 en oscuro y a 11 px (el `#666` por
+        defecto de Recharts), cursor `#ccc`, foco dentro de un `aria-hidden`, hoy sin marcar, eje Y
+        sin millones, rejilla vertical y «Importe :» en el tooltip. «Más vendidos» con `title` y
+        sin hueco. Repaso final.
+    13. Volver a pasar `/impeccable critique`.
   - **Comprobado en el navegador el 2026-11-04**, a 500 px y con `RATE_LIMIT_MAX=1000` solo para
     la sesión ([CONTEXTO.md](CONTEXTO.md) §4, «El navegador en desarrollo»). Los cuatro paneles ya
     se habían visto con las cuentas del seed el 2026-11-03.
@@ -216,9 +254,11 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       quedaba en el de la última pantalla con sesión; y la cantidad del mostrador se exponía con
       un máximo de 0 (ahora `max` es lo disponible). `pnpm verify` del frontend en verde: 973
       tests, 1 omitido.
-  - **Criterio de aceptación:** los pasos 4 a 7 hechos; `pnpm verify` del frontend en verde; la
+  - **Criterio de aceptación:** los pasos 4 a 12 hechos; `pnpm verify` del frontend en verde; la
     crítica repetida en la banda «buena» (28/40 o más) y sin P1; y la rama fusionada en `main`.
-  - **Dependencias:** ninguna. `AUD-009` y `AUD-010` salieron de aquí, pero no la bloquean.
+  - **Dependencias:** ninguna para empezar. `AUD-009` y `AUD-010` salieron de aquí y no la
+    bloquean, pero el paso 9 necesita la decisión de `AUD-009` (qué importes ve cada rol en
+    Informes) y fija qué filas usará `AUD-010`.
 
 - [ ] **AUD-010 · Los recuentos de «Necesita atención» en `/reports`: el panel de ADMIN pasó de 1 petición a 6**
   - **Área:** Rendimiento · **Severidad:** Bajo · **Esfuerzo:** Medio
