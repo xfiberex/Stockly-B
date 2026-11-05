@@ -330,6 +330,7 @@ export const reportsService = {
             stockMetrics,
             salesByDay,
             masVendido,
+            categoryCount,
         ] = await Promise.all([
             prisma.product.count(),
             prisma.product.count({ where: { isActive: true } }),
@@ -436,7 +437,10 @@ export const reportsService = {
                 FROM products p
                 LEFT JOIN categories c ON c.id = p."categoryId"
                 WHERE p."isActive" = true AND p.stock <= p."minStock"
-                ORDER BY p.stock ASC
+                -- AUD-008 — primero lo que más falta frente a su mínimo (0/10 antes que 4/5), y
+                -- al final los que no tienen mínimo: con minStock a 0 por defecto, cualquier
+                -- producto agotado entra, y por stock absoluto tapaban las faltas de verdad.
+                ORDER BY (p."minStock" = 0), p.stock::float8 / NULLIF(p."minStock", 0), p.stock, p.name
                 LIMIT 20
             `,
             /**
@@ -470,6 +474,9 @@ export const reportsService = {
             // consulta que el resumen semanal, con otra ventana.
             ventasPorDia(hoy, DIAS_DE_VENTAS, zona),
             masVendidoEntre(haceDias(hoy, DIAS_DE_VENTAS - 1), hoy, zona, MAS_VENDIDOS),
+            // AUD-008 — las categorías del catálogo. El panel contaba los grupos de
+            // `stockByCategory`, que incluyen «Sin categoría»: decía 12 donde había 11.
+            prisma.category.count(),
         ]);
 
         const [margenTotal, margenPorCategoria, margenPorProducto] = await margenEnCurso;
@@ -528,6 +535,7 @@ export const reportsService = {
                 potentialMargin: costedSaleValue - inventoryCostValue,
                 productsWithoutCost,
                 lowStockCount,
+                categoryCount,
             },
             stockByCategory: porCategoria.map((c) => ({
                 name: c.name,

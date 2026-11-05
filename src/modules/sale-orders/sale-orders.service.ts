@@ -327,7 +327,7 @@ async function devolverEnviada(
 }
 
 export const saleOrderService = {
-    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; number?: unknown; from?: unknown; to?: unknown; warehouseId?: unknown }) {
+    async getAll(query: { page?: string; limit?: string; status?: string; customerId?: unknown; number?: unknown; from?: unknown; to?: unknown; warehouseId?: unknown; createdByEmail?: unknown }) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
@@ -343,8 +343,13 @@ export const saleOrderService = {
         const creadas = hayRango ? await rangoDeDias(query, await settingsService.zonaHoraria()) : undefined;
         // T5-14 — las de un local.
         const warehouseId = await almacenDelFiltro(query.warehouseId);
+        // AUD-008 — las de quien las registró: «Mis ventas de hoy» pedía las cien primeras del día
+        // de todos y se quedaba con las suyas en el cliente, así que un día de más de cien se
+        // quedaba corto sin avisar. Sin distinguir mayúsculas, como el login.
+        const autor = typeof query.createdByEmail === "string" && query.createdByEmail.trim() ? query.createdByEmail.trim() : undefined;
         const where = {
             ...(warehouseId && { warehouseId }),
+            ...(autor && { createdByEmail: { equals: autor, mode: "insensitive" as const } }),
             ...(statusFilter && { status: statusFilter }),
             ...(customerId && { customerId }),
             ...(number !== undefined && { number }),

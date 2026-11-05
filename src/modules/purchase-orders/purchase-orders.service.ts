@@ -18,12 +18,16 @@ const ORDER_INCLUDE = {
     },
 } as const;
 
-// Solo acepta como filtro un status que sea miembro válido del enum.
-function parseStatusFilter(status?: string): $Enums.PurchaseOrderStatus | undefined {
-    if (status && status in $Enums.PurchaseOrderStatus) {
-        return status as $Enums.PurchaseOrderStatus;
-    }
-    return undefined;
+// Solo acepta como filtro un status que sea miembro válido del enum. AUD-008: también varios
+// separados por comas —`PENDING,PARTIALLY_RECEIVED`, «por recibir», la fila del panel—; los que
+// no son del enum se ignoran, como antes el único.
+function parseStatusFilter(status?: string): $Enums.PurchaseOrderStatus[] | undefined {
+    if (!status) return undefined;
+    const validos = status
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is $Enums.PurchaseOrderStatus => Object.hasOwn($Enums.PurchaseOrderStatus, s));
+    return validos.length > 0 ? validos : undefined;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -122,7 +126,7 @@ export const purchaseOrderService = {
         const statusFilter = parseStatusFilter(query.status);
         // T5-14 — las de un almacén.
         const warehouseId = await almacenDelFiltro(query.warehouseId);
-        const where = { ...(statusFilter && { status: statusFilter }), ...(warehouseId && { warehouseId }) };
+        const where = { ...(statusFilter && { status: { in: statusFilter } }), ...(warehouseId && { warehouseId }) };
 
         const [orders, total] = await prisma.$transaction([
             prisma.purchaseOrder.findMany({

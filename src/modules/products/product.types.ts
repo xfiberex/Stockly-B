@@ -55,6 +55,10 @@ export interface ProductQuery {
     abcClass?: string;
     /** T5-14 — solo los productos con existencias en ese almacén. */
     warehouseId?: string;
+    /** AUD-008 — `true`: los de stock bajo o agotado (`stock <= minStock`), como la fila del panel. */
+    lowStock?: string;
+    /** AUD-008 — `true`: los que tienen stock y no tienen coste, los que avisa el panel. */
+    withoutCost?: string;
 }
 
 /** T5-08 — `GET /products/labels`. Todo llega como cadena de la query. */

@@ -1500,6 +1500,8 @@ export const totalesReporteSchema = z.object({
     /** Activos con stock y sin coste: quedan fuera de las dos cifras anteriores. */
     productsWithoutCost: z.number(),
     lowStockCount: z.number(),
+    /** AUD-008 — categorías del catálogo; `stockByCategory` incluye además «Sin categoría». */
+    categoryCount: z.number(),
 });
 
 export const stockPorCategoriaSchema = z.object({

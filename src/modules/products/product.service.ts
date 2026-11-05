@@ -214,6 +214,13 @@ export const productService = {
             // T5-14 — lo que **hay** en un almacén: los productos con existencias en él. En el
             // `where`, como todo filtro (T4-15).
             ...(warehouseId && { stockLevels: { some: { warehouseId, stock: { gt: 0 } } } }),
+            // AUD-008 — los dos avisos del panel, para que su enlace llegue a la lista que cuenta.
+            // Las mismas condiciones que `getSummary` (`lowStockCount`, `productsWithoutCost`).
+            // En un `AND` porque los dos miran `stock`.
+            AND: [
+                ...(query.lowStock === "true" ? [{ stock: { lte: prisma.product.fields.minStock } }] : []),
+                ...(query.withoutCost === "true" ? [{ costPrice: null, stock: { gt: 0 } }] : []),
+            ],
         };
 
         // T5-10 — la clase sale de una caché que se rehace sola; si toca, en segundo plano.
