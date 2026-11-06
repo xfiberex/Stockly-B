@@ -74,6 +74,7 @@ export const caducidadesService = {
                 LIMIT ${limit} OFFSET ${skip}`,
             prisma.$queryRaw<Array<{ total: number } & InformeDeCaducidades["summary"]>>`
                 SELECT COUNT(*)::int AS total,
+                       COUNT(*) FILTER (WHERE ${caducado})::int AS "expiredCount",
                        COALESCE(SUM(sl.stock) FILTER (WHERE ${caducado}), 0)::int AS "expiredUnits",
                        COALESCE(SUM(sl.stock * p."costPrice") FILTER (WHERE ${caducado}), 0)::float8 AS "expiredCostValue",
                        COALESCE(SUM(sl.stock) FILTER (WHERE NOT ${caducado}), 0)::int AS "expiringUnits",

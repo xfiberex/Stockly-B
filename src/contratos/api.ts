@@ -794,6 +794,12 @@ export const informeDeCaducidadesSchema = z.object({
     today: z.string(),
     days: z.number(),
     summary: z.object({
+        /**
+         * AUD-008 — cuántas filas de `meta.total` (un lote en un almacén) ya han caducado; las
+         * demás caducan dentro del plazo. El panel decía «9 lotes caducados o por caducar» y no
+         * cuántos de cada.
+         */
+        expiredCount: z.number(),
         expiredUnits: z.number(),
         expiredCostValue: z.number(),
         expiringUnits: z.number(),
