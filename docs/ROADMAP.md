@@ -6,6 +6,13 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-07: once tareas abiertas.** `AUD-008`, el rediseño del panel, se cerró con
+> su crítica repetida (30/40, sin P1). Al cerrarla se pasó la misma crítica por **las 31
+> pantallas** del frontend ([informe](auditoria/2026-11-07-critica/INFORME.md); media 25,9/40,
+> ninguna crítica, una pobre: Restablecer contraseña). De ella salen `AUD-011` a `AUD-019`; las
+> dos primeras, en el Tier 2, son trabajo que se pierde sin aviso y acciones irreversibles de un
+> toque. Siguen abiertas `AUD-009` (decisión de producto pendiente) y `AUD-010`.
+>
 > **Estado al 2026-11-04: tres tareas abiertas, una de ellas a medias.** El 2026-11-03 una crítica
 > de diseño del panel principal (con el plugin Impeccable; 23/40) abrió `AUD-008`, el rediseño del
 > panel, y al hacerlo salieron `AUD-009` y `AUD-010`. **`AUD-008` está a medias, ya en `main`
@@ -61,35 +68,36 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 3
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 7
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 11
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 8
 ```
 
 ---
 
 ## Tareas abiertas
 
-Tres, abiertas el 2026-11-03 y 2026-11-04 a raíz de la crítica de diseño del panel principal:
-`AUD-009` (Tier 2), y `AUD-008` y `AUD-010` (Tier 3). Las seis de la re-auditoría del 2026-10-31
-están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
+Once. `AUD-009` (Tier 2) y `AUD-010` (Tier 3) salieron el 2026-11-03 y 04 de la crítica del
+panel. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
+([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` y `AUD-012` en el Tier 2, el
+resto en el Tier 3. Las seis de la re-auditoría del 2026-10-31 están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
 atacarlas. Las observaciones
 de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
 en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-04 · **Siguiente ID libre:** AUD-011 · **Último informe:** [2026-10-31](auditoria/2026-10-31/INFORME.md)
+**Última actualización:** 2026-11-07 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
-| 2 · Medio | 1 | 0 | Bajo |
-| 3 · Bajo | 2 | 1 | Medio · Medio |
+| 2 · Medio | 3 | 0 | 1 · 2 · 0 |
+| 3 · Bajo | 8 | 2 | 1 · 6 · 1 |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **3** | **7** | **1 · 2 · 0** |
+| **Total** | **11** | **8** | **2 · 8 · 1** |
 
-**Abiertas por área:** Diseño 1 (`AUD-008`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** Diseño 8 (`AUD-011` a `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -141,141 +149,68 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
     recibiendo; Informes no rompe con ningún rol.
   - **Dependencias:** ninguna; conviene hacerla junto con `AUD-010`, que toca la misma respuesta.
 
+- [ ] **AUD-011 · El trabajo se pierde sin aviso: las cifras de un conteo, la venta del mostrador, los ajustes de Configuración y lo editado en Sugerencias**
+  - **Área:** Diseño · **Severidad:** Medio · **Esfuerzo:** Medio
+  - **Origen:** crítica del 2026-11-07 ([informe](auditoria/2026-11-07-critica/INFORME.md), «Lo
+    que se repite», 1). Cinco P1 de cuatro bloques con la misma causa: el trabajo vive en un
+    estado local que se desmonta, y nada avisa.
+  - **Ubicación** (`Stockly-F/src/modules/`):
+    - Un conteo: `inventory-counts/components/InventoryCountPage.tsx` (`cifras`, estado de
+      `Captura`, `:62`, que se desmonta al pasar a «Revisar», `:380`). **Verificado** en el
+      navegador: escribir 3, pasar a «Revisar» y volver deja «Guardar (0)» y el campo vacío.
+      También se pierde al escanear, paginar, filtrar o salir.
+    - Mostrador: `sale-orders/components/MostradorPage.tsx` (`useState` de las líneas, `:74`).
+      Verificado: la venta armada se pierde al recargar.
+    - Configuración: `settings/components/SettingsPage.tsx` (`:273-281`). Verificado: un cambio
+      abajo del todo se descarta al navegar, y «Guardar» queda fuera de la vista.
+    - Sugerencias: `purchase-orders/components/SugerenciasReposicionPage.tsx` (`:87-90`): cambiar
+      de página borra las ediciones.
+    - Categorías y Marcas: `catalog/components/CatalogItemSection.tsx` (`:131-138`) cierra el
+      modal antes de que responda la API; si falla, lo escrito se pierde. Proveedores ya lo
+      resuelve con `onSuccess`.
+  - **Qué hacer:** decidir el patrón una vez y aplicarlo en todas. Lo que se escribe para un
+    trabajo largo (conteo, venta) sobrevive a recargar (`sessionStorage` por id) y a navegar
+    (bloqueo con `useBlocker` mientras haya algo sin guardar); los formularios avisan al salir;
+    el conteo avisa al cerrar si hay cifras sin guardar; los modales se cierran en `onSuccess`.
+    Valorar el guardado por línea al salir del campo en el conteo. Anotar el patrón en
+    `Stockly-F/docs/design-system.md`.
+  - **Criterio de aceptación:** en las cinco pantallas, lo escrito no se pierde sin que la
+    persona lo decida: test de componente por cada una (cambiar de vista, recargar o salir con
+    algo sin guardar) y comprobado en el navegador a 390 px en el conteo y el mostrador.
+  - **Dependencias:** ninguna. Toca las mismas pantallas que `AUD-013`; conviene hacerla antes.
+
+- [ ] **AUD-012 · Acciones irreversibles de un toque: borrar en el catálogo, cancelar o enviar órdenes, cambiar un rol, desactivar un almacén**
+  - **Área:** Diseño · **Severidad:** Medio · **Esfuerzo:** Medio
+  - **Origen:** crítica del 2026-11-07 («Lo que se repite», 2). P1 en cuatro bloques. Las
+    acciones con consecuencias que sí confirman (cancelar una orden recibida o enviada, borrar un
+    cliente, dar de baja un lote) son el modelo: dicen exactamente qué stock se mueve.
+  - **Ubicación** (`Stockly-F/src/modules/`):
+    - Catálogo: «Eliminar» en `products/components/ProductTable.tsx` (`:292-296`; además borra
+      la imagen de Cloudinary, `Stockly-B/src/modules/products/product.service.ts:485-489`, y
+      restaurar no la devuelve), `catalog/components/CatalogItemSection.tsx` (`:187`),
+      `suppliers/components/SuppliersPage.tsx` (`:225`) y `tags/components/TagsPage.tsx`
+      (`:423`).
+    - Compras: cancelar y eliminar una pendiente, `purchase-orders/components/PurchaseOrdersPage.tsx`
+      (`:553, 569, 687, 698`).
+    - Ventas: marcar enviada —descuenta stock— y cancelar o eliminar una pendiente,
+      `sale-orders/components/SaleOrdersPage.tsx` (`:494, 503, 504`).
+    - Usuarios: el rol se cambia en el `onChange` del select —con las flechas del teclado sobre
+      el select cerrado basta— y «Desactivar» no confirma, `users/components/UsersPage.tsx`
+      (`:195-225`).
+    - Almacenes: «Desactivar» y «Hacer predeterminado», `warehouses/components/WarehousesPage.tsx`
+      (`:335-353`); «Desactivar» está activo con stock y falla en el servidor.
+  - **Qué hacer:** confirmación que nombre la cosa y la consecuencia («Carlos pasará de Admin a
+    Consulta», «se pierde la imagen», «se descuentan 3 uds.»), o un toast con «Deshacer» donde la
+    acción sea reversible de verdad. El rol, pendiente en la fila hasta «Aplicar». Lo que el
+    servidor va a rechazar (desactivar un almacén con stock), desactivado con su motivo. Valorar
+    no borrar la imagen al desactivar un producto.
+  - **Criterio de aceptación:** ninguna de esas acciones se ejecuta con un solo toque, con test
+    de componente por pantalla; con teclado, recorrer la tabla de Usuarios no cambia ningún rol.
+  - **Dependencias:** ninguna.
+
 Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en su [informe](auditoria/2026-10-31/INFORME.md), sin tarea.
 
 ## Tier 3 · Bajo
-
-- [ ] **AUD-008 · Panel principal: lo pendiente primero, un panel por rol y sin estados rotos (crítica de diseño del 2026-11-03, 23/40)** — **a medias**
-  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** `/impeccable critique` del panel, con dos revisiones independientes (diseño y
-    detector). El informe está en `Stockly-F/.impeccable/critique/`; `Stockly-F/PRODUCT.md` es la
-    ficha de producto que lee Impeccable. Puntuación: 23/40 (aceptable), tres P1 y dos P2.
-  - **Dónde está el trabajo:** en **`main`** de `Stockly-F` (el código) y de `Stockly-B` (esta
-    documentación). Se hizo en la rama `feat/panel-principal`, fusionada sin conflictos (avance
-    directo) y borrada el 2026-11-04. `pnpm verify` del frontend, en verde en la rama el
-    2026-11-04 (cifras en el commit); tras la fusión, 969 tests en verde, 1 omitido, y `tsc -b`
-    limpio.
-  - **Hecho** (2026-11-03 y 04, un paso de Impeccable cada vez):
-    1. `layout` — **«Necesita atención» arriba** (`AtencionDeHoy.tsx`): filas fijas con su cifra y
-       su acción —stock bajo o agotado, lotes caducados o por caducar, conteos abiertos, compras
-       por recibir, ventas por enviar— y «Reponer primero» con el nivel de `NIVEL_STOCK`. Una fila
-       a cero se queda atenuada (el bloque no salta al cargar); en móvil la fila entera es el
-       enlace. Se quitaron la alerta del final y el enlace suelto «Gestionar productos».
-    2. `adapt` — **un panel por rol** (tabla `PANEL` en `DashboardPage.tsx`): ADMIN todo; USER sin
-       importes ni gráfico por categoría; WAREHOUSE sin dinero ni ventas, con caducidades y conteos;
-       SELLER con su propio `PanelDeVendedor` («Ir a mostrador» y sus ventas de hoy, filtradas por
-       `createdByEmail` en el cliente) y **sin pedir `/reports`**. Cada rol solo pide sus cifras
-       (`enabled`).
-    3. `harden` — **error de carga con «Reintentar»** (`shared/components/ErrorDeCarga.tsx`, nuevo,
-       `role="alert"`): antes una consulta fallida dejaba el esqueleto para siempre. Si falla una
-       actualización, los datos se quedan y se avisa de que son los de antes. «Actualizado a las
-       HH:MM» en el subtítulo. Cifras grandes que parten la línea. Caché de 30 s en las consultas
-       nuevas del panel.
-    4. `distill` (2026-11-04) — **fuera el gráfico «Stock y valor por categoría»**: doble eje sin
-       leyenda, eje derecho en «$0k», 3 de 9 categorías a 390 px y nada para lector de pantalla. No
-       se rehízo: Informes ya da esas dos medidas por separado y bien («Valor por categoría», en
-       barras horizontales de una medida, y «Distribución»), y en el panel es análisis, no lo
-       pendiente de hoy. Se llega por «Ver reporte completo», en el bloque de importes. Visto a
-       1440 y 390 px.
-    5. `quieter` (2026-11-04) — **las cuatro tarjetas de colores pasan a una franja neutra de
-       tres recuentos** (total, activos, categorías): sin fondos azul, verde y ámbar para cifras
-       que no son estados (design-system, «el color comunica estado»). Fuera la tarjeta «Stock
-       bajo», que repetía la primera fila de «Necesita atención», y con ella el choque
-       `bg-surface` / `bg-warning-surface/30`. Fuera el dólar sobre verde del bloque de importes,
-       la sombra de «Necesita atención» —la única tarjeta del panel con ella; la jerarquía la da
-       su sitio— y la sombra al pasar el ratón por las cifras, que ahora subrayan la etiqueta como
-       cualquier enlace. Importes en semibold, no en negrita. Visto a 1440 en claro y en oscuro y
-       a 390, con las tres cifras alineadas aunque una etiqueta parta en dos líneas.
-    6. `clarify` (2026-11-04) — **«Panel», no «Dashboard»** (`ruta.dashboard` en español; en
-       inglés sigue «Dashboard»): cambia el título, la pestaña, el menú y lo que anuncia el lector
-       de pantalla; tests y E2E actualizados. **Fuera el subtítulo «Resumen general del
-       inventario»**, que no decía nada: queda solo «Actualizado a las HH:MM». **El margen
-       potencial dice qué cuenta** —«Venta menos coste, solo de los productos con coste»—, porque
-       no sale de restar las otras dos cifras: la de venta incluye los productos sin coste
-       (`reports.service.ts`, `potentialMargin = costedSaleValue − inventoryCostValue`).
-    7. `polish` (2026-11-04) — recorrido entero por rol (ADMIN a 1440 y 390, WAREHOUSE a 390,
-       SELLER a 1440), con teclado y en claro y oscuro. Arreglado: el margen interior de los
-       bloques, que mezclaba 20 y 24 px y dejaba las cifras 4 px a la izquierda de los títulos
-       (ahora `p-5 sm:p-6` en todos, medido: 289 px a 1440 y 37 a 390); y las sombras del panel
-       del vendedor, que se habían quedado tras el paso 5. `pnpm verify` en verde: 977 tests, 1
-       omitido.
-  - **Crítica repetida el 2026-11-04: 27/40** (la primera, 23/40), con las mismas dos revisiones
-    independientes; informe en `Stockly-F/.impeccable/critique/2026-11-04T17-50-37Z__…`. Sube,
-    pero no cumple aún el criterio: quedan **dos P1** —los enlaces de «Necesita atención» llegan
-    sin filtro («4 ventas por enviar» abre 28 órdenes) y, sin datos de `/reports`, todo el panel es
-    un esqueleto genérico: al reintentar desaparece «Necesita atención», el foco cae en `<body>` y
-    sus cifras esperan al informe— y tres P2. El detector solo marcó la fuente (Inter, fijada en
-    `PRODUCT.md`), un falso positivo (el logo de las devtools de TanStack Query, solo en
-    desarrollo) y una palabra sola en el aviso de productos sin coste a 390 px.
-  - **Hecho el 2026-11-05** (pasos 8 a 12, decididos por el propietario el 2026-11-04: entra
-    todo, también lo menor; primero el reintento; dirección, un panel «de hoy» por rol):
-    8. `harden` — **«Necesita atención» se monta desde el principio** (la fila de stock, cargando)
-       y el esqueleto queda solo para el resumen de ADMIN, con su forma real. El aviso de error se
-       queda mientras se reintenta (`useFalloDeCarga`: `!data && errorUpdateCount > 0`, porque
-       TanStack v5 vuelve a `pending`) y su botón no se desactiva —se marca `aria-busy`—, así que
-       el foco no cae en `<body>`; si el reintento sale bien, el foco va al título. «Reintentar»
-       vuelve a pedir todo lo que falló en la pantalla (`useReintentarFallidas`), también las
-       cifras de atención; el de la línea de la hora, con 44 px en táctil. Lo mismo en
-       `PanelDeVendedor`. «Mis ventas de hoy» filtra por autor **en el servidor**
-       (`GET /sale-orders?createdByEmail=`) y avisa si pasa de cien. El bloque de importes tiene su
-       `h2` y el nombre accesible de cada fila empieza por su texto visible (WCAG 2.5.3).
-    9. `shape` — **un panel «de hoy» por rol**: USER y WAREHOUSE ven solo lo pendiente; el resumen
-       del negocio (recuentos, importes, ventas de la semana) queda para ADMIN y en Reportes.
-       WAREHOUSE abre con «En el almacén»: «Escanear un producto» (abre Productos con la cámara,
-       `?escanear=1`), «Recibir compras», «Conteos» y «Transferencias». **Cada cifra lleva a su
-       lista filtrada** y con el mismo recuento: ventas `?estado=PENDING`, compras
-       `?estado=porRecibir` (la API acepta varios estados separados por comas), conteos
-       `?estado=OPEN`, productos `?aviso=stockBajo` / `?aviso=sinCoste` / `?activos=todos` (filtros
-       nuevos `lowStock` y `withoutCost` en `GET /products`). Lo que la barra de filtros de la lista
-       no tiene se dice encima y se quita (`FiltroActivo`). La fila de caducidades nombra el lote
-       que antes caduca, como la campana. Las cifras que piden actuar son las más grandes (24 px
-       frente a 20). SELLER: cada venta se abre en Ventas, desplegada para reimprimir el
-       comprobante, con la hora del ticket; «Verlas en Ventas» llega filtrado por autor y día.
-    10. `clarify` — `totals.categoryCount` (las categorías del catálogo: 11, no 12);
-        «Reponer primero» por falta frente al mínimo y los que no tienen mínimo al final, con
-        «sin mínimo» en vez de «mín. 0»; «No disponible» visible y en ámbar, y una fila con error ya
-        no enseña el detalle ni el enlace de la cifra vieja. Textos: «Ir al mostrador», «Total de
-        productos», la hora sin cero delante, el punto de `en.ts`, «Ver reportes» como el menú y el
-        aviso de productos sin coste más corto y con «Ver cuáles».
-    11. `adapt` — «Ir al mostrador» ya no se mueve (tarjeta `items-start`, esqueleto con la forma
-        de la lista) y **la densidad es por puntero**: `md:pointer-fine:min-h-9` en toda la app (22
-        sitios, `densidad.test.tsx` y `docs/design-system.md` §4). En una tableta táctil los
-        controles mantienen los 44 px.
-    12. `polish` — el gráfico de ventas: ejes con `foreground-muted` a 12 px, cursor con token,
-        `accessibilityLayer={false}`, solo rejilla horizontal, el eje X en dos líneas (`vie` /
-        `30`, que a 390 px se montaban) con «Hoy» marcado, escalón de millones en el eje Y, un día
-        con ventas siempre con barra y el tooltip sin «Importe :». «Más vendidos» con `title` y
-        sin estirarse.
-    - **Comprobado en el navegador** (ADMIN a 1440 en oscuro y a 390 táctil en claro, WAREHOUSE a
-      390 táctil, SELLER a 1024 táctil): las cifras del panel coinciden con las de cada lista (4
-      ventas, 5 compras, 1 conteo, 16 productos, 88 en total); con `/reports` caído, el foco se
-      queda en «Reintentar» todo el reintento y, al recuperarse, pasa al título. `pnpm verify` del
-      frontend en verde (995 tests, 1 omitido) y, en el backend, `check` y los 1829 tests.
-    - **No se hizo, y por qué:** las cifras «de su almacén» y las compras vencidas en el panel
-      necesitan datos que no existen: los usuarios no tienen almacén asignado y la compra no
-      guarda fecha prevista (el plazo vencido lo calcula la campana con el del proveedor). Y
-      **`AUD-009` sigue sin decidir**: Reportes enseña los importes a USER y WAREHOUSE.
-  - **Falta:** volver a pasar `/impeccable critique` (paso 13) para medir contra el 27/40.
-  - **Comprobado en el navegador el 2026-11-04**, a 500 px y con `RATE_LIMIT_MAX=1000` solo para
-    la sesión ([CONTEXTO.md](CONTEXTO.md) §4, «El navegador en desarrollo»). Los cuatro paneles ya
-    se habían visto con las cuentas del seed el 2026-11-03.
-    - «Mis ventas de hoy» con ventas reales del mostrador: vacía, con una venta de SELLER, y sin la
-      de ADMIN del mismo día (el filtro por `createdByEmail` funciona).
-    - La línea de la hora, y los dos errores, provocados redirigiendo `/reports` a un puerto
-      cerrado: el de la primera carga y el de una actualización con datos ya en pantalla; con
-      «Reintentar» el panel vuelve entero.
-    - Lo que salió y se arregló ese día: el aviso de actualización decía «12:17 p.m..» (doble
-      punto) y no se anunciaba (ahora va en una región `status` siempre montada); un fallo de
-      `/reports` escondía también «Necesita atención», cuyas otras cifras no dependen de él (ahora
-      se queda, con la fila de stock «no disponible»); el título de la pestaña en el login se
-      quedaba en el de la última pantalla con sesión; y la cantidad del mostrador se exponía con
-      un máximo de 0 (ahora `max` es lo disponible). `pnpm verify` del frontend en verde: 973
-      tests, 1 omitido.
-  - **Criterio de aceptación:** los pasos 4 a 12 hechos (lo están); `pnpm verify` del frontend en verde; la
-    crítica repetida en la banda «buena» (28/40 o más) y sin P1; y la rama fusionada en `main`.
-  - **Dependencias:** ninguna para empezar. `AUD-009` y `AUD-010` salieron de aquí y no la
-    bloquean, pero el paso 9 necesita la decisión de `AUD-009` (qué importes ve cada rol en
-    Informes) y fija qué filas usará `AUD-010`.
 
 - [ ] **AUD-010 · Los recuentos de «Necesita atención» en `/reports`: el panel de ADMIN pasó de 1 petición a 6**
   - **Área:** Rendimiento · **Severidad:** Bajo · **Esfuerzo:** Medio
@@ -293,8 +228,165 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
   - **Criterio de aceptación:** el panel de ADMIN hace una petición de datos (dos como mucho) en
     vez de seis, con las mismas cifras; la prueba de carga no empeora respecto a
     [rendimiento.md §15](rendimiento.md).
-  - **Dependencias:** después de `AUD-008` (que fija qué filas existen) y junto con `AUD-009`, que
+  - **Dependencias:** `AUD-008` ya fijó las filas (cerrada el 2026-11-07: stock, caducidades —con
+    `summary.expiredCount`—, conteos, compras y ventas). Junto con `AUD-009`, que
     recorta la misma respuesta.
+
+- [ ] **AUD-013 · El móvil de quien trabaja de pie: el stock, la recepción, el conteo y el cobro quedan fuera de la pantalla a 390 px**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Alto
+  - **Origen:** crítica del 2026-11-07 («Lo que se repite», 3). El principio 2 de `PRODUCT.md`
+    («el dispositivo manda») choca con la regla del sistema de diseño de que las tablas se
+    desplazan a lo ancho: con la barra oculta (`sin-barra`), nada indica que hay más.
+  - **Ubicación y medidas** (a 390 px, `Stockly-F/src/modules/`):
+    - Productos (`products/components/ProductsPage.tsx`): la tabla mide 1099 px en 357; el stock,
+      unos 740 px a la derecha; la primera fila en y≈700.
+    - Recepción de compras (`purchase-orders/components/PurchaseOrdersPage.tsx:224-291`): «Llega
+      ahora» empieza en x=576.
+    - Un conteo (`inventory-counts/components/InventoryCountPage.tsx`): el primer campo cae en el
+      pliegue; «Guardar», arriba.
+    - Mostrador (`sale-orders/components/MostradorPage.tsx`): el total y «Registrar venta», bajo
+      el pliegue con dos líneas; a 1024 px, en una tableta, con tres. Y «Mis ventas de hoy» empieza
+      fuera de la pantalla en la tableta.
+    - Columnas escondidas sin señal: Usuarios, Clientes, Sugerencias, Categorías, Proveedores,
+      Bitácora.
+  - **Qué hacer:** por debajo de `md`, listas de tarjetas con lo que el rol viene a mirar (stock,
+    cantidades, acción); filtros plegados en «Filtros (n)»; barra fija abajo para la acción
+    principal (Guardar, Registrar venta), como «Escanear» en el panel de WAREHOUSE; dos columnas en
+    el mostrador desde `lg`. Actualizar la regla de tablas de `design-system.md`.
+  - **Criterio de aceptación:** a 390 px, en Productos se ve el stock de la primera fila sin
+    desplazar; en la recepción, el campo de cada línea; en el conteo, el primer campo y Guardar;
+    en el mostrador, el total y el botón con tres líneas. Comprobado en el navegador y con test de
+    densidad donde aplique.
+  - **Dependencias:** después de `AUD-011`, que toca el conteo y el mostrador.
+
+- [ ] **AUD-014 · Pantallas de acceso: errores que duran 3 s, la aprobación que no se anticipa y enlaces caducados sin salida**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** crítica del 2026-11-07, bloque Acceso (19 a 28/40; Restablecer contraseña, 19,
+    la única «Pobre» del proyecto). Cinco P1.
+  - **Ubicación:** `Stockly-F/src/modules/auth/components/` (las seis pantallas) y
+    `Stockly-F/src/main.tsx:16` (`autoClose={3000}`, sin `theme`).
+  - **Qué hacer:**
+    - Los errores del servidor (credenciales, cuenta pendiente, enlace caducado) en un bloque
+      persistente dentro de la tarjeta, con `role="alert"`, no solo en el aviso.
+    - El registro anticipa los dos pasos (confirmar el correo, esperar a un administrador) y,
+      tras enviar, una pantalla propia «Revisa tu correo».
+    - Restablecer y Confirmar sin token o con token inválido: la misma tarjeta, con `h1`, «Este
+      enlace ya no sirve» y «Pedir un enlace nuevo». «Ya verificada» dice que espera aprobación.
+    - Reenviar verificación responde de forma neutra, como Olvidé la contraseña.
+    - Fuera «Token» de la interfaz, el placeholder `••••••••`, la burbuja nativa (`noValidate`);
+      «mostrar contraseña»; requisitos fijos bajo el campo.
+  - **Criterio de aceptación:** la crítica de Impeccable del bloque, repetida, sin P1 y ninguna
+    pantalla por debajo de 24/40.
+  - **Dependencias:** ninguna.
+
+- [ ] **AUD-015 · Reportes: tarjetas que no cuadran, gráficos sin alternativa y un informe por periodo que abre vacío**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** crítica del 2026-11-07, bloque Reportes (25 y 28/40). Tres P1.
+  - **Ubicación:** `Stockly-F/src/modules/reports/components/ReportsPage.tsx` (tarjetas,
+    `:126-128`; gráficos, `:137-201`; meses, `:49`) e `InformePorPeriodoPage.tsx` (`:57`, `:171`).
+  - **Qué hacer:**
+    - Que las tres cifras de valor se puedan comparar: la exclusión de los productos sin coste
+      dentro de cada tarjeta afectada, o el valor a precio de venta solo de los que tienen coste
+      (el panel ya lo explica en una línea), y el aviso enlazado a `?aviso=sinCoste`.
+    - Los tres gráficos con el patrón del informe por periodo: `aria-hidden` y una tabla
+      equivalente.
+    - El periodo en la URL; sin datos, ofrecer «Mes anterior» o «Este año» y desactivar exportar.
+    - Los seis meses siempre en el eje; fuera la tarta de 9 categorías con 8 colores; ejes con
+      token.
+  - **Criterio de aceptación:** sin P1 en la crítica repetida del bloque; con el lector de
+    pantalla del árbol de accesibilidad, ningún gráfico es una parada sin nombre.
+  - **Dependencias:** conviene después de `AUD-009`, que puede cambiar qué importes ve cada rol en
+    esta pantalla.
+
+- [ ] **AUD-016 · Los roles no llegan al marco: navegación sin recortar, tema e idioma solo para ADMIN y acciones de Etiquetas que acaban en 403**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** crítica del 2026-11-07 («Lo que se repite», 5). Tres P1 de dos bloques.
+  - **Ubicación:**
+    - `Stockly-F/src/App.tsx` (`NAVEGACION`, `visibleDeNav`): SELLER ve 16 destinos; los tres de
+      WAREHOUSE empiezan a ~600 px en el menú móvil. `ocultoPara` (puesto en `AUD-008` para el
+      panel de SELLER) admite un solo rol.
+    - `SelectorDeTema` y `SelectorDeIdioma` solo se montan en `settings/components/SettingsPage.tsx`
+      (`:266-267`), ruta de ADMIN.
+    - `tags/components/TagsPage.tsx` (`:391`): «Nueva», «Editar» y «Eliminar» sin comprobar el
+      permiso; la API es `SOLO_ADMIN`.
+    - El rol no se ve en el perfil ni en el menú de usuario.
+  - **Qué hacer:** que cada destino diga para qué roles existe (o derivarlo de `PERMISOS`) y
+    ordenar lo del rol primero; la tarjeta «Apariencia» también en el Perfil; Etiquetas con
+    `usePuede("POST /tags")`; una insignia de rol junto al nombre.
+  - **Criterio de aceptación:** test de navegación por rol con la lista exacta de cada uno; un
+    WAREHOUSE cambia el tema desde su perfil; un WAREHOUSE no ve acciones en Etiquetas.
+  - **Dependencias:** ninguna.
+
+- [ ] **AUD-017 · La bitácora y la campana no dicen lo que hace falta: sobre quién se actuó, filtros por usuario y fecha, y avisos sin orden de urgencia**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** crítica del 2026-11-07, bloque Administración (Bitácora 23/40, marco 26/40). Un P1
+    y dos P2.
+  - **Ubicación:** `Stockly-F/src/modules/audit-logs/components/AuditLogsPage.tsx` (`:116-178`),
+    `Stockly-F/src/modules/notifications/components/CampanaDeAvisos.tsx` (`:31-84`) y, para el
+    nombre legible, la respuesta de `GET /audit-logs` en `Stockly-B`.
+  - **Qué hacer:**
+    - Bitácora: el nombre legible de la entidad (usuario, producto, número de venta) en vez de
+      `Usuario #8652010f`, enlazado; filtros por usuario y por rango de fechas, en la URL;
+      exportación por lotes (`enviarExportacion`); detalles como pares clave-valor traducidos, no
+      JSON.
+    - Campana: ordenar por gravedad (la aprobación pendiente salía la última de 11), un texto
+      distinto para lo ya caducado, el almacén y el enlace a la orden concreta.
+    - Usuarios y Bitácora: un estado de error con «Reintentar», que hoy se lee como lista vacía.
+  - **Criterio de aceptación:** cada fila de la bitácora dice a quién o a qué afectó; filtrar por
+    un usuario y un día devuelve solo sus filas (test del backend y de la pantalla); en la campana,
+    lo que bloquea a alguien sale primero.
+  - **Dependencias:** ninguna. Si añade campos a la respuesta, contrato regenerado en los dos
+    repositorios.
+
+- [ ] **AUD-018 · Accesibilidad que falta: filas desplegables sin teclado, pestañas sin rol, contraste del enlace verde y botones sin el nombre de su fila**
+  - **Área:** Accesibilidad · **Severidad:** Bajo · **Esfuerzo:** Bajo
+  - **Origen:** crítica del 2026-11-07, P2 de accesibilidad de varios bloques (árbol de
+    accesibilidad, sin lector de pantalla real).
+  - **Ubicación** (`Stockly-F/src/modules/`):
+    - Filas desplegables como `div` con `onClick`, sin foco ni `aria-expanded`:
+      `purchase-orders/components/PurchaseOrdersPage.tsx:637-640` y
+      `sale-orders/components/SaleOrdersPage.tsx:608-611`. En Transferencias, el `aria-label` del
+      desplegable tapa su contenido (`stock-transfers/components/TransfersPage.tsx:255`).
+    - Pestañas sin `tablist`/`tab`/`aria-selected`: `products/components/StockMovementsPage.tsx:172-192`.
+    - Nombre de cliente en `text-accent`, ~3,8:1 sobre blanco: `sale-orders/components/SaleOrdersPage.tsx:624`,
+      `customers/components/CustomersPage.tsx:147`.
+    - Botones de icono sin el nombre de la fila: `catalog/components/CatalogItemSection.tsx:181-191`,
+      `suppliers/components/SuppliersPage.tsx:219-229`, compras (`:685, 696`), «Desactivar» de
+      Usuarios; borrar línea sin nombre en el formulario de compra (`:473`).
+    - Buscador de Productos sin etiqueta accesible (`products/components/ProductFilters.tsx:98-104`).
+    - Escape no cierra el menú móvil (`Stockly-F/src/App.tsx`).
+  - **Qué hacer:** `<button aria-expanded>` con chevron en las filas; el patrón de pestañas con
+    flechas; `text-info` o un token fuerte para el enlace; `aria-label` con el nombre de la fila;
+    `aria-label` en el buscador; Escape en el menú móvil devolviendo el foco al botón.
+  - **Criterio de aceptación:** tests de accesibilidad de cada uno (rol, nombre, teclado) y
+    contraste ≥ 4,5:1 medido en los dos temas.
+  - **Dependencias:** ninguna.
+
+- [ ] **AUD-019 · Pulido restante de la crítica del 2026-11-07 (P2 y P3 sin tarea propia)**
+  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** el resto de P2 y P3 del [informe](auditoria/2026-11-07-critica/INFORME.md), que
+    no comparten causa con otra tarea. Hacer por bloques, repitiendo la crítica de cada uno.
+  - **Qué hacer**, por pantalla:
+    - **Panel:** «Mis ventas de hoy» visible en la tableta de SELLER (se resuelve con las dos
+      columnas de `AUD-013`); `/expiry` dice los lotes, no solo las unidades.
+    - **Catálogo:** la ficha que abre el escáner con «Registrar movimiento» y «Escanear otro»; el
+      formulario de edición sin «Stock inicial»; filtros de Productos en la URL; spinner de borrado
+      solo en su fila; notas de proveedor legibles.
+    - **Órdenes:** importes en las sugerencias (subtotal, total por proveedor y en la confirmación);
+      la ficha de cliente rotula «Subtotal» lo que lo es, y el número de venta enlaza a la venta;
+      números de compra que se puedan dictar; emoji de contacto por Heroicons; filtros de Ventas
+      plegados en móvil.
+    - **Inventario:** vacíos que dicen el filtro; categorías ya en conteo marcadas en «Nuevo
+      conteo»; «Quedan X» como «Tras la transferencia»; escáner en el formulario de transferencia;
+      filtro «Solo caducado»; jerarquía de botones del conteo; conteo a ciegas que no enseña
+      sobrante ni faltante mientras se cuenta.
+    - **Administración:** la 404 dentro de la app sin `<main>` anidado ni «Dashboard»; zona horaria
+      con búsqueda; logo que avisa de que se guarda al subirlo.
+    - **Tipografía (detector):** `text-pretty` o espacios no separables donde quedan palabras
+      sueltas a 390 px (`/sale-orders`, `/expiry`, `/settings`, `/profile`) y `text-balance` en los
+      dos títulos de `/reports`.
+  - **Criterio de aceptación:** cada bloque, con su crítica repetida, sin P2 de esta lista.
+  - **Dependencias:** después de `AUD-011` a `AUD-018`, que cambian varias de estas pantallas.
 
 ## Tier 4 · Propuestas
 
@@ -546,3 +638,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | ID | Tarea | Cerrada | Nota |
 |---|---|---|---|
 | AUD-007 | Tier 3 · Diseño y rendimiento: las pantallas de datos cargan con esqueleto y lo pequeño con spinner, sin que la pantalla salte al llegar los datos | 2026-11-02 | **Decisión previa, del 2026-11-02:** esqueleto para las cargas con forma, spinner para botones y lo pequeño, «tomando en cuenta el rendimiento». **Medido antes de cambiar nada** (build de producción, Slow 4G y CPU ×4, CLS con `PerformanceObserver`): en escritorio ninguna pantalla pasaba de 0.05, pero en móvil **Ventas daba 0.183**, peor que el 0.1 de «bueno», y Productos 0.076. Así que el esqueleto no se justificaba por las métricas en general, sino por esas dos y por cómo se percibe la carga. **La ficha se quedaba corta:** el esqueleto a secas **empeoró** Productos de 0.050 a 0.343. Con un spinner, lo que llegaba tarde encima de la tabla empujaba pocos píxeles; con diez filas grises, media pantalla. Hubo que arreglar tres cosas que se repetirán en pantallas nuevas: en Ventas, los filtros salían solo «si hay órdenes» y ahora se pintan también mientras carga; en Productos, la leyenda ABC llegaba después que la tabla y ahora ocupa su sitio, invisible, con una fecha de relleno del mismo formato; y la barra de filtros de Productos crece al saber si hay etiquetas o varios almacenes, y como no se le puede reservar el hueco —con un solo almacén el selector no sale, y se cerraría—, la tabla **espera** (`esperando`): anuncia «Cargando…» pero no pinta formas hasta que la barra tiene su altura final. **Resultado:** Productos, 0.019 en escritorio y 0.013 en móvil; Ventas, 0 en los dos y también en Slow 3G; Compras, Clientes, Panel, Informes y Conteos, 0. **Rendimiento:** sin librería; el retraso de 200 ms es un `animation-delay`, no un temporizador de React; el pulso anima `opacity` del envoltorio —una capa, sin repintar— en vez de un brillo con `background-position`; el JS de entrada pasa de 13.49 a 13.68 kB comprimido y el CSS de 14.26 a 14.36. **Accesibilidad**, que no había: el `Spinner` era un `div` sin `role` y ningún lector lo anunciaba; ahora es un `status` con «Cargando…» (es y en), como el esqueleto, cuyas formas van con `aria-hidden`; el del botón es decorativo y lo anuncia el botón con `aria-busy`, y es un `span` porque un `div` no puede ir dentro de un `<button>`. Con movimiento reducido el esqueleto queda quieto. **Alcance:** 21 pantallas pasan a esqueleto (tabla, lista, rejilla, bloques o página entera); el spinner grande queda en cuatro sitios sin forma que anticipar —la carga de una ruta, la sesión, la verificación del correo, la cámara—, y `cargas.test.ts` falla si aparece en otro. La regla, en `Stockly-F/docs/design-system.md` §8, y el paso 7 de «Cómo añadir una página nueva». **Comprobado:** 21 tests nuevos en 4 archivos (`Esqueleto.test.tsx`, `cargas.test.ts`, `cargaDeVentas.test.tsx`, `cargaDeProductos.test.tsx`) y 3 reescritos que miraban la clase del spinner o daban por pintada la tabla —dos de ellos habrían pasado en vacío—. Falsificado: 24 roturas, 24 caídas, **dos tras reforzar su test**: la espera por las etiquetas y la espera por los almacenes; los dos comprobaban «no está» antes de que TanStack avisara del cambio. `pnpm verify` del frontend en verde: 947 tests, 81.08 %; E2E, 39 pasados y 3 omitidos. **A saber:** en Ventas, el selector de almacén puede llegar después que la lista; medido, llegan juntos y el CLS es 0, pero es una carrera y no una garantía. Si alguna vez se ve saltar, la solución es la misma `esperando` de Productos. Y la espera se aplicó **solo donde se midió el problema**: probada en las siete pantallas con selector de almacén, rompía 65 tests de seis pantallas que no la necesitaban. |
+| AUD-008 | Tier 3 · Diseño: el panel principal, con lo pendiente primero, un panel «de hoy» por rol y sin estados rotos (crítica de Impeccable del 2026-11-03, 23/40) | 2026-11-07 | **Cuatro críticas, 23 → 27 → 27 → 30/40**, con dos revisiones independientes cada vez (diseño en el navegador y el detector de Impeccable). **El criterio, cumplido:** la última da **30/40, banda «Buena», sin ningún P1**; `pnpm verify` en verde en los dos repositorios (backend 1829 tests; frontend 998 y 1 omitido, más el test nuevo del aviso por rol: 57 en `resumen.test.tsx`). Los pasos 1 a 12 están en el historial de git de este documento (la ficha, del 2026-11-04 y 05). **Lo de la tercera crítica (2026-11-06, 27/40, un P1), decidido por el propietario —«todo, también el P3»—:** la cifra de stock de ADMIN **llevaba a la reposición sugerida**, que no es la misma lista (sale de las salidas y del plazo, no del mínimo): «4» abría seis líneas distintas a un clic de generar órdenes; ahora abre la lista filtrada, y la sugerencia queda aparte bajo «Reponer primero», diciendo de dónde sale. **Color por gravedad:** rojo para lo caducado o agotado, ámbar para el stock bajo y lo que va a caducar, neutro para las colas de trabajo. Las caducidades dicen cuántos lotes de cada: `summary.expiredCount` nuevo en `GET /reports/expiring` (contrato regenerado). **WAREHOUSE:** «Escanear» fijo abajo en móvil, sin los accesos que repetían una fila, y sus acciones detrás de «Necesita atención». **SELLER ya no tiene panel:** `/` lo lleva al mostrador, con «Mis ventas de hoy» debajo (`MisVentasDeHoy`, pasado de `dashboard/` a `sale-orders/`), y «Panel» sale de su navegación (`ocultoPara`). Sin ventas, una frase en vez de un gráfico a cero; un fallo del servidor se dice en lenguaje normal (`ErrorDeCarga`, para 5xx y 404) y la fila sin datos se reintenta desde ella misma. **De la cuarta (2026-11-07), sus dos P2:** el aviso del resumen caído ya no lo ven USER ni WAREHOUSE, que no tienen resumen, y el «Reintentar» de la fila lleva rueda y `aria-busy`, no repite y **no desaparece mientras reintenta** (la regla de `useFalloDeCarga`: TanStack v5 vuelve a `pending` y se llevaba el botón con el foco). **Comprobado en el navegador:** ADMIN a 1440, WAREHOUSE a 390 táctil (el botón fijo mide 48 px, sin tapar lo último), SELLER a 1024 táctil (entra en `/counter` y la pestaña dice «Mostrador»), y ADMIN con `/reports` caído. **Lo que la ficha no decía:** el backend de desarrollo quedó vivo entre sesiones, sirviendo código viejo, y el panel enseñó una cifra que no cuadraba hasta matarlo; y la base de tests de este equipo no tenía las migraciones de `AUD-001` (`Role.PENDING`): 524 tests en rojo hasta aplicar su SQL ([CONTEXTO.md §4](CONTEXTO.md)). **Sin hacer:** las cifras «de su almacén» y las compras vencidas siguen sin datos que las sostengan; `AUD-009` sigue sin decidir. Al cerrarla se pasó la crítica por **las 31 pantallas** ([informe](auditoria/2026-11-07-critica/INFORME.md)), que abrió `AUD-011` a `AUD-019`. |

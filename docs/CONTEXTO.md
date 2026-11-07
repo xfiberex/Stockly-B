@@ -45,14 +45,14 @@ aceptación no se pudo comprobar, se dice en lugar de darlo por bueno.
 
 ## 3. Estado
 
-Medido el 2026-11-02 en este equipo: el backend con `pnpm verify` al cerrar `AUD-003`; el frontend
-y el E2E, al cerrar `AUD-007`:
+Medido el 2026-11-06 con `pnpm verify` en los dos repositorios, en la rama de la última tanda de
+`AUD-008`; el E2E, el 2026-11-02 al cerrar `AUD-007` (no se ha vuelto a pasar):
 
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1820** en 72 archivos | **947** en 88 archivos *(+1 omitido)* |
-| Cobertura de sentencias | 97.12 % *(suelo 85 %)* | 81.08 % *(suelo 45 %)* |
+| Tests | **1829** en 73 archivos | **998** en 91 archivos *(+1 omitido)*; 999 tras el último test del panel |
+| Cobertura de sentencias | 97.13 % *(suelo 85 %)* | 81.5 % *(suelo 45 %)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
@@ -70,14 +70,16 @@ correcciones; no se ha vuelto a auditar. El mismo día, fuera de la auditoría, 
 datos pasaron a cargar con esqueleto sin que la pantalla salte (`AUD-007`).
 Las dependencias de **desarrollo** del frontend siguen con avisos, que `auditoria` no mira.
 
-**Trabajo a medias, el 2026-11-04: el rediseño del panel principal (`AUD-008`), ya en `main` de
-los dos repositorios** (la rama `feat/panel-principal` se fusionó y se borró ese día). Para
-retomarlo en otra máquina: `git switch main` y `git pull` en `Stockly-F` (el código) y en
-`Stockly-B` (estos documentos), y seguir por el paso 4 de la ficha de `AUD-008` en el [ROADMAP](ROADMAP.md). Se trabaja
+**El 2026-11-07 se cerró el rediseño del panel principal (`AUD-008`)**: cuatro críticas de
+Impeccable, de 23 a 30/40, y la última sin P1. Al cerrarlo se pasó la misma crítica por **las 31
+pantallas** ([informe](auditoria/2026-11-07-critica/INFORME.md)): media 25,9/40, ninguna
+crítica y una pobre (Restablecer contraseña, 19). De ella salen `AUD-011` a `AUD-019`; las más
+urgentes son trabajo que se pierde sin aviso (`AUD-011`) y acciones irreversibles de un toque
+(`AUD-012`). Siguen abiertas `AUD-009` (los importes de `/reports` para todos los roles, que espera
+una decisión de producto) y `AUD-010` (los recuentos del panel en una sola petición). Se trabaja
 con el plugin **Impeccable** de Claude Code (`/impeccable <comando> <qué>`, en el chat, no en la
-terminal); su contexto está en `Stockly-F/PRODUCT.md` y la crítica de partida (23/40), en
-`Stockly-F/.impeccable/critique/`. De ahí salieron también `AUD-009` (los importes de `/reports`
-para todos los roles) y `AUD-010` (los recuentos del panel en una sola petición).
+terminal); su contexto está en `Stockly-F/PRODUCT.md` y las críticas, en
+`Stockly-F/.impeccable/critique/`.
 
 El punto de control de la auditoría, para retomarla, es
 [auditoria/2026-10-31/trabajo/progreso.md](auditoria/2026-10-31/trabajo/progreso.md).
@@ -139,6 +141,12 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
   masivo, mirar si el mensaje habla del esquema. Para ver qué falta:
   `DATABASE_URL=<…> pnpm prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
   (en Prisma 7 ya no existe `--from-url`). Tiene que responder «empty migration».
+- **Al cambiar de equipo, la base de tests de este se queda con las migraciones que ya tenía.**
+  El 2026-11-06, tras traer de origin el trabajo hecho en otro equipo, 524 tests del backend
+  cayeron con `la sintaxis de entrada no es válida para el enum "Role": «PENDING»`: a la
+  `Stockly_test` local le faltaban las dos migraciones de `AUD-001`. Se aplicó su SQL, una a una
+  —la segunda usa el valor que crea la primera—, y la suite volvió a verde. Después de un `pull`
+  que trae migraciones, llevarlas también aquí.
 - **Una migración sin commitear que se edita después de aplicarla** deja las bases locales con la
   versión vieja y con su `checksum`: se rehace el cambio a mano en cada una y se actualiza
   `_prisma_migrations.checksum` con el sha256 del archivo. Pasó dos veces en `T5-14`.
@@ -260,6 +268,15 @@ cobertura se erosione, y a esa distancia no impide nada: al subirla hay que subi
 - **Una pestaña con sesión vale más que un login nuevo.** Cada revisión que entra con su propio
   contexto aislado hace su login y su carga en frío; abrir el login una vez y navegar en la misma
   pestaña gasta mucho menos cupo.
+- **El login tiene su propio límite: 10 cada 15 minutos por IP** (`AUTH_RATE_LIMIT_MAX`), aparte del
+  global. Subir `RATE_LIMIT_MAX` no lo toca. Con varias revisiones en paralelo, el 2026-11-06 se
+  agotó enseguida; para una sesión así, `AUTH_RATE_LIMIT_MAX=1000` al arrancar el backend. Los
+  contadores viven en memoria: reiniciar el backend los vacía.
+- **Parar `pnpm dev` desde la tarea en segundo plano no siempre mata el servidor.** En Windows, el
+  proceso hijo (`tsx`, `vite`) puede quedar vivo con el puerto, sirviendo **el código de antes**: el
+  2026-11-06 el panel enseñó una cifra que no cuadraba porque el backend nuevo no llegó a arrancar.
+  Antes de dar por buena una prueba en el navegador tras reiniciar, comprobar quién tiene el puerto
+  (`Get-NetTCPConnection -LocalPort 3000`) y que la respuesta trae lo nuevo.
 
 ### Tests de componentes (Vitest y jsdom)
 
@@ -566,10 +583,17 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   no hay forma que anticipar, y `cargas.test.ts` lo vigila.
 
 - **El panel principal es distinto por rol, y la tabla vive en un sitio** (`AUD-008`): `PANEL`, en
-  `DashboardPage.tsx`, dice qué filas de «Necesita atención» y qué secciones ve cada rol, y SELLER
-  tiene su propio `PanelDeVendedor`. **Los importes del negocio son solo de ADMIN** en el panel;
-  que la API los siga dando a todos es `AUD-009`. Un rol desconocido cae en el panel de USER, nunca
-  en el de ADMIN.
+  `DashboardPage.tsx`, dice qué filas de «Necesita atención» y qué secciones ve cada rol.
+  **SELLER no tiene panel**: `/` lo lleva al mostrador, con «Mis ventas de hoy» debajo
+  (`sale-orders/components/MisVentasDeHoy.tsx`), y «Panel» no sale en su navegación
+  (`ocultoPara`, en `App.tsx`). Su panel propio solo llevaba al mostrador: un toque de más con el
+  cliente delante. **Los importes del negocio son solo de ADMIN** en el panel; que la API los siga
+  dando a todos es `AUD-009`. Un rol desconocido cae en el panel de USER, nunca en el de ADMIN.
+- **Cada cifra de «Necesita atención» lleva a la lista que cuenta**, también para ADMIN
+  (`destinos.ts`). La reposición sugerida **no** es esa lista —sale de las salidas y del plazo del
+  proveedor, no del mínimo— y va aparte, bajo «Reponer primero», diciendo de dónde sale. El color
+  dice cuánto urge: rojo, lo ya mal (caducado, agotado); ámbar, lo que va a estarlo; neutro, las
+  colas de trabajo (compras por recibir, ventas por enviar, conteos).
 - **Las filas de «Necesita atención» se pintan también a cero**, atenuadas y sin acción: si
   desaparecieran, el bloque cambiaría de alto al llegar cada cifra y empujaría el resto del panel.
 - **Una consulta que falla y no tiene datos enseña `ErrorDeCarga`** (`shared/components`), con el

@@ -150,14 +150,17 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
-- **El panel principal empieza por lo que hay que hacer hoy, y cada rol ve el suyo** (`AUD-008`,
-  a medias): arriba, «Necesita atención» con stock bajo o
-  agotado, lotes caducados o por caducar, conteos abiertos, compras por recibir y ventas por
-  enviar, cada uno con su cifra y su acción, y la lista de lo que hay que reponer primero. El
-  almacén ve caducidades y conteos y nada de dinero; quien consulta, compras y ventas sin los
-  importes del negocio; el vendedor, un panel propio con «Ir a mostrador» y sus ventas de hoy. Si
-  el panel no se puede cargar lo dice y deja reintentar —antes se quedaba cargando para siempre—,
-  y dice a qué hora son los datos.
+- **El panel principal empieza por lo que hay que hacer hoy, y cada rol ve el suyo** (`AUD-008`):
+  arriba, «Necesita atención» con stock bajo o agotado, lotes caducados o por caducar —y cuántos
+  de cada—, conteos abiertos, compras por recibir y ventas por enviar. Cada cifra lleva a su lista
+  ya filtrada, con el mismo número, y el color dice cuánto urge: rojo lo caducado o agotado, ámbar
+  lo que va a estarlo, neutro el trabajo normal del día. La reposición sugerida va aparte y dice
+  de dónde sale. El almacén ve caducidades y conteos y nada de dinero, con «Escanear» fijo abajo
+  en el móvil; quien consulta, compras y ventas sin los importes del negocio. **El vendedor ya no
+  tiene panel**: entra directamente en el mostrador, con sus ventas de hoy debajo. Si algo no se
+  puede cargar lo dice en lenguaje normal y deja reintentar desde la propia fila —antes se quedaba
+  cargando para siempre—, y dice a qué hora son los datos. `GET /reports/expiring` trae
+  `summary.expiredCount`.
 - **Las pantallas de datos cargan con esqueleto** (`AUD-007`): mientras llegan los datos, las
   tablas, listas y paneles enseñan su forma en gris en vez de un círculo girando, y la pantalla ya
   no salta cuando aparecen. La carga de Ventas en el móvil, la que más saltaba, queda quieta. Los
