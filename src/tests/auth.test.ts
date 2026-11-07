@@ -424,6 +424,49 @@ describe("Auth API", () => {
     });
 
     // -----------------------------------------------------------------------
+    describe("POST /reset-password/check (AUD-014)", () => {
+        it("200 con el correo de la cuenta, y el enlace sigue sirviendo después", async () => {
+            (sendPasswordResetEmail as jest.Mock).mockClear();
+            const user = await createUser({ email: `check_${Date.now()}@example.com` });
+            await request(app).post(`${BASE}/forgot-password`).send({ email: user.email });
+            const token = getLastCapturedToken(sendPasswordResetEmail as jest.Mock);
+
+            const check = await request(app).post(`${BASE}/reset-password/check`).send({ token });
+            expect(check.status).toBe(200);
+            expect(check.body.data).toEqual({ email: user.email });
+
+            // Comprobarlo no lo consume: restablecer con el mismo enlace funciona.
+            const reset = await request(app).post(`${BASE}/reset-password`).send({ token, password: "NuevaPass1234!" });
+            expect(reset.status).toBe(200);
+
+            // Y una vez usado, ya no sirve.
+            const otra = await request(app).post(`${BASE}/reset-password/check`).send({ token });
+            expect(otra.status).toBe(400);
+            expect(otra.body.code).toBe("INVALID_OR_EXPIRED_TOKEN");
+        });
+
+        it("400 INVALID_OR_EXPIRED_TOKEN con un enlace caducado", async () => {
+            (sendPasswordResetEmail as jest.Mock).mockClear();
+            const user = await createUser({ email: `check_caducado_${Date.now()}@example.com` });
+            await request(app).post(`${BASE}/forgot-password`).send({ email: user.email });
+            const token = getLastCapturedToken(sendPasswordResetEmail as jest.Mock);
+            await prisma.user.update({ where: { id: user.id }, data: { resetExpires: new Date(Date.now() - 1000) } });
+
+            const res = await request(app).post(`${BASE}/reset-password/check`).send({ token });
+            expect(res.status).toBe(400);
+            expect(res.body.code).toBe("INVALID_OR_EXPIRED_TOKEN");
+        });
+
+        it("400 con un token que no existe y 422 sin token", async () => {
+            const falso = await request(app).post(`${BASE}/reset-password/check`).send({ token: "token-falso-xyz" });
+            expect(falso.status).toBe(400);
+
+            const vacio = await request(app).post(`${BASE}/reset-password/check`).send({});
+            expect(vacio.status).toBe(422);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     describe("PUT /me", () => {
         let user: Awaited<ReturnType<typeof createUser>>;
         let authCookie: string;

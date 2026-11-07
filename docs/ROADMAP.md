@@ -6,6 +6,11 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-07, noche (PC): ocho tareas abiertas, `AUD-014` con los once puntos hechos**
+> en la rama `feat/aud-014-pantallas-de-acceso` de los dos repositorios (sin fusionar). Para
+> cerrarla falta lo que no es código: la crítica dual repetida, el E2E contra `Stockly_e2e` y
+> fusionar.
+>
 > **Estado al 2026-11-07, noche: ocho tareas abiertas, `AUD-014` a medias** en la rama
 > `feat/aud-014-pantallas-de-acceso` de los dos repositorios (subida, sin fusionar). Su ficha dice
 > qué está hecho, lo que falta —todo, también los P3, decidido por el propietario— y cómo cerrarla.
@@ -238,36 +243,46 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       limpio. Instantánea en `Stockly-F/.impeccable/critique/2026-11-07T20-02-26Z__src-modules-auth-components.md`.
       **El criterio aún no se cumple.**
     - **Decidido por el propietario el 2026-11-07: se arregla todo, también los P3, y una invitación
-      caducada ofrece «Restablecer contraseña»** (la cuenta ya existe al invitar, así que
-      «Olvidé la contraseña» le manda un enlace nuevo sin depender de un administrador). Falta:
-      1. **[P1] Restablecer con enlace caducado se descubre al enviar** (se pierde lo escrito, el foco
-         cae en `body`, nada se anuncia): endpoint ligero en el backend para comprobar el token al
-         cargar (p. ej. `GET /auth/reset-password/:token`, sin consumirlo; contrato primero aquí) y
-         `EnlaceCaducado` antes del formulario; además, `EnlaceCaducado` lleva el foco a su `h1`.
-      2. **[P1] Invitación caducada sin salida**: hoy dos «Volver al inicio de sesión» idénticos
-         (`ResetPasswordPage.tsx`, `EnlaceCaducado.tsx`). `pedirOtro` opcional, botón principal
-         «Restablecer contraseña» → `/auth/forgot-password`, y texto que lo explique.
-      3. **[P2]** «Credenciales inválidas» → «El correo o la contraseña no son correctos», con
-         «¿Olvidaste tu contraseña?» dentro del aviso (`es.ts`, `LoginPage.tsx`).
-      4. **[P2]** El éxito de restablecer, en la tarjeta del login (`navigate` con `state`, pintado
-         como `role="status"`) y no en un aviso flotante (`useResetPassword.ts`).
-      5. **[P2]** «Mínimo 8 caracteres» sale dos veces (ayuda y error): con error, un solo `<p>`
-         (`CampoDeContrasena`).
-      6. **[P2]** El correo viaja entre pantallas: login → Olvidé/Reenviar y vuelta (`?email=` o
-         `location.state` como `defaultValues`).
-      7. **[P2]** «Enviado» dice a qué dirección, ofrece «Usar otro correo» (reinicia la mutación) y
-         la pista de spam (`PedirEnlacePorCorreo`).
-      8. **[P2]** «Correo ya registrado» ofrece «Iniciar sesión» y «¿Olvidaste tu contraseña?» en el
-         aviso del registro.
-      9. **[P2]** Enlaces sueltos de 44 px en táctil (`inline-flex min-h-11 items-center` con
-         `md:pointer-fine:min-h-0`; «¿Olvidaste…?» a `text-sm`).
-      10. **[P2]** En los estados caducados, el título de la pestaña y el anuncio de ruta dicen lo
-          mismo que el `h1`.
-      11. **[P3]** «email» → «correo» en la validación (`es.ts:306-307`); subtítulos que repiten la
-          marca; la línea de «Reenviar verificación» del login solo en contexto; `py-6` en
-          `CLASES_MARCO_CENTRADO`; `autoFocus` en el registro; campo `username` oculto con el correo
-          en Restablecer para los gestores de contraseñas. (El selector de idioma sin sesión es de
-          `AUD-016`.)
+      caducada ofrece «Restablecer contraseña»** (la cuenta ya existe al invitar, así que «Olvidé la
+      contraseña» le manda un enlace nuevo sin depender de un administrador).
+    - **Hecho (segunda tanda, 2026-11-07, en el PC): los once puntos de la crítica repetida.**
+      1. *[P1] Restablecer comprueba el enlace al abrir.* `POST /auth/reset-password/check` (contrato
+         `enlaceDeRestablecerSchema`, Swagger, exento de CSRF como las demás públicas, con
+         `authStrictLimiter`): no lo consume y devuelve el correo de la cuenta, o el mismo 400
+         `INVALID_OR_EXPIRED_TOKEN`. El token va en el cuerpo y no en la ruta, para que no quede en
+         los registros de acceso. Vale también para las invitaciones, que usan el mismo `resetToken`.
+         La pantalla espera la respuesta antes de enseñar el formulario; si caduca mientras se
+         escribe, el envío cambia a la misma tarjeta. `EnlaceCaducado` lleva el foco a su `h1`.
+         Backend: 3 tests nuevos en `auth.test.ts` y la ruta en `csrf.test.ts`.
+      2. *[P1] Invitación caducada:* el botón principal es «Restablecer contraseña» →
+         `/auth/forgot-password`, con un texto que dice que la cuenta ya existe; ya no hay dos
+         «Volver al inicio de sesión».
+      3. «El correo o la contraseña no son correctos», con «¿Olvidaste tu contraseña?» dentro del aviso.
+      4. El éxito de restablecer o de guardar la contraseña de una invitación se dice en la tarjeta
+         del login (`role="status"`, `AvisoDeAcceso tono="exito"`), con el correo ya puesto; fuera el
+         aviso flotante.
+      5. Cuando el error repite la ayuda («Mínimo 8 caracteres»), un solo texto; si dice otra cosa,
+         el requisito sigue a la vista.
+      6. El correo viaja en `location.state` (no en `?email=`, que quedaría en el historial y en los
+         registros): login ↔ Olvidé/Reenviar, registro → login, restablecer → login
+         (`useEstadoDeAcceso`). Con el correo puesto, el foco va a la contraseña.
+      7. «Enviado» dice a qué dirección, la pista del spam y «Usar otro correo» (reinicia la mutación
+         y devuelve el foco al campo, con lo escrito seleccionado).
+      8. «El correo ya está registrado» ofrece «Inicia sesión» y «¿Olvidaste tu contraseña?».
+      9. Enlaces sueltos con 44 px en táctil: `CLASES_ENLACE_SUELTO` en `clasesDeMarco.ts`;
+         «¿Olvidaste…?» a `text-sm` y subrayado.
+      10. En los estados caducados, la pestaña y el anuncio de ruta dicen «Este enlace ya no sirve»:
+          `useTituloDePantalla` (almacén de módulo que lee `AnuncioDeRuta`). De paso, el efecto del
+          título se separó del de navegar: cambiar el título (o el idioma) ya no sube la página ni
+          mueve el foco.
+      11. «email» → «correo» en la validación; fuera los subtítulos que repetían la marca (el del
+          login dice ahora «Entra con tu correo y tu contraseña»); la línea de «Reenviar
+          verificación» del login sale solo en el aviso de `EMAIL_NOT_CONFIRMED` y tras registrarse;
+          `py-6` en `CLASES_MARCO_CENTRADO`; `autoFocus` en el nombre del registro; campo `username`
+          oculto con el correo en Restablecer.
+      - *Comprobado:* `pnpm verify` del frontend en verde (1061 tests y 1 omitido, en 94 archivos;
+        10 nuevos en `pantallasDeAcceso.test.tsx` y `ResetPasswordPage.test.tsx`) y, en el backend,
+        `check` y los 1836 tests. **Sin comprobar en el navegador, sin E2E y sin la crítica.**
     - **Para cerrarla:** repetir la crítica dual (sin P1, ninguna por debajo de 24), `pnpm verify` en
       los dos, E2E contra `Stockly_e2e`, y fusionar.
 

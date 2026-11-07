@@ -1405,6 +1405,18 @@ export const usuarioSchema = z.object({
  */
 export const perfilSchema = usuarioSchema.omit({ updatedAt: true }).extend({ idioma: idiomaSchema });
 
+/**
+ * AUD-014 — respuesta de `POST /auth/reset-password/check`: el enlace de restablecer (o de una
+ * invitación) aún sirve. Se pregunta al abrir la pantalla, para no descubrirlo al enviar y
+ * perder lo escrito. Si no sirve, la respuesta es un 400 `INVALID_OR_EXPIRED_TOKEN`, como el de
+ * `POST /auth/reset-password`.
+ *
+ * `email` es el de la cuenta: la pantalla lo pone en un campo `username` oculto para que el
+ * gestor de contraseñas guarde la nueva con su usuario. No revela nada a quien no lo sepa ya:
+ * con ese enlace se puede cambiar la contraseña de la cuenta.
+ */
+export const enlaceDeRestablecerSchema = z.object({ email: z.string() });
+
 /** Respuesta de `PATCH /auth/me/idioma`. */
 export const idiomaGuardadoSchema = z.object({ idioma: idiomaSchema });
 
@@ -1757,6 +1769,7 @@ export type TransferenciaConLineas = z.infer<typeof transferenciaConLineasSchema
 export type Usuario = z.infer<typeof usuarioSchema>;
 export type Perfil = z.infer<typeof perfilSchema>;
 export type IdiomaGuardado = z.infer<typeof idiomaGuardadoSchema>;
+export type EnlaceDeRestablecer = z.infer<typeof enlaceDeRestablecerSchema>;
 export type Ajuste = z.infer<typeof ajusteSchema>;
 export type AjusteGuardado = z.infer<typeof ajusteGuardadoSchema>;
 export type GrupoDeAjuste = z.infer<typeof grupoDeAjusteSchema>;

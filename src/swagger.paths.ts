@@ -189,7 +189,20 @@ export const rutasAdicionales: Record<string, Ruta> = {
             tags: ["Auth"], security: [],
             summary: "Reenvía el correo de verificación",
             requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email"], properties: { email: { type: "string", format: "email" } } } } } },
-            responses: { "200": JSON_OK(undefined, "Correo reenviado"), "400": ERROR("Cuenta no encontrada o ya verificada") },
+            description: "Responde siempre lo mismo, exista o no la cuenta y esté o no confirmada (AUD-014): no revela qué correos están registrados.",
+            responses: { "200": JSON_OK(undefined, "Si la cuenta existe y falta confirmarla, se envió un enlace nuevo") },
+        },
+    },
+    "/auth/reset-password/check": {
+        post: {
+            tags: ["Auth"], security: [],
+            summary: "Comprueba un enlace de restablecer o de invitación sin consumirlo (AUD-014)",
+            description: "La pantalla lo pregunta al abrirse, para decir que el enlace caducó antes de que se escriba la contraseña. El token va en el cuerpo para que no quede en los registros de acceso.",
+            requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["token"], properties: { token: { type: "string" } } } } } },
+            responses: {
+                "200": JSON_OK({ type: "object", properties: { email: { type: "string", format: "email" } } }, "El enlace sirve; `email` es el de la cuenta"),
+                "400": ERROR("Enlace inválido o caducado (`INVALID_OR_EXPIRED_TOKEN`)"),
+            },
         },
     },
 

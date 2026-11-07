@@ -21,6 +21,7 @@ const CSRF_EXEMPT_PATHS = new Set([
     "/api/v1/auth/resend-verification",
     "/api/v1/auth/forgot-password",
     "/api/v1/auth/reset-password",
+    "/api/v1/auth/reset-password/check",
 ]);
 
 export function csrfProtection(req: Request, res: Response, next: NextFunction): void {
@@ -36,7 +37,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
         return;
     }
 
-    // Solo las siete rutas públicas quedan exentas; el resto de `/auth`, no.
+    // Solo las ocho rutas públicas quedan exentas; el resto de `/auth`, no.
     if (CSRF_EXEMPT_PATHS.has(req.path)) {
         next();
         return;

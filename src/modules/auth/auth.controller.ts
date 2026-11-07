@@ -125,6 +125,12 @@ export const authController = {
         res.json({ message: "Si el correo existe, recibirás instrucciones para restablecer tu contraseña" });
     },
 
+    async checkResetToken(req: Request, res: Response) {
+        const { token } = req.body as { token: string };
+        const data = await authService.checkResetToken(token);
+        res.json({ message: "El enlace es válido", data });
+    },
+
     async resetPassword(req: Request, res: Response) {
         const { token, password } = req.body as { token: string; password: string };
         await authService.resetPassword(token, password);

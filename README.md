@@ -152,7 +152,8 @@ es el mapa.
 ### Autenticación — `/auth`
 
 No dependen del rol. Públicas: `POST /register`, `/login`, `/logout`, `/refresh`,
-`/verify-email`, `/resend-verification`, `/forgot-password` y `/reset-password`. Con sesión:
+`/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password` y
+`/reset-password/check` (comprueba el enlace sin consumirlo). Con sesión:
 `GET /me`, `PUT /me`, `PATCH /me/password` y `PATCH /me/idioma`.
 
 ### Rutas por módulo y rol

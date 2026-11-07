@@ -9,6 +9,7 @@ import {
     emailSchema,
     verifyEmailSchema,
     resetPasswordSchema,
+    checkResetTokenSchema,
     updateProfileSchema,
     updatePasswordSchema,
     idiomaSchema,
@@ -24,6 +25,8 @@ router.post("/logout", authController.logout);
 router.get("/me", requireAuth, authController.me);
 router.post("/refresh", authController.refresh);
 router.post("/forgot-password", authStrictLimiter, validate(emailSchema), authController.forgotPassword);
+// AUD-014 — el token va en el cuerpo y no en la ruta: así no queda en los registros de acceso.
+router.post("/reset-password/check", authStrictLimiter, validate(checkResetTokenSchema), authController.checkResetToken);
 router.post("/reset-password", authStrictLimiter, validate(resetPasswordSchema), authController.resetPassword);
 router.put("/me", requireAuth, validate(updateProfileSchema), authController.updateProfile);
 router.patch("/me/password", requireAuth, validate(updatePasswordSchema), authController.updatePassword);

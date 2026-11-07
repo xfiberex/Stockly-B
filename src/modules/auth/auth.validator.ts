@@ -29,6 +29,11 @@ export const verifyEmailSchema = z.object({
     token: z.string().min(1, "El token es obligatorio"),
 });
 
+/** AUD-014 — `POST /auth/reset-password/check`: solo el token, sin consumirlo. */
+export const checkResetTokenSchema = z.object({
+    token: z.string().min(1, "El token es obligatorio"),
+});
+
 export const resetPasswordSchema = z.object({
     token: z.string().min(1, "El token es obligatorio"),
     password: passwordField(),

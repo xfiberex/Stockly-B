@@ -225,13 +225,27 @@ export const authService = {
         await sendPasswordResetEmail(email, user.name ?? "Usuario", raw, user.idioma);
     },
 
-    async resetPassword(rawToken: string, newPassword: string) {
+    /**
+     * AUD-014 — el usuario dueño de un enlace de restablecer que aún sirve, o un 400. Lo usan
+     * `checkResetToken` (al abrir la pantalla, sin consumirlo) y `resetPassword` (al enviar).
+     */
+    async findByResetToken(rawToken: string) {
         const hash = hashToken(rawToken);
         const user = await prisma.user.findFirst({ where: { resetToken: hash } });
 
         if (!user || !user.resetExpires || user.resetExpires < new Date()) {
             throw new HttpError(400, "Token inválido o expirado", "INVALID_OR_EXPIRED_TOKEN");
         }
+        return user;
+    },
+
+    async checkResetToken(rawToken: string) {
+        const user = await authService.findByResetToken(rawToken);
+        return { email: user.email };
+    },
+
+    async resetPassword(rawToken: string, newPassword: string) {
+        const user = await authService.findByResetToken(rawToken);
 
         const hashed = await hashPassword(newPassword);
         // El reset es el flujo de recuperación de una cuenta potencialmente comprometida:

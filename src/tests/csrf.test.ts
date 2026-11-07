@@ -48,6 +48,7 @@ describe("Protección CSRF (double-submit)", () => {
         "/api/v1/auth/resend-verification",
         "/api/v1/auth/forgot-password",
         "/api/v1/auth/reset-password",
+        "/api/v1/auth/reset-password/check",
     ])("no exige token CSRF en la ruta pública %s", async (path) => {
         const res = await request(app).post(path).send({});
         // Puede fallar por validación o credenciales, pero nunca por CSRF.
