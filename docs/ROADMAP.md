@@ -6,6 +6,10 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-07, noche: ocho tareas abiertas, `AUD-014` a medias** en la rama
+> `feat/aud-014-pantallas-de-acceso` de los dos repositorios (subida, sin fusionar). Su ficha dice
+> qué está hecho, lo que falta —todo, también los P3, decidido por el propietario— y cómo cerrarla.
+>
 > **Estado al 2026-11-07, al cerrar `AUD-013`: ocho tareas abiertas.** A 390 px, el stock de
 > Productos, el campo de cada línea de una recepción, el primer campo de un conteo con su «Guardar»
 > y el cobro del mostrador se ven sin desplazar; y toda tabla que sigue a lo ancho lo dice. Lo
@@ -207,6 +211,65 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
   - **Criterio de aceptación:** la crítica de Impeccable del bloque, repetida, sin P1 y ninguna
     pantalla por debajo de 24/40.
   - **Dependencias:** ninguna.
+  - **Estado al 2026-11-07: a medias, en la rama `feat/aud-014-pantallas-de-acceso` de los dos
+    repositorios (subida, sin fusionar en `main`).** Se siguió en el PC; esto es lo que hay que
+    saber para retomarla.
+    - **Hecho (primera tanda):**
+      - *Backend:* `POST /auth/resend-verification` responde siempre lo mismo, exista o no la
+        cuenta (antes un 400 lo revelaba); `POST /auth/verify-email` conserva la huella del enlace
+        hasta que caduca, de modo que abrirlo otra vez devuelve 200 con
+        `data: { alreadyVerified, pendingApproval }` en vez de «enlace inválido»
+        (`auth.service.ts`, `auth.controller.ts`; 3 tests nuevos en `auth.test.ts`). Sin cambio de
+        contrato: `api.ts` no tipa esa respuesta; el código `ACCOUNT_NOT_FOUND_OR_VERIFIED` queda en
+        el contrato aunque ya no se emite.
+      - *Frontend:* `MarcoDeAcceso` (marca, `h1` y tarjeta en las seis), `AvisoDeAcceso` (el error del
+        servidor dentro de la tarjeta, `role="alert"`; los hooks ya no hacen `toast.error`),
+        `CampoDeContrasena` («Mostrar la contraseña», requisito fijo debajo), `EnlaceCaducado`
+        («Este enlace ya no sirve» con un siguiente paso), `PedirEnlacePorCorreo` (Olvidé y Reenviar,
+        respuesta neutra y foco al mensaje), registro con los dos pasos anticipados y pantalla
+        «Revisa tu correo», `noValidate`, sin «Token» ni `••••••••`, `codigoDeError()` en
+        `errorApi.ts`, y `AvisosFlotantes` (tema de la aplicación y 6 s en vez de 3).
+      - *Comprobado:* `pnpm verify` en verde en los dos (backend 1832, frontend 1051 y 1 omitido en
+        94 archivos); E2E completo en local contra `Stockly_e2e`, 39 pasados y 3 omitidos (los
+        `getByLabel("Contraseña")` del E2E pasaron a `{ exact: true }`: el botón «Mostrar la
+        contraseña» también casaba).
+    - **Crítica repetida (2026-11-07, dual-agent):** media **25,2/40** (antes 24) y **2 P1** (antes
+      5): Login 26, Registro 27, Olvidé 25, **Restablecer 19**, Confirmar 29, Reenviar 25. Detector
+      limpio. Instantánea en `Stockly-F/.impeccable/critique/2026-11-07T20-02-26Z__src-modules-auth-components.md`.
+      **El criterio aún no se cumple.**
+    - **Decidido por el propietario el 2026-11-07: se arregla todo, también los P3, y una invitación
+      caducada ofrece «Restablecer contraseña»** (la cuenta ya existe al invitar, así que
+      «Olvidé la contraseña» le manda un enlace nuevo sin depender de un administrador). Falta:
+      1. **[P1] Restablecer con enlace caducado se descubre al enviar** (se pierde lo escrito, el foco
+         cae en `body`, nada se anuncia): endpoint ligero en el backend para comprobar el token al
+         cargar (p. ej. `GET /auth/reset-password/:token`, sin consumirlo; contrato primero aquí) y
+         `EnlaceCaducado` antes del formulario; además, `EnlaceCaducado` lleva el foco a su `h1`.
+      2. **[P1] Invitación caducada sin salida**: hoy dos «Volver al inicio de sesión» idénticos
+         (`ResetPasswordPage.tsx`, `EnlaceCaducado.tsx`). `pedirOtro` opcional, botón principal
+         «Restablecer contraseña» → `/auth/forgot-password`, y texto que lo explique.
+      3. **[P2]** «Credenciales inválidas» → «El correo o la contraseña no son correctos», con
+         «¿Olvidaste tu contraseña?» dentro del aviso (`es.ts`, `LoginPage.tsx`).
+      4. **[P2]** El éxito de restablecer, en la tarjeta del login (`navigate` con `state`, pintado
+         como `role="status"`) y no en un aviso flotante (`useResetPassword.ts`).
+      5. **[P2]** «Mínimo 8 caracteres» sale dos veces (ayuda y error): con error, un solo `<p>`
+         (`CampoDeContrasena`).
+      6. **[P2]** El correo viaja entre pantallas: login → Olvidé/Reenviar y vuelta (`?email=` o
+         `location.state` como `defaultValues`).
+      7. **[P2]** «Enviado» dice a qué dirección, ofrece «Usar otro correo» (reinicia la mutación) y
+         la pista de spam (`PedirEnlacePorCorreo`).
+      8. **[P2]** «Correo ya registrado» ofrece «Iniciar sesión» y «¿Olvidaste tu contraseña?» en el
+         aviso del registro.
+      9. **[P2]** Enlaces sueltos de 44 px en táctil (`inline-flex min-h-11 items-center` con
+         `md:pointer-fine:min-h-0`; «¿Olvidaste…?» a `text-sm`).
+      10. **[P2]** En los estados caducados, el título de la pestaña y el anuncio de ruta dicen lo
+          mismo que el `h1`.
+      11. **[P3]** «email» → «correo» en la validación (`es.ts:306-307`); subtítulos que repiten la
+          marca; la línea de «Reenviar verificación» del login solo en contexto; `py-6` en
+          `CLASES_MARCO_CENTRADO`; `autoFocus` en el registro; campo `username` oculto con el correo
+          en Restablecer para los gestores de contraseñas. (El selector de idioma sin sesión es de
+          `AUD-016`.)
+    - **Para cerrarla:** repetir la crítica dual (sin P1, ninguna por debajo de 24), `pnpm verify` en
+      los dos, E2E contra `Stockly_e2e`, y fusionar.
 
 - [ ] **AUD-015 · Reportes: tarjetas que no cuadran, gráficos sin alternativa y un informe por periodo que abre vacío**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio

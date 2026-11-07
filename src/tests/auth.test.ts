@@ -127,7 +127,23 @@ describe("Auth API", () => {
 
             const user = await prisma.user.findUnique({ where: { email: "verify@example.com" } });
             expect(user?.isVerified).toBe(true);
-            expect(user?.verifyToken).toBeNull();
+            // AUD-014 — el registro público deja la cuenta pendiente de aprobación (AUD-001).
+            expect(res.body.data).toEqual({ alreadyVerified: false, pendingApproval: true });
+        });
+
+        it("AUD-014 — abrir el enlace otra vez dice que ya estaba confirmada, no que no vale", async () => {
+            const res = await request(app).post(`${BASE}/verify-email`).send({ token: rawToken });
+
+            expect(res.status).toBe(200);
+            expect(res.body.data).toEqual({ alreadyVerified: true, pendingApproval: true });
+        });
+
+        it("AUD-014 — el enlace sigue caducando: pasado su plazo ya no sirve", async () => {
+            await prisma.user.update({ where: { email: "verify@example.com" }, data: { verifyExpires: new Date(Date.now() - 1000) } });
+            const res = await request(app).post(`${BASE}/verify-email`).send({ token: rawToken });
+
+            expect(res.status).toBe(400);
+            expect(res.body.code).toBe("INVALID_OR_EXPIRED_TOKEN");
         });
 
         it("400: token inválido", async () => {
@@ -162,22 +178,29 @@ describe("Auth API", () => {
             expect(sendVerificationEmail).toHaveBeenCalledTimes(1);
         });
 
-        it("400: usuario ya verificado", async () => {
+        // AUD-014 — la respuesta es la misma exista o no la cuenta: antes un 400 distinto
+        // revelaba qué correos están registrados.
+        it("200 sin enviar nada: usuario ya verificado", async () => {
+            (sendVerificationEmail as jest.Mock).mockClear();
             const user = await createUser({ email: `verified_${Date.now()}@example.com`, isVerified: true });
 
             const res = await request(app)
                 .post(`${BASE}/resend-verification`)
                 .send({ email: user.email });
 
-            expect(res.status).toBe(400);
+            expect(res.status).toBe(200);
+            expect(sendVerificationEmail).not.toHaveBeenCalled();
         });
 
-        it("400: email inexistente", async () => {
-            const res = await request(app)
-                .post(`${BASE}/resend-verification`)
-                .send({ email: "fantasma@example.com" });
+        it("200 sin enviar nada: email inexistente, con el mismo mensaje", async () => {
+            (sendVerificationEmail as jest.Mock).mockClear();
+            const existe = await createUser({ email: `resend2_${Date.now()}@example.com`, isVerified: false });
+            const conCuenta = await request(app).post(`${BASE}/resend-verification`).send({ email: existe.email });
+            const sinCuenta = await request(app).post(`${BASE}/resend-verification`).send({ email: "fantasma@example.com" });
 
-            expect(res.status).toBe(400);
+            expect(sinCuenta.status).toBe(200);
+            expect(sinCuenta.body.message).toBe(conCuenta.body.message);
+            expect(sendVerificationEmail).toHaveBeenCalledTimes(1);
         });
     });
 

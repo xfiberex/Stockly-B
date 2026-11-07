@@ -61,6 +61,13 @@ export const authService = {
         await sendVerificationEmail(email, name, raw, idioma);
     },
 
+    /**
+     * AUD-014 — el enlace sigue sirviendo hasta que caduca, y abrirlo otra vez dice «ya estaba
+     * confirmada» en vez de «enlace inválido». Antes se borraba al confirmar, y la segunda vez
+     * —un doble clic, el cliente de correo que previsualiza el enlace— le decía a alguien ya
+     * confirmado que su enlace no valía. Devuelve también si falta la aprobación de un ADMIN,
+     * para que la pantalla diga lo que viene después.
+     */
     async verifyEmail(rawToken: string) {
         const hash = hashToken(rawToken);
         const user = await prisma.user.findFirst({ where: { verifyToken: hash } });
@@ -69,17 +76,19 @@ export const authService = {
             throw new HttpError(400, "Token inválido o expirado", "INVALID_OR_EXPIRED_TOKEN");
         }
 
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { isVerified: true, verifyToken: null, verifyExpires: null },
-        });
-
-        await avisarSiEsperaAprobacion(user);
+        const yaConfirmada = user.isVerified;
+        if (!yaConfirmada) {
+            await prisma.user.update({ where: { id: user.id }, data: { isVerified: true } });
+            await avisarSiEsperaAprobacion(user);
+        }
+        return { alreadyVerified: yaConfirmada, pendingApproval: user.role === "PENDING" };
     },
 
     async resendVerification(email: string) {
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || user.isVerified) throw new HttpError(400, "Cuenta no encontrada o ya verificada", "ACCOUNT_NOT_FOUND_OR_VERIFIED");
+        // AUD-014 — silencioso, como `forgotPassword`: responder distinto a un correo que no
+        // existe o ya está confirmado le decía a cualquiera qué cuentas hay.
+        if (!user || user.isVerified) return;
 
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);

@@ -75,14 +75,14 @@ export const authController = {
 
     async verifyEmail(req: Request, res: Response) {
         const { token } = req.body as { token: string };
-        await authService.verifyEmail(token);
-        res.json({ message: "Cuenta confirmada exitosamente" });
+        const data = await authService.verifyEmail(token);
+        res.json({ message: data.alreadyVerified ? "La cuenta ya estaba confirmada" : "Cuenta confirmada exitosamente", data });
     },
 
     async resendVerification(req: Request, res: Response) {
         const { email } = req.body as { email: string };
         await authService.resendVerification(email);
-        res.json({ message: "Correo de verificación reenviado" });
+        res.json({ message: "Si la cuenta existe y falta confirmarla, le hemos enviado un enlace nuevo" });
     },
 
     async login(req: Request, res: Response) {
