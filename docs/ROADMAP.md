@@ -6,6 +6,11 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-07, al cerrar `AUD-013`: ocho tareas abiertas.** A 390 px, el stock de
+> Productos, el campo de cada línea de una recepción, el primer campo de un conteo con su «Guardar»
+> y el cobro del mostrador se ven sin desplazar; y toda tabla que sigue a lo ancho lo dice. Lo
+> siguiente sin decisión pendiente es `AUD-014`, las pantallas de acceso.
+>
 > **Estado al 2026-11-07, al cerrar `AUD-012`: nueve tareas abiertas.** Ninguna acción irreversible
 > ocurre ya de un toque: borrar, cancelar, enviar, cambiar un rol o desactivar piden confirmación y
 > dicen la consecuencia. En el Tier 2 solo queda `AUD-009`, que espera una decisión de producto; lo
@@ -78,15 +83,15 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 9
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 10
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 8
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 11
 ```
 
 ---
 
 ## Tareas abiertas
 
-Nueve. `AUD-009` (Tier 2) y `AUD-010` (Tier 3) salieron el 2026-11-03 y 04 de la crítica del
+Ocho. `AUD-009` (Tier 2) y `AUD-010` (Tier 3) salieron el 2026-11-03 y 04 de la crítica del
 panel. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
 ([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` y `AUD-012` (ya cerradas) en el Tier 2, el
 resto en el Tier 3. Las seis de la re-auditoría del 2026-10-31 están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
@@ -103,11 +108,11 @@ ficha, como dice «Una tarea nueva», más abajo.
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
 | 2 · Medio | 1 | 2 | 1 · 0 · 0 |
-| 3 · Bajo | 8 | 2 | 1 · 6 · 1 |
+| 3 · Bajo | 7 | 3 | 1 · 6 · 0 |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **9** | **10** | **2 · 6 · 1** |
+| **Total** | **8** | **11** | **2 · 6 · 0** |
 
-**Abiertas por área:** Diseño 6 (`AUD-013` a `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** Diseño 5 (`AUD-014` a `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -182,33 +187,6 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
   - **Dependencias:** `AUD-008` ya fijó las filas (cerrada el 2026-11-07: stock, caducidades —con
     `summary.expiredCount`—, conteos, compras y ventas). Junto con `AUD-009`, que
     recorta la misma respuesta.
-
-- [ ] **AUD-013 · El móvil de quien trabaja de pie: el stock, la recepción, el conteo y el cobro quedan fuera de la pantalla a 390 px**
-  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Alto
-  - **Origen:** crítica del 2026-11-07 («Lo que se repite», 3). El principio 2 de `PRODUCT.md`
-    («el dispositivo manda») choca con la regla del sistema de diseño de que las tablas se
-    desplazan a lo ancho: con la barra oculta (`sin-barra`), nada indica que hay más.
-  - **Ubicación y medidas** (a 390 px, `Stockly-F/src/modules/`):
-    - Productos (`products/components/ProductsPage.tsx`): la tabla mide 1099 px en 357; el stock,
-      unos 740 px a la derecha; la primera fila en y≈700.
-    - Recepción de compras (`purchase-orders/components/PurchaseOrdersPage.tsx:224-291`): «Llega
-      ahora» empieza en x=576.
-    - Un conteo (`inventory-counts/components/InventoryCountPage.tsx`): el primer campo cae en el
-      pliegue; «Guardar», arriba.
-    - Mostrador (`sale-orders/components/MostradorPage.tsx`): el total y «Registrar venta», bajo
-      el pliegue con dos líneas; a 1024 px, en una tableta, con tres. Y «Mis ventas de hoy» empieza
-      fuera de la pantalla en la tableta.
-    - Columnas escondidas sin señal: Usuarios, Clientes, Sugerencias, Categorías, Proveedores,
-      Bitácora.
-  - **Qué hacer:** por debajo de `md`, listas de tarjetas con lo que el rol viene a mirar (stock,
-    cantidades, acción); filtros plegados en «Filtros (n)»; barra fija abajo para la acción
-    principal (Guardar, Registrar venta), como «Escanear» en el panel de WAREHOUSE; dos columnas en
-    el mostrador desde `lg`. Actualizar la regla de tablas de `design-system.md`.
-  - **Criterio de aceptación:** a 390 px, en Productos se ve el stock de la primera fila sin
-    desplazar; en la recepción, el campo de cada línea; en el conteo, el primer campo y Guardar;
-    en el mostrador, el total y el botón con tres líneas. Comprobado en el navegador y con test de
-    densidad donde aplique.
-  - **Dependencias:** después de `AUD-011`, que toca el conteo y el mostrador.
 
 - [ ] **AUD-014 · Pantallas de acceso: errores que duran 3 s, la aprobación que no se anticipa y enlaces caducados sin salida**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
@@ -592,3 +570,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | AUD-008 | Tier 3 · Diseño: el panel principal, con lo pendiente primero, un panel «de hoy» por rol y sin estados rotos (crítica de Impeccable del 2026-11-03, 23/40) | 2026-11-07 | **Cuatro críticas, 23 → 27 → 27 → 30/40**, con dos revisiones independientes cada vez (diseño en el navegador y el detector de Impeccable). **El criterio, cumplido:** la última da **30/40, banda «Buena», sin ningún P1**; `pnpm verify` en verde en los dos repositorios (backend 1829 tests; frontend 998 y 1 omitido, más el test nuevo del aviso por rol: 57 en `resumen.test.tsx`). Los pasos 1 a 12 están en el historial de git de este documento (la ficha, del 2026-11-04 y 05). **Lo de la tercera crítica (2026-11-06, 27/40, un P1), decidido por el propietario —«todo, también el P3»—:** la cifra de stock de ADMIN **llevaba a la reposición sugerida**, que no es la misma lista (sale de las salidas y del plazo, no del mínimo): «4» abría seis líneas distintas a un clic de generar órdenes; ahora abre la lista filtrada, y la sugerencia queda aparte bajo «Reponer primero», diciendo de dónde sale. **Color por gravedad:** rojo para lo caducado o agotado, ámbar para el stock bajo y lo que va a caducar, neutro para las colas de trabajo. Las caducidades dicen cuántos lotes de cada: `summary.expiredCount` nuevo en `GET /reports/expiring` (contrato regenerado). **WAREHOUSE:** «Escanear» fijo abajo en móvil, sin los accesos que repetían una fila, y sus acciones detrás de «Necesita atención». **SELLER ya no tiene panel:** `/` lo lleva al mostrador, con «Mis ventas de hoy» debajo (`MisVentasDeHoy`, pasado de `dashboard/` a `sale-orders/`), y «Panel» sale de su navegación (`ocultoPara`). Sin ventas, una frase en vez de un gráfico a cero; un fallo del servidor se dice en lenguaje normal (`ErrorDeCarga`, para 5xx y 404) y la fila sin datos se reintenta desde ella misma. **De la cuarta (2026-11-07), sus dos P2:** el aviso del resumen caído ya no lo ven USER ni WAREHOUSE, que no tienen resumen, y el «Reintentar» de la fila lleva rueda y `aria-busy`, no repite y **no desaparece mientras reintenta** (la regla de `useFalloDeCarga`: TanStack v5 vuelve a `pending` y se llevaba el botón con el foco). **Comprobado en el navegador:** ADMIN a 1440, WAREHOUSE a 390 táctil (el botón fijo mide 48 px, sin tapar lo último), SELLER a 1024 táctil (entra en `/counter` y la pestaña dice «Mostrador»), y ADMIN con `/reports` caído. **Lo que la ficha no decía:** el backend de desarrollo quedó vivo entre sesiones, sirviendo código viejo, y el panel enseñó una cifra que no cuadraba hasta matarlo; y la base de tests de este equipo no tenía las migraciones de `AUD-001` (`Role.PENDING`): 524 tests en rojo hasta aplicar su SQL ([CONTEXTO.md §4](CONTEXTO.md)). **Sin hacer:** las cifras «de su almacén» y las compras vencidas siguen sin datos que las sostengan; `AUD-009` sigue sin decidir. Al cerrarla se pasó la crítica por **las 31 pantallas** ([informe](auditoria/2026-11-07-critica/INFORME.md)), que abrió `AUD-011` a `AUD-019`. |
 | AUD-011 | Tier 2 · Diseño: el trabajo se pierde sin aviso — las cifras de un conteo, la venta del mostrador, los ajustes de Configuración, lo editado en Sugerencias y los modales de Categorías y Marcas (crítica del 2026-11-07) | 2026-11-07 | **El patrón, una vez y para las cinco**, anotado en `Stockly-F/docs/design-system.md` §8, «No perder lo escrito»: lo largo vive en la pestaña con `useEstadoDeSesion` (`sessionStorage`, con el «de quién» en la clave); lo que se confirma con un botón pregunta al irse con `AvisoDeCambiosSinGuardar` (`useBlocker` dentro de la aplicación, `beforeunload` al recargar o cerrar; «Salir sin guardar» borra también lo de la pestaña); y un modal se cierra en el `onSuccess`. **Conteo:** las cifras suben de la captura a la página —pasar a «Revisar» ya no las tira—, viven en la pestaña por conteo, «Guardar» envía **todas** las pendientes y no solo las de la página que se ve (antes enviaba esas y borraba el resto; en tandas de 500, el tope del `PATCH`), «Revisar» dice cuántas esperan, el cierre avisa de que lo no guardado no entra, e irse pregunta. Un conteo cerrado o cancelado vacía lo que quedara. **Mostrador:** líneas y cliente en la pestaña, por usuario; **sin pregunta al navegar**, a propósito: el vendedor sale a mirar un producto y la venta sigue ahí. **Configuración:** «Guardar cambios» baja a una barra pegada abajo con el recuento y «Descartar» (arriba quedaba fuera de la vista), e irse o recargar con cambios pregunta. **Sugerencias:** paginar ya no borra lo editado (va por producto), generar quita solo lo generado, e irse pregunta. **Categorías y Marcas:** el modal espera a la API, como Proveedores. **Los tests montan con un router de datos:** `renderWithProviders` pasa de `MemoryRouter` a `createMemoryRouter` —sin eso `useBlocker` lanza—, y la suite entera siguió en verde antes de tocar ninguna pantalla; `setup.ts` limpia `sessionStorage` antes de cada test. **Comprobado:** 22 tests nuevos (conteo 7, mostrador 4, Configuración 5, Sugerencias 3, Categorías 3); `pnpm verify` del frontend en verde, 1021 tests y 1 omitido en 92 archivos. **En el navegador a 390 px táctil:** conteo del seed como WAREHOUSE —escribir 3, pasar a «Revisar» (sale «1 cifra sin guardar en «Contar»»), recargar (sigue el 3 y «Guardar (1)»), irse por el enlace (sale «¿Salir sin guardar?», y salir deja la pestaña limpia)—; mostrador como SELLER —una línea, recargar, sigue con su total—. Nada se guardó ni se vendió en la base de desarrollo. **Sin hacer:** en Sugerencias, marcar y desmarcar una casilla cuenta como cambio aunque quede como estaba; y el disponible de un producto recuperado en el mostrador es el de cuando se añadió (el servidor lo vuelve a comprobar al vender). |
 | AUD-012 | Tier 2 · Diseño: acciones irreversibles de un toque — borrar en el catálogo, cancelar o enviar órdenes, cambiar un rol, desactivar un almacén (crítica del 2026-11-07) | 2026-11-07 | **Un componente para todas:** `ConfirmarAccion` (`Stockly-F/src/shared/components/`), con el modelo de las que ya confirmaban (borrar un cliente, cancelar una venta enviada): el título nombra la acción y la cosa, el cuerpo dice la consecuencia que no se ve desde la fila, el botón lleva el verbo, «Volver» va antes en el teclado y el diálogo se cierra en el `onSuccess`. El patrón, en `Stockly-F/docs/design-system.md` §8, «Lo que no se deshace, se confirma». **Pantallas:** borrar en Productos, Categorías, Marcas, Proveedores y Etiquetas (cada una dice qué les pasa a sus productos); cancelar y eliminar una compra pendiente; marcar enviada —lista lo que sale y de qué almacén—, cancelar y eliminar una venta pendiente; en Usuarios, **el rol se elige en el desplegable pero solo se aplica al confirmar** («Laura pasará de Consulta a Admin»; con las flechas sobre el desplegable cerrado ya no cambia nada), igual que aprobar una cuenta pendiente, y desactivar confirma; en Almacenes, hacer predeterminado (dice adónde irá lo que no diga almacén) y desactivar confirman, y **con existencias «Desactivar» no se ofrece**: desactivado, con «Guarda N unidades: transfiérelas antes» atado por `aria-describedby`. **No confirman, a propósito,** las que devuelven sin quitar nada: reactivar a alguien o un almacén y restaurar un producto. **Backend:** desactivar un producto **ya no borra su imagen de Cloudinary** (`product.service.ts`): era un borrado lógico que `restore` deshacía a medias, devolviendo el producto sin foto; test nuevo en `products.test.ts`. **Comprobado:** `pnpm verify` en verde en los dos repositorios —backend 1830 tests, frontend 1029 y 1 omitido en 92 archivos—. Los 12 tests que fijaban la acción de un toque se reescribieron para pasar por la confirmación y comprobar que un toque solo no hace nada, y hay tests nuevos por pantalla (Productos, Categorías —también si borrar falla—, Proveedores, Etiquetas, eliminar una venta, Usuarios con el recorrido de teclado, Almacenes vacío y con existencias). **E2E** actualizado (tres envíos confirman; Almacenes espera el botón desactivado y recarga tras la transferencia por API) **pero no ejecutado**. **Sin comprobar en el navegador**: el criterio pedía tests de componente. **Sin hacer:** un «Deshacer» en el aviso en lugar de confirmar, que la ficha dejaba como alternativa; y los `aria-label` con el nombre en los botones de icono de Categorías, Marcas y Proveedores, que siguen en `AUD-019`. |
+| AUD-013 | Tier 3 · Diseño: el móvil de quien trabaja de pie — el stock, la recepción, el conteo y el cobro quedaban fuera de la pantalla a 390 px (crítica del 2026-11-07) | 2026-11-07 | **El criterio, medido en el navegador a 390 px táctil:** **Productos** —la tabla pasa de 1099 a 357 px, sin desplazamiento, y el stock de la primera fila está en x≈177 (antes 661); la primera fila, en y=474 (antes 770)—: por debajo de `md` se queda con nombre, stock y acciones (estas, de dos en dos), sin el ancho mínimo; imagen, ABC, categoría, marca, precio y estado se ocultan (están en la ficha, a un toque), los cinco desplegables se pliegan tras «Filtros (n)» y la leyenda ABC no se pinta. **Recepción de compras** —el campo de cada línea, en x=262–358 dentro de un diálogo de 358 (antes x=576)—: producto y «Llega ahora», con «Pedido 5 · recibido 0» debajo del nombre. **Conteo** —el primer campo, en y=713–757 (antes 825, en el pliegue)—: buscador y «Escanear» en una fila y «Guardar» en una barra fija abajo. **Mostrador** —con tres líneas, el total en y=751 y el botón en y=788–832 de 844—: el cobro va en una barra fija hasta `lg`, con el hueco reservado (lo último de la página no queda tapado); desde `lg`, dos columnas, la venta a la izquierda y cliente y cobro a la derecha, `sticky` bajo la cabecera (comprobado a 1024 px). **Las columnas escondidas sin señal** (Usuarios, Clientes, Sugerencias, Categorías, Proveedores, Bitácora): `pista-de-desplazamiento`, en `CLASES_TABLA_DESPLAZABLE` y por tanto en las 39 tablas, desvanece el borde hacia el que sigue la tabla y se apaga al final —una animación ligada al desplazamiento, sin JavaScript; medido en Usuarios: 40 px a la derecha al principio, los dos bordes a mitad, solo la izquierda al final—. En Firefox, sin `animation-timeline`, queda como estaba. **Compartido:** `clasesDeBarraFija.ts` (la barra del panel del almacén pasa a usarla). **Regla de tablas** de `design-system.md` actualizada: en una pantalla de consulta ninguna columna se esconde; en una de trabajo de pie, sí, si lo oculto va debajo del nombre o en la ficha. **Comprobado:** `pnpm verify` del frontend en verde, 1037 tests y 1 omitido en 93 archivos; tests de densidad nuevos (`movilDePie.test.ts`, 7, que fijan las clases porque jsdom no aplica CSS) y el del plegado de filtros. El backend no cambia. **Sin hacer:** en Productos, en el móvil, el ajuste masivo y la selección siguen ahí pero el precio no se ve sin abrir la ficha; los cuatro botones de cabecera de Productos siguen ocupando dos filas; y en las pantallas de consulta las columnas siguen a lo ancho, ahora con señal, no en tarjetas. |

@@ -150,6 +150,12 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **El móvil de quien trabaja de pie** (`AUD-013`): a 390 px, Productos enseña el stock de cada
+  fila sin desplazar (la tabla se queda con nombre, stock y acciones, y los filtros se pliegan
+  tras «Filtros (n)»); la recepción de una compra, el campo de cada línea; un conteo, su primer
+  campo, con «Guardar» en una barra fija abajo; y el mostrador, el total y «Registrar venta», en
+  una barra fija hasta las tabletas y en dos columnas a partir de ahí. Toda tabla que sigue a lo
+  ancho lo dice: el borde hacia el que continúa se desvanece.
 - **El panel principal empieza por lo que hay que hacer hoy, y cada rol ve el suyo** (`AUD-008`):
   arriba, «Necesita atención» con stock bajo o agotado, lotes caducados o por caducar —y cuántos
   de cada—, conteos abiertos, compras por recibir y ventas por enviar. Cada cifra lleva a su lista
