@@ -131,6 +131,13 @@ una condición: `pnpm verify` en verde en la máquina desde la que se hace el pu
 más de una persona, o un cambio que se quiera poder revertir de una pieza, rama
 (`git switch -c feat/…`) y pull request.
 
+**Desde el 2026-11-07, sin ramas de tarea: se trabaja directamente en `main` en los dos
+repositorios.** Quien trabaja con un agente (Claude Code) le pide los cambios sin commitear y el
+texto del commit; el commit y el push los hace el propietario, en el orden de abajo
+([Orden de subida](#orden-de-subida-primero-el-backend-en-verde-después-el-frontend)), y la
+siguiente tarea empieza cuando los workflows terminan en verde. La última rama de tarea,
+`feat/aud-014-pantallas-de-acceso`, se fusionó ese día.
+
 ### Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/), con la descripción en español y la

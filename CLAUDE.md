@@ -54,6 +54,11 @@ auditoria`. El workflow llama a ese mismo script: no se le añaden pasos propios
 
 ## Reglas
 
+- **Se trabaja en `main`, en los dos repositorios, sin ramas de tarea.** El agente deja los
+  cambios **sin commitear** y entrega solo el texto del commit (Conventional Commits, en español,
+  [CONTRIBUTING](CONTRIBUTING.md#commits)). El propietario hace el commit y el push y mira
+  terminar los workflows; si están en verde, se sigue con la siguiente tarea. Ni commit, ni push,
+  ni fusionar o borrar ramas salvo que lo pida de forma explícita.
 - **pnpm 12.4.1**, fijado en `packageManager` y en el `Dockerfile`. No usar npm ni yarn. pnpm 12
   rechaza ajustes desconocidos en `pnpm-workspace.yaml`.
 - **Comentarios y documentación en español.**
