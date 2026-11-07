@@ -222,6 +222,13 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- **Lo escrito ya no se pierde sin que la persona lo decida** (`AUD-011`): las cifras de un
+  conteo sobreviven a pasar a «Revisar», a escanear, a paginar y a recargar, y «Guardar» envía
+  todas las pendientes, no solo las de la página que se ve; la venta del mostrador sobrevive a
+  recargar y a irse a otra pantalla; Configuración y Sugerencias de reposición preguntan antes de
+  salir con cambios sin guardar; paginar en Sugerencias ya no borra lo editado, y los modales de
+  Categorías y Marcas solo se cierran cuando el guardado sale bien. «Guardar cambios», en
+  Configuración, va en una barra pegada abajo con el recuento y «Descartar».
 - **Dos envíos o dos cancelaciones a la vez de la misma venta movían el stock dos veces**
   (`AUD-005`): las dos peticiones leían su estado antes de bloquear nada. Ahora la orden se
   bloquea primero y la segunda recibe el error del estado que dejó la primera. Además, una venta

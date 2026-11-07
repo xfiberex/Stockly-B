@@ -6,6 +6,11 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-07, por la tarde: diez tareas abiertas.** Se cerró `AUD-011`: lo escrito en
+> el conteo, el mostrador, Configuración, Sugerencias y los modales del catálogo ya no se pierde sin
+> que la persona lo decida. La siguiente del Tier 2 es `AUD-012`, las acciones irreversibles de un
+> toque. Lo de abajo es el estado de la mañana.
+>
 > **Estado al 2026-11-07: once tareas abiertas.** `AUD-008`, el rediseño del panel, se cerró con
 > su crítica repetida (30/40, sin P1). Al cerrarla se pasó la misma crítica por **las 31
 > pantallas** del frontend ([informe](auditoria/2026-11-07-critica/INFORME.md); media 25,9/40,
@@ -68,17 +73,17 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 11
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 8
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 10
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 9
 ```
 
 ---
 
 ## Tareas abiertas
 
-Once. `AUD-009` (Tier 2) y `AUD-010` (Tier 3) salieron el 2026-11-03 y 04 de la crítica del
+Diez. `AUD-009` (Tier 2) y `AUD-010` (Tier 3) salieron el 2026-11-03 y 04 de la crítica del
 panel. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
-([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` y `AUD-012` en el Tier 2, el
+([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` (ya cerrada) y `AUD-012` en el Tier 2, el
 resto en el Tier 3. Las seis de la re-auditoría del 2026-10-31 están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
 atacarlas. Las observaciones
 de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
@@ -92,12 +97,12 @@ ficha, como dice «Una tarea nueva», más abajo.
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
-| 2 · Medio | 3 | 0 | 1 · 2 · 0 |
+| 2 · Medio | 2 | 1 | 1 · 1 · 0 |
 | 3 · Bajo | 8 | 2 | 1 · 6 · 1 |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **11** | **8** | **2 · 8 · 1** |
+| **Total** | **10** | **9** | **2 · 7 · 1** |
 
-**Abiertas por área:** Diseño 8 (`AUD-011` a `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** Diseño 7 (`AUD-012` a `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Seguridad 1 (`AUD-009`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -148,36 +153,6 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
     de esos importes (o da 403), fijado en `permisos.test.ts` o un test propio; ADMIN los sigue
     recibiendo; Informes no rompe con ningún rol.
   - **Dependencias:** ninguna; conviene hacerla junto con `AUD-010`, que toca la misma respuesta.
-
-- [ ] **AUD-011 · El trabajo se pierde sin aviso: las cifras de un conteo, la venta del mostrador, los ajustes de Configuración y lo editado en Sugerencias**
-  - **Área:** Diseño · **Severidad:** Medio · **Esfuerzo:** Medio
-  - **Origen:** crítica del 2026-11-07 ([informe](auditoria/2026-11-07-critica/INFORME.md), «Lo
-    que se repite», 1). Cinco P1 de cuatro bloques con la misma causa: el trabajo vive en un
-    estado local que se desmonta, y nada avisa.
-  - **Ubicación** (`Stockly-F/src/modules/`):
-    - Un conteo: `inventory-counts/components/InventoryCountPage.tsx` (`cifras`, estado de
-      `Captura`, `:62`, que se desmonta al pasar a «Revisar», `:380`). **Verificado** en el
-      navegador: escribir 3, pasar a «Revisar» y volver deja «Guardar (0)» y el campo vacío.
-      También se pierde al escanear, paginar, filtrar o salir.
-    - Mostrador: `sale-orders/components/MostradorPage.tsx` (`useState` de las líneas, `:74`).
-      Verificado: la venta armada se pierde al recargar.
-    - Configuración: `settings/components/SettingsPage.tsx` (`:273-281`). Verificado: un cambio
-      abajo del todo se descarta al navegar, y «Guardar» queda fuera de la vista.
-    - Sugerencias: `purchase-orders/components/SugerenciasReposicionPage.tsx` (`:87-90`): cambiar
-      de página borra las ediciones.
-    - Categorías y Marcas: `catalog/components/CatalogItemSection.tsx` (`:131-138`) cierra el
-      modal antes de que responda la API; si falla, lo escrito se pierde. Proveedores ya lo
-      resuelve con `onSuccess`.
-  - **Qué hacer:** decidir el patrón una vez y aplicarlo en todas. Lo que se escribe para un
-    trabajo largo (conteo, venta) sobrevive a recargar (`sessionStorage` por id) y a navegar
-    (bloqueo con `useBlocker` mientras haya algo sin guardar); los formularios avisan al salir;
-    el conteo avisa al cerrar si hay cifras sin guardar; los modales se cierran en `onSuccess`.
-    Valorar el guardado por línea al salir del campo en el conteo. Anotar el patrón en
-    `Stockly-F/docs/design-system.md`.
-  - **Criterio de aceptación:** en las cinco pantallas, lo escrito no se pierde sin que la
-    persona lo decida: test de componente por cada una (cambiar de vista, recargar o salir con
-    algo sin guardar) y comprobado en el navegador a 390 px en el conteo y el mostrador.
-  - **Dependencias:** ninguna. Toca las mismas pantallas que `AUD-013`; conviene hacerla antes.
 
 - [ ] **AUD-012 · Acciones irreversibles de un toque: borrar en el catálogo, cancelar o enviar órdenes, cambiar un rol, desactivar un almacén**
   - **Área:** Diseño · **Severidad:** Medio · **Esfuerzo:** Medio
@@ -639,3 +614,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 |---|---|---|---|
 | AUD-007 | Tier 3 · Diseño y rendimiento: las pantallas de datos cargan con esqueleto y lo pequeño con spinner, sin que la pantalla salte al llegar los datos | 2026-11-02 | **Decisión previa, del 2026-11-02:** esqueleto para las cargas con forma, spinner para botones y lo pequeño, «tomando en cuenta el rendimiento». **Medido antes de cambiar nada** (build de producción, Slow 4G y CPU ×4, CLS con `PerformanceObserver`): en escritorio ninguna pantalla pasaba de 0.05, pero en móvil **Ventas daba 0.183**, peor que el 0.1 de «bueno», y Productos 0.076. Así que el esqueleto no se justificaba por las métricas en general, sino por esas dos y por cómo se percibe la carga. **La ficha se quedaba corta:** el esqueleto a secas **empeoró** Productos de 0.050 a 0.343. Con un spinner, lo que llegaba tarde encima de la tabla empujaba pocos píxeles; con diez filas grises, media pantalla. Hubo que arreglar tres cosas que se repetirán en pantallas nuevas: en Ventas, los filtros salían solo «si hay órdenes» y ahora se pintan también mientras carga; en Productos, la leyenda ABC llegaba después que la tabla y ahora ocupa su sitio, invisible, con una fecha de relleno del mismo formato; y la barra de filtros de Productos crece al saber si hay etiquetas o varios almacenes, y como no se le puede reservar el hueco —con un solo almacén el selector no sale, y se cerraría—, la tabla **espera** (`esperando`): anuncia «Cargando…» pero no pinta formas hasta que la barra tiene su altura final. **Resultado:** Productos, 0.019 en escritorio y 0.013 en móvil; Ventas, 0 en los dos y también en Slow 3G; Compras, Clientes, Panel, Informes y Conteos, 0. **Rendimiento:** sin librería; el retraso de 200 ms es un `animation-delay`, no un temporizador de React; el pulso anima `opacity` del envoltorio —una capa, sin repintar— en vez de un brillo con `background-position`; el JS de entrada pasa de 13.49 a 13.68 kB comprimido y el CSS de 14.26 a 14.36. **Accesibilidad**, que no había: el `Spinner` era un `div` sin `role` y ningún lector lo anunciaba; ahora es un `status` con «Cargando…» (es y en), como el esqueleto, cuyas formas van con `aria-hidden`; el del botón es decorativo y lo anuncia el botón con `aria-busy`, y es un `span` porque un `div` no puede ir dentro de un `<button>`. Con movimiento reducido el esqueleto queda quieto. **Alcance:** 21 pantallas pasan a esqueleto (tabla, lista, rejilla, bloques o página entera); el spinner grande queda en cuatro sitios sin forma que anticipar —la carga de una ruta, la sesión, la verificación del correo, la cámara—, y `cargas.test.ts` falla si aparece en otro. La regla, en `Stockly-F/docs/design-system.md` §8, y el paso 7 de «Cómo añadir una página nueva». **Comprobado:** 21 tests nuevos en 4 archivos (`Esqueleto.test.tsx`, `cargas.test.ts`, `cargaDeVentas.test.tsx`, `cargaDeProductos.test.tsx`) y 3 reescritos que miraban la clase del spinner o daban por pintada la tabla —dos de ellos habrían pasado en vacío—. Falsificado: 24 roturas, 24 caídas, **dos tras reforzar su test**: la espera por las etiquetas y la espera por los almacenes; los dos comprobaban «no está» antes de que TanStack avisara del cambio. `pnpm verify` del frontend en verde: 947 tests, 81.08 %; E2E, 39 pasados y 3 omitidos. **A saber:** en Ventas, el selector de almacén puede llegar después que la lista; medido, llegan juntos y el CLS es 0, pero es una carrera y no una garantía. Si alguna vez se ve saltar, la solución es la misma `esperando` de Productos. Y la espera se aplicó **solo donde se midió el problema**: probada en las siete pantallas con selector de almacén, rompía 65 tests de seis pantallas que no la necesitaban. |
 | AUD-008 | Tier 3 · Diseño: el panel principal, con lo pendiente primero, un panel «de hoy» por rol y sin estados rotos (crítica de Impeccable del 2026-11-03, 23/40) | 2026-11-07 | **Cuatro críticas, 23 → 27 → 27 → 30/40**, con dos revisiones independientes cada vez (diseño en el navegador y el detector de Impeccable). **El criterio, cumplido:** la última da **30/40, banda «Buena», sin ningún P1**; `pnpm verify` en verde en los dos repositorios (backend 1829 tests; frontend 998 y 1 omitido, más el test nuevo del aviso por rol: 57 en `resumen.test.tsx`). Los pasos 1 a 12 están en el historial de git de este documento (la ficha, del 2026-11-04 y 05). **Lo de la tercera crítica (2026-11-06, 27/40, un P1), decidido por el propietario —«todo, también el P3»—:** la cifra de stock de ADMIN **llevaba a la reposición sugerida**, que no es la misma lista (sale de las salidas y del plazo, no del mínimo): «4» abría seis líneas distintas a un clic de generar órdenes; ahora abre la lista filtrada, y la sugerencia queda aparte bajo «Reponer primero», diciendo de dónde sale. **Color por gravedad:** rojo para lo caducado o agotado, ámbar para el stock bajo y lo que va a caducar, neutro para las colas de trabajo. Las caducidades dicen cuántos lotes de cada: `summary.expiredCount` nuevo en `GET /reports/expiring` (contrato regenerado). **WAREHOUSE:** «Escanear» fijo abajo en móvil, sin los accesos que repetían una fila, y sus acciones detrás de «Necesita atención». **SELLER ya no tiene panel:** `/` lo lleva al mostrador, con «Mis ventas de hoy» debajo (`MisVentasDeHoy`, pasado de `dashboard/` a `sale-orders/`), y «Panel» sale de su navegación (`ocultoPara`). Sin ventas, una frase en vez de un gráfico a cero; un fallo del servidor se dice en lenguaje normal (`ErrorDeCarga`, para 5xx y 404) y la fila sin datos se reintenta desde ella misma. **De la cuarta (2026-11-07), sus dos P2:** el aviso del resumen caído ya no lo ven USER ni WAREHOUSE, que no tienen resumen, y el «Reintentar» de la fila lleva rueda y `aria-busy`, no repite y **no desaparece mientras reintenta** (la regla de `useFalloDeCarga`: TanStack v5 vuelve a `pending` y se llevaba el botón con el foco). **Comprobado en el navegador:** ADMIN a 1440, WAREHOUSE a 390 táctil (el botón fijo mide 48 px, sin tapar lo último), SELLER a 1024 táctil (entra en `/counter` y la pestaña dice «Mostrador»), y ADMIN con `/reports` caído. **Lo que la ficha no decía:** el backend de desarrollo quedó vivo entre sesiones, sirviendo código viejo, y el panel enseñó una cifra que no cuadraba hasta matarlo; y la base de tests de este equipo no tenía las migraciones de `AUD-001` (`Role.PENDING`): 524 tests en rojo hasta aplicar su SQL ([CONTEXTO.md §4](CONTEXTO.md)). **Sin hacer:** las cifras «de su almacén» y las compras vencidas siguen sin datos que las sostengan; `AUD-009` sigue sin decidir. Al cerrarla se pasó la crítica por **las 31 pantallas** ([informe](auditoria/2026-11-07-critica/INFORME.md)), que abrió `AUD-011` a `AUD-019`. |
+| AUD-011 | Tier 2 · Diseño: el trabajo se pierde sin aviso — las cifras de un conteo, la venta del mostrador, los ajustes de Configuración, lo editado en Sugerencias y los modales de Categorías y Marcas (crítica del 2026-11-07) | 2026-11-07 | **El patrón, una vez y para las cinco**, anotado en `Stockly-F/docs/design-system.md` §8, «No perder lo escrito»: lo largo vive en la pestaña con `useEstadoDeSesion` (`sessionStorage`, con el «de quién» en la clave); lo que se confirma con un botón pregunta al irse con `AvisoDeCambiosSinGuardar` (`useBlocker` dentro de la aplicación, `beforeunload` al recargar o cerrar; «Salir sin guardar» borra también lo de la pestaña); y un modal se cierra en el `onSuccess`. **Conteo:** las cifras suben de la captura a la página —pasar a «Revisar» ya no las tira—, viven en la pestaña por conteo, «Guardar» envía **todas** las pendientes y no solo las de la página que se ve (antes enviaba esas y borraba el resto; en tandas de 500, el tope del `PATCH`), «Revisar» dice cuántas esperan, el cierre avisa de que lo no guardado no entra, e irse pregunta. Un conteo cerrado o cancelado vacía lo que quedara. **Mostrador:** líneas y cliente en la pestaña, por usuario; **sin pregunta al navegar**, a propósito: el vendedor sale a mirar un producto y la venta sigue ahí. **Configuración:** «Guardar cambios» baja a una barra pegada abajo con el recuento y «Descartar» (arriba quedaba fuera de la vista), e irse o recargar con cambios pregunta. **Sugerencias:** paginar ya no borra lo editado (va por producto), generar quita solo lo generado, e irse pregunta. **Categorías y Marcas:** el modal espera a la API, como Proveedores. **Los tests montan con un router de datos:** `renderWithProviders` pasa de `MemoryRouter` a `createMemoryRouter` —sin eso `useBlocker` lanza—, y la suite entera siguió en verde antes de tocar ninguna pantalla; `setup.ts` limpia `sessionStorage` antes de cada test. **Comprobado:** 22 tests nuevos (conteo 7, mostrador 4, Configuración 5, Sugerencias 3, Categorías 3); `pnpm verify` del frontend en verde, 1021 tests y 1 omitido en 92 archivos. **En el navegador a 390 px táctil:** conteo del seed como WAREHOUSE —escribir 3, pasar a «Revisar» (sale «1 cifra sin guardar en «Contar»»), recargar (sigue el 3 y «Guardar (1)»), irse por el enlace (sale «¿Salir sin guardar?», y salir deja la pestaña limpia)—; mostrador como SELLER —una línea, recargar, sigue con su total—. Nada se guardó ni se vendió en la base de desarrollo. **Sin hacer:** en Sugerencias, marcar y desmarcar una casilla cuenta como cambio aunque quede como estaba; y el disponible de un producto recuperado en el mostrador es el de cuando se añadió (el servidor lo vuelve a comprobar al vender). |

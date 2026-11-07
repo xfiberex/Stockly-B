@@ -51,8 +51,8 @@ Medido el 2026-11-06 con `pnpm verify` en los dos repositorios, en la rama de la
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1829** en 73 archivos | **998** en 91 archivos *(+1 omitido)*; 999 tras el último test del panel |
-| Cobertura de sentencias | 97.13 % *(suelo 85 %)* | 81.5 % *(suelo 45 %)* |
+| Tests | **1829** en 73 archivos | **1021** en 92 archivos *(+1 omitido; 2026-11-07, al cerrar `AUD-011`)* |
+| Cobertura de sentencias | 97.13 % *(suelo 85 %)* | 81.95 % *(suelo 45 %; 2026-11-07)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
 | E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` |
