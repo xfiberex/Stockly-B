@@ -222,6 +222,13 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Corregido
 
+- **Ninguna acción irreversible ocurre ya con un solo toque** (`AUD-012`): borrar en el catálogo,
+  cancelar o eliminar una compra o una venta pendiente, marcar una venta como enviada, cambiar un
+  rol, aprobar una cuenta, desactivar a alguien o un almacén y cambiar el almacén predeterminado
+  piden confirmación y dicen la consecuencia (qué stock sale y de dónde, de qué rol a cuál, qué les
+  pasa a los productos). En Usuarios, el rol se elige en el desplegable y se aplica al confirmar:
+  las flechas del teclado ya no lo cambian. Un almacén con existencias no ofrece «Desactivar», y
+  dice por qué. Desactivar un producto ya no borra su imagen, así que restaurarlo lo devuelve entero.
 - **Lo escrito ya no se pierde sin que la persona lo decida** (`AUD-011`): las cifras de un
   conteo sobreviven a pasar a «Revisar», a escanear, a paginar y a recargar, y «Guardar» envía
   todas las pendientes, no solo las de la página que se ve; la venta del mostrador sobrevive a

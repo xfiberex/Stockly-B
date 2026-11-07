@@ -482,12 +482,10 @@ export const productService = {
         const existing = await prisma.product.findUnique({ where: { id } });
         if (!existing) throw new HttpError(404, "Producto no encontrado", "PRODUCT_NOT_FOUND");
 
-        if (existing.imagePublicId) await deleteFromCloudinary(existing.imagePublicId);
-
-        await prisma.product.update({
-            where: { id },
-            data: { isActive: false, imageUrl: null, imagePublicId: null },
-        });
+        // AUD-012 — desactivar no borra la imagen. Es un borrado lógico que `restore` deshace, y
+        // borrarla de Cloudinary lo dejaba a medias: el producto volvía sin foto y no había forma
+        // de recuperarla. Una imagen solo se borra cuando se sustituye o se quita a propósito.
+        await prisma.product.update({ where: { id }, data: { isActive: false } });
     },
 
     async restore(id: string) {

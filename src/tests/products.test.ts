@@ -286,6 +286,21 @@ describe("Products API", () => {
             expect(deleted?.isActive).toBe(false);
         });
 
+        it("AUD-012: conserva la imagen, para que restaurar devuelva el producto entero", async () => {
+            const { deleteFromCloudinary } = jest.requireMock("@/shared/middlewares/upload.middleware");
+            (deleteFromCloudinary as jest.Mock).mockClear();
+            await prisma.product.update({
+                where: { id: productId },
+                data: { imageUrl: "https://res.cloudinary.com/x/foto.jpg", imagePublicId: "stockly/foto" },
+            });
+
+            await request(app).delete(`${BASE}/${productId}`).set("Cookie", authCookie).expect(200);
+            const restaurado = await request(app).patch(`${BASE}/${productId}/restore`).set("Cookie", authCookie);
+
+            expect(deleteFromCloudinary).not.toHaveBeenCalled();
+            expect(restaurado.body.data.imageUrl).toBe("https://res.cloudinary.com/x/foto.jpg");
+        });
+
         it("404: producto inexistente", async () => {
             const res = await request(app)
                 .delete(`${BASE}/00000000-0000-0000-0000-000000000000`)
