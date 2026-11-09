@@ -161,7 +161,8 @@ describe("Lo más vendido de la ventana (T6-09)", () => {
 
 describe("GET /reports — las ventas en el resumen del panel (T6-09)", () => {
     const resumen = async () => {
-        const usuario = await createUser({ email: "panel@example.com", role: "USER" });
+        // AUD-009 — las ventas de la semana llevan importe: solo le llegan a ADMIN.
+        const usuario = await createUser({ email: "panel@example.com", role: "ADMIN" });
         return request(app).get("/api/v1/reports").set("Cookie", getAuthCookie(usuario.id));
     };
 

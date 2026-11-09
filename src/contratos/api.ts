@@ -162,8 +162,11 @@ export const PERMISOS = {
     "GET /stock-transfers": TODOS,
     "GET /stock-transfers/:id": TODOS,
     "POST /stock-transfers": ALMACEN,
-    // Informes
+    // Informes. AUD-009 — `GET /reports` sigue abierta a todos, pero los importes solo le llegan
+    // a ADMIN (ver `resumenReporteSchema`).
     "GET /reports": TODOS,
+    // AUD-010 — lo de «Necesita atención» del panel, en una sola petición.
+    "GET /reports/attention": TODOS,
     "GET /reports/period": TODOS,
     "GET /reports/abc": TODOS,
     // T5-15 — lo que caduca pronto y lo ya caducado, con su valor a coste.
@@ -1509,12 +1512,12 @@ export const totalesReporteSchema = z.object({
     totalProducts: z.number(),
     activeProducts: z.number(),
     inactiveProducts: z.number(),
-    /** A precio de **venta**: incluye un beneficio que todavía no existe. */
-    inventoryValue: z.number(),
-    /** T5-02 — a coste medio, sumando solo los productos que tienen coste. */
-    inventoryCostValue: z.number(),
-    /** Precio de venta menos coste, **sobre los productos con coste**; no sobre todos. */
-    potentialMargin: z.number(),
+    /** A precio de **venta**: incluye un beneficio que todavía no existe. Solo ADMIN (AUD-009). */
+    inventoryValue: z.number().optional(),
+    /** T5-02 — a coste medio, sumando solo los productos que tienen coste. Solo ADMIN (AUD-009). */
+    inventoryCostValue: z.number().optional(),
+    /** Precio de venta menos coste, **sobre los productos con coste**; no sobre todos. Solo ADMIN. */
+    potentialMargin: z.number().optional(),
     /** Activos con stock y sin coste: quedan fuera de las dos cifras anteriores. */
     productsWithoutCost: z.number(),
     lowStockCount: z.number(),
@@ -1525,7 +1528,8 @@ export const totalesReporteSchema = z.object({
 export const stockPorCategoriaSchema = z.object({
     name: z.string(),
     stock: z.number(),
-    value: z.number(),
+    /** Precio de venta × stock. Solo ADMIN (AUD-009). */
+    value: z.number().optional(),
 });
 
 export const productoTopSchema = z.object({
@@ -1617,18 +1621,67 @@ export const masVendidoSchema = z.object({
     revenue: z.number(),
 });
 
+/**
+ * `GET /reports`.
+ *
+ * AUD-009 — **los importes del negocio son solo de ADMIN** (decisión del propietario, en
+ * `CONTEXTO.md` §6). Para los demás roles la respuesta llega **sin** los campos marcados «Solo
+ * ADMIN»: ni el valor del inventario (a venta y a coste), ni el margen potencial, ni el valor por
+ * categoría, ni el top por valor, ni las ventas de la semana, ni el margen realizado. No vienen a
+ * cero: no vienen, y el servidor ni siquiera los calcula. Lo demás —recuentos, stock por
+ * categoría, movimientos, stock bajo y rotación— es igual para todos. El PDF sigue la misma regla.
+ */
 export const resumenReporteSchema = z.object({
     totals: totalesReporteSchema,
     stockByCategory: z.array(stockPorCategoriaSchema),
-    topByValue: z.array(productoTopSchema),
+    /** Solo ADMIN (AUD-009). */
+    topByValue: z.array(productoTopSchema).optional(),
     movementsByMonth: z.array(movimientoPorMesSchema),
     lowStockProducts: z.array(productoBajoStockSchema),
     stockMetrics: z.array(metricaStockSchema),
-    /** T6-09 — hoy y los seis días anteriores, del más antiguo al más reciente: siempre siete. */
-    salesByDay: z.array(ventasPorDiaSchema),
-    /** T6-09 — los cinco más vendidos por unidades en esos siete días. */
-    topSold: z.array(masVendidoSchema),
-    margin: margenRealizadoSchema,
+    /** T6-09 — hoy y los seis días anteriores, del más antiguo al más reciente: siempre siete. Solo ADMIN. */
+    salesByDay: z.array(ventasPorDiaSchema).optional(),
+    /** T6-09 — los cinco más vendidos por unidades en esos siete días. Solo ADMIN (llevan importe). */
+    topSold: z.array(masVendidoSchema).optional(),
+    /** Solo ADMIN (AUD-009). */
+    margin: margenRealizadoSchema.optional(),
+});
+
+/**
+ * AUD-010 — `GET /reports/attention`: lo que pide actuar hoy, para el bloque «Necesita atención»
+ * del panel, **en una sola petición**. Antes eran cinco o seis —cada recuento leído de un listado
+ * con `limit: 1`— contra el límite global de la API. Sin importes: lo ve cualquier rol.
+ *
+ * Cada cifra es la misma que da su lista filtrada, a la que lleva la fila: `lowStock.total`, la de
+ * `GET /products?lowStock=true`; `expiring.total`, la de `GET /reports/expiring` (con el plazo del
+ * ajuste); `openCounts`, la de los conteos `OPEN`; `purchasesToReceive`, la de las compras
+ * `PENDING` y `PARTIALLY_RECEIVED`; `pendingSales`, la de las ventas `PENDING`.
+ */
+export const atencionDeHoySchema = z.object({
+    lowStock: z.object({
+        total: z.number(),
+        /** Los primeros, en el orden de `lowStockProducts` del resumen: lo que más falta primero. */
+        products: z.array(productoBajoStockSchema),
+    }),
+    expiring: z.object({
+        /** El plazo del ajuste: lo que caduca de hoy a dentro de `days` días. */
+        days: z.number(),
+        total: z.number(),
+        /** Cuántos de `total` ya caducaron. */
+        expiredCount: z.number(),
+        /** El lote que antes caduca, o `null` si no hay ninguno. */
+        first: z
+            .object({
+                code: z.string(),
+                productName: z.string(),
+                expiresAt: z.string(),
+                expired: z.boolean(),
+            })
+            .nullable(),
+    }),
+    openCounts: z.number(),
+    purchasesToReceive: z.number(),
+    pendingSales: z.number(),
 });
 
 /**
@@ -1783,6 +1836,7 @@ export type MovimientoPorMes = z.infer<typeof movimientoPorMesSchema>;
 export type ProductoBajoStock = z.infer<typeof productoBajoStockSchema>;
 export type MetricaStock = z.infer<typeof metricaStockSchema>;
 export type ResumenReporte = z.infer<typeof resumenReporteSchema>;
+export type AtencionDeHoy = z.infer<typeof atencionDeHoySchema>;
 export type VentasPorDia = z.infer<typeof ventasPorDiaSchema>;
 export type MasVendido = z.infer<typeof masVendidoSchema>;
 export type MargenRealizado = z.infer<typeof margenRealizadoSchema>;

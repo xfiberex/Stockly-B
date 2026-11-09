@@ -87,6 +87,7 @@ const RESPUESTAS = {
     StockTransferDetail: contrato.transferenciaConLineasSchema,
     ProductLots: contrato.lotesDeProductoSchema,
     ExpiryReport: contrato.informeDeCaducidadesSchema,
+    AttentionToday: contrato.atencionDeHoySchema,
     PaginationMeta: contrato.metaPaginacionSchema,
     Error: contrato.errorSchema,
 } as const;

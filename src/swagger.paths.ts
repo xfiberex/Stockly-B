@@ -675,6 +675,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/reports": {
         get: {
             tags: ["Reports"], summary: "Resumen de inventario para el dashboard",
+            description: "Abierta a todos los roles, pero **los importes solo le llegan a ADMIN** (AUD-009): para los demás no vienen ni el valor del inventario, ni el margen, ni el valor por categoría, ni el top por valor, ni las ventas de la semana. El PDF sigue la misma regla.",
             parameters: [{ name: "format", in: "query", schema: { type: "string", enum: ["json", "pdf"], default: "json" } }],
             responses: {
                 // T4-02 — cuatro de las seis listas se documentaban como `items: {}`, o sea
@@ -735,6 +736,19 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 "400": ERROR("Periodo no válido: fecha mal escrita, atajo desconocido, fin antes del inicio o más de 60 meses"),
                 "401": ERROR("No autenticado"),
                 "413": ERROR("El CSV supera el máximo de filas de una exportación"),
+            },
+        },
+    },
+    "/reports/attention": {
+        get: {
+            tags: ["Reports"],
+            summary: "Lo que necesita atención hoy, para el panel (AUD-010)",
+            description:
+                "Stock bajo (con los primeros productos), lotes caducados o por caducar en el plazo del ajuste, conteos abiertos, " +
+                "compras por recibir y ventas por enviar, en una sola petición. Cada cifra coincide con la de su lista filtrada. Sin importes.",
+            responses: {
+                "200": JSON_OK({ $ref: "#/components/schemas/AttentionToday" }, "Las cifras de hoy"),
+                "401": ERROR("No autenticado"),
             },
         },
     },

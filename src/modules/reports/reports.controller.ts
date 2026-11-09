@@ -10,7 +10,8 @@ import { settingsService } from "@/modules/settings/settings.service";
 export const reportsController = {
     async getSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const summary = await reportsService.getSummary();
+            // AUD-009 — los importes, solo para ADMIN; también en el PDF.
+            const summary = await reportsService.getSummary({ conImportes: req.userRole === "ADMIN" });
             const format = (req.query.format as string | undefined) ?? "json";
 
             if (format === "pdf") {
@@ -104,6 +105,16 @@ export const reportsController = {
     },
 
     /** T5-15 — lo caducado y lo que caduca en los próximos `days` días, con su valor a coste. */
+    /** AUD-010 — lo de «Necesita atención» del panel, en una sola petición. */
+    async getAttention(_req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const atencion = await reportsService.getAttention();
+            res.json({ success: true, message: "Lo que necesita atención hoy", data: atencion });
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async getExpiring(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const informe = await caducidadesService.informe(req.query as Record<string, string>);

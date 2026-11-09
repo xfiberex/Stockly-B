@@ -190,31 +190,42 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
     const { money, moneyShort } = formatosDeImporte(moneda);
     let y = drawHeader(doc, generatedAt);
 
+    // AUD-009 — los importes solo vienen para ADMIN: sin ellos, el PDF es el de las unidades.
+    const { totals, margin } = summary;
+    const importes =
+        totals.inventoryValue !== undefined && totals.inventoryCostValue !== undefined && totals.potentialMargin !== undefined && margin
+            ? { inventoryValue: totals.inventoryValue, inventoryCostValue: totals.inventoryCostValue, potentialMargin: totals.potentialMargin, margin }
+            : null;
+
     // Resumen general
     y = sectionHeading(doc, "Resumen general", y);
     y = drawKpis(
         doc,
         [
-            { label: "Total productos", value: int(summary.totals.totalProducts) },
-            { label: "Productos activos", value: int(summary.totals.activeProducts) },
-            { label: "Bajo stock", value: int(summary.totals.lowStockCount) },
+            { label: "Total productos", value: int(totals.totalProducts) },
+            { label: "Productos activos", value: int(totals.activeProducts) },
+            { label: "Bajo stock", value: int(totals.lowStockCount) },
             // T5-02 — «a precio de venta», con su nombre: sin él se leía como lo invertido.
-            { label: "Valor a precio de venta", value: moneyShort(summary.totals.inventoryValue) },
+            importes
+                ? { label: "Valor a precio de venta", value: moneyShort(importes.inventoryValue) }
+                : { label: "Categorías", value: int(totals.categoryCount) },
         ],
         y,
     );
     y += 10;
-    y = drawKpis(
-        doc,
-        [
-            { label: "Valor a coste", value: moneyShort(summary.totals.inventoryCostValue) },
-            { label: "Margen potencial", value: moneyShort(summary.totals.potentialMargin) },
-            { label: `Margen ${summary.margin.days} días`, value: moneyShort(summary.margin.margin) },
-            { label: "% margen realizado", value: pct(summary.margin.marginPercent) },
-        ],
-        y,
-    );
-    if (summary.totals.productsWithoutCost > 0) {
+    if (importes) {
+        y = drawKpis(
+            doc,
+            [
+                { label: "Valor a coste", value: moneyShort(importes.inventoryCostValue) },
+                { label: "Margen potencial", value: moneyShort(importes.potentialMargin) },
+                { label: `Margen ${importes.margin.days} días`, value: moneyShort(importes.margin.margin) },
+                { label: "% margen realizado", value: pct(importes.margin.marginPercent) },
+            ],
+            y,
+        );
+    }
+    if (importes && totals.productsWithoutCost > 0) {
         doc.font("Helvetica").fontSize(8).fillColor(MUTED).text(
             `${int(summary.totals.productsWithoutCost)} productos con stock no tienen coste: no suman ni al valor a coste ni al margen potencial.`,
             MARGIN, y, { width: CONTENT_W, lineBreak: false },
@@ -227,15 +238,19 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
     if (summary.stockByCategory.length > 0) {
         y = ensureSpace(doc, y, 90);
         y = sectionHeading(doc, "Stock por categoría", y);
-        const cats = [...summary.stockByCategory].sort((a, b) => Number(b.value) - Number(a.value));
-        const totalVal = cats.reduce((s, c) => s + Number(c.value), 0);
+        // Con importes, por valor y con su parte del valor; sin ellos, por unidades y su parte.
+        const medida = (c: { stock: number; value?: number }) => (importes ? Number(c.value ?? 0) : c.stock);
+        const cats = [...summary.stockByCategory].sort((a, b) => medida(b) - medida(a));
+        const totalMedida = cats.reduce((s, c) => s + medida(c), 0);
         const totalUnits = cats.reduce((s, c) => s + c.stock, 0);
+        const parte = (c: { stock: number; value?: number }) =>
+            totalMedida > 0 ? `${((medida(c) / totalMedida) * 100).toFixed(1)}%` : "—";
         const rows: Row[] = cats.map((c) => ({
             cells: [
                 c.name,
-                { text: int(c.stock), align: "right", color: MUTED },
-                { text: money(Number(c.value)), align: "right", color: INK },
-                { text: totalVal > 0 ? `${((Number(c.value) / totalVal) * 100).toFixed(1)}%` : "—", align: "right", color: MUTED },
+                { text: int(c.stock), align: "right", color: importes ? MUTED : INK },
+                ...(importes ? [{ text: money(Number(c.value ?? 0)), align: "right" as const, color: INK }] : []),
+                { text: parte(c), align: "right", color: MUTED },
             ],
         }));
         rows.push({
@@ -243,18 +258,24 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
             cells: [
                 { text: "Total", bold: true, color: INK },
                 { text: int(totalUnits), align: "right", bold: true, color: INK },
-                { text: money(totalVal), align: "right", bold: true, color: INK },
+                ...(importes ? [{ text: money(totalMedida), align: "right" as const, bold: true, color: INK }] : []),
                 { text: "100.0%", align: "right", bold: true, color: MUTED },
             ],
         });
         y = drawTable(
             doc,
-            [
-                { header: "Categoría", width: 205 },
-                { header: "Unidades", width: 90, align: "right" },
-                { header: "Valor", width: 115, align: "right" },
-                { header: "% del valor", width: 105, align: "right" },
-            ],
+            importes
+                ? [
+                      { header: "Categoría", width: 205 },
+                      { header: "Unidades", width: 90, align: "right" },
+                      { header: "Valor", width: 115, align: "right" },
+                      { header: "% del valor", width: 105, align: "right" },
+                  ]
+                : [
+                      { header: "Categoría", width: 295 },
+                      { header: "Unidades", width: 115, align: "right" },
+                      { header: "% de las unidades", width: 105, align: "right" },
+                  ],
             rows,
             y,
             22,
@@ -263,7 +284,7 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
     }
 
     // Top 10 productos por valor
-    if (summary.topByValue.length > 0) {
+    if (summary.topByValue && summary.topByValue.length > 0) {
         y = ensureSpace(doc, y, 90);
         y = sectionHeading(doc, "Top 10 productos por valor", y);
         const rows: Row[] = summary.topByValue.map((p, i) => ({
@@ -295,7 +316,7 @@ export function renderReportPdf(doc: Doc, summary: ReportSummary, generatedAt: s
 
     // T5-02 — margen realizado de las ventas enviadas en la ventana
     const margen = summary.margin;
-    if (margen.byCategory.length > 0 || margen.revenueWithoutCost > 0) {
+    if (margen && (margen.byCategory.length > 0 || margen.revenueWithoutCost > 0)) {
         y = ensureSpace(doc, y, 110);
         const sinCoste = margen.revenueWithoutCost > 0
             ? `Fuera del cálculo, por no tener coste al enviarse: ${money(margen.revenueWithoutCost)} en ventas`

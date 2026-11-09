@@ -5,9 +5,39 @@ import { hoyEn } from "@/shared/lib/zonaHoraria";
 import { haceDias, masVendidoEntre, ventasPorDia } from "@/shared/lib/ventasEnviadas";
 import { settingsService } from "@/modules/settings/settings.service";
 import { mesesDe, resolverPeriodo } from "./reports.periodo";
+import { caducidadesService } from "./reports.caducidades";
+import type { AtencionDeHoy, ResumenReporte } from "@/contratos/api";
 
-// Forma del resumen que consumen tanto el JSON como el generador de PDF.
-export type ReportSummary = Awaited<ReturnType<typeof reportsService.getSummary>>;
+// Forma del resumen que consumen tanto el JSON como el generador de PDF: la del contrato, con los
+// importes opcionales (AUD-009: solo le llegan a ADMIN).
+export type ReportSummary = ResumenReporte;
+
+/**
+ * Los productos activos con stock bajo (`stock <= minStock`), lo que más falta primero. La usan
+ * el resumen y la atención de hoy (AUD-010), que tienen que dar la misma lista.
+ */
+async function productosConStockBajo(limite: number) {
+    const filas = await prisma.$queryRaw<Array<{ id: string; name: string; sku: string | null; stock: number; minStock: number; categoryName: string | null }>>`
+        SELECT p.id, p.name, p.sku, p.stock, p."minStock",
+               c.name AS "categoryName"
+        FROM products p
+        LEFT JOIN categories c ON c.id = p."categoryId"
+        WHERE p."isActive" = true AND p.stock <= p."minStock"
+        -- AUD-008 — primero lo que más falta frente a su mínimo (0/10 antes que 4/5), y
+        -- al final los que no tienen mínimo: con minStock a 0 por defecto, cualquier
+        -- producto agotado entra, y por stock absoluto tapaban las faltas de verdad.
+        ORDER BY (p."minStock" = 0), p.stock::float8 / NULLIF(p."minStock", 0), p.stock, p.name
+        LIMIT ${limite}
+    `;
+    return filas.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        stock: Number(p.stock),
+        minStock: Number(p.minStock),
+        category: p.categoryName ?? null,
+    }));
+}
 
 /** Una fila de la tabla de rotación del dashboard. */
 type FilaDeRotacion = {
@@ -306,13 +336,19 @@ function productosDelPeriodo(tramo: Tramo, limite: number | null) {
 }
 
 export const reportsService = {
-    async getSummary() {
+    /**
+     * AUD-009 — `conImportes` solo para ADMIN (lo decide el controlador por el rol): sin él, la
+     * respuesta no lleva ningún importe del negocio, y el margen, el top por valor y las ventas de
+     * la semana **ni se consultan**. El panel ya no se los enseñaba a los demás roles, pero
+     * ocultar no es proteger: la ruta está abierta a todos y se leían llamándola.
+     */
+    async getSummary({ conImportes }: { conImportes: boolean }): Promise<ResumenReporte> {
         // T5-02 — el margen arranca a la vez que el resto y se recoge más abajo: esperarlo
         // después sumaría sus ~190 ms a la primera pantalla tras el login (medido sobre el
         // conjunto de carga). El `catch` vacío no lo silencia —el `await` de abajo sigue
         // fallando—; solo evita un rechazo sin manejar si antes falla el otro bloque.
-        const margenEnCurso = consultarMargen();
-        margenEnCurso.catch(() => undefined);
+        const margenEnCurso = conImportes ? consultarMargen() : null;
+        margenEnCurso?.catch(() => undefined);
 
         // T5-09 — el gráfico de movimientos va por meses del negocio. Es una lectura por
         // clave primaria de `app_settings`; mientras, el margen ya está en marcha.
@@ -380,14 +416,16 @@ export const reportsService = {
                 GROUP BY 1
                 ORDER BY value DESC
             `,
-            // Top 10 por valor de inventario (precio × stock), no por cantidad.
-            prisma.$queryRaw<Array<{ id: string; name: string; sku: string | null; price: string; stock: number }>>`
-                SELECT id, name, sku, price, stock
-                FROM products
-                WHERE "isActive" = true
-                ORDER BY price * stock DESC
-                LIMIT 10
-            `,
+            // Top 10 por valor de inventario (precio × stock), no por cantidad. Solo ADMIN.
+            conImportes
+                ? prisma.$queryRaw<Array<{ id: string; name: string; sku: string | null; price: string; stock: number }>>`
+                      SELECT id, name, sku, price, stock
+                      FROM products
+                      WHERE "isActive" = true
+                      ORDER BY price * stock DESC
+                      LIMIT 10
+                  `
+                : Promise.resolve([]),
             /**
              * Movimientos por mes, últimos 6 meses (T4-16).
              *
@@ -431,18 +469,7 @@ export const reportsService = {
                 ORDER BY g.mes ASC
             `,
             // Productos con stock bajo
-            prisma.$queryRaw<Array<{ id: string; name: string; sku: string | null; stock: number; minStock: number; categoryName: string | null }>>`
-                SELECT p.id, p.name, p.sku, p.stock, p."minStock",
-                       c.name AS "categoryName"
-                FROM products p
-                LEFT JOIN categories c ON c.id = p."categoryId"
-                WHERE p."isActive" = true AND p.stock <= p."minStock"
-                -- AUD-008 — primero lo que más falta frente a su mínimo (0/10 antes que 4/5), y
-                -- al final los que no tienen mínimo: con minStock a 0 por defecto, cualquier
-                -- producto agotado entra, y por stock absoluto tapaban las faltas de verdad.
-                ORDER BY (p."minStock" = 0), p.stock::float8 / NULLIF(p."minStock", 0), p.stock, p.name
-                LIMIT 20
-            `,
+            productosConStockBajo(20),
             /**
              * Rotación: unidades salidas por producto en los últimos 30 días (T4-16).
              *
@@ -472,14 +499,14 @@ export const reportsService = {
             prisma.$queryRaw<FilaDeRotacion[]>(rotacionRapida),
             // T6-09 — las ventas de la semana, por día, y lo más vendido en ella: la misma
             // consulta que el resumen semanal, con otra ventana.
-            ventasPorDia(hoy, DIAS_DE_VENTAS, zona),
-            masVendidoEntre(haceDias(hoy, DIAS_DE_VENTAS - 1), hoy, zona, MAS_VENDIDOS),
+            conImportes ? ventasPorDia(hoy, DIAS_DE_VENTAS, zona) : Promise.resolve([]),
+            conImportes ? masVendidoEntre(haceDias(hoy, DIAS_DE_VENTAS - 1), hoy, zona, MAS_VENDIDOS) : Promise.resolve([]),
             // AUD-008 — las categorías del catálogo. El panel contaba los grupos de
             // `stockByCategory`, que incluyen «Sin categoría»: decía 12 donde había 11.
             prisma.category.count(),
         ]);
 
-        const [margenTotal, margenPorCategoria, margenPorProducto] = await margenEnCurso;
+        const margen = margenEnCurso ? await margenEnCurso : null;
 
         // Si el margen no bastó, se repite sin él. Es el caso raro —haría falta que casi
         // todos los primeros por rotación estuvieran inactivos— y cuesta 56 ms; lo que no
@@ -525,17 +552,34 @@ export const reportsService = {
             };
         });
 
-        return {
+        const base = {
             totals: {
                 totalProducts,
                 activeProducts,
                 inactiveProducts: totalProducts - activeProducts,
-                inventoryValue,
-                inventoryCostValue,
-                potentialMargin: costedSaleValue - inventoryCostValue,
                 productsWithoutCost,
                 lowStockCount,
                 categoryCount,
+            },
+            stockByCategory: porCategoria.map((c) => ({ name: c.name, stock: Number(c.stock) })),
+            movementsByMonth: movementsByMonth.map((m) => ({
+                month: m.month,
+                type: m.type,
+                total: Number(m.total),
+            })),
+            lowStockProducts,
+            stockMetrics: rotationMetrics,
+        };
+        if (!conImportes || !margen) return base;
+
+        const [margenTotal, margenPorCategoria, margenPorProducto] = margen;
+        return {
+            ...base,
+            totals: {
+                ...base.totals,
+                inventoryValue,
+                inventoryCostValue,
+                potentialMargin: costedSaleValue - inventoryCostValue,
             },
             stockByCategory: porCategoria.map((c) => ({
                 name: c.name,
@@ -550,20 +594,6 @@ export const reportsService = {
                 stock: p.stock,
                 totalValue: Number(p.price) * p.stock,
             })),
-            movementsByMonth: movementsByMonth.map((m) => ({
-                month: m.month,
-                type: m.type,
-                total: Number(m.total),
-            })),
-            lowStockProducts: lowStockProducts.map((p) => ({
-                id: p.id,
-                name: p.name,
-                sku: p.sku,
-                stock: Number(p.stock),
-                minStock: Number(p.minStock),
-                category: p.categoryName ?? null,
-            })),
-            stockMetrics: rotationMetrics,
             salesByDay,
             topSold: masVendido.map((p) => ({ name: p.nombre, units: p.unidades, revenue: p.importe })),
             margin: {
@@ -578,6 +608,39 @@ export const reportsService = {
                     conMargen({ productId: p.productId, name: p.name, units: Number(p.units), revenue: p.revenue, cost: p.cost }),
                 ),
             },
+        };
+    },
+
+    /**
+     * AUD-010 — «Necesita atención», en una petición. Cada cifra sale de la misma condición que
+     * la lista filtrada a la que lleva su fila, para que el número del panel y el de la lista
+     * coincidan. Todo son recuentos por índice o consultas ya acotadas; nada de esto toca el
+     * resumen, que es lo que la prueba de carga ya encuentra lento (rendimiento.md §15).
+     */
+    async getAttention(): Promise<AtencionDeHoy> {
+        const [lowStockTotal, products, caducidades, openCounts, purchasesToReceive, pendingSales] = await Promise.all([
+            prisma.product.count({ where: { isActive: true, stock: { lte: prisma.product.fields.minStock } } }),
+            productosConStockBajo(20),
+            caducidadesService.informe({ limit: "1" }),
+            prisma.inventoryCount.count({ where: { status: "OPEN" } }),
+            prisma.purchaseOrder.count({ where: { status: { in: ["PENDING", "PARTIALLY_RECEIVED"] } } }),
+            prisma.saleOrder.count({ where: { status: "PENDING" } }),
+        ]);
+        const primero = caducidades.data[0];
+
+        return {
+            lowStock: { total: lowStockTotal, products },
+            expiring: {
+                days: caducidades.days,
+                total: caducidades.meta.total,
+                expiredCount: caducidades.summary.expiredCount,
+                first: primero
+                    ? { code: primero.code, productName: primero.productName, expiresAt: primero.expiresAt, expired: primero.expired }
+                    : null,
+            },
+            openCounts,
+            purchasesToReceive,
+            pendingSales,
         };
     },
 
