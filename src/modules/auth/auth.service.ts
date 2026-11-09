@@ -2,7 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { HttpError } from "@/shared/lib/httpError";
 import { hashPassword, comparePassword } from "@/shared/lib/hash";
 import { generateToken, hashToken } from "@/shared/lib/tokens";
-import { sendPasswordResetEmail, sendVerificationEmail } from "@/shared/lib/nodemailer";
+import { sendAccountExistsEmail, sendPasswordResetEmail, sendVerificationEmail } from "@/shared/lib/nodemailer";
 import { auditService } from "@/modules/audit-logs";
 import { notificationsService } from "@/modules/notifications/notifications.service";
 import { logger } from "@/shared/lib/logger";
@@ -28,10 +28,17 @@ export const authService = {
      * que se crea aquí, así que a partir del segundo correo ya sale de ella.
      */
     async register(email: string, password: string, name: string, idioma: Idioma) {
-        const existing = await prisma.user.findUnique({ where: { email } });
-        if (existing) throw new HttpError(409, "El correo ya está registrado", "EMAIL_ALREADY_REGISTERED");
-
+        // AUD-014 — la respuesta es la misma exista o no la cuenta: un 409 decía a cualquiera qué
+        // correos están registrados, que «olvidé la contraseña» y «reenviar» ya no revelan. Quien
+        // sí la tiene recibe un correo que se lo dice. El hash se calcula antes de mirar, para
+        // que el tiempo de respuesta tampoco lo delate.
         const hashed = await hashPassword(password);
+        const existing = await prisma.user.findUnique({ where: { email } });
+        if (existing) {
+            await sendAccountExistsEmail(email, existing.name ?? name, existing.idioma);
+            return;
+        }
+
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 

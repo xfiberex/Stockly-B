@@ -648,6 +648,18 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   - El aviso sale al **confirmar el correo**, no al registrarse: un registro con un correo ajeno
     no llega a la campana.
 
+- **Ninguna pantalla sin sesión dice si un correo tiene cuenta** (`AUD-014`, decisión del
+  propietario del 2026-11-09). Registrarse, «olvidé la contraseña» y «reenviar la confirmación»
+  responden igual exista o no; quien sí la tiene se entera por su buzón. En el registro, el correo
+  «Ya tienes una cuenta» (`sendAccountExistsEmail`), sin tocar la cuenta, y el hash de la
+  contraseña se calcula **antes** de buscar, para que el tiempo de respuesta tampoco lo delate.
+  Devolver otra vez un 409 «para ayudar» deshace la decisión. (Invitar desde Usuarios sí da 409:
+  es una ruta de ADMIN.)
+- **Los importes del negocio son solo de ADMIN** (`AUD-009`, decisión del propietario del
+  2026-11-09): valor a coste, a precio de venta, margen y valor por categoría. El panel ya los
+  enseñaba solo a ADMIN; falta que `GET /reports` deje de mandarlos a los demás roles y que
+  Reportes no los pida (la tarea).
+
 - **Ninguna contraseña viaja por correo, y una cuenta no nace con una vacía.** A quien un
   administrador da de alta (`POST /users`) le llega un enlace para elegirla; la cuenta se crea con
   el hash de un secreto aleatorio que nadie conoce. Si el correo de la invitación no sale, la

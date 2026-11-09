@@ -35,6 +35,15 @@ export const correosEs = {
     "reset.boton": "Restablecer contraseña",
     "reset.nota": "El enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo y tu contraseña seguirá siendo la misma.",
 
+    // ── Registro con un correo que ya tiene cuenta (AUD-014) ─────────────────
+    // El registro responde lo mismo exista o no la cuenta; quien sí la tiene se entera aquí.
+    "cuentaExistente.asunto": "Ya tienes una cuenta en {marca}",
+    "cuentaExistente.preencabezado": "Alguien intentó registrarse en {marca} con este correo.",
+    "cuentaExistente.titulo": "Ya tienes una cuenta",
+    "cuentaExistente.cuerpo": "Alguien —quizá tú— ha intentado crear una cuenta en {marca} con este correo, que ya tiene una. No hemos creado otra. Si eres tú, inicia sesión; si no recuerdas la contraseña, usa «¿Olvidaste tu contraseña?» en esa página.",
+    "cuentaExistente.boton": "Iniciar sesión",
+    "cuentaExistente.nota": "Si no has sido tú, puedes ignorar este correo: tu cuenta sigue igual.",
+
     // ── Invitación a una cuenta (T6-10) ──────────────────────────────────────
     "invitacion.asunto": "Te han invitado a {marca}",
     "invitacion.preencabezado": "Elige tu contraseña para entrar en {marca}.",

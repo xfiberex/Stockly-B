@@ -5,11 +5,12 @@ import { cleanDb, createUser, getAuthCookie } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+    sendAccountExistsEmail: jest.fn().mockResolvedValue(undefined),
     sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
     transporter: { sendMail: jest.fn() },
 }));
 
-import { sendVerificationEmail, sendPasswordResetEmail } from "@/shared/lib/nodemailer";
+import { sendAccountExistsEmail, sendVerificationEmail, sendPasswordResetEmail } from "@/shared/lib/nodemailer";
 
 // El tercer argumento del mock es el rawToken enviado al usuario
 function getLastCapturedToken(mockFn: jest.Mock): string {
@@ -60,15 +61,25 @@ describe("Auth API", () => {
             expect(primero?.role).toBe("PENDING");
         });
 
-        it("409: email ya registrado", async () => {
+        it("AUD-014 — con un correo ya registrado responde lo mismo, no crea otra y avisa al dueño", async () => {
+            (sendVerificationEmail as jest.Mock).mockClear();
+            (sendAccountExistsEmail as jest.Mock).mockClear();
+            const antes = await prisma.user.findUniqueOrThrow({ where: { email: "ana@example.com" } });
+
             const res = await request(app).post(`${BASE}/register`).send({
                 name: "Ana Dup",
                 email: "ana@example.com",
-                password: "Test1234!",
+                password: "Otra1234!",
             });
 
-            expect(res.status).toBe(409);
-            expect(res.body.success).toBe(false);
+            expect(res.status).toBe(201);
+            expect(res.body.message).toBe("Revisa tu correo para confirmar tu cuenta");
+            expect(sendVerificationEmail).not.toHaveBeenCalled();
+            expect(sendAccountExistsEmail).toHaveBeenCalledWith("ana@example.com", antes.name, antes.idioma);
+            // La cuenta no cambia: ni nombre, ni contraseña, ni enlace.
+            const despues = await prisma.user.findUniqueOrThrow({ where: { email: "ana@example.com" } });
+            expect(despues).toEqual(antes);
+            expect(await prisma.user.count({ where: { email: "ana@example.com" } })).toBe(1);
         });
 
         it("422: email inválido", async () => {

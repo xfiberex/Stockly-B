@@ -39,7 +39,7 @@ export const spec = {
                 tags: ["Auth"], summary: "Registrar usuario",
                 security: [],
                 requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["name", "email", "password"], properties: { name: { type: "string" }, email: { type: "string", format: "email" }, password: { type: "string", minLength: 8 } } } } } },
-                responses: { "201": { description: "Registro exitoso. Se envía email de verificación. La cuenta nace sin rol (`PENDING`) y no entra hasta que un ADMIN le asigne uno (AUD-001)." }, "409": { description: "El correo ya está registrado" } },
+                responses: { "201": { description: "Siempre la misma respuesta, exista o no la cuenta (AUD-014). Si es nueva, se envía el correo de verificación y nace sin rol (`PENDING`): no entra hasta que un ADMIN le asigne uno (AUD-001). Si el correo ya tenía cuenta, no se crea otra ni se cambia nada, y a su dueño le llega «Ya tienes una cuenta»." } },
             },
         },
         "/auth/verify-email": {

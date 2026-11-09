@@ -6,6 +6,10 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-09: ocho tareas abiertas.** `AUD-014` en `main`, con la tercera tanda hecha
+> (la crítica del 2026-11-09 dio 27,8/40 y un P1, ya arreglado); para cerrarla falta repetir la
+> crítica. `AUD-009` ya tiene decisión: los importes, solo para ADMIN.
+>
 > **Estado al 2026-11-07, noche (PC): ocho tareas abiertas, `AUD-014` con los once puntos hechos**
 > en la rama `feat/aud-014-pantallas-de-acceso` de los dos repositorios (sin fusionar). Para
 > cerrarla falta lo que no es código: la crítica dual repetida, el E2E contra `Stockly_e2e` y
@@ -161,9 +165,10 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
   - **Ubicación:** `src/contratos/api.ts` (`PERMISOS`, `"GET /reports"`),
     `src/modules/reports/reports.service.ts` (`getSummary`: `totals.inventoryCostValue`,
     `inventoryValue`, `potentialMargin`, `stockByCategory[].value`, `margin`, `topByValue`).
-  - **Decisión previa:** qué importes ve cada rol. Lo aplicado en el panel —**solo ADMIN** ve
-    importes— es la propuesta; falta que el propietario la confirme y anotarla en
-    [CONTEXTO.md](CONTEXTO.md) §6. Ojo: **Informes** (`/reports` en la interfaz) también los enseña
+  - **Decisión previa, tomada el 2026-11-09: solo ADMIN** recibe importes (la propuesta, ya
+    aplicada en el panel), anotada en [CONTEXTO.md](CONTEXTO.md) §6. Para los demás roles, el mismo
+    endpoint con la respuesta recortada y declarada en el contrato; Reportes sigue abierto a todos,
+    sin importes para quien no es ADMIN. Ojo: **Informes** (`/reports` en la interfaz) también los enseña
     hoy a USER y WAREHOUSE, y no se tocó.
   - **Qué hacer:** según la decisión, o quitar esos campos de la respuesta para quien no es ADMIN
     (mismo endpoint, respuesta recortada y declarada en el contrato), o sacar `GET /reports` de
@@ -283,8 +288,49 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       - *Comprobado:* `pnpm verify` del frontend en verde (1061 tests y 1 omitido, en 94 archivos;
         10 nuevos en `pantallasDeAcceso.test.tsx` y `ResetPasswordPage.test.tsx`) y, en el backend,
         `check` y los 1836 tests. **Sin comprobar en el navegador, sin E2E y sin la crítica.**
-    - **Para cerrarla:** repetir la crítica dual (sin P1, ninguna por debajo de 24), `pnpm verify` en
-      los dos, E2E contra `Stockly_e2e`, y fusionar.
+    - **Fusionada en `main` el 2026-11-07** (las dos tandas), con los workflows de los dos
+      repositorios en verde, **también el E2E** de la CI del frontend.
+    - **Tercera crítica (2026-11-09, dual-agent):** media **27,8/40** (24 → 25,2 → 27,8): Login 29,
+      Registro 28, Olvidé 31, **Restablecer 24** (antes 19), Confirmar 27, Reenviar 28. Ninguna por
+      debajo de 24, pero **un P1**: la invitación caducada hablaba de «restablecer» y llevaba a
+      «Recuperar contraseña» a quien nunca tuvo una. Detector: CLI limpio; en el navegador, solo el
+      falso positivo de las devtools de TanStack y una palabra suelta en el aviso del login.
+      Instantánea en `Stockly-F/.impeccable/critique/2026-11-09T15-07-22Z__src-modules-auth-components.md`.
+    - **Hecho (tercera tanda, 2026-11-09; el propietario decidió «todo, también lo menor», y que el
+      registro responda de forma neutra):**
+      - *[P1] Invitación caducada:* «Pedir un enlace nuevo», con un texto que no habla de
+        restablecer, y «Olvidé» llega sabiendo que viene de una invitación (`EstadoDeAcceso.invitacion`):
+        título y pestaña «Elegir tu contraseña».
+      - *Invitación con enlace bueno:* «Para {correo}» bajo el título, la pestaña dice «Elige tu
+        contraseña», la etiqueta es «Contraseña» y hay «Volver al inicio de sesión» (también en
+        Restablecer, que no tenía salida).
+      - *El foco ya no cae en `<body>` al enviar:* `Button` con `isLoading` ya no se desactiva; se
+        marca `aria-disabled` y el clic (y el envío implícito con Intro) no hace nada, el patrón de
+        `ErrorDeCarga`. Vale para toda la aplicación. Y anillo de foco propio en los botones
+        (`focus-visible:outline-accent`), que en el primario apenas se veía.
+      - *Registro neutro* (decisión del propietario, en [CONTEXTO.md](CONTEXTO.md) §6): con un correo
+        ya registrado, `POST /auth/register` responde el mismo 201, no crea ni cambia nada y manda
+        «Ya tienes una cuenta» (`sendAccountExistsEmail`, en español e inglés); el hash se calcula
+        antes de buscar. Fuera el 409 de Swagger. La pantalla siempre acaba en «Revisa tu correo».
+      - *Confirmar anuncia el resultado:* foco al `h1` y la pestaña con su título, en «hecho» y en
+        «error».
+      - *Menores:* un solo «¿Olvidaste tu contraseña?» con el aviso de credenciales; sin subtítulo
+        en futuro tras pedir un enlace y «Volver al inicio de sesión» como botón; la carga de las
+        rutas de acceso en el sitio de la tarjeta y el `Spinner` con `border-t-accent`; la tarjeta
+        arriba (`sm:pt-[16vh]`) y no centrada en vertical, para que el aviso no mueva el botón;
+        `p-6` en el móvil; sin ejemplos en los campos de correo y nombre; vacía, «La contraseña es
+        obligatoria»; `gap-2` en `EnlaceCaducado`; «Pide uno nuevo: llega en unos minutos»;
+        `text-pretty` en los avisos; «Mostrar «Contraseña»» con el nombre de su campo; sin una alerta
+        por campo al enviar vacío (`Input anunciarError={false}`; el foco ya va al primero);
+        `autoFocus` solo con ratón en Registro y en Olvidé/Reenviar (`hayPunteroFino`); «Regístrate»
+        e «Inicia sesión» con 44 px en táctil; un solo vocabulario, «confirmar» («Reenviar la
+        confirmación», «Pedir un enlace nuevo»); y tras confirmar, a quién preguntar si la
+        aprobación tarda.
+      - *No se hizo:* el botón primario gris claro en el tema oscuro es del sistema de diseño, no de
+        estas pantallas; el selector de idioma sin sesión es de `AUD-016`.
+      - *Comprobado:* `pnpm verify` del frontend en verde (1065 tests y 1 omitido; los que fijaban
+        `disabled` al cargar pasan a `aria-disabled`) y, en el backend, `check` y los 1836 tests.
+    - **Para cerrarla:** repetir la crítica dual (sin P1, ninguna por debajo de 24).
 
 - [ ] **AUD-015 · Reportes: tarjetas que no cuadran, gráficos sin alternativa y un informe por periodo que abre vacío**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio

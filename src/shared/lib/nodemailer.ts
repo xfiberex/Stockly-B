@@ -127,6 +127,36 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
 }
 
 /**
+ * AUD-014 — a quien ya tiene cuenta, cuando alguien se registra con su correo. El registro
+ * responde lo mismo exista o no la cuenta (como «olvidé la contraseña»), así que es este
+ * correo, que solo lee el dueño del buzón, el que dice que ya la tenía. Sin token: el botón va
+ * al inicio de sesión, y desde ahí está «¿Olvidaste tu contraseña?».
+ */
+export async function sendAccountExistsEmail(to: string, name: string, idioma: Idioma) {
+    requireSmtp();
+    const url = `${env.frontendUrl}/auth/login`;
+    const t = traductorDeCorreo(idioma);
+
+    const bodyHtml =
+        emailParagraph(t("comun.saludo", { nombre: escapeHtml(name) })) +
+        emailParagraph(t("cuentaExistente.cuerpo")) +
+        emailButton(url, t("cuentaExistente.boton")) +
+        emailNote(t("cuentaExistente.nota"));
+
+    await transporter.sendMail({
+        from: env.smtp.from,
+        to,
+        subject: t("cuentaExistente.asunto"),
+        html: renderEmail({
+            preheader: t("cuentaExistente.preencabezado"),
+            heading: t("cuentaExistente.titulo"),
+            bodyHtml,
+            idioma,
+        }),
+    });
+}
+
+/**
  * T6-10 — la invitación a una cuenta que ha creado un administrador. **No lleva contraseña**:
  * lleva un enlace para ponerla, a la misma página que «olvidé mi contraseña» y con el mismo
  * token. `invitacion=1` solo cambia lo que dice esa página; no decide nada en el servidor.

@@ -34,6 +34,12 @@ export const correosEn: Record<ClaveDeCorreo, string> = {
     "invitacion.titulo": "Your account is ready",
     "invitacion.cuerpo": "An administrator created a {marca} account for you. Choose your password to start using it.",
     "invitacion.boton": "Choose my password",
+    "cuentaExistente.asunto": "You already have a {marca} account",
+    "cuentaExistente.preencabezado": "Someone tried to sign up to {marca} with this email.",
+    "cuentaExistente.titulo": "You already have an account",
+    "cuentaExistente.cuerpo": "Someone (maybe you) tried to create a {marca} account with this email, which already has one. We have not created another. If it was you, sign in; if you do not remember your password, use “Forgot your password?” on that page.",
+    "cuentaExistente.boton": "Sign in",
+    "cuentaExistente.nota": "If it was not you, you can ignore this email: your account is unchanged.",
     "invitacion.nota": "The link expires in {dias} days. If it does, use “Forgot your password?” on the sign-in page to get a new one.",
 
     "aprobacion.asunto": "Your {marca} account is approved",
