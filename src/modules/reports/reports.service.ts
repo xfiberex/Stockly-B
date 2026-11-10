@@ -453,19 +453,21 @@ export const reportsService = {
              * instante UTC en que empieza ese mes en el negocio, que es como se guardan las
              * fechas. Sigue siendo un recorrido por rango de índice por mes.
              */
-            prisma.$queryRaw<Array<{ month: string; type: string; total: bigint }>>`
+            // AUD-015 — `LEFT JOIN`: un mes sin movimientos sale igual, con el tipo a null, para
+            // que la respuesta diga cuáles son los seis meses y el eje no se salte los vacíos.
+            prisma.$queryRaw<Array<{ month: string; type: string | null; total: bigint | null }>>`
                 SELECT TO_CHAR(g.mes, 'YYYY-MM') AS month, c.type, c.total
                 FROM generate_series(
                         date_trunc('month', NOW() AT TIME ZONE ${zona}) - INTERVAL '5 months',
                         date_trunc('month', NOW() AT TIME ZONE ${zona}),
-                        INTERVAL '1 month') AS g(mes),
-                     LATERAL (
+                        INTERVAL '1 month') AS g(mes)
+                     LEFT JOIN LATERAL (
                         SELECT sm.type, COUNT(*)::bigint AS total
                         FROM stock_movements sm
                         WHERE sm."createdAt" >= (g.mes AT TIME ZONE ${zona} AT TIME ZONE 'UTC')
                           AND sm."createdAt" < ((g.mes + INTERVAL '1 month') AT TIME ZONE ${zona} AT TIME ZONE 'UTC')
                         GROUP BY sm.type
-                     ) c
+                     ) c ON true
                 ORDER BY g.mes ASC
             `,
             // Productos con stock bajo
@@ -562,11 +564,10 @@ export const reportsService = {
                 categoryCount,
             },
             stockByCategory: porCategoria.map((c) => ({ name: c.name, stock: Number(c.stock) })),
-            movementsByMonth: movementsByMonth.map((m) => ({
-                month: m.month,
-                type: m.type,
-                total: Number(m.total),
-            })),
+            movementsByMonth: movementsByMonth.flatMap((m) =>
+                m.type === null ? [] : [{ month: m.month, type: m.type, total: Number(m.total) }],
+            ),
+            movementMonths: [...new Set(movementsByMonth.map((m) => m.month))],
             lowStockProducts,
             stockMetrics: rotationMetrics,
         };
@@ -579,6 +580,7 @@ export const reportsService = {
                 ...base.totals,
                 inventoryValue,
                 inventoryCostValue,
+                costedSaleValue,
                 potentialMargin: costedSaleValue - inventoryCostValue,
             },
             stockByCategory: porCategoria.map((c) => ({

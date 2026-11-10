@@ -143,6 +143,19 @@ describe("Consultas del dashboard (T4-16)", () => {
         expect(salidas?.total).toBeGreaterThan(0);
     });
 
+    it("dice cuáles son los seis meses de la ventana, también los que no tuvieron movimientos (AUD-015)", async () => {
+        const res = await resumen();
+
+        const [anio, mes] = hoyEn(ZONA_HORARIA_POR_DEFECTO).split("-").map(Number);
+        const esperados = Array.from({ length: 6 }, (_, i) => new Date(Date.UTC(anio!, mes! - 6 + i, 1)).toISOString().slice(0, 7));
+        expect(res.body.data.movementMonths).toEqual(esperados);
+        // Esta suite solo crea movimientos en el mes en curso: los otros cinco no traen filas,
+        // y ninguna fila viene con el tipo vacío del mes sin actividad.
+        const conFilas = new Set(res.body.data.movementsByMonth.map((f: { month: string }) => f.month));
+        expect(conFilas.size).toBeLessThan(6);
+        for (const fila of res.body.data.movementsByMonth) expect(fila.type).toBeTruthy();
+    });
+
     it("un movimiento fuera de la ventana de 6 meses no aparece", async () => {
         const viejo = await crearProducto({ data: { name: "Antiguo", price: 1, stock: 1 } });
         await prisma.stockMovement.create({

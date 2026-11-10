@@ -72,6 +72,9 @@ describe("Valor a coste y margen realizado (T5-02)", () => {
             expect(totals.inventoryCostValue).toBe(30); // solo 6×5
             // (10 − 6) × 5. Si se restara el coste de uno al precio de los dos saldría 220.
             expect(totals.potentialMargin).toBe(20);
+            // AUD-015 — la cifra con la que sí cuadra la resta: venta de los que tienen coste.
+            expect(totals.costedSaleValue).toBe(50);
+            expect(totals.costedSaleValue - totals.inventoryCostValue).toBe(totals.potentialMargin);
             expect(totals.productsWithoutCost).toBe(1);
         });
 

@@ -1516,6 +1516,12 @@ export const totalesReporteSchema = z.object({
     inventoryValue: z.number().optional(),
     /** T5-02 — a coste medio, sumando solo los productos que tienen coste. Solo ADMIN (AUD-009). */
     inventoryCostValue: z.number().optional(),
+    /**
+     * AUD-015 — a precio de venta, **solo de los productos con coste**: la cifra de la que sale el
+     * margen potencial (`costedSaleValue − inventoryCostValue`). `inventoryValue` cuenta todos, y
+     * restarle el coste no da el margen. Solo ADMIN.
+     */
+    costedSaleValue: z.number().optional(),
     /** Precio de venta menos coste, **sobre los productos con coste**; no sobre todos. Solo ADMIN. */
     potentialMargin: z.number().optional(),
     /** Activos con stock y sin coste: quedan fuera de las dos cifras anteriores. */
@@ -1637,6 +1643,12 @@ export const resumenReporteSchema = z.object({
     /** Solo ADMIN (AUD-009). */
     topByValue: z.array(productoTopSchema).optional(),
     movementsByMonth: z.array(movimientoPorMesSchema),
+    /**
+     * AUD-015 — los seis meses de la ventana de `movementsByMonth` (`YYYY-MM`, del más antiguo al
+     * mes en curso del negocio), **también los que no tuvieron movimientos**: `movementsByMonth`
+     * solo trae filas de los meses con actividad, y un eje hecho con ellas se saltaba los vacíos.
+     */
+    movementMonths: z.array(z.string()),
     lowStockProducts: z.array(productoBajoStockSchema),
     stockMetrics: z.array(metricaStockSchema),
     /** T6-09 — hoy y los seis días anteriores, del más antiguo al más reciente: siempre siete. Solo ADMIN. */

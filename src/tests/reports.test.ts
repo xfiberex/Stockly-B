@@ -127,7 +127,7 @@ describe("Reports API", () => {
 
     // -----------------------------------------------------------------------
     describe("AUD-009 — los importes del negocio, solo para ADMIN", () => {
-        const IMPORTES_DE_TOTALES = ["inventoryValue", "inventoryCostValue", "potentialMargin"];
+        const IMPORTES_DE_TOTALES = ["inventoryValue", "inventoryCostValue", "costedSaleValue", "potentialMargin"];
         const LISTAS_CON_IMPORTE = ["topByValue", "salesByDay", "topSold", "margin"];
 
         it.each(["USER", "WAREHOUSE", "SELLER"] as const)("%s recibe el resumen sin ningún importe", async (role) => {

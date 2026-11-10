@@ -6,6 +6,13 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-10: siete tareas abiertas; `AUD-015` hecha, a falta de su crítica.** Las
+> tarjetas de Reportes cuadran, los tres gráficos tienen tabla para el lector y ninguno es una
+> parada, el eje enseña los seis meses y el informe por periodo vive en la URL y, vacío, ofrece
+> otro periodo. La crítica repetida del bloque queda con las demás críticas de cierre, al final.
+> Lo siguiente sin decisión pendiente: `AUD-016`, `AUD-017` y `AUD-018`. Desde hoy se trabaja en
+> `main`, sin ramas (`CLAUDE.md`).
+>
 > **Estado al 2026-11-09, tarde: siete tareas abiertas.** Se cerró `AUD-009`: los importes del
 > negocio solo le llegan a ADMIN. `AUD-010` está hecha —el panel hace una petición (dos para
 > ADMIN) en vez de cinco o seis— a falta de repetir la prueba de carga, que necesita `k6`. Lo
@@ -350,6 +357,31 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
     pantalla del árbol de accesibilidad, ningún gráfico es una parada sin nombre.
   - **Dependencias:** conviene después de `AUD-009`, que puede cambiar qué importes ve cada rol en
     esta pantalla.
+  - **Estado al 2026-11-10: hecha, a falta de la crítica repetida** (queda con las críticas de
+    cierre, al final). En `main`, sin commitear al escribir esto.
+    - **Tarjetas que cuadran:** `GET /reports` trae `costedSaleValue` (la venta de los productos
+      con coste, solo ADMIN), de la que sale el margen potencial. La tarjeta del margen enseña la
+      resta («$X a venta − $Y a coste») y la del coste dice «Solo los productos con coste» cuando
+      hay alguno sin él; el aviso enlaza a `?aviso=sinCoste`, como en el panel.
+    - **Gráficos:** los tres en `aria-hidden`, con `accessibilityLayer={false}` (ningún SVG con
+      `role="application"` ni en el orden de tabulación) y una tabla `sr-only` con las mismas
+      cifras, con su título como `caption`. La tarta de 9 categorías con 8 colores pasa a barras
+      horizontales ordenadas; el valor por categoría, también ordenado. Ejes con
+      `TEXTO_DE_EJE`, que se muda del panel a `shared/lib/grafico.ts`.
+    - **Meses:** `GET /reports` trae `movementMonths`, los seis meses de la ventana aunque no
+      tengan movimientos (`LEFT JOIN LATERAL`); el eje y la tabla los enseñan todos.
+    - **Informe por periodo:** el periodo en la URL (`?preset=…` o `?from=…&to=…`; lo que no se
+      entiende se ignora y queda este mes); vacío, ofrece «Mes anterior» y «Este año» (menos el
+      que ya está) y desactiva exportar CSV y PDF.
+    - **Comprobado:** tests nuevos en `margen.test.ts`, `reports.test.ts` y
+      `dashboard-consultas.test.ts` (backend) y en `resumen.test.tsx` e
+      `InformePorPeriodo.test.tsx` (frontend); `pnpm verify` en verde en los dos (backend 1850
+      tests; frontend 1079 y 1 omitido); E2E contra `Stockly_e2e`, 39 pasados y 3 omitidos. En el
+      navegador, con los datos del seed: barras ordenadas, julio a cero en el eje, ningún
+      `role="application"` fuera de `aria-hidden`, ningún elemento del gráfico con
+      `tabindex` ≥ 0, y `/reports/period?from=2025-01-01&to=2025-01-31` abre ese rango, vacío,
+      con exportar desactivado y las dos alternativas.
+    - **Falta:** la crítica repetida del bloque Reportes (criterio: sin P1).
 
 - [ ] **AUD-016 · Los roles no llegan al marco: navegación sin recortar, tema e idioma solo para ADMIN y acciones de Etiquetas que acaban en 403**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio

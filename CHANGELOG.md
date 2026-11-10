@@ -150,6 +150,14 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Reportes: cifras que cuadran y gráficos que se leen** (`AUD-015`): el margen potencial
+  enseña de qué resta sale —la venta y el coste de los productos que tienen coste— y el valor a
+  coste dice que solo cuenta esos; el aviso de los que no tienen coste lleva a la lista. Los tres
+  gráficos tienen sus cifras en una tabla para el lector de pantalla y ya no son una parada sin
+  nombre; la tarta por categoría pasa a barras ordenadas; el gráfico de movimientos enseña siempre
+  los seis meses, también los que no tuvieron ninguno. El informe por periodo guarda el periodo
+  en la URL y, si sale vacío, ofrece el mes anterior o el año y no deja exportar ceros.
+  `GET /reports` añade `totals.costedSaleValue` (solo ADMIN) y `movementMonths`.
 - **El móvil de quien trabaja de pie** (`AUD-013`): a 390 px, Productos enseña el stock de cada
   fila sin desplazar (la tabla se queda con nombre, stock y acciones, y los filtros se pliegan
   tras «Filtros (n)»); la recepción de una compra, el campo de cada línea; un conteo, su primer
