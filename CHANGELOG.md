@@ -150,6 +150,11 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Cada rol ve su menú** (`AUD-016`): el vendedor, el mostrador, sus ventas, sus clientes y los
+  productos; el almacén empieza por el inventario. Todos los roles eligen tema e idioma desde su
+  Perfil —y el idioma, también antes de entrar, bajo la tarjeta de acceso—, y el rol se ve en el
+  menú de usuario y en el Perfil. Etiquetas ya no ofrece crear,
+  editar ni eliminar a quien la API se lo rechaza.
 - **Reportes: cifras que cuadran y gráficos que se leen** (`AUD-015`): el margen potencial
   enseña de qué resta sale —la venta y el coste de los productos que tienen coste— y el valor a
   coste dice que solo cuenta esos; el aviso de los que no tienen coste lleva a la lista. Los tres

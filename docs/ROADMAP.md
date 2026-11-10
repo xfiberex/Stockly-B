@@ -6,6 +6,13 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-10, tarde: seis tareas abiertas; `AUD-016` hecha.** Cada rol tiene su menú
+> escrito entero (`shared/navegacion.ts`): SELLER pasa de 16 destinos a 4 y WAREHOUSE empieza por el
+> inventario. Tema e idioma, en el Perfil de todos; el rol se ve en el menú de usuario y en el
+> Perfil, y en las pantallas de acceso antes de entrar; Etiquetas no ofrece a nadie más que ADMIN lo
+> que la API le rechazaría. Lo siguiente sin
+> decisión pendiente: `AUD-017` y `AUD-018`.
+>
 > **Estado al 2026-11-10: siete tareas abiertas; `AUD-015` hecha, a falta de su crítica.** Las
 > tarjetas de Reportes cuadran, los tres gráficos tienen tabla para el lector y ninguno es una
 > parada, el eje enseña los seis meses y el informe por periodo vive en la URL y, vacío, ofrece
@@ -127,18 +134,18 @@ en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-09 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
+**Última actualización:** 2026-11-10 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
 | 2 · Medio | 0 | 3 | — |
-| 3 · Bajo | 7 | 3 | 1 · 6 · 0 |
+| 3 · Bajo | 6 | 4 | 1 · 5 · 0 |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **7** | **12** | **1 · 6 · 0** |
+| **Total** | **6** | **13** | **1 · 5 · 0** |
 
-**Abiertas por área:** Diseño 5 (`AUD-014` a `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** Diseño 4 (`AUD-014`, `AUD-015`, `AUD-017`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -334,7 +341,7 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
         confirmación», «Pedir un enlace nuevo»); y tras confirmar, a quién preguntar si la
         aprobación tarda.
       - *No se hizo:* el botón primario gris claro en el tema oscuro es del sistema de diseño, no de
-        estas pantallas; el selector de idioma sin sesión es de `AUD-016`.
+        estas pantallas; el selector de idioma sin sesión es de `AUD-016` (hecho allí).
       - *Comprobado:* `pnpm verify` del frontend en verde (1065 tests y 1 omitido; los que fijaban
         `disabled` al cargar pasan a `aria-disabled`) y, en el backend, `check` y los 1836 tests.
     - **Para cerrarla:** repetir la crítica dual (sin P1, ninguna por debajo de 24).
@@ -382,25 +389,6 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       `tabindex` ≥ 0, y `/reports/period?from=2025-01-01&to=2025-01-31` abre ese rango, vacío,
       con exportar desactivado y las dos alternativas.
     - **Falta:** la crítica repetida del bloque Reportes (criterio: sin P1).
-
-- [ ] **AUD-016 · Los roles no llegan al marco: navegación sin recortar, tema e idioma solo para ADMIN y acciones de Etiquetas que acaban en 403**
-  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** crítica del 2026-11-07 («Lo que se repite», 5). Tres P1 de dos bloques.
-  - **Ubicación:**
-    - `Stockly-F/src/App.tsx` (`NAVEGACION`, `visibleDeNav`): SELLER ve 16 destinos; los tres de
-      WAREHOUSE empiezan a ~600 px en el menú móvil. `ocultoPara` (puesto en `AUD-008` para el
-      panel de SELLER) admite un solo rol.
-    - `SelectorDeTema` y `SelectorDeIdioma` solo se montan en `settings/components/SettingsPage.tsx`
-      (`:266-267`), ruta de ADMIN.
-    - `tags/components/TagsPage.tsx` (`:391`): «Nueva», «Editar» y «Eliminar» sin comprobar el
-      permiso; la API es `SOLO_ADMIN`.
-    - El rol no se ve en el perfil ni en el menú de usuario.
-  - **Qué hacer:** que cada destino diga para qué roles existe (o derivarlo de `PERMISOS`) y
-    ordenar lo del rol primero; la tarjeta «Apariencia» también en el Perfil; Etiquetas con
-    `usePuede("POST /tags")`; una insignia de rol junto al nombre.
-  - **Criterio de aceptación:** test de navegación por rol con la lista exacta de cada uno; un
-    WAREHOUSE cambia el tema desde su perfil; un WAREHOUSE no ve acciones en Etiquetas.
-  - **Dependencias:** ninguna.
 
 - [ ] **AUD-017 · La bitácora y la campana no dicen lo que hace falta: sobre quién se actuó, filtros por usuario y fecha, y avisos sin orden de urgencia**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
@@ -728,3 +716,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | AUD-012 | Tier 2 · Diseño: acciones irreversibles de un toque — borrar en el catálogo, cancelar o enviar órdenes, cambiar un rol, desactivar un almacén (crítica del 2026-11-07) | 2026-11-07 | **Un componente para todas:** `ConfirmarAccion` (`Stockly-F/src/shared/components/`), con el modelo de las que ya confirmaban (borrar un cliente, cancelar una venta enviada): el título nombra la acción y la cosa, el cuerpo dice la consecuencia que no se ve desde la fila, el botón lleva el verbo, «Volver» va antes en el teclado y el diálogo se cierra en el `onSuccess`. El patrón, en `Stockly-F/docs/design-system.md` §8, «Lo que no se deshace, se confirma». **Pantallas:** borrar en Productos, Categorías, Marcas, Proveedores y Etiquetas (cada una dice qué les pasa a sus productos); cancelar y eliminar una compra pendiente; marcar enviada —lista lo que sale y de qué almacén—, cancelar y eliminar una venta pendiente; en Usuarios, **el rol se elige en el desplegable pero solo se aplica al confirmar** («Laura pasará de Consulta a Admin»; con las flechas sobre el desplegable cerrado ya no cambia nada), igual que aprobar una cuenta pendiente, y desactivar confirma; en Almacenes, hacer predeterminado (dice adónde irá lo que no diga almacén) y desactivar confirman, y **con existencias «Desactivar» no se ofrece**: desactivado, con «Guarda N unidades: transfiérelas antes» atado por `aria-describedby`. **No confirman, a propósito,** las que devuelven sin quitar nada: reactivar a alguien o un almacén y restaurar un producto. **Backend:** desactivar un producto **ya no borra su imagen de Cloudinary** (`product.service.ts`): era un borrado lógico que `restore` deshacía a medias, devolviendo el producto sin foto; test nuevo en `products.test.ts`. **Comprobado:** `pnpm verify` en verde en los dos repositorios —backend 1830 tests, frontend 1029 y 1 omitido en 92 archivos—. Los 12 tests que fijaban la acción de un toque se reescribieron para pasar por la confirmación y comprobar que un toque solo no hace nada, y hay tests nuevos por pantalla (Productos, Categorías —también si borrar falla—, Proveedores, Etiquetas, eliminar una venta, Usuarios con el recorrido de teclado, Almacenes vacío y con existencias). **E2E** actualizado (tres envíos confirman; Almacenes espera el botón desactivado y recarga tras la transferencia por API) **pero no ejecutado**. **Sin comprobar en el navegador**: el criterio pedía tests de componente. **Sin hacer:** un «Deshacer» en el aviso en lugar de confirmar, que la ficha dejaba como alternativa; y los `aria-label` con el nombre en los botones de icono de Categorías, Marcas y Proveedores, que siguen en `AUD-019`. |
 | AUD-009 | Tier 2 · Seguridad: `GET /reports` entregaba los importes del negocio a todos los roles, aunque el panel ya solo se los enseñaba a ADMIN | 2026-11-09 | **Decisión del propietario (2026-11-09): solo ADMIN** recibe importes, anotada en [CONTEXTO.md](CONTEXTO.md) §6. **Mismo endpoint, respuesta recortada y declarada en el contrato:** para USER, WAREHOUSE y SELLER no vienen `inventoryValue`, `inventoryCostValue`, `potentialMargin`, `stockByCategory[].value`, `topByValue`, `salesByDay`, `topSold` ni `margin` (campos `.optional()` en `resumenReporteSchema`, con el porqué). No vienen a cero: no vienen, y `getSummary({ conImportes })` **ni los consulta** (el margen, el top por valor y las ventas de la semana). El PDF sigue la misma regla (sin importes: unidades y su reparto por categoría). **Frontend:** el panel solo pide el resumen a ADMIN (`useReports({ enabled })`); Reportes, sin importes, quita las tarjetas de dinero, el margen realizado, el valor por categoría y el top por valor, y pone «Categorías» en el sitio del valor. **Comprobado:** `reports.test.ts` (USER, WAREHOUSE y SELLER sin ningún importe; ADMIN con todos; el PDF de USER sale), test de Reportes sin importes, `pnpm verify` en verde en los dos repositorios (backend 1849 tests; frontend 1070 y 1 omitido); en el navegador, el `/reports` de WAREHOUSE no trae ningún importe y su pantalla de Reportes no enseña un solo «$». **Sin hacer, y no lo pedía la ficha:** `GET /reports/period` (ventas y compras en importe) y el valor a coste de `GET /reports/expiring` siguen llegando a todos; si la decisión vale también para ellos, es una tarea nueva. |
 | AUD-013 | Tier 3 · Diseño: el móvil de quien trabaja de pie — el stock, la recepción, el conteo y el cobro quedaban fuera de la pantalla a 390 px (crítica del 2026-11-07) | 2026-11-07 | **El criterio, medido en el navegador a 390 px táctil:** **Productos** —la tabla pasa de 1099 a 357 px, sin desplazamiento, y el stock de la primera fila está en x≈177 (antes 661); la primera fila, en y=474 (antes 770)—: por debajo de `md` se queda con nombre, stock y acciones (estas, de dos en dos), sin el ancho mínimo; imagen, ABC, categoría, marca, precio y estado se ocultan (están en la ficha, a un toque), los cinco desplegables se pliegan tras «Filtros (n)» y la leyenda ABC no se pinta. **Recepción de compras** —el campo de cada línea, en x=262–358 dentro de un diálogo de 358 (antes x=576)—: producto y «Llega ahora», con «Pedido 5 · recibido 0» debajo del nombre. **Conteo** —el primer campo, en y=713–757 (antes 825, en el pliegue)—: buscador y «Escanear» en una fila y «Guardar» en una barra fija abajo. **Mostrador** —con tres líneas, el total en y=751 y el botón en y=788–832 de 844—: el cobro va en una barra fija hasta `lg`, con el hueco reservado (lo último de la página no queda tapado); desde `lg`, dos columnas, la venta a la izquierda y cliente y cobro a la derecha, `sticky` bajo la cabecera (comprobado a 1024 px). **Las columnas escondidas sin señal** (Usuarios, Clientes, Sugerencias, Categorías, Proveedores, Bitácora): `pista-de-desplazamiento`, en `CLASES_TABLA_DESPLAZABLE` y por tanto en las 39 tablas, desvanece el borde hacia el que sigue la tabla y se apaga al final —una animación ligada al desplazamiento, sin JavaScript; medido en Usuarios: 40 px a la derecha al principio, los dos bordes a mitad, solo la izquierda al final—. En Firefox, sin `animation-timeline`, queda como estaba. **Compartido:** `clasesDeBarraFija.ts` (la barra del panel del almacén pasa a usarla). **Regla de tablas** de `design-system.md` actualizada: en una pantalla de consulta ninguna columna se esconde; en una de trabajo de pie, sí, si lo oculto va debajo del nombre o en la ficha. **Comprobado:** `pnpm verify` del frontend en verde, 1037 tests y 1 omitido en 93 archivos; tests de densidad nuevos (`movilDePie.test.ts`, 7, que fijan las clases porque jsdom no aplica CSS) y el del plegado de filtros. El backend no cambia. **Sin hacer:** en Productos, en el móvil, el ajuste masivo y la selección siguen ahí pero el precio no se ve sin abrir la ficha; los cuatro botones de cabecera de Productos siguen ocupando dos filas; y en las pantallas de consulta las columnas siguen a lo ancho, ahora con señal, no en tarjetas. |
+| AUD-016 | Tier 3 · Diseño: los roles no llegaban al marco — navegación sin recortar, tema e idioma solo para ADMIN y acciones de Etiquetas que acababan en 403 (crítica del 2026-11-07) | 2026-11-10 | **Una lista por rol, escrita entera** en `Stockly-F/src/shared/navegacion.ts`, en el orden en que se pinta; sustituye a `soloAdmin`, `permiso` y `ocultoPara`. **No se deriva de `PERMISOS`**: casi todas las lecturas son de todos, así que diría lo que cada rol puede abrir, no lo que le hace falta; lo que queda fuera de un menú sigue abriéndose por URL si la ruta lo permite (el menú ordena, no protege). **Las listas** (decisión de producto, ajustable en ese archivo): ADMIN, todo; USER, todo menos mostrador y administración; WAREHOUSE, Panel · Inventario · Órdenes (Compra, Venta) · Productos · Reportes; SELLER, Mostrador · Órdenes (Venta, Clientes) · Productos (antes, 16 destinos). **Además:** «Apariencia» (tema e idioma) también en el Perfil; Etiquetas con `usePuede`; `InsigniaDeRol` en el menú de usuario, el Perfil y Usuarios (el mapa `ROL` pasa a `modules/users/rol.ts`); y, lo que `AUD-014` dejó para esta tarea, **el idioma sin sesión**: «Español · English», cada uno escrito en el suyo, bajo la tarjeta de las seis pantallas de acceso. **Comprobado:** `navegacion.test.tsx` con la lista exacta de los cuatro roles, que ningún menú lleve a una ruta que su rol no abre y que todo destino esté en algún menú; un WAREHOUSE pasa a oscuro desde su perfil; USER, WAREHOUSE y SELLER sin botones en Etiquetas; en el login, «English» cambia la pantalla al momento. `pnpm verify` del frontend en verde (1091 y 1 omitido); el backend no cambia. **E2E:** 38 pasados, 3 omitidos y uno fallido, «el interruptor de configuración sigue activo tras recargar», que **falla igual sin estos cambios** (la pantalla sigue en el `Suspense` de la carga diferida a los 5 s, en el primer test de la pasada) y pasa tres de tres en serie: no es de esta tarea, queda para mirarlo aparte. |
