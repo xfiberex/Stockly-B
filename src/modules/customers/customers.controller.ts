@@ -40,8 +40,10 @@ export const customersController = {
 
     async delete(req: Request<{ id: string }>, res: Response, next: NextFunction) {
         try {
+            // AUD-017 — la etiqueta se lee antes de borrar: después la bitácora no tendría de dónde.
+            const etiqueta = await auditService.etiquetaDe("Customer", req.params.id);
             await customersService.delete(req.params.id);
-            await auditService.log({ userId: req.userId, userEmail: req.userEmail }, "DELETE", "Customer", req.params.id);
+            await auditService.log({ userId: req.userId, userEmail: req.userEmail }, "DELETE", "Customer", req.params.id, etiqueta);
             res.json({ success: true, message: "Cliente eliminado correctamente" });
         } catch (error) { next(error); }
     },

@@ -949,7 +949,8 @@ describe("Lotes y fechas de caducidad (T5-15)", () => {
             expect(new Set(creados.map((a) => a.entityId))).toEqual(new Set([dentro.id, caducado.id]));
             const delLote = creados.find((a) => a.entityId === dentro.id)!;
             // Las unidades son las de todos los almacenes.
-            expect(delLote.data).toEqual({ productName: "Yogur", lotCode: "DENTRO", expiresAt: dia(10), units: 6 });
+            // AUD-017 — y en qué almacenes queda, por nombre: retirarlo es ir allí.
+            expect(delLote.data).toEqual({ productName: "Yogur", lotCode: "DENTRO", expiresAt: dia(10), units: 6, warehouses: ["Principal", "Sucursal Norte"] });
             expect(() => avisoSchema.parse({ ...delLote, readAt: null, createdAt: delLote.createdAt.toISOString() })).not.toThrow();
 
             // Repetirlo no apila otro ni reabre el que ya se leyó.

@@ -150,6 +150,15 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **La bitácora dice sobre quién se actuó, y la campana empieza por lo urgente** (`AUD-017`):
+  cada fila de la auditoría nombra el producto, la persona o la venta afectada —enlazada si sigue
+  existiendo— y sus detalles se leen traducidos, no como JSON. Se filtra por usuario y por días, el
+  filtro queda en la dirección de la página y lo filtrado se exporta en CSV. En la campana, lo que
+  bloquea a alguien sale primero; un lote ya caducado se dice distinto y con sus almacenes, y el
+  aviso de una venta o una compra abre esa orden. Usuarios y la bitácora distinguen un fallo de
+  carga de una lista vacía, con «Reintentar». `GET /audit-logs` añade `entityLabel`,
+  `entityExists` y los filtros `userId`, `from` y `to`; nuevas `GET /audit-logs/actors` y
+  `GET /audit-logs/export`; `GET /purchase-orders` acepta `id`.
 - **Cada rol ve su menú** (`AUD-016`): el vendedor, el mostrador, sus ventas, sus clientes y los
   productos; el almacén empieza por el inventario. Todos los roles eligen tema e idioma desde su
   Perfil —y el idioma, también antes de entrar, bajo la tarjeta de acceso—, y el rol se ve en el

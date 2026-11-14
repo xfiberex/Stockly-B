@@ -76,6 +76,7 @@ const RESPUESTAS = {
     Setting: contrato.ajusteSchema,
     Business: contrato.negocioSchema,
     AuditLog: contrato.registroAuditoriaSchema,
+    AuditActor: contrato.actorAuditoriaSchema,
     ReportSummary: contrato.resumenReporteSchema,
     PeriodReport: contrato.informePorPeriodoSchema,
     AbcSummary: contrato.resumenAbcSchema,

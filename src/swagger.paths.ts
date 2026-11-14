@@ -42,6 +42,13 @@ const PARAMS_PAGINA = [
     { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
 ];
 
+/** AUD-017 — filtros de la auditoría: quién, y un rango de días del negocio (los dos incluidos). */
+const PARAMS_AUDITORIA = [
+    { name: "userId", in: "query", schema: { type: "string", format: "uuid" } },
+    { name: "from", in: "query", schema: { type: "string", format: "date" }, description: "AAAA-MM-DD, en la zona horaria del negocio" },
+    { name: "to", in: "query", schema: { type: "string", format: "date" }, description: "AAAA-MM-DD, incluido" },
+];
+
 /**
  * Sobre paginado real de la API: la lista va en `data.data`, junto a `data.meta`.
  * El `meta` se referencia (T4-02): lo genera `swagger.esquemas.ts` desde el contrato,
@@ -284,7 +291,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
     "/purchase-orders": {
         get: {
             tags: ["Purchase Orders"], summary: "Listar órdenes de compra",
-            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] } }, PARAM_ALMACEN],
+            parameters: [...PARAMS_PAGINA, { name: "status", in: "query", schema: { type: "string", enum: ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] } }, PARAM_ALMACEN, { name: "id", in: "query", schema: { type: "string", format: "uuid" }, description: "AUD-017 — solo esa orden" }],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/PurchaseOrder"), "Listado paginado"), "401": ERROR("No autenticado") },
         },
         post: {
@@ -945,8 +952,29 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 ...PARAMS_PAGINA,
                 { name: "action", in: "query", schema: { type: "string" } },
                 { name: "entity", in: "query", schema: { type: "string" } },
+                ...PARAMS_AUDITORIA,
             ],
             responses: { "200": JSON_OK(LISTA_PAGINADA("#/components/schemas/AuditLog"), "Listado paginado"), "403": ERROR("Requiere rol ADMIN") },
+        },
+    },
+    "/audit-logs/actors": {
+        get: {
+            tags: ["Audit Logs"], summary: "Quién aparece en la auditoría (ADMIN)",
+            description: "Una fila por cuenta que tiene registros, también las que ya no existen (por su correo). Es la lista del filtro por usuario.",
+            responses: { "200": JSON_OK({ type: "array", items: { $ref: "#/components/schemas/AuditActor" } }, "Cuentas"), "403": ERROR("Requiere rol ADMIN") },
+        },
+    },
+    "/audit-logs/export": {
+        get: {
+            tags: ["Audit Logs"], summary: "Exportar la auditoría filtrada (ADMIN)",
+            description: "Los mismos filtros que el listado; por lotes, en CSV (`format=csv`) o JSON. 413 si pasa del máximo de filas.",
+            parameters: [
+                { name: "action", in: "query", schema: { type: "string" } },
+                { name: "entity", in: "query", schema: { type: "string" } },
+                ...PARAMS_AUDITORIA,
+                { name: "format", in: "query", schema: { type: "string", enum: ["csv", "json"] } },
+            ],
+            responses: { "200": { description: "Archivo" }, "403": ERROR("Requiere rol ADMIN"), "413": ERROR("Demasiadas filas") },
         },
     },
 

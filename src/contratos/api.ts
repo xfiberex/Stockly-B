@@ -186,6 +186,9 @@ export const PERMISOS = {
     "PUT /settings/logo": SOLO_ADMIN,
     "DELETE /settings/logo": SOLO_ADMIN,
     "GET /audit-logs": SOLO_ADMIN,
+    // AUD-017 — quién aparece en la bitácora (el filtro por usuario) y su exportación.
+    "GET /audit-logs/actors": SOLO_ADMIN,
+    "GET /audit-logs/export": SOLO_ADMIN,
     // Avisos (T5-12): cada cual lee y marca **los suyos**; no hay ruta que enseñe los de otro.
     "GET /notifications": TODOS,
     "GET /notifications/unread-count": TODOS,
@@ -1165,8 +1168,16 @@ export const avisoSchema = z.discriminatedUnion("type", [
         /**
          * T5-15 — un lote con existencias ha entrado en el plazo de aviso. `entityId` es el
          * lote; `units` es lo que quedaba de él, en todos los almacenes, al avisar.
+         * AUD-017 — `warehouses`: en qué almacenes quedaba, por nombre. Los avisos anteriores no
+         * lo traen.
          */
-        data: z.object({ productName: z.string(), lotCode: z.string(), expiresAt: z.string(), units: z.number() }),
+        data: z.object({
+            productName: z.string(),
+            lotCode: z.string(),
+            expiresAt: z.string(),
+            units: z.number(),
+            warehouses: z.array(z.string()).optional(),
+        }),
     }),
     z.object({
         ...camposDeAviso,
@@ -1500,8 +1511,28 @@ export const registroAuditoriaSchema = z.object({
     action: accionAuditoriaSchema,
     entity: entidadAuditoriaSchema,
     entityId: z.string().nullable(),
+    /**
+     * AUD-017 — el nombre legible de la entidad: el producto, la persona, el número de venta, el
+     * proveedor de una compra, el almacén de un conteo, «origen → destino» de una transferencia.
+     * Se lee al responder (dice el nombre de ahora); de lo ya borrado, el que se guardó al
+     * borrar. `null` si no hay ninguno.
+     */
+    entityLabel: z.string().nullable(),
+    /** AUD-017 — si la entidad sigue existiendo: solo entonces la interfaz la enlaza. */
+    entityExists: z.boolean(),
     details: z.unknown().nullable(),
     createdAt: fechaSchema,
+});
+
+/**
+ * AUD-017 — `GET /audit-logs/actors`: cada cuenta que aparece en la bitácora, para filtrar por
+ * ella. El nombre es el de ahora (`null` si la cuenta ya no existe); el correo, el de ahora o el
+ * último con el que firmó.
+ */
+export const actorAuditoriaSchema = z.object({
+    userId: z.string(),
+    name: z.string().nullable(),
+    email: z.string().nullable(),
 });
 
 // ─────────────────────── Reportes ───────────────────────
@@ -1840,6 +1871,7 @@ export type AjusteGuardado = z.infer<typeof ajusteGuardadoSchema>;
 export type GrupoDeAjuste = z.infer<typeof grupoDeAjusteSchema>;
 export type Negocio = z.infer<typeof negocioSchema>;
 export type RegistroAuditoria = z.infer<typeof registroAuditoriaSchema>;
+export type ActorAuditoria = z.infer<typeof actorAuditoriaSchema>;
 
 export type TotalesReporte = z.infer<typeof totalesReporteSchema>;
 export type StockPorCategoria = z.infer<typeof stockPorCategoriaSchema>;

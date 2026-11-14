@@ -128,10 +128,12 @@ export const purchaseOrderController = {
         next: NextFunction,
     ): Promise<void> {
         try {
+            // AUD-017 — la etiqueta se lee antes de borrar: después la bitácora no tendría de dónde.
+            const etiqueta = await auditService.etiquetaDe("PurchaseOrder", req.params.id);
             await purchaseOrderService.delete(req.params.id);
             await auditService.log(
                 { userId: req.userId, userEmail: req.userEmail },
-                "DELETE", "PurchaseOrder", req.params.id,
+                "DELETE", "PurchaseOrder", req.params.id, etiqueta,
             );
             res.json({ success: true, message: "Orden de compra eliminada" });
         } catch (error) {

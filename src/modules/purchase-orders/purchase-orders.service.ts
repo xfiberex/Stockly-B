@@ -120,13 +120,16 @@ async function registrarEntradas(
 export const purchaseOrderService = {
     // Era la única lista de la API sin techo: traía todas las órdenes con el detalle
     // completo de cada ítem. Mismo contrato `{ data, meta }` que las de venta.
-    async getAll(query: { page?: string; limit?: string; status?: string; warehouseId?: unknown } = {}) {
+    async getAll(query: { page?: string; limit?: string; status?: string; warehouseId?: unknown; id?: unknown } = {}) {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 10 });
 
         const statusFilter = parseStatusFilter(query.status);
         // T5-14 — las de un almacén.
         const warehouseId = await almacenDelFiltro(query.warehouseId);
-        const where = { ...(statusFilter && { status: { in: statusFilter } }), ...(warehouseId && { warehouseId }) };
+        // AUD-017 — una orden concreta (`?id=`): el aviso de compra atrasada lleva a ella, y en el
+        // listado por fechas una orden antigua podía estar varias páginas más allá.
+        const id = typeof query.id === "string" && query.id ? query.id : undefined;
+        const where = { ...(statusFilter && { status: { in: statusFilter } }), ...(warehouseId && { warehouseId }), ...(id && { id }) };
 
         const [orders, total] = await prisma.$transaction([
             prisma.purchaseOrder.findMany({

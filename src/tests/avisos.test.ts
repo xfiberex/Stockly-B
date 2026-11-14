@@ -322,7 +322,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
             }
         }
 
-        it("GET /notifications da los míos, del más reciente al más antiguo, con su contador, y encaja en el contrato", async () => {
+        it("GET /notifications da los míos —sin leer por gravedad, después los leídos—, con su contador, y encaja en el contrato", async () => {
             await tres(ana.id);
             await prisma.notification.create({
                 data: { userId: ana.id, type: "SALE_UNSHIPPABLE", entityId: "v-1", data: { productName: "X", available: 1, required: 2 }, readAt: new Date() },
@@ -337,9 +337,35 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
             expect(res.status).toBe(200);
             expect(() => avisosSchema.parse(res.body.data)).not.toThrow();
             expect(res.body.data.unread).toBe(4);
-            expect(res.body.data.items.map((a: { entityId: string }) => a.entityId)).toEqual(["v-1", "p-Tres", "p-Dos", "p-Uno", "c-1"]);
+            // AUD-017 — sin leer: el agotado (p-Uno), la compra atrasada y el resto del stock bajo,
+            // este por fecha; y al final la venta, que ya se leyó aunque sea la más reciente.
+            expect(res.body.data.items.map((a: { entityId: string }) => a.entityId)).toEqual(["p-Uno", "c-1", "p-Tres", "p-Dos", "v-1"]);
             // Nada de más en el cable: ni de quién es, ni campos internos.
             expect(Object.keys(res.body.data.items[0]).sort()).toEqual(["createdAt", "data", "entityId", "id", "readAt", "type"]);
+        });
+
+        it("lo que bloquea a alguien sale primero aunque sea lo más antiguo, y no se queda fuera de los 30 (AUD-017)", async () => {
+            await prisma.notification.create({
+                data: { userId: ana.id, type: "USER_PENDING", entityId: "u-1", data: { name: "Nuevo", email: "nuevo@example.com" }, createdAt: new Date(Date.now() - 10 * DIA) },
+            });
+            await prisma.notification.create({
+                data: { userId: ana.id, type: "LOT_EXPIRING", entityId: "l-caducado", data: { productName: "Yogur", lotCode: "L1", expiresAt: "2020-01-01", units: 2 }, createdAt: new Date(Date.now() - 5 * DIA) },
+            });
+            await prisma.notification.create({
+                data: { userId: ana.id, type: "LOT_EXPIRING", entityId: "l-pronto", data: { productName: "Yogur", lotCode: "L2", expiresAt: "2099-01-01", units: 2 }, createdAt: new Date(Date.now() - 4 * DIA) },
+            });
+            await prisma.notification.createMany({
+                data: Array.from({ length: 35 }, (_, i) => ({
+                    userId: ana.id, type: "LOW_STOCK" as const, entityId: `p-${i}`,
+                    data: { productName: `P${i}`, stock: 2, minStock: 5 },
+                    createdAt: new Date(Date.now() - i * 60_000),
+                })),
+            });
+
+            const items = (await request(app).get(BASE).set("Cookie", ana.cookie)).body.data.items as Array<{ entityId: string }>;
+
+            expect(items.slice(0, 3).map((a) => a.entityId)).toEqual(["u-1", "l-caducado", "l-pronto"]);
+            expect(items).toHaveLength(30);
         });
 
         it("enseña los 30 últimos, y el contador cuenta también los que no enseña", async () => {

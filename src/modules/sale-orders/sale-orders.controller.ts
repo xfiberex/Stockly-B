@@ -103,10 +103,12 @@ export const saleOrderController = {
 
     async deleteSaleOrder(req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> {
         try {
+            // AUD-017 — la etiqueta se lee antes de borrar: después la bitácora no tendría de dónde.
+            const etiqueta = await auditService.etiquetaDe("SaleOrder", req.params.id);
             await saleOrderService.delete(req.params.id);
             await auditService.log(
                 { userId: req.userId, userEmail: req.userEmail },
-                "DELETE", "SaleOrder", req.params.id,
+                "DELETE", "SaleOrder", req.params.id, etiqueta,
             );
             res.json({ success: true, message: "Orden de venta eliminada" });
         } catch (error) { next(error); }

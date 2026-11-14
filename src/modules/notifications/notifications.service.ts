@@ -59,15 +59,44 @@ async function sinLeerDe(userId: string): Promise<number> {
 }
 
 export const notificationsService = {
-    /** Los últimos avisos del usuario, del más reciente al más antiguo, y cuántos tiene sin leer. */
+    /**
+     * Los avisos del usuario y cuántos tiene sin leer.
+     *
+     * AUD-017 — **los sin leer, por gravedad; después, los leídos, del más reciente al más
+     * antiguo.** Antes iban todos por fecha, y la cuenta que esperaba aprobación salió la última
+     * de once, debajo de diez de stock bajo. La gravedad es lo que bloquea a alguien:
+     *
+     * 0. una cuenta esperando rol (una persona que no puede trabajar);
+     * 1. una venta que no se puede enviar (un cliente esperando);
+     * 2. un lote **ya caducado** (no se puede vender: hay que retirarlo);
+     * 3. un producto agotado;
+     * 4. una compra atrasada;
+     * 5. un lote que caduca pronto;
+     * 6. el resto del stock bajo.
+     *
+     * Se ordena en la consulta y no en la pantalla porque solo se mandan `MOSTRADOS`: ordenando
+     * después, lo grave pero antiguo podía no llegar a la lista.
+     */
     async getAll(userId: string) {
+        const hoy = hoyEn(await settingsService.zonaHoraria());
         const [items, unread] = await Promise.all([
-            prisma.notification.findMany({
-                where: { userId },
-                orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-                take: MOSTRADOS,
-                select: { id: true, type: true, entityId: true, data: true, readAt: true, createdAt: true },
-            }),
+            prisma.$queryRaw<Array<{ id: string; type: string; entityId: string; data: Prisma.JsonValue; readAt: Date | null; createdAt: Date }>>`
+                SELECT "id", "type"::text AS "type", "entityId", "data", "readAt", "createdAt"
+                FROM "notifications"
+                WHERE "userId" = ${userId}
+                ORDER BY ("readAt" IS NULL) DESC,
+                         CASE
+                             WHEN "readAt" IS NOT NULL THEN 0
+                             WHEN "type" = 'USER_PENDING' THEN 0
+                             WHEN "type" = 'SALE_UNSHIPPABLE' THEN 1
+                             WHEN "type" = 'LOT_EXPIRING' AND ("data"->>'expiresAt') < ${hoy} THEN 2
+                             WHEN "type" = 'LOW_STOCK' AND ("data"->>'stock')::int = 0 THEN 3
+                             WHEN "type" = 'PURCHASE_OVERDUE' THEN 4
+                             WHEN "type" = 'LOT_EXPIRING' THEN 5
+                             ELSE 6
+                         END,
+                         "createdAt" DESC, "id" ASC
+                LIMIT ${MOSTRADOS}`,
             sinLeerDe(userId),
         ]);
         return { items, unread };
@@ -173,11 +202,15 @@ export const notificationsService = {
             INSERT INTO "notifications" ("id", "userId", "type", "entityId", "data", "createdAt")
             SELECT gen_random_uuid(), u."id", 'LOT_EXPIRING'::"NotificationType", c."id",
                    jsonb_build_object('productName', c.producto, 'lotCode', c."code",
-                                      'expiresAt', to_char(c."expiresAt", 'YYYY-MM-DD'), 'units', c.unidades), ${enUtc(ahora)}
+                                      'expiresAt', to_char(c."expiresAt", 'YYYY-MM-DD'), 'units', c.unidades,
+                                      'warehouses', c.almacenes), ${enUtc(ahora)}
             FROM (
-                SELECT l."id", l."code", l."expiresAt", p."name" AS producto, SUM(sl."stock")::int AS unidades
+                -- AUD-017 — y en qué almacenes queda: retirarlo es ir allí.
+                SELECT l."id", l."code", l."expiresAt", p."name" AS producto, SUM(sl."stock")::int AS unidades,
+                       to_jsonb(array_agg(DISTINCT w."name" ORDER BY w."name")) AS almacenes
                 FROM "lots" l
                 JOIN "stock_levels" sl ON sl."lotId" = l."id"
+                JOIN "warehouses" w ON w."id" = sl."warehouseId"
                 JOIN "products" p ON p."id" = l."productId"
                 WHERE sl."stock" > 0 AND l."expiresAt" <= ${hoy}::date + ${diasDeAviso}::int
                 GROUP BY l."id", p."name"

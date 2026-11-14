@@ -264,6 +264,17 @@ describe("Purchase Orders API", () => {
             expect(res.body.data.data[0].status).toBe("CANCELLED");
         });
 
+        it("filtra por una orden concreta: a ella lleva el aviso de compra atrasada (AUD-017)", async () => {
+            await crearOrdenes(3);
+            const listado = await request(app).get(BASE).set("Cookie", adminCookie);
+            const id = listado.body.data.data[2].id;
+
+            const res = await request(app).get(`${BASE}?id=${id}`).set("Cookie", adminCookie);
+
+            expect(res.body.data.meta.total).toBe(1);
+            expect(res.body.data.data[0].id).toBe(id);
+        });
+
         it("ignora un estado que no existe en lugar de fallar", async () => {
             await crearOrdenes(2);
 
