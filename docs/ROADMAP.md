@@ -6,6 +6,14 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-14: cuatro tareas abiertas; `AUD-018` hecha.** Las filas de Compras y Ventas
+> se despliegan con el teclado y dicen si están abiertas; las pestañas de Movimientos son un
+> `tablist` que se recorre con flechas; el texto en verde llega a 4,5:1 en los dos temas; cada
+> botón de icono nombra su fila; el buscador de Productos tiene nombre y Escape cierra el menú
+> móvil. Dos guardias nuevas en `accesibilidad.test.ts` vigilan los botones de solo icono y el
+> acento suave en texto. Lo siguiente: `AUD-019`, y al final las críticas de cierre y la prueba
+> de carga.
+>
 > **Estado al 2026-11-13: cinco tareas abiertas; `AUD-017` hecha.** La bitácora dice a quién o a qué
 > afectó cada fila, con enlace, se filtra por usuario y por días y se exporta; sus detalles se leen
 > traducidos. En la campana, lo que bloquea a alguien sale primero, lo caducado se dice distinto y
@@ -122,8 +130,8 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 7
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 12
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 4
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 15
 ```
 
 ---
@@ -140,18 +148,18 @@ en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-13 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
+**Última actualización:** 2026-11-14 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
 | 2 · Medio | 0 | 3 | — |
-| 3 · Bajo | 5 | 5 | 1 · 4 · 0 |
+| 3 · Bajo | 4 | 6 | 0 · 4 · 0 |
 | 4 · Propuestas | 0 | 0 | — |
-| **Total** | **5** | **14** | **1 · 4 · 0** |
+| **Total** | **4** | **15** | **0 · 4 · 0** |
 
-**Abiertas por área:** Diseño 3 (`AUD-014`, `AUD-015`, `AUD-019`) · Accesibilidad 1 (`AUD-018`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** Diseño 3 (`AUD-014`, `AUD-015`, `AUD-019`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -395,30 +403,6 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       `tabindex` ≥ 0, y `/reports/period?from=2025-01-01&to=2025-01-31` abre ese rango, vacío,
       con exportar desactivado y las dos alternativas.
     - **Falta:** la crítica repetida del bloque Reportes (criterio: sin P1).
-
-- [ ] **AUD-018 · Accesibilidad que falta: filas desplegables sin teclado, pestañas sin rol, contraste del enlace verde y botones sin el nombre de su fila**
-  - **Área:** Accesibilidad · **Severidad:** Bajo · **Esfuerzo:** Bajo
-  - **Origen:** crítica del 2026-11-07, P2 de accesibilidad de varios bloques (árbol de
-    accesibilidad, sin lector de pantalla real).
-  - **Ubicación** (`Stockly-F/src/modules/`):
-    - Filas desplegables como `div` con `onClick`, sin foco ni `aria-expanded`:
-      `purchase-orders/components/PurchaseOrdersPage.tsx:637-640` y
-      `sale-orders/components/SaleOrdersPage.tsx:608-611`. En Transferencias, el `aria-label` del
-      desplegable tapa su contenido (`stock-transfers/components/TransfersPage.tsx:255`).
-    - Pestañas sin `tablist`/`tab`/`aria-selected`: `products/components/StockMovementsPage.tsx:172-192`.
-    - Nombre de cliente en `text-accent`, ~3,8:1 sobre blanco: `sale-orders/components/SaleOrdersPage.tsx:624`,
-      `customers/components/CustomersPage.tsx:147`.
-    - Botones de icono sin el nombre de la fila: `catalog/components/CatalogItemSection.tsx:181-191`,
-      `suppliers/components/SuppliersPage.tsx:219-229`, compras (`:685, 696`), «Desactivar» de
-      Usuarios; borrar línea sin nombre en el formulario de compra (`:473`).
-    - Buscador de Productos sin etiqueta accesible (`products/components/ProductFilters.tsx:98-104`).
-    - Escape no cierra el menú móvil (`Stockly-F/src/App.tsx`).
-  - **Qué hacer:** `<button aria-expanded>` con chevron en las filas; el patrón de pestañas con
-    flechas; `text-info` o un token fuerte para el enlace; `aria-label` con el nombre de la fila;
-    `aria-label` en el buscador; Escape en el menú móvil devolviendo el foco al botón.
-  - **Criterio de aceptación:** tests de accesibilidad de cada uno (rol, nombre, teclado) y
-    contraste ≥ 4,5:1 medido en los dos temas.
-  - **Dependencias:** ninguna.
 
 - [ ] **AUD-019 · Pulido restante de la crítica del 2026-11-07 (P2 y P3 sin tarea propia)**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
@@ -703,3 +687,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | AUD-013 | Tier 3 · Diseño: el móvil de quien trabaja de pie — el stock, la recepción, el conteo y el cobro quedaban fuera de la pantalla a 390 px (crítica del 2026-11-07) | 2026-11-07 | **El criterio, medido en el navegador a 390 px táctil:** **Productos** —la tabla pasa de 1099 a 357 px, sin desplazamiento, y el stock de la primera fila está en x≈177 (antes 661); la primera fila, en y=474 (antes 770)—: por debajo de `md` se queda con nombre, stock y acciones (estas, de dos en dos), sin el ancho mínimo; imagen, ABC, categoría, marca, precio y estado se ocultan (están en la ficha, a un toque), los cinco desplegables se pliegan tras «Filtros (n)» y la leyenda ABC no se pinta. **Recepción de compras** —el campo de cada línea, en x=262–358 dentro de un diálogo de 358 (antes x=576)—: producto y «Llega ahora», con «Pedido 5 · recibido 0» debajo del nombre. **Conteo** —el primer campo, en y=713–757 (antes 825, en el pliegue)—: buscador y «Escanear» en una fila y «Guardar» en una barra fija abajo. **Mostrador** —con tres líneas, el total en y=751 y el botón en y=788–832 de 844—: el cobro va en una barra fija hasta `lg`, con el hueco reservado (lo último de la página no queda tapado); desde `lg`, dos columnas, la venta a la izquierda y cliente y cobro a la derecha, `sticky` bajo la cabecera (comprobado a 1024 px). **Las columnas escondidas sin señal** (Usuarios, Clientes, Sugerencias, Categorías, Proveedores, Bitácora): `pista-de-desplazamiento`, en `CLASES_TABLA_DESPLAZABLE` y por tanto en las 39 tablas, desvanece el borde hacia el que sigue la tabla y se apaga al final —una animación ligada al desplazamiento, sin JavaScript; medido en Usuarios: 40 px a la derecha al principio, los dos bordes a mitad, solo la izquierda al final—. En Firefox, sin `animation-timeline`, queda como estaba. **Compartido:** `clasesDeBarraFija.ts` (la barra del panel del almacén pasa a usarla). **Regla de tablas** de `design-system.md` actualizada: en una pantalla de consulta ninguna columna se esconde; en una de trabajo de pie, sí, si lo oculto va debajo del nombre o en la ficha. **Comprobado:** `pnpm verify` del frontend en verde, 1037 tests y 1 omitido en 93 archivos; tests de densidad nuevos (`movilDePie.test.ts`, 7, que fijan las clases porque jsdom no aplica CSS) y el del plegado de filtros. El backend no cambia. **Sin hacer:** en Productos, en el móvil, el ajuste masivo y la selección siguen ahí pero el precio no se ve sin abrir la ficha; los cuatro botones de cabecera de Productos siguen ocupando dos filas; y en las pantallas de consulta las columnas siguen a lo ancho, ahora con señal, no en tarjetas. |
 | AUD-016 | Tier 3 · Diseño: los roles no llegaban al marco — navegación sin recortar, tema e idioma solo para ADMIN y acciones de Etiquetas que acababan en 403 (crítica del 2026-11-07) | 2026-11-10 | **Una lista por rol, escrita entera** en `Stockly-F/src/shared/navegacion.ts`, en el orden en que se pinta; sustituye a `soloAdmin`, `permiso` y `ocultoPara`. **No se deriva de `PERMISOS`**: casi todas las lecturas son de todos, así que diría lo que cada rol puede abrir, no lo que le hace falta; lo que queda fuera de un menú sigue abriéndose por URL si la ruta lo permite (el menú ordena, no protege). **Las listas** (decisión de producto, ajustable en ese archivo): ADMIN, todo; USER, todo menos mostrador y administración; WAREHOUSE, Panel · Inventario · Órdenes (Compra, Venta) · Productos · Reportes; SELLER, Mostrador · Órdenes (Venta, Clientes) · Productos (antes, 16 destinos). **Además:** «Apariencia» (tema e idioma) también en el Perfil; Etiquetas con `usePuede`; `InsigniaDeRol` en el menú de usuario, el Perfil y Usuarios (el mapa `ROL` pasa a `modules/users/rol.ts`); y, lo que `AUD-014` dejó para esta tarea, **el idioma sin sesión**: «Español · English», cada uno escrito en el suyo, bajo la tarjeta de las seis pantallas de acceso. **Comprobado:** `navegacion.test.tsx` con la lista exacta de los cuatro roles, que ningún menú lleve a una ruta que su rol no abre y que todo destino esté en algún menú; un WAREHOUSE pasa a oscuro desde su perfil; USER, WAREHOUSE y SELLER sin botones en Etiquetas; en el login, «English» cambia la pantalla al momento. `pnpm verify` del frontend en verde (1091 y 1 omitido); el backend no cambia. **E2E:** 38 pasados, 3 omitidos y uno fallido, «el interruptor de configuración sigue activo tras recargar», que **falla igual sin estos cambios** (la pantalla sigue en el `Suspense` de la carga diferida a los 5 s, en el primer test de la pasada) y pasa tres de tres en serie: no es de esta tarea, queda para mirarlo aparte. |
 | AUD-017 | Tier 3 · Diseño: la bitácora no decía sobre quién se actuó ni se filtraba por usuario y fecha, y la campana no ordenaba por urgencia (crítica del 2026-11-07) | 2026-11-13 | **Bitácora.** Cada fila dice a quién o a qué afectó: `GET /audit-logs` añade `entityLabel` (el nombre del producto, la persona, el número de venta, el proveedor de una compra, el almacén y la categoría de un conteo, «origen → destino» de una transferencia), resuelto al leer con una consulta por tipo de entidad, y `entityExists` (solo se enlaza lo que sigue existiendo). Clientes, compras y ventas se borran de verdad: su controlador guarda la etiqueta en `details.label` **antes** de borrar (`auditService.etiquetaDe`). Filtros por usuario y por rango de días **del negocio** (`userId`, `from`, `to`, con `rangoDeDias`), en la URL de la pantalla (`?usuario=&desde=&hasta=&accion=&entidad=&pagina=`); `GET /audit-logs/actors` da las cuentas con registros, también las que ya no existen (por su correo), para el filtro; `GET /audit-logs/export` exporta lo filtrado por lotes con `enviarExportacion`. Los detalles se pintan como pares traducidos (`modules/audit-logs/detalles.ts`: rol, tipo de movimiento y estado con su rótulo; un cambio `{ de, a }` como «antes → después»; sin repetir el nombre que ya sale en la columna), no como JSON. **Campana.** Los sin leer van **por gravedad** —cuenta esperando rol, venta que no se puede enviar, lote ya caducado, agotado, compra atrasada, lote que caduca pronto, resto del stock bajo— y después los leídos por fecha; se ordena en la consulta (`notificationsService.getAll`), así lo grave pero antiguo no se queda fuera de los 30. El lote caducado tiene su texto («caducado: retíralo»), en rojo; el aviso de lote trae `warehouses` (dónde queda). La venta y la compra llevan a esa orden: `/sale-orders?numero=&venta=` y `/purchase-orders?compra=` (nuevo filtro `id` en `GET /purchase-orders`, con su aviso «Solo una compra»). **Usuarios y Bitácora**, con `ErrorDeCarga` y «Reintentar» si la carga falla; Usuarios abre ya buscado con `?buscar=`. **Comprobado** (también en el navegador, con los datos del seed: cada fila nombrada, los detalles traducidos y la campana con la cuenta pendiente arriba, después los lotes caducados): backend — `audit-logs.test.ts` (etiquetas y contrato, la etiqueta de un cliente borrado, un usuario y un día devuelven solo sus filas con el día de Santo Domingo, 400 con rango al revés o fecha inexistente, `/actors` con la cuenta que ya no existe, la exportación en CSV con los filtros, 403 para USER), `avisos.test.ts` (el orden por gravedad, y que lo grave y antiguo entra en los 30), `lotes.test.ts` (`warehouses`), `purchase-orders.test.ts` (`?id=`); frontend — `AuditLogsPage.test.tsx`, `CampanaDeAvisos.test.tsx`, `UsersPage.test.tsx`, `PurchaseOrdersPage.test.tsx`. `pnpm verify` en verde en los dos (backend 1869 tests; frontend 1102 y 1 omitido); E2E, 39 pasados y 3 omitidos (en una primera pasada, recién terminados los dos `verify`, los ocho primeros de chromium se quedaron en el login a los 5 s; la segunda pasó entera). |
+| AUD-018 | Tier 3 · Accesibilidad: filas desplegables sin teclado, pestañas sin rol, enlace verde a 3,8:1 y botones de icono sin el nombre de su fila (crítica del 2026-11-07) | 2026-11-14 | Todo en el frontend. **Filas.** En Compras y Ventas, el número de la orden es un `<button aria-expanded>` con chevron (`shared/components/BotonDeDesplegar.tsx`); la cabecera no puede ser el botón porque lleva dentro el enlace al cliente y las acciones, y el `div` sigue respondiendo al clic. En Transferencias, la fila entera ya era botón: se le quita el `aria-label` («Ver los productos de…»), que tapaba los almacenes, la fecha y las unidades, y gana chevron. **Pestañas** de Movimientos: `shared/components/Pestanas.tsx`, con `tablist`/`tab`/`aria-selected`/`tabpanel`, una sola parada de tabulador, flechas, Inicio y Fin; la lista se desplaza por dentro a 390 px (`contain-paint sin-barra`, con la línea gris en un envoltorio para que el recorte no se coma el subrayado). **Contraste:** los tres enlaces en `text-accent` (Ventas, Clientes, Transferencias) pasan a `text-accent-strong`, 5,5:1 en claro y ≥ 4,5:1 también sobre `surface-muted`. **Nombres:** Editar/Eliminar de Catálogo y Proveedores (`comun.editarNombre`), Activar/Desactivar de Usuarios («Desactivar a Laura Gómez», con el texto visible delante), quitar línea en los formularios de compra y de venta («Quitar la línea de Monitor LG» o «Quitar la línea 2»), y `aria-label` en el buscador de Productos. **Escape** cierra el menú móvil y devuelve el foco a la hamburguesa. **La ficha estaba en parte desfasada:** los botones de las filas de Compras (`:685, 696`) y los de Clientes ya nombraban su fila; el resto, como decía. **Comprobado:** dos guardias nuevas en `accesibilidad.test.ts` —ningún `<Button>`/`<button>` de solo icono sin `aria-label`, y el acento suave solo en iconos—, cada una probada con una mutación que la hace saltar; `theme.test.ts` mide el acento fuerte contra tarjeta, fondo y `surface-muted` **en los dos temas**; tests de rol, nombre y teclado en `Pestanas.test.tsx` (nuevo), `PurchaseOrdersForm.test.tsx`, `SaleOrdersPage.test.tsx`, `Transferencias.test.tsx`, `App.test.tsx` y `ProductFilters.test.tsx`, y los de Catálogo, Proveedores, Usuarios y Movimientos buscan ya por el nombre nuevo. `pnpm verify` del frontend en verde (1115 tests y 1 omitido; cobertura 82,95 %); el backend no cambia de código. E2E contra `Stockly_e2e`, 39 pasados y 3 omitidos, tras cambiar en `flows.spec.ts` el selector del desplegable de Transferencias (`{ expanded: false }`). En el navegador, en tema oscuro: las flechas mueven y eligen, el anillo de foco se ve en la pestaña y en el número de la venta, Enter despliega la fila y el enlace sale en `#34d399`; a 486 px (Windows no estrecha más la ventana) el documento no desborda y las pestañas se desplazan dentro. **Sin comprobar:** con lector de pantalla real (sigue el listón de `T4-17`: teclado y árbol de accesibilidad), y la vista a 390 px exactos. |

@@ -150,6 +150,14 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Lo que faltaba para usar la aplicación sin ratón ni vista** (`AUD-018`): las filas de Compras y
+  Ventas se despliegan con el teclado desde el número de la orden y dicen si están abiertas; las
+  pestañas del historial de un producto se recorren con las flechas y el lector sabe cuál está
+  elegida; el nombre del cliente y los demás enlaces en verde pasan al acento fuerte, que se lee
+  en los dos temas; los botones de icono de Catálogo, Proveedores y los formularios de compra y
+  venta, y Activar/Desactivar en Usuarios, dicen sobre qué fila actúan; el buscador de Productos
+  tiene nombre, y Escape cierra el menú móvil devolviendo el foco a su botón. El desplegable de
+  Transferencias deja de tapar su contenido con un rótulo fijo.
 - **La bitácora dice sobre quién se actuó, y la campana empieza por lo urgente** (`AUD-017`):
   cada fila de la auditoría nombra el producto, la persona o la venta afectada —enlazada si sigue
   existiendo— y sus detalles se leen traducidos, no como JSON. Se filtra por usuario y por días, el
