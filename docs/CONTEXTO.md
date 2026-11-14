@@ -434,6 +434,11 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   esas funciones escriben los dos. Un `product.update({ stock })` en un servicio no llega lejos:
   la base no confirma una transacción en la que el total no sea la suma. **Quitar `products.stock`
   «porque es redundante» multiplica por 5–8 las consultas del panel**, medido.
+- **El formulario de producto no mueve stock al editar** (`AUD-019`). Solo pide «Stock inicial» al
+  crear; al editar lo enseña como dato y manda `stock: undefined`. Antes, cambiar el número creaba
+  un ajuste sin motivo en el almacén predeterminado. El stock se mueve con un movimiento, que dice
+  por qué, dónde y, con lotes, de qué lote. La API **sigue aceptando** `stock` en el `PUT` (lo usa
+  quien llama sin interfaz); volver a pintar el campo sería devolver el ajuste silencioso.
 - **El mínimo, su aviso, la reposición y el coste medio son del producto entero, no del almacén**
   (`T5-14`, decisión del 2026-10-10). Lo disponible y lo comprometido sí son del almacén: una
   venta no puede prometer lo que hay en otro local. Que una sucursal se quede a cero con la

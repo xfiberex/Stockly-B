@@ -6,6 +6,11 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-14, tarde: cuatro tareas abiertas; `AUD-019` empezada.** Hechos sus bloques
+> Panel y Catálogo: `/expiry` cuenta lotes, la ficha del escáner deja mover el stock o escanear
+> otro, el formulario de edición ya no mueve stock y los filtros de Productos viven en la URL.
+> Faltan Órdenes, Inventario, Administración y Tipografía.
+>
 > **Estado al 2026-11-14: cuatro tareas abiertas; `AUD-018` hecha.** Las filas de Compras y Ventas
 > se despliegan con el teclado y dicen si están abiertas; las pestañas de Movimientos son un
 > `tablist` que se recorre con flechas; el texto en verde llega a 4,5:1 en los dos temas; cada
@@ -429,6 +434,32 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       dos títulos de `/reports`.
   - **Criterio de aceptación:** cada bloque, con su crítica repetida, sin P2 de esta lista.
   - **Dependencias:** después de `AUD-011` a `AUD-018`, que cambian varias de estas pantallas.
+  - **Hecho, tanda 1 (2026-11-14): Panel y Catálogo**, todo en el frontend.
+    - **Panel.** «Mis ventas de hoy» **ya se veía** sin desplazar en la tableta de SELLER desde
+      `AUD-013`, como suponía la ficha: medido en el navegador, a 1024×768 empieza a 523 px y a
+      820×1180, a 631 (encima de la barra de cobro). Sin cambio. `/expiry` dice los lotes delante
+      de las unidades («1 lote · 6 uds. · …»), con `expiredCount` y `meta.total`, que ya llegaban.
+    - **Catálogo.** La ficha que abre el escáner ofrece «Registrar movimiento» (si se puede mover
+      stock; pasa a ser la acción principal) y «Escanear otro». El formulario de edición ya no
+      tiene «Stock inicial»: enseña el stock actual y dice que se mueve con un movimiento, y no
+      manda `stock` (CONTEXTO §6). Los filtros de Productos viven en la URL (`buscar`,
+      `categoria`, `etiqueta`, `abc`, `almacen`, `activos`), con `replace` y sin pisar `aviso` ni
+      `escanear`; el `?activos=todos` del panel lo lee ya el propio filtro. **El spinner por fila
+      era el de Restaurar**, no el de borrar: desde `AUD-012` el borrado confirma en un diálogo y
+      su spinner está allí; el de Restaurar giraba en todas las inactivas y ahora solo en la suya.
+      Las notas de proveedor y, por el mismo defecto, la descripción de Categorías y Marcas se leen
+      enteras en vez de cortarse con `truncate`.
+    - **Comprobado:** tests nuevos en `Lotes.test.tsx` (lotes en la cabecera, acciones del
+      escáner y que fuera de él no salen, edición sin stock), `ProductForm.test.tsx`,
+      `ProductFilters.test.tsx` (abrir con la URL, escribirla sin pisar parámetros, `activos=todos`),
+      `ProductTable.test.tsx` y `PlazoDeEntrega.test.tsx`. `pnpm verify` del frontend en verde
+      (1123 tests y 1 omitido); E2E, 38 pasados y 3 omitidos, con el intermitente del interruptor
+      de Configuración en rojo en la pasada completa y en verde repetido solo. En el navegador:
+      los filtros sobreviven a ir a Movimientos y volver, y el formulario de edición enseña el
+      stock como texto.
+    - **Sin comprobar:** el escaneo con cámara real (la ficha se probó montada con las props); la
+      crítica repetida de los dos bloques, que va con las críticas de cierre.
+  - **Falta:** Órdenes, Inventario, Administración y Tipografía.
 
 ## Tier 4 · Propuestas
 
