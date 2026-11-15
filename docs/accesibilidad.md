@@ -184,3 +184,34 @@ recorrido esta barra lateral, y con la decisión del 2026-08-12 ninguno va a hac
 enlaces por delante del contenido en cada pantalla es justo el tipo de cosa que se juzga
 escuchándola; lo que la sostiene aquí es el enlace de saltar al contenido, que **sí** está
 verificado (§6).
+
+---
+
+## 7. Revisión del 2026-11-15 — los grupos de la barra lateral se pliegan
+
+Decisión del propietario, que revisa la de §6: con veinte destinos, el menú de ADMIN ya no cabía
+en la barra lateral de un portátil (a 1280×900, «Configuración» quedaba debajo del borde). Los
+grupos empiezan plegados, salvo el de la pantalla abierta, que se abre solo; lo que se abre a
+mano se recuerda en el dispositivo. Las reglas están en `Stockly-F/docs/design-system.md`.
+
+**Lo que se cede:** «los doce destinos a un clic» de §6. Un destino de otro grupo cuesta ahora un
+clic más; Panel, Mostrador y Reportes siguen sueltos.
+
+Comprobado en el navegador, **sobre el servidor de desarrollo y no sobre la pila del compose**, y
+sin repetir Lighthouse:
+
+| Qué | Resultado |
+|---|---|
+| Cada grupo es un botón con estado | ✅ `button` «Órdenes» `expandable`; `aria-expanded` y `aria-controls` a su lista |
+| Con el teclado | ✅ Enter lo pliega y lo despliega; el foco se queda en el botón |
+| Plegado, lo de dentro no se anuncia ni se tabula | ✅ la lista lleva `hidden`: sus enlaces salen del árbol de accesibilidad |
+| La sección actual, con su grupo plegado | ✅ `text-info`, un punto que no depende del color, y el nombre «Órdenes (contiene la pantalla actual)» |
+| El grupo de la pantalla abierta se abre solo | ✅ en `/purchase-orders/suggestions`, Órdenes abierto y «Compra» con `aria-current` |
+| Barra lateral y panel móvil, el mismo estado | ✅ plegado en la barra, plegado en el panel |
+
+**Un defecto encontrado al mirarlo:** el primer diseño conservaba el estilo del antiguo subtítulo,
+en mayúsculas con `uppercase`, y Chrome calcula el nombre accesible con la transformación
+aplicada: el botón se anunciaba «ADMIN», que hay lectores que deletrean. Los botones de grupo
+tienen ahora el mismo estilo que un enlace suelto, sin transformar.
+
+**Sigue sin comprobarse lo mismo que en §4 y §6:** ningún lector de pantalla real lo ha recorrido.

@@ -6,6 +6,12 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-15: cuatro tareas abiertas, sin cambios.** Fuera de tarea, a petición del
+> propietario: los grupos de la barra lateral se pliegan (empiezan cerrados, salvo el de la
+> pantalla abierta; lo abierto a mano se recuerda). Revisa la decisión de `T4-10`; las reglas, en
+> `Stockly-F/docs/design-system.md`, y lo comprobado, en [accesibilidad.md §7](accesibilidad.md).
+> Lo siguiente sigue siendo `AUD-019`: Inventario, Administración y Tipografía.
+>
 > **Estado al 2026-11-14, noche (PC): cuatro tareas abiertas; `AUD-019` con Órdenes hecho.** Las
 > compras tienen número correlativo (`#000042`, migración nueva) en lugar del trozo de UUID; las
 > sugerencias enseñan subtotal, total por proveedor y total, y confirman antes de generar; la ficha
