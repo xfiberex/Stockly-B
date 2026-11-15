@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto, numeroDeCompra } from "./helpers";
 
 const BASE = "/api/v1/reports";
 
@@ -207,9 +207,9 @@ describe("Reports API", () => {
             const cookie = getAuthCookie(admin.id);
             const antes = (await request(app).get(`${BASE}/attention`).set("Cookie", cookie)).body.data.purchasesToReceive;
 
-            await prisma.purchaseOrder.createMany({
-                data: (["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] as const).map((status) => ({ status, warehouseId: ALMACEN })),
-            });
+            for (const status of ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] as const) {
+                await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), status, warehouseId: ALMACEN } });
+            }
 
             const despues = (await request(app).get(`${BASE}/attention`).set("Cookie", cookie)).body.data.purchasesToReceive;
             expect(despues).toBe(antes + 2);

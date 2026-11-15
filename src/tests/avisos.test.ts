@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto, numeroDeCompra } from "./helpers";
 import { avisosSchema, avisosSinLeerSchema } from "@/contratos/api";
 import { notificationsService } from "@/modules/notifications/notifications.service";
 
@@ -205,15 +205,15 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
             const rapido = await prisma.supplier.create({ data: { name: "Rápido SA", leadTimeDays: 3 } });
             const sinPlazo = await prisma.supplier.create({ data: { name: "Sin Plazo SL" } });
 
-            const atrasada = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, createdAt: hace(10) } });
+            const atrasada = await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: rapido.id, createdAt: hace(10) } });
             const parcial = await prisma.purchaseOrder.create({
-                data: { warehouseId: ALMACEN, supplierId: sinPlazo.id, status: "PARTIALLY_RECEIVED", createdAt: hace(10) },
+                data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: sinPlazo.id, status: "PARTIALLY_RECEIVED", createdAt: hace(10) },
             });
-            const sinProveedor = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: hace(10) } });
+            const sinProveedor = await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, createdAt: hace(10) } });
             // Las que no: dentro de plazo, recibida y cancelada.
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, createdAt: hace(2) } });
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, status: "RECEIVED", createdAt: hace(10) } });
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: rapido.id, status: "CANCELLED", createdAt: hace(10) } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: rapido.id, createdAt: hace(2) } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: rapido.id, status: "RECEIVED", createdAt: hace(10) } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: rapido.id, status: "CANCELLED", createdAt: hace(10) } });
 
             await notificationsService.mantener(AHORA);
 
@@ -222,9 +222,10 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
             expect(avisos).toHaveLength(3);
             expect(avisos.every((a) => a.type === "PURCHASE_OVERDUE")).toBe(true);
             // Pedida el 20 de septiembre: con 3 días vencía el 23; con los 7 por defecto, el 27.
-            expect(porOrden.get(atrasada.id)!.data).toEqual({ supplierName: "Rápido SA", dueDate: "2026-09-23" });
-            expect(porOrden.get(parcial.id)!.data).toEqual({ supplierName: "Sin Plazo SL", dueDate: "2026-09-27" });
-            expect(porOrden.get(sinProveedor.id)!.data).toEqual({ supplierName: null, dueDate: "2026-09-27" });
+            // AUD-019 — con el número de la compra, para nombrarla en la campana.
+            expect(porOrden.get(atrasada.id)!.data).toEqual({ orderNumber: atrasada.number, supplierName: "Rápido SA", dueDate: "2026-09-23" });
+            expect(porOrden.get(parcial.id)!.data).toEqual({ orderNumber: parcial.number, supplierName: "Sin Plazo SL", dueDate: "2026-09-27" });
+            expect(porOrden.get(sinProveedor.id)!.data).toEqual({ orderNumber: sinProveedor.number, supplierName: null, dueDate: "2026-09-27" });
             expect(porOrden.get(atrasada.id)!.createdAt).toEqual(AHORA);
 
             expect(await avisosDe(bruno.id)).toHaveLength(3);
@@ -234,7 +235,7 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         it("el día en que vence todavía no está atrasada, y el día se cuenta en la zona del negocio", async () => {
             const proveedor = await prisma.supplier.create({ data: { name: "Rápido SA", leadTimeDays: 5 } });
             // Las 02:00 UTC del 20 son las 22:00 del **19** en Santo Domingo: vence el 24, no el 25.
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: proveedor.id, createdAt: new Date("2026-09-20T02:00:00Z") } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: proveedor.id, createdAt: new Date("2026-09-20T02:00:00Z") } });
 
             // Todavía día 24 en Santo Domingo —aunque ya sea 25 en UTC—.
             await notificationsService.mantener(new Date("2026-09-25T03:00:00Z"));
@@ -243,11 +244,11 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
             // Día 25 en Santo Domingo.
             await notificationsService.mantener(new Date("2026-09-25T05:00:00Z"));
             const [aviso] = await avisosDe(ana.id);
-            expect(aviso!.data).toEqual({ supplierName: "Rápido SA", dueDate: "2026-09-24" });
+            expect(aviso!.data).toEqual({ orderNumber: 1, supplierName: "Rápido SA", dueDate: "2026-09-24" });
         });
 
         it("repetirlo no duplica el aviso ni reabre el que ya se leyó", async () => {
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: hace(20) } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, createdAt: hace(20) } });
 
             await notificationsService.mantener(AHORA);
             await request(app).post(`${BASE}/read-all`).set("Cookie", ana.cookie).expect(200);
@@ -260,13 +261,13 @@ describe("Avisos dentro de la aplicación (T5-12)", () => {
         });
 
         it("la consulta del contador hace el mantenimiento, pero no en cada consulta", async () => {
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: new Date(Date.now() - 30 * DIA) } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, createdAt: new Date(Date.now() - 30 * DIA) } });
 
             const primera = await request(app).get(`${BASE}/unread-count`).set("Cookie", ana.cookie);
             expect(primera.body.data).toEqual({ unread: 1 });
 
             // Otra orden atrasada, y otra consulta dentro de la pausa: aún no se ha mirado.
-            await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: new Date(Date.now() - 30 * DIA) } });
+            await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, createdAt: new Date(Date.now() - 30 * DIA) } });
             const segunda = await request(app).get(`${BASE}/unread-count`).set("Cookie", ana.cookie);
             expect(segunda.body.data).toEqual({ unread: 1 });
 

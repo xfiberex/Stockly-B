@@ -44,7 +44,7 @@ export interface DatosDelResumen extends Semana {
     /** Estos tres son **de hoy**, no de la semana: es lo que sigue pidiendo que alguien haga algo. */
     stockBajo: { total: number; productos: Array<{ nombre: string; stock: number; minimo: number }> };
     pendientes: { total: number; ordenes: Array<{ id: string; numero: number; fecha: Date; importe: number }> };
-    comprasAtrasadas: { total: number; ordenes: Array<{ id: string; proveedor: string | null; diasDeRetraso: number }> };
+    comprasAtrasadas: { total: number; ordenes: Array<{ id: string; numero: number; proveedor: string | null; diasDeRetraso: number }> };
 }
 
 export type ResultadoDelResumen =
@@ -112,16 +112,16 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
         }),
         // Fuera de plazo: abierta, y pasado el plazo de entrega de su proveedor —o el de
         // Configuración si no tiene— desde el día en que se pidió, contado en días del negocio.
-        prisma.$queryRaw<Array<{ id: string; proveedor: string | null; retraso: number; total: bigint }>>`
+        prisma.$queryRaw<Array<{ id: string; numero: number; proveedor: string | null; retraso: number; total: bigint }>>`
             WITH abiertas AS (
-                SELECT po."id", s."name" AS proveedor,
+                SELECT po."id", po."number" AS numero, s."name" AS proveedor,
                        (${hoy}::date - ((po."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${zona})::date
                            + COALESCE(s."leadTimeDays", ${plazoPorDefecto}::int)))::int AS retraso
                 FROM "purchase_orders" po
                 LEFT JOIN "suppliers" s ON s."id" = po."supplierId"
                 WHERE po."status" IN ('PENDING', 'PARTIALLY_RECEIVED')
             )
-            SELECT "id", proveedor, retraso, COUNT(*) OVER () AS total
+            SELECT "id", numero, proveedor, retraso, COUNT(*) OVER () AS total
             FROM abiertas
             WHERE retraso > 0
             ORDER BY retraso DESC, "id" ASC
@@ -154,7 +154,7 @@ export async function reunirDatosDelResumen(semana: Semana, zona: string, hoy: s
         },
         comprasAtrasadas: {
             total: Number(compras[0]?.total ?? 0),
-            ordenes: compras.map((o) => ({ id: o.id, proveedor: o.proveedor, diasDeRetraso: o.retraso })),
+            ordenes: compras.map((o) => ({ id: o.id, numero: o.numero, proveedor: o.proveedor, diasDeRetraso: o.retraso })),
         },
     };
 }

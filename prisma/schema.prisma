@@ -299,6 +299,9 @@ model CostHistory {
 
 model PurchaseOrder {
   id          String              @id @default(uuid())
+  // AUD-019 — el número con el que se nombra la compra (`#000042`), para poder dictarla. Lo da
+  // `siguienteNumeroDeCompra`, nunca quien llama; la serie es aparte de la de las ventas.
+  number      Int                 @unique
   supplierId  String?
   supplier    Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   status      PurchaseOrderStatus @default(PENDING)

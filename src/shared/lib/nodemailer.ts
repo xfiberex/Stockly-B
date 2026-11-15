@@ -11,7 +11,7 @@ import {
     emailTable,
 } from "@/shared/lib/emailTemplates";
 import { formatearImporte } from "@/shared/lib/moneda";
-import { escribirNumeroDeVenta, type RolAsignable } from "@/contratos/api";
+import { escribirNumeroDeCompra, escribirNumeroDeVenta, type RolAsignable } from "@/contratos/api";
 import type { DatosDelResumen } from "@/shared/lib/resumenSemanal";
 import {
     traducirCorreo,
@@ -349,9 +349,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
     requireSmtp();
     const t = traductorDeCorreo(idioma);
     const periodo = rangoDeDias(idioma, datos.from, datos.to);
-    // T6-04 — las ventas se nombran por su correlativo; las compras siguen con el principio
-    // de su identificador.
-    const numero = (id: string) => id.slice(0, 8).toUpperCase();
+    // T6-04 y AUD-019 — ventas y compras se nombran por su correlativo, cada una con su serie.
     const dia = new Intl.DateTimeFormat(localeDe(idioma), { day: "numeric", month: "short", timeZone: datos.zona });
     // T6-03 — el símbolo viene de `settingsService.moneda()`, que solo devuelve lo que pasa la
     // regla del contrato: ni `<` ni `&`, así que va al HTML sin escapar.
@@ -409,7 +407,7 @@ export async function sendWeeklyDigestEmail(to: string, adminName: string, datos
               emailTable(
                   [t("resumen.col.orden"), t("resumen.col.proveedor"), t("resumen.col.retraso")],
                   datos.comprasAtrasadas.ordenes.map((o) => [
-                      t("resumen.compra", { numero: numero(o.id) }),
+                      t("resumen.compra", { numero: escribirNumeroDeCompra(o.numero) }),
                       o.proveedor ? escapeHtml(o.proveedor) : t("resumen.sinProveedor"),
                       String(o.diasDeRetraso),
                   ]),

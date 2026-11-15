@@ -1,6 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 import { env } from "@/config/env";
-import { cleanDb, createUser, numeroDeVenta, ALMACEN, crearProductos } from "./helpers";
+import { cleanDb, createUser, numeroDeVenta, ALMACEN, crearProductos, numeroDeCompra } from "./helpers";
 
 /**
  * T5-11 — el resumen semanal por correo.
@@ -279,12 +279,12 @@ describe("Lo que cuenta el resumen", () => {
 
         // Plazo del proveedor, 3 días: pedida el 20, debía llegar el 23; el 30 lleva 7 de retraso.
         const proveedor = await prisma.supplier.create({ data: { name: "Lento S.A.", leadTimeDays: 3 } });
-        const tarde = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, supplierId: proveedor.id, createdAt: new Date("2026-09-20T16:00:00Z") } });
+        const tarde = await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, supplierId: proveedor.id, createdAt: new Date("2026-09-20T16:00:00Z") } });
         // Sin proveedor: el plazo por defecto de Configuración, 7 días. Pedida el 10, 13 de retraso.
-        const sinProveedor = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, status: "PARTIALLY_RECEIVED", createdAt: new Date("2026-09-10T16:00:00Z") } });
+        const sinProveedor = await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, status: "PARTIALLY_RECEIVED", createdAt: new Date("2026-09-10T16:00:00Z") } });
         // Dentro de plazo, y una recibida hace meses: ninguna de las dos.
-        await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, createdAt: new Date("2026-09-25T16:00:00Z") } });
-        await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, status: "RECEIVED", createdAt: new Date("2026-01-10T16:00:00Z") } });
+        await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, createdAt: new Date("2026-09-25T16:00:00Z") } });
+        await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, status: "RECEIVED", createdAt: new Date("2026-01-10T16:00:00Z") } });
 
         const datos = await reunirDatosDelResumen(SEMANA, ZONA, "2026-09-30");
 
@@ -300,8 +300,8 @@ describe("Lo que cuenta el resumen", () => {
         expect(datos.comprasAtrasadas).toEqual({
             total: 2,
             ordenes: [
-                { id: sinProveedor.id, proveedor: null, diasDeRetraso: 13 },
-                { id: tarde.id, proveedor: "Lento S.A.", diasDeRetraso: 7 },
+                { id: sinProveedor.id, numero: sinProveedor.number, proveedor: null, diasDeRetraso: 13 },
+                { id: tarde.id, numero: tarde.number, proveedor: "Lento S.A.", diasDeRetraso: 7 },
             ],
         });
     });
@@ -332,6 +332,17 @@ describe("Lo que cuenta el resumen", () => {
         expect(html).not.toContain("Bajo 10");
         // Sin compras fuera de plazo, esa sección no sale.
         expect(html).not.toContain("<h2 style=\"margin:24px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#111827;\">Compras fuera de plazo");
+    });
+
+    it("una compra fuera de plazo se nombra por su número, no por el principio del id (AUD-019)", async () => {
+        await activar();
+        await admin("ana@stockly.test");
+        const atrasada = await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, createdAt: new Date("2026-09-01T16:00:00Z") } });
+
+        await enviarResumenSemanal(AHORA);
+
+        expect(enviados[0]!.html).toContain("Compra #000001");
+        expect(enviados[0]!.html).not.toContain(atrasada.id.slice(0, 8).toUpperCase());
     });
 
     it("una semana sin ventas lo dice, en vez de dejar la sección vacía", async () => {

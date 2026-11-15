@@ -3,7 +3,7 @@ import path from "node:path";
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto, numeroDeCompra } from "./helpers";
 import { $Enums } from "@/generated/prisma/client";
 import type { z } from "zod";
 import * as contrato from "@/contratos/api";
@@ -193,7 +193,7 @@ describe("Contrato de la API (T4-01)", () => {
             });
 
             await prisma.purchaseOrder.create({
-                data: { warehouseId: ALMACEN,
+                data: { number: await numeroDeCompra(), warehouseId: ALMACEN,
                     supplierId: proveedor.id,
                     items: {
                         create: [{ productId: producto.id, productName: producto.name, quantity: 5, unitPrice: 900 }],

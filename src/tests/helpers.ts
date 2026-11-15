@@ -2,6 +2,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { signToken } from "@/shared/lib/jwt";
 import { hashPassword } from "@/shared/lib/hash";
 import { siguienteNumeroDeVenta } from "@/shared/lib/numeroDeVenta";
+import { siguienteNumeroDeCompra } from "@/shared/lib/numeroDeCompra";
 import type { $Enums, Prisma } from "@/generated/prisma/client";
 
 export async function cleanDb() {
@@ -90,6 +91,9 @@ export async function ponerStock(productId: string, stock: number) {
  * por la API.
  */
 export const numeroDeVenta = () => siguienteNumeroDeVenta(prisma);
+
+/** AUD-019 — lo mismo para una compra creada directamente con Prisma: del contador del servicio. */
+export const numeroDeCompra = () => siguienteNumeroDeCompra(prisma);
 
 interface CreateUserOptions {
     name?: string;

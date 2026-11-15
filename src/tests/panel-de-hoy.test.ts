@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, crearProducto, numeroDeVenta, ALMACEN } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, crearProducto, numeroDeVenta, ALMACEN, numeroDeCompra } from "./helpers";
 
 /**
  * AUD-008 — lo que el panel necesita de la API para que cada cifra lleve a una lista que diga
@@ -85,7 +85,7 @@ describe("El panel de hoy (AUD-008)", () => {
     describe("GET /purchase-orders", () => {
         beforeAll(async () => {
             for (const status of ["PENDING", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] as const) {
-                await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, status } });
+                await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, status } });
             }
         });
 

@@ -4,7 +4,7 @@ import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { MONTAJES } from "@/routes";
 import { PERMISOS, rolSchema, type RutaConPermiso } from "@/contratos/api";
-import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, ALMACEN, crearProducto, numeroDeCompra } from "./helpers";
 import type { $Enums } from "@/generated/prisma/client";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
@@ -152,7 +152,7 @@ describe("Permisos por rol (T5-13)", () => {
         });
 
         it("tampoco puede cancelar la compra que recibió: el PATCH sigue siendo de ADMIN", async () => {
-            const orden = await prisma.purchaseOrder.create({ data: { warehouseId: ALMACEN, items: { create: [{ productName: "X", quantity: 1, unitPrice: 1 }] } } });
+            const orden = await prisma.purchaseOrder.create({ data: { number: await numeroDeCompra(), warehouseId: ALMACEN, items: { create: [{ productName: "X", quantity: 1, unitPrice: 1 }] } } });
 
             const res = await request(app)
                 .patch(`/api/v1/purchase-orders/${orden.id}`)

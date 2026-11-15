@@ -853,15 +853,18 @@ export const productService = {
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 20 });
         const where = { productId };
 
-        const [history, total] = await prisma.$transaction([
+        const [filas, total] = await prisma.$transaction([
             prisma.costHistory.findMany({
                 where,
                 skip,
                 take: limit,
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                // AUD-019 — el número de la compra, para nombrarla en vez del principio del id.
+                include: { purchaseOrder: { select: { number: true } } },
             }),
             prisma.costHistory.count({ where }),
         ]);
+        const history = filas.map(({ purchaseOrder, ...fila }) => ({ ...fila, purchaseOrderNumber: purchaseOrder?.number ?? null }));
 
         return { history, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     },

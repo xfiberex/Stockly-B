@@ -7,6 +7,8 @@ import { costeMedioTrasRecepcion, mismoCoste } from "@/shared/lib/costeMedio";
 import { bloquearProductos, entrar, sacar } from "@/shared/lib/stock";
 import { almacenDelFiltro, almacenParaOperar } from "@/shared/lib/almacenes";
 import { hoyDelNegocio, loteDeEntrada, type LoteDeLaPeticion } from "@/shared/lib/lotes";
+import { siguienteNumeroDeCompra } from "@/shared/lib/numeroDeCompra";
+import { escribirNumeroDeCompra } from "@/contratos/api";
 import type { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, UpdatePurchaseOrderDto } from "./purchase-orders.types";
 
 const ORDER_INCLUDE = {
@@ -59,7 +61,7 @@ async function bloquearOrden(tx: Tx, id: string) {
  */
 async function registrarEntradas(
     tx: Tx,
-    orden: { id: string; warehouseId: string },
+    orden: { id: string; number: number; warehouseId: string },
     lineas: Array<{ item: PurchaseOrderItem; cantidad: number; lote?: LoteDeLaPeticion }>,
     hoy: string,
 ) {
@@ -90,7 +92,8 @@ async function registrarEntradas(
             cantidad,
             lotId,
             type: "IN",
-            note: `Orden de compra #${purchaseOrderId.slice(0, 8)}`,
+            // AUD-019 — por su número, que se puede dictar, y no por el principio del id.
+            note: `Orden de compra #${escribirNumeroDeCompra(orden.number)}`,
             // T5-09 — fecha esta recepción para el informe de compras por periodo.
             purchaseOrderItemId: item.id,
         });
@@ -155,22 +158,27 @@ export const purchaseOrderService = {
         // T5-14 — a qué almacén entrará: el de la petición o el predeterminado.
         const almacen = await almacenParaOperar(dto.warehouseId);
 
-        return prisma.purchaseOrder.create({
-            data: {
-                warehouseId: almacen.id,
-                supplierId: dto.supplierId ?? null,
-                notes: dto.notes,
-                items: {
-                    create: dto.items.map((item) => ({
-                        productId: item.productId ?? null,
-                        productName: item.productName,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                    })),
+        // AUD-019 — el número se toma dentro de la transacción que crea la orden: si la creación
+        // falla, el contador vuelve atrás con ella y el número no se gasta.
+        return prisma.$transaction(async (tx) =>
+            tx.purchaseOrder.create({
+                data: {
+                    number: await siguienteNumeroDeCompra(tx),
+                    warehouseId: almacen.id,
+                    supplierId: dto.supplierId ?? null,
+                    notes: dto.notes,
+                    items: {
+                        create: dto.items.map((item) => ({
+                            productId: item.productId ?? null,
+                            productName: item.productName,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                        })),
+                    },
                 },
-            },
-            include: ORDER_INCLUDE,
-        });
+                include: ORDER_INCLUDE,
+            }),
+        );
     },
 
     async update(id: string, dto: UpdatePurchaseOrderDto) {
@@ -269,7 +277,7 @@ export const purchaseOrderService = {
                                 cantidad: retirar,
                                 lotId,
                                 type: "OUT",
-                                note: `Cancelación de orden de compra #${id.slice(0, 8)}`,
+                                note: `Cancelación de orden de compra #${escribirNumeroDeCompra(orden.number)}`,
                             },
                             (enAlmacen, producto) =>
                                 new HttpError(
@@ -391,6 +399,8 @@ export const purchaseOrderService = {
                     totalLine: item.quantity * Number(item.unitPrice),
                     // T5-14 — a qué almacén entra. Al final, para no mover las columnas que ya había.
                     warehouseName: o.warehouse.name,
+                    // AUD-019 — el número con sus ceros, como en la pantalla. También al final.
+                    orderNumber: escribirNumeroDeCompra(o.number),
                 })),
             );
 

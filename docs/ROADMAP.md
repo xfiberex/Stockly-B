@@ -6,6 +6,12 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-14, noche (PC): cuatro tareas abiertas; `AUD-019` con Órdenes hecho.** Las
+> compras tienen número correlativo (`#000042`, migración nueva) en lugar del trozo de UUID; las
+> sugerencias enseñan subtotal, total por proveedor y total, y confirman antes de generar; la ficha
+> de cliente rotula «Subtotal» y enlaza cada venta; los filtros de Ventas se pliegan en el móvil.
+> Faltan Inventario, Administración y Tipografía.
+>
 > **Estado al 2026-11-14, tarde: cuatro tareas abiertas; `AUD-019` empezada.** Hechos sus bloques
 > Panel y Catálogo: `/expiry` cuenta lotes, la ficha del escáner deja mover el stock o escanear
 > otro, el formulario de edición ya no mueve stock y los filtros de Productos viven en la URL.
@@ -143,7 +149,7 @@ grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 15
 
 ## Tareas abiertas
 
-Siete. `AUD-009` (ya cerrada) y `AUD-010` salieron el 2026-11-03 y 04 de la crítica del
+Cuatro. `AUD-009` (ya cerrada) y `AUD-010` salieron el 2026-11-03 y 04 de la crítica del
 panel. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
 ([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` y `AUD-012` (ya cerradas) en el Tier 2, el
 resto en el Tier 3. Las seis de la re-auditoría del 2026-10-31 están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
@@ -459,7 +465,47 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       stock como texto.
     - **Sin comprobar:** el escaneo con cámara real (la ficha se probó montada con las props); la
       crítica repetida de los dos bloques, que va con las críticas de cierre.
-  - **Falta:** Órdenes, Inventario, Administración y Tipografía.
+  - **Hecho, tanda 2 (2026-11-14, en el PC): Órdenes.** Backend, contrato y frontend.
+    - **Número de compra correlativo** (decisión del propietario: correlativo, como las ventas de
+      `T6-04`, y no solo partir el UUID en grupos). Columna `purchase_orders.number`, única; la
+      migración `20261114120000_aud_019_numero_de_compra` numera las existentes por fecha y deja la
+      fila `purchaseOrder` en `counters`. `siguienteNumeroDeCompra` (`shared/lib/numeroDeCompra.ts`)
+      se llama dentro de la transacción que crea la orden: crear a mano y generar desde sugerencias,
+      que pasó de `$transaction([...])` a una transacción interactiva para numerar cada orden. El
+      contrato gana `ordenCompraSchema.number`, `escribirNumeroDeCompra`, `orderNumber` (opcional)
+      en el aviso `PURCHASE_OVERDUE` y `purchaseOrderNumber` en el historial de costes. Lo usan las
+      notas de recibir y cancelar, el resumen semanal, la exportación (columna `orderNumber`, al
+      final), la lista, la recepción, la cancelación, la campana y el origen del coste en
+      Movimientos. Los avisos anteriores, sin número, se siguen nombrando por el id. El seed numera
+      por fecha, como las ventas.
+    - **Sugerencias:** cada línea dice su subtotal (atenuado si no está marcada), la cabecera de
+      cada proveedor lo marcado de su grupo y el resumen el total. Con una línea marcada a medio
+      escribir no se enseña un total que solo sume las demás. «Generar órdenes» abre
+      `ConfirmarAccion` con cada orden, sus líneas, su importe y el total, y dice que una orden de
+      compra no se edita después (y a qué almacén, si hay varios). Es solo frontend: el precio
+      propuesto ya llegaba y la pantalla es de ADMIN, así que `AUD-009` no entra.
+    - **Ficha de cliente:** la columna dice «Subtotal», que es lo que suma, y el número de cada
+      venta lleva a `/sale-orders?numero=…&venta=…`, desplegada.
+    - **Ventas:** el contacto del cliente, con `EnvelopeIcon` y `PhoneIcon` y su rótulo para el
+      lector, en vez de emoji. En el móvil, estado, fechas y almacén se pliegan tras «Filtros (n)»,
+      como en Productos; el número de venta queda a la vista. Los textos del botón pasan a
+      `filtro.plegados` y lo usan las dos pantallas; el patrón queda en `design-system.md`.
+    - **Comprobado:** backend, `numero-de-compra.test.ts` nuevo (serie, veinte a la vez, rollback,
+      contador ausente, series separadas, generar, notas, historial, aviso, exportación y la parte
+      de datos de la migración) y el correo semanal con el número; frontend, tests de Sugerencias
+      (subtotales, totales, confirmación), ficha de cliente, campana, lista de compras y Ventas
+      (iconos, plegado y recuento). La base de desarrollo, migrada: 18 compras numeradas del 1 al
+      18 y el contador en 18; `prisma migrate diff` contra el esquema, vacío. `pnpm verify` en verde
+      en los dos (backend 1884 tests; frontend 1130 y 1 omitido); E2E completo, 39 pasados y 3
+      omitidos, con el flujo de `T5-05` confirmando en el diálogo (54,00) y los tres de compras
+      nombrándolas por `escribirNumeroDeCompra`.
+    - **En el navegador:** a 1280 px la tabla de Sugerencias ya medía 1052 px en 975, y la columna
+      nueva y el «Marcado» de cada proveedor (alineado a la derecha de la fila) quedaban fuera de la
+      vista. Se arregló poniendo el «Marcado» junto al nombre del proveedor, estrechando los campos
+      de cantidad y precio y bajando el relleno de las celdas a `px-2`: ahora mide 975 en 975. Las
+      cifras cuadran (40.300 + 23.400 = 63.700) y la confirmación dice el almacén. En Ventas, a 500 px
+      (el mínimo de la ventana; por debajo de `md` es lo mismo), la primera venta empieza a 370 px.
+  - **Falta:** Inventario, Administración y Tipografía.
 
 ## Tier 4 · Propuestas
 

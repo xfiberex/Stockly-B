@@ -184,9 +184,9 @@ export const notificationsService = {
         await prisma.$executeRaw`
             INSERT INTO "notifications" ("id", "userId", "type", "entityId", "data", "createdAt")
             SELECT gen_random_uuid(), u."id", 'PURCHASE_OVERDUE'::"NotificationType", a."id",
-                   jsonb_build_object('supplierName', a.proveedor, 'dueDate', to_char(a.vence, 'YYYY-MM-DD')), ${enUtc(ahora)}
+                   jsonb_build_object('orderNumber', a."number", 'supplierName', a.proveedor, 'dueDate', to_char(a.vence, 'YYYY-MM-DD')), ${enUtc(ahora)}
             FROM (
-                SELECT po."id", s."name" AS proveedor,
+                SELECT po."id", po."number", s."name" AS proveedor,
                        (po."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${zona})::date
                            + COALESCE(s."leadTimeDays", ${plazoPorDefecto}::int) AS vence
                 FROM "purchase_orders" po

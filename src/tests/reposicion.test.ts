@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
-import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
+import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto, numeroDeCompra } from "./helpers";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -94,22 +94,24 @@ describe("Sugerencias de reposición (T5-05)", () => {
         productId: string; supplierId?: string | null; status: "PENDING" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
         quantity: number; receivedQuantity?: number; unitPrice?: number; createdAt?: Date;
     }) =>
-        prisma.purchaseOrder.create({
-            data: { warehouseId: ALMACEN,
-                supplierId: datos.supplierId ?? null,
-                status: datos.status,
-                ...(datos.createdAt && { createdAt: datos.createdAt }),
-                items: {
-                    create: {
-                        productId: datos.productId,
-                        productName: "línea",
-                        quantity: datos.quantity,
-                        receivedQuantity: datos.receivedQuantity ?? 0,
-                        unitPrice: datos.unitPrice ?? 5,
+        numeroDeCompra().then((number) =>
+            prisma.purchaseOrder.create({
+                data: { number, warehouseId: ALMACEN,
+                    supplierId: datos.supplierId ?? null,
+                    status: datos.status,
+                    ...(datos.createdAt && { createdAt: datos.createdAt }),
+                    items: {
+                        create: {
+                            productId: datos.productId,
+                            productName: "línea",
+                            quantity: datos.quantity,
+                            receivedQuantity: datos.receivedQuantity ?? 0,
+                            unitPrice: datos.unitPrice ?? 5,
+                        },
                     },
                 },
-            },
-        });
+            }),
+        );
 
     describe("El criterio", () => {
         it("velocidad 2/día, plazo 7, mínimo 10, 5 disponibles y nada pedido sugiere 19", async () => {

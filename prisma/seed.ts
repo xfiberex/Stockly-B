@@ -5,6 +5,7 @@ import { hashPassword } from "../src/shared/lib/hash";
 import { codigoDeLotePorDefecto, digitoDeControlGtin } from "../src/contratos/api";
 import { ZONA_HORARIA_POR_DEFECTO, hoyEn } from "../src/shared/lib/zonaHoraria";
 import { CONTADOR_DE_VENTAS } from "../src/shared/lib/numeroDeVenta";
+import { CONTADOR_DE_COMPRAS } from "../src/shared/lib/numeroDeCompra";
 import { transferir } from "../src/shared/lib/stock";
 import { FORZAR, motivoParaNoSembrar } from "../src/shared/lib/guardaDelSeed";
 import { categoriesData } from "./data/categories";
@@ -670,7 +671,11 @@ async function sembrarOrdenesDeCompra(
 ): Promise<number> {
     let items = 0;
 
-    for (const orden of ordenesDeCompra) {
+    // AUD-019 — numeradas por fecha, como las ventas (T6-04) y como hizo la migración con las que
+    // ya existían. `sort` es estable: dos del mismo día conservan el orden en que están escritas.
+    const porFecha = [...ordenesDeCompra].sort((a, b) => b.dias - a.dias);
+
+    for (const [indice, orden] of porFecha.entries()) {
         const fecha = hace(orden.dias);
         const lineas = orden.items.map((i) => {
             const producto = exigirProducto(porSku, i.sku);
@@ -701,6 +706,7 @@ async function sembrarOrdenesDeCompra(
 
         await prisma.purchaseOrder.create({
             data: {
+                number: indice + 1,
                 warehouseId: principal.id,
                 supplierId: exigir(proveedores, orden.proveedor, "proveedor"),
                 status: orden.status,
@@ -711,6 +717,9 @@ async function sembrarOrdenesDeCompra(
         });
         items += lineas.length;
     }
+
+    // El contador se queda en la última: la siguiente compra, ya desde la aplicación, es la que sigue.
+    await prisma.counter.create({ data: { key: CONTADOR_DE_COMPRAS, value: porFecha.length } });
 
     console.log(`  - ${ordenesDeCompra.length} órdenes de compra creadas (${items} ítems)`);
     return items;

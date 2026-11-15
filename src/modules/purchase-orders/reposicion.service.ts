@@ -2,6 +2,7 @@ import { almacenParaOperar } from "@/shared/lib/almacenes";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { HttpError } from "@/shared/lib/httpError";
+import { siguienteNumeroDeCompra } from "@/shared/lib/numeroDeCompra";
 import { parsePagination } from "@/shared/lib/pagination";
 import { settingsService } from "@/modules/settings/settings.service";
 import type { GenerarDesdeSugerenciasDto } from "./purchase-orders.types";
@@ -231,10 +232,15 @@ export const reposicionService = {
             (a[0]!.producto.supplier?.name ?? "").localeCompare(b[0]!.producto.supplier?.name ?? ""),
         );
 
-        return prisma.$transaction(
-            grupos.map(([supplierId, grupo]) =>
-                prisma.purchaseOrder.create({
+        // AUD-019 — una transacción interactiva y las órdenes de una en una: cada una toma su
+        // número del contador, y si falla una se deshacen todas y ningún número se gasta. Un
+        // `$transaction([...])` con las creaciones ya escritas no deja pedir el número antes.
+        return prisma.$transaction(async (tx) => {
+            const ordenes = [];
+            for (const [supplierId, grupo] of grupos) {
+                const orden = await tx.purchaseOrder.create({
                     data: {
+                        number: await siguienteNumeroDeCompra(tx),
                         supplierId,
                         warehouseId: almacen.id,
                         items: {
@@ -251,8 +257,10 @@ export const reposicionService = {
                         warehouse: { select: { id: true, name: true } },
                         items: { include: { product: { select: { id: true, name: true, sku: true, tracksLots: true } } } },
                     },
-                }),
-            ),
-        );
+                });
+                ordenes.push(orden);
+            }
+            return ordenes;
+        });
     },
 };

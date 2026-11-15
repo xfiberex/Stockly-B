@@ -517,8 +517,13 @@ reflejo. El relato de cada una está en el [histórico](historico/ROADMAP-2026-1
   secuencia no se deshace con la transacción y gastaría un número en cada venta rechazada con 409.
   `siguienteNumeroDeVenta` se llama **dentro** de la transacción que crea la orden y lo último antes
   de crearla. Los tests que crean ventas con Prisma piden el suyo a `numeroDeVenta()` de
-  `helpers.ts`, que usa el mismo contador. Se escribe con `escribirNumeroDeVenta`, del contrato; las
-  compras y los conteos siguen con el principio de su id.
+  `helpers.ts`, que usa el mismo contador. Se escribe con `escribirNumeroDeVenta`, del contrato.
+  **Las compras tienen la suya desde `AUD-019`**, con el mismo mecanismo y otra fila
+  (`siguienteNumeroDeCompra`, `numeroDeCompra()` en los tests, `escribirNumeroDeCompra`): una
+  orden de compra **no se crea sin `number`**, también en un test o en el seed. Generar desde
+  sugerencias crea las órdenes de una en una dentro de una transacción interactiva, para que cada
+  una tome su número y un fallo no gaste ninguno. Los conteos y las transferencias siguen con el
+  principio de su id.
 
 - **Los importes de una venta no se guardan ni se suman en el navegador** (`T6-05`). Lo guardado es
   lo congelado en cada línea —cantidad, `unitPrice` sin impuesto y `taxRate`—, y `conTotales`

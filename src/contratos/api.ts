@@ -858,6 +858,11 @@ export const historialCosteSchema = z.object({
     newCost: importeSchema.nullable(),
     source: origenCosteSchema,
     purchaseOrderId: z.string().nullable(),
+    /**
+     * AUD-019 — el número de esa compra, para nombrarla. `null` cuando no sale de una recepción, o
+     * si la compra ya se borró (`purchaseOrderId` es `SetNull`, así que entonces faltan los dos).
+     */
+    purchaseOrderNumber: z.number().nullable(),
     createdAt: fechaSchema,
 });
 
@@ -1011,6 +1016,16 @@ export function escribirNumeroDeVenta(numero: number): string {
 }
 
 /**
+ * AUD-019 — el número de una compra, con las mismas cifras que el de una venta: `42` → `000042`.
+ * La serie es otra; la forma de escribirlo, la misma, para que «Compra #000042» y
+ * «Venta #000042» se lean igual. Antes la compra se nombraba con el principio de su UUID, que no
+ * se podía dictar.
+ */
+export function escribirNumeroDeCompra(numero: number): string {
+    return escribirNumeroDeVenta(numero);
+}
+
+/**
  * T6-07 — si una orden tiene comprobante: **las enviadas**. Una pendiente todavía no es una
  * venta, y una cancelada sin enviar nunca lo fue. La que se canceló después de enviarse lo
  * conserva —el papel ya se entregó—, marcado como anulada: `shippedAt` sobrevive a la
@@ -1159,8 +1174,13 @@ export const avisoSchema = z.discriminatedUnion("type", [
     z.object({
         ...camposDeAviso,
         type: z.literal("PURCHASE_OVERDUE"),
-        /** `dueDate` es el día en que vencía el plazo, `AAAA-MM-DD` en la zona del negocio. */
-        data: z.object({ supplierName: z.string().nullable(), dueDate: z.string() }),
+        /**
+         * `dueDate` es el día en que vencía el plazo, `AAAA-MM-DD` en la zona del negocio.
+         *
+         * AUD-019 — `orderNumber` es el correlativo de la compra. Falta en los avisos anteriores,
+         * que no se reescriben: esos se siguen nombrando por el principio de `entityId`.
+         */
+        data: z.object({ orderNumber: z.number().optional(), supplierName: z.string().nullable(), dueDate: z.string() }),
     }),
     z.object({
         ...camposDeAviso,
@@ -1215,6 +1235,8 @@ export const itemOrdenCompraSchema = z.object({
 
 export const ordenCompraSchema = z.object({
     id: z.string(),
+    /** AUD-019 — el correlativo de la compra; se escribe con `escribirNumeroDeCompra`. */
+    number: z.number(),
     supplierId: z.string().nullable(),
     supplier: referenciaSchema.nullable(),
     status: estadoOrdenCompraSchema,
