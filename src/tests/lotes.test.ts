@@ -309,7 +309,7 @@ describe("Lotes y fechas de caducidad (T5-15)", () => {
                 { code: "PRONTO", expiresAt: dia(5), daysLeft: 5, expired: false, stock: 4, costValue: 10 },
             ]);
             expect(datos.data[0]).toMatchObject({ productId: p.id, productName: "Jamón", warehouseId: ALMACEN, warehouseName: "Principal", unitCost: 2.5 });
-            expect(datos.summary).toEqual({ expiredCount: 1, expiredUnits: 2, expiredCostValue: 5, expiringUnits: 4, expiringCostValue: 10, unitsWithoutCost: 0 });
+            expect(datos.summary).toEqual({ expiredCount: 1, expiringCount: 1, expiredUnits: 2, expiredCostValue: 5, expiringUnits: 4, expiringCostValue: 10, unitsWithoutCost: 0 });
 
             // Con un plazo más largo entra el tercero.
             expect((await informe("?days=40")).data.map((f) => f.code)).toEqual(["CADUCADO", "PRONTO", "LEJOS"]);
@@ -369,7 +369,7 @@ describe("Lotes y fechas de caducidad (T5-15)", () => {
             await ponerLote(sinCoste.id, "B", dia(2), 5);
 
             const datos = await informe();
-            expect(datos.summary).toEqual({ expiredCount: 0, expiredUnits: 0, expiredCostValue: 0, expiringUnits: 7, expiringCostValue: 6, unitsWithoutCost: 5 });
+            expect(datos.summary).toEqual({ expiredCount: 0, expiringCount: 2, expiredUnits: 0, expiredCostValue: 0, expiringUnits: 7, expiringCostValue: 6, unitsWithoutCost: 5 });
             expect(datos.data.find((f) => f.code === "B")).toMatchObject({ unitCost: null, costValue: null });
         });
 
@@ -379,6 +379,30 @@ describe("Lotes y fechas de caducidad (T5-15)", () => {
             await enviar((await vender(p, 6)).body.data.id);
 
             expect((await informe()).meta.total).toBe(0);
+        });
+
+        it("AUD-019 — `expired=true` deja en la lista solo lo caducado; el resumen sigue contando las dos cosas", async () => {
+            const p = await conLotes("Jamón", { costPrice: 2.5 });
+            await ponerLote(p.id, "VIEJO", dia(-10), 1);
+            await ponerLote(p.id, "CADUCADO", dia(-3), 2);
+            await ponerLote(p.id, "PRONTO", dia(5), 4);
+
+            const todo = await informe("?days=30");
+            const soloCaducado = await informe("?days=30&expired=true");
+
+            expect(soloCaducado.data.map((f) => f.code)).toEqual(["VIEJO", "CADUCADO"]);
+            expect(soloCaducado.meta.total).toBe(2);
+            expect(todo.meta.total).toBe(3);
+            // Igual con y sin filtro: si no, la tarjeta «por caducar» diría 0 lotes al filtrar.
+            expect(soloCaducado.summary).toEqual(todo.summary);
+            expect(soloCaducado.summary).toMatchObject({ expiredCount: 2, expiringCount: 1 });
+        });
+
+        it("AUD-019 — un `expired` que no es `true` se rechaza: un `false` ignorado lo enseñaría todo", async () => {
+            for (const malo of ["false", "1", "si"]) {
+                const res = await comoAdmin.get(`/reports/expiring?expired=${malo}`);
+                expect([malo, res.status, res.body.code]).toEqual([malo, 400, "INVALID_FILTER_VALUE"]);
+            }
         });
 
         it("un `days` que no es un entero entre 0 y 730 se rechaza, no se ignora", async () => {

@@ -34,6 +34,21 @@ function diasDelFiltro(valor: unknown): number | undefined {
     return dias;
 }
 
+/**
+ * AUD-019 — `expired`, si viene: solo `true` (lo ya caducado). Cualquier otro valor se rechaza: un
+ * `expired=false` ignorado parecería filtrar lo no caducado y enseñaría todo.
+ */
+function soloCaducadoDelFiltro(valor: unknown): boolean {
+    if (valor === undefined || valor === "") return false;
+    if (valor === "true") return true;
+    throw new HttpError(
+        400,
+        `El filtro «expired» no admite el valor «${String(valor)}». Valores válidos: true.`,
+        "INVALID_FILTER_VALUE",
+        { campo: "expired", valor: String(valor), validos: "true" },
+    );
+}
+
 interface Fila {
     lotId: string;
     code: string;
@@ -48,8 +63,9 @@ interface Fila {
 }
 
 export const caducidadesService = {
-    async informe(query: { days?: unknown; warehouseId?: unknown; page?: string; limit?: string }): Promise<InformeDeCaducidades> {
+    async informe(query: { days?: unknown; warehouseId?: unknown; expired?: unknown; page?: string; limit?: string }): Promise<InformeDeCaducidades> {
         const days = diasDelFiltro(query.days) ?? (await diasDeAvisoDeCaducidad());
+        const soloCaducado = soloCaducadoDelFiltro(query.expired);
         const warehouseId = await almacenDelFiltro(query.warehouseId);
         const { page, limit, skip } = parsePagination(query, { defaultLimit: 50 });
         const hoy = await hoyDelNegocio();
@@ -64,17 +80,20 @@ export const caducidadesService = {
             WHERE sl.stock > 0 AND l."expiresAt" <= ${hoy}::date + ${days}::int
               ${warehouseId ? Prisma.sql`AND sl."warehouseId" = ${warehouseId}` : Prisma.empty}`;
         const caducado = Prisma.sql`l."expiresAt" < ${hoy}::date`;
+        // AUD-019 — el filtro recorta la lista y su `meta`, no el resumen (ver el contrato).
+        const deLaLista = soloCaducado ? Prisma.sql`AND ${caducado}` : Prisma.empty;
 
         const [filas, [totales]] = await Promise.all([
             prisma.$queryRaw<Fila[]>`
                 SELECT l.id AS "lotId", l.code, l."expiresAt", p.id AS "productId", p.name AS "productName", p.sku,
                        w.id AS "warehouseId", w.name AS "warehouseName", sl.stock, p."costPrice"::float8 AS "unitCost"
-                ${desde}
+                ${desde} ${deLaLista}
                 ORDER BY l."expiresAt", p.name, l.code, w.name, sl.id
                 LIMIT ${limit} OFFSET ${skip}`,
             prisma.$queryRaw<Array<{ total: number } & InformeDeCaducidades["summary"]>>`
-                SELECT COUNT(*)::int AS total,
+                SELECT COUNT(*) FILTER (WHERE TRUE ${deLaLista})::int AS total,
                        COUNT(*) FILTER (WHERE ${caducado})::int AS "expiredCount",
+                       COUNT(*) FILTER (WHERE NOT ${caducado})::int AS "expiringCount",
                        COALESCE(SUM(sl.stock) FILTER (WHERE ${caducado}), 0)::int AS "expiredUnits",
                        COALESCE(SUM(sl.stock * p."costPrice") FILTER (WHERE ${caducado}), 0)::float8 AS "expiredCostValue",
                        COALESCE(SUM(sl.stock) FILTER (WHERE NOT ${caducado}), 0)::int AS "expiringUnits",

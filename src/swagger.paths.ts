@@ -770,6 +770,7 @@ export const rutasAdicionales: Record<string, Ruta> = {
                 "productos sin coste se cuentan aparte en `unitsWithoutCost`.",
             parameters: [
                 { name: "days", in: "query", schema: { type: "integer", minimum: 0, maximum: 730 }, description: "El plazo. Sin él, el del ajuste `expiryWarningDays` (30 por defecto)" },
+                { name: "expired", in: "query", schema: { type: "string", enum: ["true"] }, description: "Solo lo ya caducado en `data` y `meta` (AUD-019). `summary` no cambia" },
                 PARAM_ALMACEN,
                 ...PARAMS_PAGINA,
             ],

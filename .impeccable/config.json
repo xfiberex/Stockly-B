@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-11-17T15:46:58.762Z",
+        "reason": "Claude: plantillas HTML de correo (nodemailer.ts); los clientes de correo no cargan tipografías web y Arial es la pila segura"
+      }
+    ]
+  }
+}

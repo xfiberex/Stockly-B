@@ -795,17 +795,25 @@ export const caducidadSchema = z.object({
  *
  * Los valores son a coste, como el valor de inventario del panel, y por lo mismo las unidades
  * de productos sin coste se cuentan aparte (`unitsWithoutCost`) en vez de sumar cero.
+ *
+ * AUD-019 — `?expired=true` deja en `data` y `meta` **solo lo ya caducado**. `summary` no cambia
+ * con él: sigue diciendo las dos cosas del plazo, para que la pantalla no pase a contar «0 por
+ * caducar» solo porque esas filas no se están enseñando.
  */
 export const informeDeCaducidadesSchema = z.object({
     today: z.string(),
     days: z.number(),
     summary: z.object({
         /**
-         * AUD-008 — cuántas filas de `meta.total` (un lote en un almacén) ya han caducado; las
-         * demás caducan dentro del plazo. El panel decía «9 lotes caducados o por caducar» y no
-         * cuántos de cada.
+         * AUD-008 — cuántas filas (un lote en un almacén) ya han caducado. El panel decía
+         * «9 lotes caducados o por caducar» y no cuántos de cada.
          */
         expiredCount: z.number(),
+        /**
+         * AUD-019 — cuántas filas caducan dentro del plazo sin haber caducado aún. Antes se
+         * deducía de `meta.total − expiredCount`, que deja de valer con `?expired=true`.
+         */
+        expiringCount: z.number(),
         expiredUnits: z.number(),
         expiredCostValue: z.number(),
         expiringUnits: z.number(),

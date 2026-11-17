@@ -6,6 +6,12 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-17: cuatro tareas abiertas; `AUD-019` con Inventario hecho.** Las listas
+> vacías por un filtro lo dicen y dejan quitarlo; «Nuevo conteo» marca lo que ya está en otro
+> conteo abierto; las transferencias se escanean y su desglose dice «Tras la transferencia»;
+> Caducidades filtra «Solo lo ya caducado» en el servidor; y un conteo es a ciegas también en las
+> cifras, con pestañas y un solo primario. Faltan Administración y Tipografía.
+>
 > **Estado al 2026-11-15: cuatro tareas abiertas, sin cambios.** Fuera de tarea, a petición del
 > propietario: los grupos de la barra lateral se pliegan (empiezan cerrados, salvo el de la
 > pantalla abierta; lo abierto a mano se recuerda). Revisa la decisión de `T4-10`; las reglas, en
@@ -511,7 +517,41 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       de cantidad y precio y bajando el relleno de las celdas a `px-2`: ahora mide 975 en 975. Las
       cifras cuadran (40.300 + 23.400 = 63.700) y la confirmación dice el almacén. En Ventas, a 500 px
       (el mínimo de la ventana; por debajo de `md` es lo mismo), la primera venta empieza a 370 px.
-  - **Falta:** Inventario, Administración y Tipografía.
+  - **Hecho, tanda 3 (2026-11-17, en el PC): Inventario.** Los siete puntos de la ficha.
+    - **Vacíos que dicen el filtro:** `VacioDeLista` (`shared/components`) en Conteos, Transferencias
+      y Caducidades: con un filtro puesto, «Ningún conteo coincide con el filtro.» y «Quitar los
+      filtros» al lado; sin filtro, el «Todavía no hay…» de siempre. Regla en `design-system.md` §8.
+    - **«Nuevo conteo» no ofrece lo ocupado:** lee los conteos abiertos del almacén elegido y marca
+      «— ya en un conteo abierto» (opción desactivada; `Select` admite ahora `disabled` por opción)
+      las categorías con conteo abierto, y «Todo el catálogo» si hay cualquiera. Arranca en la
+      primera libre; con un conteo del catálogo entero abierto, no deja abrir y enlaza a él. El
+      servidor sigue decidiendo producto a producto (409 `PRODUCTS_IN_OPEN_COUNT`): esto evita el
+      viaje, no lo sustituye.
+    - **Transferencias:** el desglose dice «Tras la transferencia: X en … y Y en …» en vez de
+      «Quedan», que se leía como el stock de hoy. El formulario tiene «Escanear», con
+      `GET /products/lookup` (trae el desglose por almacén que la línea necesita): avisa de un código
+      desconocido, de un producto inactivo y del tope de líneas; dos lecturas, dos unidades.
+    - **Caducidades, «Solo lo ya caducado»:** filtro del servidor, `GET /reports/expiring?expired=true`
+      (solo `true`; otro valor, 400 `INVALID_FILTER_VALUE`), que recorta `data` y `meta` y **no** el
+      resumen. El contrato gana `summary.expiringCount`: la tarjeta «Caduca en el plazo» lo deducía
+      de `meta.total − expiredCount` y con el filtro habría dicho 0. Plazo, almacén y el filtro nuevo
+      viven en la URL (`?dias=`, `?almacen=`, `?caducado=1`), con `replace`.
+    - **Un conteo, jerarquía:** Contar/Revisar y los filtros de Revisar son `<Pestanas>` (`tablist`),
+      no botones con el elegido en primario. «Cerrar conteo» es secundario mientras se cuenta y
+      primario en Revisar: un solo primario a la vez («Guardar» o «Cerrar conteo»).
+    - **Un conteo, a ciegas también en las cifras:** en Contar solo se ve el avance («2 de 6
+      contados») y una nota de por qué; «Con diferencia», «Sobrante» y «Faltante» salen en Revisar.
+    - **Comprobado:** backend, dos tests nuevos en `lotes.test.ts` (el filtro con el resumen igual,
+      y los valores que se rechazan). Frontend, tests nuevos en `Conteo.test.tsx` (a ciegas, pestañas
+      y un primario, vacío con filtro, categorías marcadas), `Transferencias.test.tsx` (escáner,
+      avisos, vacío con filtro) y `Lotes.test.tsx` (el filtro en la URL y la consulta, el resumen,
+      el vacío). `pnpm verify` en verde en los dos (backend 1886; frontend 1145 y 1 omitido); E2E
+      completo, 39 pasados y 3 omitidos, con dos flujos ajustados (la pestaña «Revisar» y «Tras la
+      transferencia»). En el navegador, con el seed: «Electrónica» y «Todo el catálogo» marcadas en
+      Tienda Central y nada en Santiago; el conteo a ciegas y la revisión; el formulario de
+      transferencia y Caducidades a 500 px (el mínimo de la ventana), con 2 filas caducadas y la
+      tarjeta «Caduca en el plazo» en 6 lotes.
+  - **Falta:** Administración y Tipografía.
 
 ## Tier 4 · Propuestas
 
