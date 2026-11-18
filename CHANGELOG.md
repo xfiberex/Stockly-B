@@ -150,6 +150,15 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Las pantallas de acceso dicen qué pasa y qué hacer** (`AUD-014`): el motivo de un rechazo se
+  queda en la tarjeta hasta el siguiente intento (antes, un aviso de 3 s en una esquina), y lo que
+  tiene salida dice cuál —reenviar la confirmación, recuperar la contraseña—. Una cuenta que
+  espera a que la aprueben lo ve como un aviso informativo, con a quién preguntar, y no como un
+  error. El registro anuncia los dos pasos antes de enviar, termina en «Revisa tu correo» con la
+  dirección a la vista y deja corregirla. Un enlace caducado se detecta al abrirlo, con una sola
+  salida —o dos, si la cuenta ya está lista y basta con iniciar sesión—, y la invitación habla de
+  elegir la contraseña, no de restablecerla. El correo escrito pasa de una pantalla a otra.
+  `POST /auth/reset-password` responde `pendingApproval`.
 - **Lo que faltaba para usar la aplicación sin ratón ni vista** (`AUD-018`): las filas de Compras y
   Ventas se despliegan con el teclado desde el número de la orden y dicen si están abiertas; las
   pestañas del historial de un producto se recorren con las flechas y el lector sabe cuál está

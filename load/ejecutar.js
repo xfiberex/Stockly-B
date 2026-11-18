@@ -16,6 +16,7 @@
 // Uso:
 //   pnpm build && node load/ejecutar.js
 //   node load/ejecutar.js --base=Stockly_carga --puerto=3200
+//   node load/ejecutar.js --panel=ahora     (AUD-010: el panel con su segunda petición)
 
 const { spawn, spawnSync } = require("node:child_process");
 const path = require("node:path");
@@ -105,6 +106,9 @@ function ejecutarK6() {
         `BASE_URL=http://host.docker.internal:${PUERTO}/api/v1`,
         "-e",
         `SIN_CALIENTE=${process.argv.includes("--sin-caliente") ? "1" : ""}`,
+        // AUD-010 — qué pide el panel junto a `/reports`: nada, `antes` o `ahora` (movimientos.js).
+        "-e",
+        `PANEL=${argumento("panel", "")}`,
         "-v",
         `${__dirname}:/carga`,
         "grafana/k6",

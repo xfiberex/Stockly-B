@@ -2,6 +2,7 @@ import request from "supertest";
 import app from "@/app";
 import { prisma } from "@/shared/lib/prisma";
 import { cleanDb, createUser, getAuthCookie } from "./helpers";
+import { contrasenaRestablecidaSchema } from "@/contratos/api";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -381,6 +382,23 @@ describe("Auth API", () => {
                 .send({ token: rawToken, password: "NuevaPass1234!" });
 
             expect(res.status).toBe(200);
+            // AUD-014 — una cuenta con rol ya puede entrar con la contraseña nueva.
+            expect(contrasenaRestablecidaSchema.parse(res.body.data)).toEqual({ pendingApproval: false });
+        });
+
+        it("AUD-014: dice si la cuenta sigue pendiente de aprobación, para no prometer que ya se puede entrar", async () => {
+            const user = await createUser({ email: `reset_pendiente_${Date.now()}@example.com`, role: "PENDING" });
+            (sendPasswordResetEmail as jest.Mock).mockClear();
+            await request(app).post(`${BASE}/forgot-password`).send({ email: user.email });
+            const token = getLastCapturedToken(sendPasswordResetEmail as jest.Mock);
+
+            const res = await request(app).post(`${BASE}/reset-password`).send({ token, password: "NuevaPass1234!" });
+
+            expect(res.status).toBe(200);
+            expect(contrasenaRestablecidaSchema.parse(res.body.data)).toEqual({ pendingApproval: true });
+            // Y es verdad: el login la sigue rechazando hasta que la aprueben.
+            const login = await request(app).post(`${BASE}/login`).send({ email: user.email, password: "NuevaPass1234!" });
+            expect(login.body.code).toBe("ACCOUNT_PENDING_APPROVAL");
         });
 
         it("400: token inválido", async () => {

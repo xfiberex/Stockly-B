@@ -105,7 +105,8 @@ export const spec = {
                 tags: ["Auth"], summary: "Restablecer contraseña con token",
                 security: [],
                 requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["token", "password"], properties: { token: { type: "string" }, password: { type: "string", minLength: 8 } } } } } },
-                responses: { "200": { description: "Contraseña restablecida" }, "400": { description: "Token inválido o expirado" } },
+                // AUD-014 — `pendingApproval`: guardada, pero la cuenta aún espera a un ADMIN.
+                responses: { "200": { description: "Contraseña restablecida", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/ContrasenaRestablecida" } } } } } }, "400": { description: "Token inválido o expirado" } },
             },
         },
         "/products": {

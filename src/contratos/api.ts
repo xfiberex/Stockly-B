@@ -1461,6 +1461,15 @@ export const perfilSchema = usuarioSchema.omit({ updatedAt: true }).extend({ idi
  */
 export const enlaceDeRestablecerSchema = z.object({ email: z.string() });
 
+/**
+ * AUD-014 — respuesta de `POST /auth/reset-password`. `pendingApproval`: la cuenta sigue
+ * esperando a que un ADMIN la apruebe, así que la contraseña está guardada pero todavía no deja
+ * entrar. Sin esto, el login decía «Ya puedes entrar» y lo siguiente era un rechazo. Es lo mismo
+ * que ya respondía la confirmación del correo, y no revela nada: quien tiene el enlace es el
+ * dueño de la cuenta.
+ */
+export const contrasenaRestablecidaSchema = z.object({ pendingApproval: z.boolean() });
+
 /** Respuesta de `PATCH /auth/me/idioma`. */
 export const idiomaGuardadoSchema = z.object({ idioma: idiomaSchema });
 
@@ -1896,6 +1905,7 @@ export type Usuario = z.infer<typeof usuarioSchema>;
 export type Perfil = z.infer<typeof perfilSchema>;
 export type IdiomaGuardado = z.infer<typeof idiomaGuardadoSchema>;
 export type EnlaceDeRestablecer = z.infer<typeof enlaceDeRestablecerSchema>;
+export type ContrasenaRestablecida = z.infer<typeof contrasenaRestablecidaSchema>;
 export type Ajuste = z.infer<typeof ajusteSchema>;
 export type AjusteGuardado = z.infer<typeof ajusteGuardadoSchema>;
 export type GrupoDeAjuste = z.infer<typeof grupoDeAjusteSchema>;

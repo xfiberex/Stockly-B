@@ -279,6 +279,9 @@ export const authService = {
 
         // AUD-001 — si esto es lo que la verificó, es aquí donde empieza a esperar aprobación.
         if (!user.isVerified) await avisarSiEsperaAprobacion(user);
+
+        // AUD-014 — la pantalla dice «ya puedes entrar» solo si es verdad.
+        return { pendingApproval: user.role === "PENDING" };
     },
 
     async getById(id: string) {

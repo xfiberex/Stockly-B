@@ -6,6 +6,15 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-18, noche: cuatro tareas abiertas; `AUD-014` cerrada y `AUD-020` abierta.**
+> La crítica de cierre del acceso dio 29,3/40, sin P1 y ninguna pantalla por debajo de 28: se
+> cerró `AUD-014`, con sus cinco P2 arreglados (la cuenta pendiente ya no sale en rojo, «Ya puedes
+> entrar» solo si es verdad, los enlaces caducados ofrecen iniciar sesión, el registro deja
+> corregir el correo y los enlaces del aviso miden 44 px). Sus dos preguntas de producto son
+> `AUD-020`. La prueba de carga de `AUD-010` no se pudo medir en el portátil (falta memoria): queda
+> preparada para el PC. Lo siguiente: la crítica de cierre de Reportes (`AUD-015`) y las de los
+> bloques de `AUD-019`.
+>
 > **Estado al 2026-11-18: cuatro tareas abiertas; `AUD-019` con todo su código hecho.** La 404
 > dentro de la app ya no anida un `<main>` y lleva «al inicio»; la zona horaria se busca por
 > ciudad o por desfase; el logo dice que se guarda al elegirlo; y párrafos y títulos cortan sin
@@ -160,7 +169,7 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
 grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 4
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 15
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 16
 ```
 
 ---
@@ -168,7 +177,7 @@ grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 15
 ## Tareas abiertas
 
 Cuatro. `AUD-009` (ya cerrada) y `AUD-010` salieron el 2026-11-03 y 04 de la crítica del
-panel. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
+panel. `AUD-020` sale de la crítica de cierre de `AUD-014` (2026-11-18), en el Tier 4. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
 ([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` y `AUD-012` (ya cerradas) en el Tier 2, el
 resto en el Tier 3. Las seis de la re-auditoría del 2026-10-31 están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
 atacarlas. Las observaciones
@@ -177,18 +186,18 @@ en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-18 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
+**Última actualización:** 2026-11-18 · **Siguiente ID libre:** AUD-021 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
 | 2 · Medio | 0 | 3 | — |
-| 3 · Bajo | 4 | 6 | 0 · 4 · 0 |
-| 4 · Propuestas | 0 | 0 | — |
-| **Total** | **4** | **15** | **0 · 4 · 0** |
+| 3 · Bajo | 3 | 7 | 0 · 3 · 0 |
+| 4 · Propuestas | 1 | 0 | 0 · 1 · 0 |
+| **Total** | **4** | **16** | **0 · 4 · 0** |
 
-**Abiertas por área:** Diseño 3 (`AUD-014`, `AUD-015`, `AUD-019`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** Diseño 3 (`AUD-015`, `AUD-019`, `AUD-020`) · Rendimiento 1 (`AUD-010`)
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -204,6 +213,7 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 | **El trozo `vendor` del frontend sigue por encima de 250 kB** (346 kB el 2026-10-05). Separar React lo empeora, medido | comentario de `manualChunks` en `Stockly-F/vite.config.ts` |
 | **La fila de la tabla de productos mide 48 px**, no los 36 del perfil denso: bajar exige quitar el SKU o encoger la miniatura | [CONTEXTO.md §6](CONTEXTO.md) |
 | **La clase ABC podría filtrar al abrir un conteo físico**; hoy solo filtra la categoría | — |
+| **Las cinco consultas de ventas del resumen recorren `sale_order_items` entera.** Margen (tres), ventas por día y lo más vendido: el plan hace `Parallel Seq Scan` de las 660 000 líneas para quedarse con las de 24 414 ventas del mes (367 ms la de margen por categoría, sola). En paralelo y sin caché, `/reports` sube a ~1 s en el portátil. Medido el 2026-11-18 en `Stockly_carga`; candidata a tarea si la prueba de carga del PC confirma que es lo que satura | `reports.service.ts` (`consultarMargen`, `ventasPorDia`, `masVendidoEntre`) |
 | **La prueba de carga ya no cumple sus umbrales**, y no es de `T5-14`: repetida el 2026-10-10 con el código de antes, el panel da 2,2 s de p(95) (límite, 2 s; eran 337 ms tras `T4-16`) y arrastra a las demás rutas. Son las consultas que `getSummary` ganó en los Tiers 5 y 6, que solas no ordenan en disco y juntas, con diez usuarios, saturan la base. Pide tarea propia. **Auditoría del 2026-10-31:** Medio tras la verificación independiente (0 % de errores; que el cuello sea el pool y no la CPU no está medido); sin tarea por ser una pasada rápida | [rendimiento.md §15](rendimiento.md) · [informe](auditoria/2026-10-31/INFORME.md) |
 | **Los lotes no tienen retirada, ni se eligen al vender, ni entran por CSV** (`T5-15`). De qué lote salió cada venta está guardado (`sale_order_item_lots`), pero no hay pantalla que liste a quién se vendió un lote; el lote lo elige siempre el orden de caducidad; la importación crea productos sin lotes; y el resumen semanal no habla de caducidades | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
 | **El conteo físico es por producto, no por lote** (`T5-15`): lo que sobra queda «sin lote» y lo que falta sale por orden de caducidad | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
@@ -259,136 +269,23 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
   - **Falta:** repetir la prueba de carga contra `Stockly_carga` ([rendimiento.md §15](rendimiento.md)).
     En el PC no está `k6`. El resumen de ADMIN no cambió y el de los demás roles adelgazó, así que
     no se espera que empeore, pero el criterio pide medirlo.
-- [ ] **AUD-014 · Pantallas de acceso: errores que duran 3 s, la aprobación que no se anticipa y enlaces caducados sin salida**
-  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** crítica del 2026-11-07, bloque Acceso (19 a 28/40; Restablecer contraseña, 19,
-    la única «Pobre» del proyecto). Cinco P1.
-  - **Ubicación:** `Stockly-F/src/modules/auth/components/` (las seis pantallas) y
-    `Stockly-F/src/main.tsx:16` (`autoClose={3000}`, sin `theme`).
-  - **Qué hacer:**
-    - Los errores del servidor (credenciales, cuenta pendiente, enlace caducado) en un bloque
-      persistente dentro de la tarjeta, con `role="alert"`, no solo en el aviso.
-    - El registro anticipa los dos pasos (confirmar el correo, esperar a un administrador) y,
-      tras enviar, una pantalla propia «Revisa tu correo».
-    - Restablecer y Confirmar sin token o con token inválido: la misma tarjeta, con `h1`, «Este
-      enlace ya no sirve» y «Pedir un enlace nuevo». «Ya verificada» dice que espera aprobación.
-    - Reenviar verificación responde de forma neutra, como Olvidé la contraseña.
-    - Fuera «Token» de la interfaz, el placeholder `••••••••`, la burbuja nativa (`noValidate`);
-      «mostrar contraseña»; requisitos fijos bajo el campo.
-  - **Criterio de aceptación:** la crítica de Impeccable del bloque, repetida, sin P1 y ninguna
-    pantalla por debajo de 24/40.
-  - **Dependencias:** ninguna.
-  - **Estado al 2026-11-07: a medias, en la rama `feat/aud-014-pantallas-de-acceso` de los dos
-    repositorios (subida, sin fusionar en `main`).** Se siguió en el PC; esto es lo que hay que
-    saber para retomarla.
-    - **Hecho (primera tanda):**
-      - *Backend:* `POST /auth/resend-verification` responde siempre lo mismo, exista o no la
-        cuenta (antes un 400 lo revelaba); `POST /auth/verify-email` conserva la huella del enlace
-        hasta que caduca, de modo que abrirlo otra vez devuelve 200 con
-        `data: { alreadyVerified, pendingApproval }` en vez de «enlace inválido»
-        (`auth.service.ts`, `auth.controller.ts`; 3 tests nuevos en `auth.test.ts`). Sin cambio de
-        contrato: `api.ts` no tipa esa respuesta; el código `ACCOUNT_NOT_FOUND_OR_VERIFIED` queda en
-        el contrato aunque ya no se emite.
-      - *Frontend:* `MarcoDeAcceso` (marca, `h1` y tarjeta en las seis), `AvisoDeAcceso` (el error del
-        servidor dentro de la tarjeta, `role="alert"`; los hooks ya no hacen `toast.error`),
-        `CampoDeContrasena` («Mostrar la contraseña», requisito fijo debajo), `EnlaceCaducado`
-        («Este enlace ya no sirve» con un siguiente paso), `PedirEnlacePorCorreo` (Olvidé y Reenviar,
-        respuesta neutra y foco al mensaje), registro con los dos pasos anticipados y pantalla
-        «Revisa tu correo», `noValidate`, sin «Token» ni `••••••••`, `codigoDeError()` en
-        `errorApi.ts`, y `AvisosFlotantes` (tema de la aplicación y 6 s en vez de 3).
-      - *Comprobado:* `pnpm verify` en verde en los dos (backend 1832, frontend 1051 y 1 omitido en
-        94 archivos); E2E completo en local contra `Stockly_e2e`, 39 pasados y 3 omitidos (los
-        `getByLabel("Contraseña")` del E2E pasaron a `{ exact: true }`: el botón «Mostrar la
-        contraseña» también casaba).
-    - **Crítica repetida (2026-11-07, dual-agent):** media **25,2/40** (antes 24) y **2 P1** (antes
-      5): Login 26, Registro 27, Olvidé 25, **Restablecer 19**, Confirmar 29, Reenviar 25. Detector
-      limpio. Instantánea en `Stockly-F/.impeccable/critique/2026-11-07T20-02-26Z__src-modules-auth-components.md`.
-      **El criterio aún no se cumple.**
-    - **Decidido por el propietario el 2026-11-07: se arregla todo, también los P3, y una invitación
-      caducada ofrece «Restablecer contraseña»** (la cuenta ya existe al invitar, así que «Olvidé la
-      contraseña» le manda un enlace nuevo sin depender de un administrador).
-    - **Hecho (segunda tanda, 2026-11-07, en el PC): los once puntos de la crítica repetida.**
-      1. *[P1] Restablecer comprueba el enlace al abrir.* `POST /auth/reset-password/check` (contrato
-         `enlaceDeRestablecerSchema`, Swagger, exento de CSRF como las demás públicas, con
-         `authStrictLimiter`): no lo consume y devuelve el correo de la cuenta, o el mismo 400
-         `INVALID_OR_EXPIRED_TOKEN`. El token va en el cuerpo y no en la ruta, para que no quede en
-         los registros de acceso. Vale también para las invitaciones, que usan el mismo `resetToken`.
-         La pantalla espera la respuesta antes de enseñar el formulario; si caduca mientras se
-         escribe, el envío cambia a la misma tarjeta. `EnlaceCaducado` lleva el foco a su `h1`.
-         Backend: 3 tests nuevos en `auth.test.ts` y la ruta en `csrf.test.ts`.
-      2. *[P1] Invitación caducada:* el botón principal es «Restablecer contraseña» →
-         `/auth/forgot-password`, con un texto que dice que la cuenta ya existe; ya no hay dos
-         «Volver al inicio de sesión».
-      3. «El correo o la contraseña no son correctos», con «¿Olvidaste tu contraseña?» dentro del aviso.
-      4. El éxito de restablecer o de guardar la contraseña de una invitación se dice en la tarjeta
-         del login (`role="status"`, `AvisoDeAcceso tono="exito"`), con el correo ya puesto; fuera el
-         aviso flotante.
-      5. Cuando el error repite la ayuda («Mínimo 8 caracteres»), un solo texto; si dice otra cosa,
-         el requisito sigue a la vista.
-      6. El correo viaja en `location.state` (no en `?email=`, que quedaría en el historial y en los
-         registros): login ↔ Olvidé/Reenviar, registro → login, restablecer → login
-         (`useEstadoDeAcceso`). Con el correo puesto, el foco va a la contraseña.
-      7. «Enviado» dice a qué dirección, la pista del spam y «Usar otro correo» (reinicia la mutación
-         y devuelve el foco al campo, con lo escrito seleccionado).
-      8. «El correo ya está registrado» ofrece «Inicia sesión» y «¿Olvidaste tu contraseña?».
-      9. Enlaces sueltos con 44 px en táctil: `CLASES_ENLACE_SUELTO` en `clasesDeMarco.ts`;
-         «¿Olvidaste…?» a `text-sm` y subrayado.
-      10. En los estados caducados, la pestaña y el anuncio de ruta dicen «Este enlace ya no sirve»:
-          `useTituloDePantalla` (almacén de módulo que lee `AnuncioDeRuta`). De paso, el efecto del
-          título se separó del de navegar: cambiar el título (o el idioma) ya no sube la página ni
-          mueve el foco.
-      11. «email» → «correo» en la validación; fuera los subtítulos que repetían la marca (el del
-          login dice ahora «Entra con tu correo y tu contraseña»); la línea de «Reenviar
-          verificación» del login sale solo en el aviso de `EMAIL_NOT_CONFIRMED` y tras registrarse;
-          `py-6` en `CLASES_MARCO_CENTRADO`; `autoFocus` en el nombre del registro; campo `username`
-          oculto con el correo en Restablecer.
-      - *Comprobado:* `pnpm verify` del frontend en verde (1061 tests y 1 omitido, en 94 archivos;
-        10 nuevos en `pantallasDeAcceso.test.tsx` y `ResetPasswordPage.test.tsx`) y, en el backend,
-        `check` y los 1836 tests. **Sin comprobar en el navegador, sin E2E y sin la crítica.**
-    - **Fusionada en `main` el 2026-11-07** (las dos tandas), con los workflows de los dos
-      repositorios en verde, **también el E2E** de la CI del frontend.
-    - **Tercera crítica (2026-11-09, dual-agent):** media **27,8/40** (24 → 25,2 → 27,8): Login 29,
-      Registro 28, Olvidé 31, **Restablecer 24** (antes 19), Confirmar 27, Reenviar 28. Ninguna por
-      debajo de 24, pero **un P1**: la invitación caducada hablaba de «restablecer» y llevaba a
-      «Recuperar contraseña» a quien nunca tuvo una. Detector: CLI limpio; en el navegador, solo el
-      falso positivo de las devtools de TanStack y una palabra suelta en el aviso del login.
-      Instantánea en `Stockly-F/.impeccable/critique/2026-11-09T15-07-22Z__src-modules-auth-components.md`.
-    - **Hecho (tercera tanda, 2026-11-09; el propietario decidió «todo, también lo menor», y que el
-      registro responda de forma neutra):**
-      - *[P1] Invitación caducada:* «Pedir un enlace nuevo», con un texto que no habla de
-        restablecer, y «Olvidé» llega sabiendo que viene de una invitación (`EstadoDeAcceso.invitacion`):
-        título y pestaña «Elegir tu contraseña».
-      - *Invitación con enlace bueno:* «Para {correo}» bajo el título, la pestaña dice «Elige tu
-        contraseña», la etiqueta es «Contraseña» y hay «Volver al inicio de sesión» (también en
-        Restablecer, que no tenía salida).
-      - *El foco ya no cae en `<body>` al enviar:* `Button` con `isLoading` ya no se desactiva; se
-        marca `aria-disabled` y el clic (y el envío implícito con Intro) no hace nada, el patrón de
-        `ErrorDeCarga`. Vale para toda la aplicación. Y anillo de foco propio en los botones
-        (`focus-visible:outline-accent`), que en el primario apenas se veía.
-      - *Registro neutro* (decisión del propietario, en [CONTEXTO.md](CONTEXTO.md) §6): con un correo
-        ya registrado, `POST /auth/register` responde el mismo 201, no crea ni cambia nada y manda
-        «Ya tienes una cuenta» (`sendAccountExistsEmail`, en español e inglés); el hash se calcula
-        antes de buscar. Fuera el 409 de Swagger. La pantalla siempre acaba en «Revisa tu correo».
-      - *Confirmar anuncia el resultado:* foco al `h1` y la pestaña con su título, en «hecho» y en
-        «error».
-      - *Menores:* un solo «¿Olvidaste tu contraseña?» con el aviso de credenciales; sin subtítulo
-        en futuro tras pedir un enlace y «Volver al inicio de sesión» como botón; la carga de las
-        rutas de acceso en el sitio de la tarjeta y el `Spinner` con `border-t-accent`; la tarjeta
-        arriba (`sm:pt-[16vh]`) y no centrada en vertical, para que el aviso no mueva el botón;
-        `p-6` en el móvil; sin ejemplos en los campos de correo y nombre; vacía, «La contraseña es
-        obligatoria»; `gap-2` en `EnlaceCaducado`; «Pide uno nuevo: llega en unos minutos»;
-        `text-pretty` en los avisos; «Mostrar «Contraseña»» con el nombre de su campo; sin una alerta
-        por campo al enviar vacío (`Input anunciarError={false}`; el foco ya va al primero);
-        `autoFocus` solo con ratón en Registro y en Olvidé/Reenviar (`hayPunteroFino`); «Regístrate»
-        e «Inicia sesión» con 44 px en táctil; un solo vocabulario, «confirmar» («Reenviar la
-        confirmación», «Pedir un enlace nuevo»); y tras confirmar, a quién preguntar si la
-        aprobación tarda.
-      - *No se hizo:* el botón primario gris claro en el tema oscuro es del sistema de diseño, no de
-        estas pantallas; el selector de idioma sin sesión es de `AUD-016` (hecho allí).
-      - *Comprobado:* `pnpm verify` del frontend en verde (1065 tests y 1 omitido; los que fijaban
-        `disabled` al cargar pasan a `aria-disabled`) y, en el backend, `check` y los 1836 tests.
-    - **Para cerrarla:** repetir la crítica dual (sin P1, ninguna por debajo de 24).
-
+  - **Intento del 2026-11-18 (portátil), sin validez como medición.** Queda preparado:
+    - **La prueba ya mide el panel de verdad.** El paso «dashboard» de `load/movimientos.js` solo
+      pedía `/reports`; ahora `--panel=antes` le suma los cuatro listados con `limit=1` que leía
+      `useAtencionDeHoy` antes de esta tarea, y `--panel=ahora`, `GET /reports/attention`, en
+      paralelo como el navegador. `ruta_dashboard` sigue siendo solo `/reports` (comparable con
+      §15) y `ruta_panel`, el panel entero. Sin `--panel`, la prueba de siempre.
+    - **`pnpm carga:sembrar` volvía a funcionar:** no rellenaba `purchase_orders.number`, que es
+      obligatorio desde la tanda de Órdenes de `AUD-019`. Ahora numera por fecha, deja el contador
+      y escribe las notas de recepción con el número, como la aplicación.
+    - **Lo medido no vale:** con 7,2 GB de RAM y 1,4 libres, la VM de Docker y la base de 1,1 GB,
+      cuatro pasadas alternas dieron 1,0 · 2,0 · 3,9 · 7,4 req/s, subiendo en cada una sin cambiar
+      nada, con esperas de 60 s en unas y ninguna en otras. Sin concurrencia sí es estable:
+      `/reports` 1 045 ms de mediana, `/reports/attention` 198 ms y los cuatro listados de antes
+      118 + 8 + 14 + 14 ms. En paralelo, el panel tarda lo que `/reports` con las dos variantes.
+    - **Para cerrarla:** `pnpm build`, `pnpm carga:sembrar` y `node load/ejecutar.js --panel=ahora`
+      y `--panel=antes`, dos veces cada una y alternando, **en una máquina con memoria de sobra**
+      (el PC, donde se midió §15).
 - [ ] **AUD-015 · Reportes: tarjetas que no cuadran, gráficos sin alternativa y un informe por periodo que abre vacío**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
   - **Origen:** crítica del 2026-11-07, bloque Reportes (25 y 28/40). Tres P1.
@@ -586,7 +483,27 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
 
 ## Tier 4 · Propuestas
 
-Sin tareas abiertas.
+- [ ] **AUD-020 · Acceso: una pantalla propia para «pendiente de aprobación» y una invitación que diga quién invita**
+  - **Área:** Diseño y producto · **Severidad:** Bajo · **Esfuerzo:** Medio
+  - **Origen:** las preguntas de la crítica de cierre de `AUD-014` (2026-11-18); el propietario
+    decidió abrirlas como tarea.
+  - **Qué hacer:**
+    - **«Pendiente de aprobación» con pantalla propia.** Es el estado más frecuente de una cuenta
+      recién registrada y hoy es un aviso dentro del formulario del login, que invita a seguir
+      pulsando «Entrar». Lo que la crítica proponía: la misma tarjeta que enseña Confirmar —qué
+      falta, quién lo decide, a quién preguntar— cuando el login responde
+      `ACCOUNT_PENDING_APPROVAL`, sin el formulario debajo.
+    - **La invitación dice quién invita y a qué negocio.** Hoy el correo y la pantalla dicen «Te
+      han invitado a Stockly». El backend conoce a quien invita y el nombre del negocio (ajustes
+      de `T6-03`): «Ana te ha invitado a Ferretería López». Toca el correo de invitación
+      (`correos.es.ts` y su par en inglés), `POST /auth/reset-password/check` (que tendría que
+      devolver quién invitó, solo para el enlace de invitación) y `ResetPasswordPage`.
+  - **Decisión previa:** si la pantalla de espera sustituye al aviso del login o se añade; y qué
+    datos de quien invita se enseñan a alguien que todavía no tiene cuenta (el nombre, no el
+    correo, parece suficiente).
+  - **Criterio de aceptación:** las dos, con tests de componente y de la ruta, y una crítica del
+    bloque Acceso que no baje de la de cierre de `AUD-014` (29,3/40, sin P1).
+  - **Dependencias:** ninguna.
 
 ---
 
@@ -842,3 +759,4 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | AUD-016 | Tier 3 · Diseño: los roles no llegaban al marco — navegación sin recortar, tema e idioma solo para ADMIN y acciones de Etiquetas que acababan en 403 (crítica del 2026-11-07) | 2026-11-10 | **Una lista por rol, escrita entera** en `Stockly-F/src/shared/navegacion.ts`, en el orden en que se pinta; sustituye a `soloAdmin`, `permiso` y `ocultoPara`. **No se deriva de `PERMISOS`**: casi todas las lecturas son de todos, así que diría lo que cada rol puede abrir, no lo que le hace falta; lo que queda fuera de un menú sigue abriéndose por URL si la ruta lo permite (el menú ordena, no protege). **Las listas** (decisión de producto, ajustable en ese archivo): ADMIN, todo; USER, todo menos mostrador y administración; WAREHOUSE, Panel · Inventario · Órdenes (Compra, Venta) · Productos · Reportes; SELLER, Mostrador · Órdenes (Venta, Clientes) · Productos (antes, 16 destinos). **Además:** «Apariencia» (tema e idioma) también en el Perfil; Etiquetas con `usePuede`; `InsigniaDeRol` en el menú de usuario, el Perfil y Usuarios (el mapa `ROL` pasa a `modules/users/rol.ts`); y, lo que `AUD-014` dejó para esta tarea, **el idioma sin sesión**: «Español · English», cada uno escrito en el suyo, bajo la tarjeta de las seis pantallas de acceso. **Comprobado:** `navegacion.test.tsx` con la lista exacta de los cuatro roles, que ningún menú lleve a una ruta que su rol no abre y que todo destino esté en algún menú; un WAREHOUSE pasa a oscuro desde su perfil; USER, WAREHOUSE y SELLER sin botones en Etiquetas; en el login, «English» cambia la pantalla al momento. `pnpm verify` del frontend en verde (1091 y 1 omitido); el backend no cambia. **E2E:** 38 pasados, 3 omitidos y uno fallido, «el interruptor de configuración sigue activo tras recargar», que **falla igual sin estos cambios** (la pantalla sigue en el `Suspense` de la carga diferida a los 5 s, en el primer test de la pasada) y pasa tres de tres en serie: no es de esta tarea, queda para mirarlo aparte. |
 | AUD-017 | Tier 3 · Diseño: la bitácora no decía sobre quién se actuó ni se filtraba por usuario y fecha, y la campana no ordenaba por urgencia (crítica del 2026-11-07) | 2026-11-13 | **Bitácora.** Cada fila dice a quién o a qué afectó: `GET /audit-logs` añade `entityLabel` (el nombre del producto, la persona, el número de venta, el proveedor de una compra, el almacén y la categoría de un conteo, «origen → destino» de una transferencia), resuelto al leer con una consulta por tipo de entidad, y `entityExists` (solo se enlaza lo que sigue existiendo). Clientes, compras y ventas se borran de verdad: su controlador guarda la etiqueta en `details.label` **antes** de borrar (`auditService.etiquetaDe`). Filtros por usuario y por rango de días **del negocio** (`userId`, `from`, `to`, con `rangoDeDias`), en la URL de la pantalla (`?usuario=&desde=&hasta=&accion=&entidad=&pagina=`); `GET /audit-logs/actors` da las cuentas con registros, también las que ya no existen (por su correo), para el filtro; `GET /audit-logs/export` exporta lo filtrado por lotes con `enviarExportacion`. Los detalles se pintan como pares traducidos (`modules/audit-logs/detalles.ts`: rol, tipo de movimiento y estado con su rótulo; un cambio `{ de, a }` como «antes → después»; sin repetir el nombre que ya sale en la columna), no como JSON. **Campana.** Los sin leer van **por gravedad** —cuenta esperando rol, venta que no se puede enviar, lote ya caducado, agotado, compra atrasada, lote que caduca pronto, resto del stock bajo— y después los leídos por fecha; se ordena en la consulta (`notificationsService.getAll`), así lo grave pero antiguo no se queda fuera de los 30. El lote caducado tiene su texto («caducado: retíralo»), en rojo; el aviso de lote trae `warehouses` (dónde queda). La venta y la compra llevan a esa orden: `/sale-orders?numero=&venta=` y `/purchase-orders?compra=` (nuevo filtro `id` en `GET /purchase-orders`, con su aviso «Solo una compra»). **Usuarios y Bitácora**, con `ErrorDeCarga` y «Reintentar» si la carga falla; Usuarios abre ya buscado con `?buscar=`. **Comprobado** (también en el navegador, con los datos del seed: cada fila nombrada, los detalles traducidos y la campana con la cuenta pendiente arriba, después los lotes caducados): backend — `audit-logs.test.ts` (etiquetas y contrato, la etiqueta de un cliente borrado, un usuario y un día devuelven solo sus filas con el día de Santo Domingo, 400 con rango al revés o fecha inexistente, `/actors` con la cuenta que ya no existe, la exportación en CSV con los filtros, 403 para USER), `avisos.test.ts` (el orden por gravedad, y que lo grave y antiguo entra en los 30), `lotes.test.ts` (`warehouses`), `purchase-orders.test.ts` (`?id=`); frontend — `AuditLogsPage.test.tsx`, `CampanaDeAvisos.test.tsx`, `UsersPage.test.tsx`, `PurchaseOrdersPage.test.tsx`. `pnpm verify` en verde en los dos (backend 1869 tests; frontend 1102 y 1 omitido); E2E, 39 pasados y 3 omitidos (en una primera pasada, recién terminados los dos `verify`, los ocho primeros de chromium se quedaron en el login a los 5 s; la segunda pasó entera). |
 | AUD-018 | Tier 3 · Accesibilidad: filas desplegables sin teclado, pestañas sin rol, enlace verde a 3,8:1 y botones de icono sin el nombre de su fila (crítica del 2026-11-07) | 2026-11-14 | Todo en el frontend. **Filas.** En Compras y Ventas, el número de la orden es un `<button aria-expanded>` con chevron (`shared/components/BotonDeDesplegar.tsx`); la cabecera no puede ser el botón porque lleva dentro el enlace al cliente y las acciones, y el `div` sigue respondiendo al clic. En Transferencias, la fila entera ya era botón: se le quita el `aria-label` («Ver los productos de…»), que tapaba los almacenes, la fecha y las unidades, y gana chevron. **Pestañas** de Movimientos: `shared/components/Pestanas.tsx`, con `tablist`/`tab`/`aria-selected`/`tabpanel`, una sola parada de tabulador, flechas, Inicio y Fin; la lista se desplaza por dentro a 390 px (`contain-paint sin-barra`, con la línea gris en un envoltorio para que el recorte no se coma el subrayado). **Contraste:** los tres enlaces en `text-accent` (Ventas, Clientes, Transferencias) pasan a `text-accent-strong`, 5,5:1 en claro y ≥ 4,5:1 también sobre `surface-muted`. **Nombres:** Editar/Eliminar de Catálogo y Proveedores (`comun.editarNombre`), Activar/Desactivar de Usuarios («Desactivar a Laura Gómez», con el texto visible delante), quitar línea en los formularios de compra y de venta («Quitar la línea de Monitor LG» o «Quitar la línea 2»), y `aria-label` en el buscador de Productos. **Escape** cierra el menú móvil y devuelve el foco a la hamburguesa. **La ficha estaba en parte desfasada:** los botones de las filas de Compras (`:685, 696`) y los de Clientes ya nombraban su fila; el resto, como decía. **Comprobado:** dos guardias nuevas en `accesibilidad.test.ts` —ningún `<Button>`/`<button>` de solo icono sin `aria-label`, y el acento suave solo en iconos—, cada una probada con una mutación que la hace saltar; `theme.test.ts` mide el acento fuerte contra tarjeta, fondo y `surface-muted` **en los dos temas**; tests de rol, nombre y teclado en `Pestanas.test.tsx` (nuevo), `PurchaseOrdersForm.test.tsx`, `SaleOrdersPage.test.tsx`, `Transferencias.test.tsx`, `App.test.tsx` y `ProductFilters.test.tsx`, y los de Catálogo, Proveedores, Usuarios y Movimientos buscan ya por el nombre nuevo. `pnpm verify` del frontend en verde (1115 tests y 1 omitido; cobertura 82,95 %); el backend no cambia de código. E2E contra `Stockly_e2e`, 39 pasados y 3 omitidos, tras cambiar en `flows.spec.ts` el selector del desplegable de Transferencias (`{ expanded: false }`). En el navegador, en tema oscuro: las flechas mueven y eligen, el anillo de foco se ve en la pestaña y en el número de la venta, Enter despliega la fila y el enlace sale en `#34d399`; a 486 px (Windows no estrecha más la ventana) el documento no desborda y las pestañas se desplazan dentro. **Sin comprobar:** con lector de pantalla real (sigue el listón de `T4-17`: teclado y árbol de accesibilidad), y la vista a 390 px exactos. |
+| AUD-014 | Tier 3 · Diseño: pantallas de acceso — errores que duraban 3 s, la aprobación que no se anticipaba y enlaces caducados sin salida (crítica del 2026-11-07) | 2026-11-18 | **Cuatro críticas dual-agent, media 24 → 25,2 → 27,8 → 29,3/40**; la de cierre (2026-11-18), sin P0 ni P1 y ninguna por debajo de 24 (Login 29, Registro 28, Olvidé 32, Restablecer 29, Confirmar 29, Reenviar 29): el criterio. Las tres tandas están en el historial de git de este documento (fichas del 2026-11-07 y 09). **De la crítica de cierre, sus cinco P2, arreglados (decisión del propietario):** la cuenta pendiente de aprobación ya no sale como error rojo sino como aviso informativo (`AvisoDeAcceso tono="info"`, `role=status`, con a quién acudir); `POST /auth/reset-password` devuelve `pendingApproval` (contrato `contrasenaRestablecidaSchema`, Swagger) y el login deja de decir «Ya puedes entrar» a una cuenta sin aprobar; el enlace de confirmación caducado y la invitación caducada dicen que, si la cuenta ya está lista, basta con iniciar sesión, y lo ofrecen como botón (`EnlaceCaducado iniciarSesionComoBoton`): «Reenviar» no manda nada a una cuenta confirmada; el éxito del registro pone la pestaña en «Revisa tu correo», enseña el correo en su línea (cortado delante de la arroba) y ofrece «Corregir el correo», que vuelve al formulario con lo escrito; los enlaces del aviso de error del login miden 44 px en táctil (medían 20). **Comprobado:** backend, test nuevo en `auth.test.ts` (una cuenta pendiente recibe `pendingApproval: true` y el login la sigue rechazando) y `pnpm verify` en verde (1887); frontend, tests nuevos y ajustados en `pantallasDeAcceso.test.tsx` y `VerifyEmailPage.test.tsx`, `pnpm verify` en verde (1159 y 1 omitido); E2E 38 pasados y 3 omitidos, con uno de los primeros de chromium en rojo por el arranque en frío y en verde repetido solo. En el navegador, a 390 px en oscuro: el aviso informativo de la cuenta pendiente, el enlace de 44 px, el enlace caducado con sus dos salidas y el registro con un correo largo y «Corregir el correo». **Sin hacer:** lo menor de la crítica (en desarrollo, StrictMode hace que el primer enlace de confirmación diga «ya estaba confirmada»; «Enviar instrucciones» cuando se manda un enlace; «Elegir»/«Elige tu contraseña»; el `autoFocus` del login en táctil; el botón secundario que en oscuro casi no se distingue de la tarjeta, que es de todo el sistema); y las dos decisiones de producto, que pasan a `AUD-020`. Instantánea en `Stockly-F/.impeccable/critique/2026-11-18T22-34-22Z__src-modules-auth-components.md`. |

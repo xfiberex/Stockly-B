@@ -31,6 +31,19 @@ const catalogo = new Trend("ruta_catalogo", true);
 const dashboard = new Trend("ruta_dashboard", true);
 const escritura = new Trend("ruta_escritura", true);
 const caliente = new Trend("ruta_historico_grande", true);
+const panel = new Trend("ruta_panel", true);
+
+// AUD-010 — lo que el panel de ADMIN pide junto a `/reports`, según la variante (`PANEL`).
+const PANEL = {
+    "": [],
+    antes: [
+        "/reports/expiring?limit=1",
+        "/inventory-counts?status=OPEN&limit=1",
+        "/purchase-orders?status=PENDING,PARTIALLY_RECEIVED&limit=1",
+        "/sale-orders?status=PENDING&limit=1",
+    ],
+    ahora: ["/reports/attention"],
+};
 
 export const options = {
     scenarios: {
@@ -154,9 +167,23 @@ export default function ({ sesion, ids, idCaliente }) {
     });
 
     group("dashboard", () => {
-        const r = http.get(`${BASE}/reports`, { headers: cabeceras(sesion) });
-        dashboard.add(r.timings.duration);
-        check(r, { "dashboard 200": (x) => x.status === 200 });
+        // AUD-010 — el panel de ADMIN no pide solo `/reports`: pide a la vez lo que necesita
+        // atención. `PANEL` elige qué, y `ruta_dashboard` sigue midiendo **solo `/reports`** en
+        // las tres variantes, para que la cifra se compare con las de antes (rendimiento.md §15):
+        //   - sin `PANEL`, solo `/reports`, como se midió hasta AUD-010;
+        //   - `PANEL=antes`, más los cuatro listados con `limit=1` que leía `useAtencionDeHoy`
+        //     antes de AUD-010;
+        //   - `PANEL=ahora`, más `GET /reports/attention`, que los sustituye.
+        // En paralelo (`http.batch`), como los lanza el navegador. `ruta_panel` es lo que tarda
+        // el panel entero: la más lenta de sus peticiones.
+        const peticiones = [["GET", `${BASE}/reports`, null, { headers: cabeceras(sesion) }]];
+        for (const ruta of PANEL[__ENV.PANEL || ""]) peticiones.push(["GET", `${BASE}${ruta}`, null, { headers: cabeceras(sesion) }]);
+
+        const respuestas = http.batch(peticiones);
+        dashboard.add(respuestas[0].timings.duration);
+        panel.add(Math.max(...respuestas.map((r) => r.timings.duration)));
+        check(respuestas[0], { "dashboard 200": (x) => x.status === 200 });
+        if (respuestas.length > 1) check(respuestas.slice(1), { "atención 200": (rs) => rs.every((x) => x.status === 200) });
     });
 
     group("movimiento manual", () => {

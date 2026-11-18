@@ -348,16 +348,26 @@ paso(`${COMPRAS.toLocaleString("es")} órdenes de compra (${(COMPRAS * 3).toLoca
                    now() - (floor(random() * 525600)::int || ' minutes')::interval AS fecha
             FROM generate_series(1, ${COMPRAS}) i;
 
-        INSERT INTO purchase_orders (id, "supplierId", status, "createdAt", "updatedAt", "warehouseId")
-        SELECT c.id, s.a[1 + (c.i % ${CATALOGOS})], c.status, c.fecha, c.fecha, w.id
+        -- AUD-019 — el correlativo de compra es obligatorio, como el de venta (T6-04): por orden
+        -- de creación, y el contador en el último para que la serie pueda seguir.
+        ALTER TABLE compras ADD COLUMN numero int;
+        UPDATE compras c SET numero = n.r
+        FROM (SELECT id, row_number() OVER (ORDER BY fecha, id) AS r FROM compras) n
+        WHERE n.id = c.id;
+
+        INSERT INTO purchase_orders (id, number, "supplierId", status, "createdAt", "updatedAt", "warehouseId")
+        SELECT c.id, c.numero, s.a[1 + (c.i % ${CATALOGOS})], c.status, c.fecha, c.fecha, w.id
         FROM compras c, (SELECT array_agg(id) a FROM suppliers) s, (SELECT id FROM warehouses WHERE "isDefault") w;
 
+        INSERT INTO counters (key, value) SELECT 'purchaseOrder', count(*) FROM compras
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+
         CREATE TEMP TABLE lineas AS
-            SELECT gen_random_uuid()::text AS id, x.orden, x.status, x.fecha, x.cantidad, x.dos_entregas, n.id AS producto, n.name,
+            SELECT gen_random_uuid()::text AS id, x.orden, x.numero, x.status, x.fecha, x.cantidad, x.dos_entregas, n.id AS producto, n.name,
                    round(COALESCE(n."costPrice", n.price * 0.6), 2) AS precio,
                    CASE x.status WHEN 'RECEIVED' THEN x.cantidad WHEN 'PARTIALLY_RECEIVED' THEN x.cantidad / 2 ELSE 0 END AS recibida
             FROM (
-                SELECT c.id AS orden, c.status, c.fecha,
+                SELECT c.id AS orden, c.numero, c.status, c.fecha,
                        1 + floor(random() * (SELECT count(*) FROM numerados))::int AS k,
                        10 + floor(random() * 90)::int AS cantidad,
                        random() < 0.3 AS dos_entregas
@@ -371,7 +381,7 @@ paso(`${COMPRAS.toLocaleString("es")} órdenes de compra (${(COMPRAS * 3).toLoca
         -- Cada entrega, una entrada enlazada a su línea, con la nota que escribe la recepción.
         INSERT INTO stock_movements (id, "productId", type, delta, "stockAfter", note, "createdAt", "purchaseOrderItemId", "warehouseId", "warehouseStockAfter")
         SELECT gen_random_uuid()::text, l.producto, 'IN', e.unidades, 0,
-               'Orden de compra #'||left(l.orden, 8),
+               'Orden de compra #'||lpad(l.numero::text, 6, '0'),
                LEAST(now(), l.fecha + (e.dias || ' days')::interval),
                l.id, w.id, 0
         FROM lineas l

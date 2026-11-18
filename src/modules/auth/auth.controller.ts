@@ -133,8 +133,8 @@ export const authController = {
 
     async resetPassword(req: Request, res: Response) {
         const { token, password } = req.body as { token: string; password: string };
-        await authService.resetPassword(token, password);
-        res.json({ message: "Contraseña restablecida exitosamente" });
+        const data = await authService.resetPassword(token, password);
+        res.json({ message: "Contraseña restablecida exitosamente", data });
     },
 
     async updateProfile(req: Request, res: Response) {

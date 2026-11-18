@@ -89,6 +89,7 @@ const RESPUESTAS = {
     ProductLots: contrato.lotesDeProductoSchema,
     ExpiryReport: contrato.informeDeCaducidadesSchema,
     AttentionToday: contrato.atencionDeHoySchema,
+    ContrasenaRestablecida: contrato.contrasenaRestablecidaSchema,
     PaginationMeta: contrato.metaPaginacionSchema,
     Error: contrato.errorSchema,
 } as const;
