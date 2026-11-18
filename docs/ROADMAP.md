@@ -6,6 +6,12 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-18: cuatro tareas abiertas; `AUD-019` con todo su código hecho.** La 404
+> dentro de la app ya no anida un `<main>` y lleva «al inicio»; la zona horaria se busca por
+> ciudad o por desfase; el logo dice que se guarda al elegirlo; y párrafos y títulos cortan sin
+> palabras sueltas, por regla de `index.css`. A `AUD-019` solo le falta su crítica repetida, que
+> va con las demás críticas de cierre y la prueba de carga: es lo siguiente.
+>
 > **Estado al 2026-11-17: cuatro tareas abiertas; `AUD-019` con Inventario hecho.** Las listas
 > vacías por un filtro lo dicen y dejan quitarlo; «Nuevo conteo» marca lo que ya está en otro
 > conteo abierto; las transferencias se escanean y su desglose dice «Tras la transferencia»;
@@ -171,7 +177,7 @@ en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-14 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
+**Última actualización:** 2026-11-18 · **Siguiente ID libre:** AUD-020 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
@@ -551,7 +557,32 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       Tienda Central y nada en Santiago; el conteo a ciegas y la revisión; el formulario de
       transferencia y Caducidades a 500 px (el mínimo de la ventana), con 2 filas caducadas y la
       tarjeta «Caduca en el plazo» en 6 lotes.
-  - **Falta:** Administración y Tipografía.
+  - **Hecho, tanda 4 (2026-11-18): Administración y Tipografía.** Solo frontend.
+    - **La 404 dentro de la app** (`NotFoundPage dentroDeLaApp`) ya no anida un `<main>` en el de
+      `App.tsx` ni repite la marca, que está en la barra; fuera de la sesión conserva los dos y
+      ahora pasa por `Acceso`, así que también pone el título de la pestaña. El botón dice «Volver
+      al inicio», no «Volver al Dashboard»: `/` no es el panel para SELLER.
+    - **Zona horaria con búsqueda:** `SelectorDeZonaHoraria`, combobox de ARIA 1.2 como
+      `BuscadorDeCliente`, en lugar del `<select>` de ~420 zonas. Busca por cualquier palabra, sin
+      tildes ni guiones bajos, y por el desfase de hoy, que cada opción enseña («santo utc-4»).
+      Abre con la zona puesta centrada; Escape o salir sin elegir devuelven la que había, sin
+      dejar cambios pendientes; sin coincidencias, lo dice.
+    - **El logo avisa** de que se guarda al elegir el archivo, sin «Guardar cambios», con el
+      texto atado al botón por `aria-describedby`.
+    - **Tipografía, por regla y no pantalla a pantalla:** `index.css` da `text-wrap-style: pretty`
+      a `p`, `li`, `dd`, `figcaption` y `label`, y `balance` a `h1`–`h3`, en `@layer base`. La
+      propiedad larga y no el atajo `text-wrap`, que desharía los `truncate`. Regla en
+      `design-system.md` §2, guardia en `tipografia.test.ts`.
+    - **Comprobado:** tests nuevos en `NotFoundPage.test.tsx` (un solo `<main>` dentro, marca
+      solo fuera, enlace al inicio) y `SettingsPage.test.tsx` (búsqueda y Enter, desfase,
+      apertura por la zona puesta, Escape y Tab sin cambios, vacío, aviso del logo). `pnpm verify`
+      del frontend en verde (1157 y 1 omitido); E2E completo 35 pasados, 3 omitidos y los 4
+      primeros de chromium en rojo por el login lento en frío, en verde repetidos solos. En el
+      navegador (Chrome DevTools, 1280 px y 390 px táctil): la 404 con un solo `main`, la lista de
+      zonas filtrando por «utc-4», el aviso del logo y `pretty` aplicado.
+    - **Sin hacer:** la crítica repetida de los seis bloques, que va con las críticas de cierre;
+      «Quitar logo» sigue sin confirmar (la crítica no lo marcó; `AUD-012` no lo incluía).
+  - **Falta:** solo la crítica repetida, con las de cierre.
 
 ## Tier 4 · Propuestas
 
