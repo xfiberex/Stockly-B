@@ -150,6 +150,28 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Cambiado
 
+- **Una cuenta que espera aprobación tiene su pantalla, y la invitación dice quién invita**
+  (`AUD-020`): el login de una cuenta pendiente ya no deja un aviso sobre el formulario, sino una
+  pantalla propia —qué falta, quién lo decide, a quién preguntar y con qué cuenta—, con vuelta al
+  formulario sin perder lo escrito. El correo de invitación y la pantalla de elegir la contraseña
+  dicen «Ana te ha invitado a Ferretería López» (el nombre de quien invita, no su correo, y el
+  negocio de Configuración; sin él, «a su equipo»), y la cuenta con la que se entrará va en su
+  línea. `POST /auth/reset-password/check` añade `invitation` solo en una invitación sin usar.
+  **Requiere migración** (`users.invitedById`).
+- **Pulido de la crítica del 2026-11-07** (`AUD-019`): números de compra correlativos
+  (`#000042`); importes y confirmación en Sugerencias; la ficha del escáner lleva a registrar un
+  movimiento o a escanear otro, con esas dos acciones fijas al pie; los filtros de Productos,
+  Caducidades y Ventas viven en la URL y los de Ventas se pliegan en el móvil; las listas vacías
+  por un filtro lo dicen y dejan quitarlo; «Nuevo conteo» marca lo que ya está en otro conteo
+  abierto; un conteo es a ciegas también en sus cifras y en la lista de conteos; las
+  transferencias se escanean y dicen «Tras la transferencia»; Caducidades filtra «Solo lo ya
+  caducado»; la zona horaria se busca por ciudad o desfase; el texto secundario llega a 4,5:1
+  sobre las cabeceras de tabla; y las tablas de líneas de las órdenes caben en el móvil.
+  `GET /reports/expiring` acepta `expired=true` y su resumen añade `expiringCount`.
+  **Requiere migración** (`purchase_orders.number`).
+- **El panel hace una petición de datos, dos para ADMIN** (`AUD-010`): «Necesita atención» sale de
+  `GET /reports/attention` en vez de cinco listados. Medido bajo carga: no empeora
+  ([rendimiento.md §17](docs/rendimiento.md)).
 - **Las pantallas de acceso dicen qué pasa y qué hacer** (`AUD-014`): el motivo de un rechazo se
   queda en la tarjeta hasta el siguiente intento (antes, un aviso de 3 s en una esquina), y lo que
   tiene salida dice cuál —reenviar la confirmación, recuperar la contraseña—. Una cuenta que
@@ -346,6 +368,9 @@ repositorios**, `Stockly-B` y `Stockly-F`. Entre paréntesis va la tarea del
 
 ### Seguridad
 
+- **`effect` subido a ≥3.22.1** (GHSA-7589-6fvf-x4pw, ReDoS): lo fija a 3.20.0 exacta
+  `@prisma/config`, del CLI de Prisma, así que va por `overrides` en `pnpm-workspace.yaml` hasta
+  que Prisma traiga la corregida. El aviso salió el 2026-11-19 y tenía `pnpm verify` en rojo.
 - **El seed se niega fuera de una base local, y el primer administrador tiene su comando**
   (`AUD-003`): el despliegue documentado mandaba ejecutar `pnpm db:seed`, que vacía la base y deja
   administradores con la contraseña del README. Ahora el seed sale con error, sin tocar nada, con

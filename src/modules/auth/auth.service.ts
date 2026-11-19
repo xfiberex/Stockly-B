@@ -6,6 +6,7 @@ import { sendAccountExistsEmail, sendPasswordResetEmail, sendVerificationEmail }
 import { auditService } from "@/modules/audit-logs";
 import { notificationsService } from "@/modules/notifications/notifications.service";
 import { logger } from "@/shared/lib/logger";
+import { settingsService } from "@/modules/settings/settings.service";
 import type { Idioma } from "@/shared/i18n/correos";
 
 /**
@@ -248,7 +249,17 @@ export const authService = {
 
     async checkResetToken(rawToken: string) {
         const user = await authService.findByResetToken(rawToken);
-        return { email: user.email };
+        // AUD-020 — una invitación sin usar dice quién invita y a qué negocio. «Sin usar» es sin
+        // verificar: `resetPassword` verifica la cuenta, así que un «olvidé mi contraseña»
+        // posterior de esa misma cuenta ya no se presenta como invitación.
+        if (!user.invitedById || user.isVerified) return { email: user.email };
+
+        const [quien, negocio] = await Promise.all([
+            prisma.user.findUnique({ where: { id: user.invitedById }, select: { name: true } }),
+            settingsService.negocio(),
+        ]);
+        if (!quien) return { email: user.email };
+        return { email: user.email, invitation: { inviterName: quien.name, businessName: negocio.name.trim() || null } };
     },
 
     async resetPassword(rawToken: string, newPassword: string) {

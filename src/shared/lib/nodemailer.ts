@@ -160,22 +160,40 @@ export async function sendAccountExistsEmail(to: string, name: string, idioma: I
  * T6-10 — la invitación a una cuenta que ha creado un administrador. **No lleva contraseña**:
  * lleva un enlace para ponerla, a la misma página que «olvidé mi contraseña» y con el mismo
  * token. `invitacion=1` solo cambia lo que dice esa página; no decide nada en el servidor.
+ *
+ * AUD-020 — dice quién invita y a qué negocio («Ana te ha invitado a Ferretería López»). Sin
+ * nombre de negocio en Configuración, el negocio es la marca; sin quien invita (no debería
+ * pasar), vuelve al «Te han invitado» de antes.
  */
-export async function sendInvitationEmail(to: string, name: string, token: string, dias: number, idioma: Idioma) {
+export async function sendInvitationEmail(
+    to: string,
+    name: string,
+    token: string,
+    dias: number,
+    idioma: Idioma,
+    origen: { invitador: string | null; negocio: string | null },
+) {
     requireSmtp();
     const url = `${env.frontendUrl}/auth/reset-password?token=${token}&invitacion=1`;
     const t = traductorDeCorreo(idioma);
+    const negocio = origen.negocio ?? BRAND.name;
+    const invitador = origen.invitador;
 
     const bodyHtml =
         emailParagraph(t("comun.saludo", { nombre: escapeHtml(name) })) +
-        emailParagraph(t("invitacion.cuerpo")) +
+        emailParagraph(
+            invitador
+                ? t("invitacion.cuerpoDe", { invitador: escapeHtml(invitador), negocio: escapeHtml(negocio) })
+                : t("invitacion.cuerpo", { negocio: escapeHtml(negocio) }),
+        ) +
         emailButton(url, t("invitacion.boton")) +
         emailNote(t("invitacion.nota", { dias }));
 
     await transporter.sendMail({
         from: env.smtp.from,
         to,
-        subject: t("invitacion.asunto"),
+        // El asunto es texto, no HTML: sin escapar.
+        subject: invitador ? t("invitacion.asuntoDe", { invitador, negocio }) : t("invitacion.asunto", { negocio }),
         html: renderEmail({
             preheader: t("invitacion.preencabezado"),
             heading: t("invitacion.titulo"),

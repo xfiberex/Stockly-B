@@ -29,10 +29,12 @@ export const correosEn: Record<ClaveDeCorreo, string> = {
     "reset.nota": "The link expires in 1 hour. If you did not request this change, ignore this email and your password will stay the same.",
 
     // ── Account invitation (T6-10) ───────────────────────────────────────────
-    "invitacion.asunto": "You have been invited to {marca}",
+    "invitacion.asunto": "You have been invited to {negocio}",
+    "invitacion.asuntoDe": "{invitador} has invited you to {negocio}",
     "invitacion.preencabezado": "Choose your password to sign in to {marca}.",
     "invitacion.titulo": "Your account is ready",
-    "invitacion.cuerpo": "An administrator created a {marca} account for you. Choose your password to start using it.",
+    "invitacion.cuerpo": "An administrator created an account for you at {negocio}. Choose your password to start using it.",
+    "invitacion.cuerpoDe": "<strong>{invitador}</strong> created an account for you at {negocio}. Choose your password to start using it.",
     "invitacion.boton": "Choose my password",
     "cuentaExistente.asunto": "You already have a {marca} account",
     "cuentaExistente.preencabezado": "Someone tried to sign up to {marca} with this email.",

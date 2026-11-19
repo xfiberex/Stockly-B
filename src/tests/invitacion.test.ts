@@ -51,7 +51,7 @@ describe("Alta de usuarios por invitación (T6-10)", () => {
 
     beforeAll(async () => {
         await cleanDb();
-        admin = await createUser({ email: "invita_admin@example.com", role: "ADMIN" });
+        admin = await createUser({ name: "Ana Admin", email: "invita_admin@example.com", role: "ADMIN" });
         galletaAdmin = getAuthCookie(admin.id);
     });
 
@@ -93,7 +93,7 @@ describe("Alta de usuarios por invitación (T6-10)", () => {
 
             expect(enviados).toHaveLength(1);
             expect(enviados[0]!.to).toBe("enlace@example.com");
-            expect(enviados[0]!.subject).toBe("Te han invitado a Stockly");
+            expect(enviados[0]!.subject).toBe("Ana Admin te ha invitado a Stockly");
             expect(enviados[0]!.html).toContain("Luis Enlace");
             expect(enviados[0]!.html).toContain(`${DIAS_DE_INVITACION} días`);
 
@@ -233,7 +233,7 @@ describe("Alta de usuarios por invitación (T6-10)", () => {
                 .send({ name: "Sam English", email: "sam@example.com", role: "SELLER" });
 
             expect(res.status).toBe(201);
-            expect(enviados[0]!.subject).toBe("You have been invited to Stockly");
+            expect(enviados[0]!.subject).toBe("Ana Admin has invited you to Stockly");
             expect(enviados[0]!.html).toContain('lang="en"');
             expect((await prisma.user.findUniqueOrThrow({ where: { email: "sam@example.com" } })).idioma).toBe("EN");
         });
@@ -287,6 +287,67 @@ describe("Alta de usuarios por invitación (T6-10)", () => {
             const login = await request(app).post(`${AUTH}/login`).send({ email: "debaja@example.com", password: CLAVE });
             expect(login.status).toBe(403);
             expect(login.body.code).toBe("ACCOUNT_DISABLED");
+        });
+    });
+
+    describe("AUD-020 — quién invita y a qué negocio", () => {
+        const comprobar = (token: string) => request(app).post(`${AUTH}/reset-password/check`).send({ token });
+
+        afterEach(async () => {
+            await prisma.appSetting.deleteMany({ where: { key: "businessName" } });
+        });
+
+        it("la cuenta guarda quién la invitó", async () => {
+            const res = await invitar({ name: "Guarda Quien", email: "guardaquien@example.com", role: "USER" });
+            const fila = await prisma.user.findUniqueOrThrow({ where: { id: res.body.data.id } });
+            expect(fila.invitedById).toBe(admin.id);
+            // Y no sale en la respuesta del alta.
+            expect(res.body.data).not.toHaveProperty("invitedById");
+        });
+
+        it("el correo nombra a quien invita y al negocio de Configuración, escapado en el HTML", async () => {
+            await prisma.appSetting.create({ data: { key: "businessName", value: "Ferretería <López>" } });
+            await invitar({ name: "Con Negocio", email: "connegocio@example.com", role: "USER" });
+
+            expect(enviados[0]!.subject).toBe("Ana Admin te ha invitado a Ferretería <López>");
+            expect(enviados[0]!.html).toContain("<strong>Ana Admin</strong> te ha creado una cuenta en Ferretería &lt;López&gt;.");
+            expect(enviados[0]!.html).not.toContain("<López>");
+        });
+
+        it("la comprobación del enlace dice quién invita y a qué negocio, sin el correo de quien invita", async () => {
+            await prisma.appSetting.create({ data: { key: "businessName", value: "  Ferretería López  " } });
+            await invitar({ name: "Mira Quien", email: "miraquien@example.com", role: "USER" });
+
+            const res = await comprobar(tokenDelUltimoCorreo());
+            expect(res.status).toBe(200);
+            expect(res.body.data).toEqual({
+                email: "miraquien@example.com",
+                invitation: { inviterName: "Ana Admin", businessName: "Ferretería López" },
+            });
+            expect(JSON.stringify(res.body)).not.toContain(admin.email);
+        });
+
+        it("sin nombre de negocio, `businessName` es null", async () => {
+            await invitar({ name: "Sin Negocio", email: "sinnegocio@example.com", role: "USER" });
+            const res = await comprobar(tokenDelUltimoCorreo());
+            expect(res.body.data.invitation).toEqual({ inviterName: "Ana Admin", businessName: null });
+        });
+
+        it("usada la invitación, un «olvidé mi contraseña» de esa cuenta ya no se presenta como invitación", async () => {
+            await invitar({ name: "Ya Usada", email: "yausada@example.com", role: "USER" });
+            await request(app).post(`${AUTH}/reset-password`).send({ token: tokenDelUltimoCorreo(), password: CLAVE });
+
+            await request(app).post(`${AUTH}/forgot-password`).send({ email: "yausada@example.com" });
+            const res = await comprobar(tokenDelUltimoCorreo());
+            expect(res.status).toBe(200);
+            expect(res.body.data).toEqual({ email: "yausada@example.com" });
+        });
+
+        it("el enlace de restablecer de una cuenta que no nació de una invitación no trae `invitation`", async () => {
+            await createUser({ email: "propia@example.com" });
+            await request(app).post(`${AUTH}/forgot-password`).send({ email: "propia@example.com" });
+            const res = await comprobar(tokenDelUltimoCorreo());
+            expect(res.body.data).toEqual({ email: "propia@example.com" });
         });
     });
 });

@@ -8,6 +8,7 @@ import { generateToken } from "@/shared/lib/tokens";
 import { requireSmtp, sendAccountApprovedEmail, sendInvitationEmail } from "@/shared/lib/nodemailer";
 import { logger } from "@/shared/lib/logger";
 import { notificationsService } from "@/modules/notifications/notifications.service";
+import { settingsService } from "@/modules/settings/settings.service";
 import type { RolAsignable } from "@/contratos/api";
 import type { Idioma } from "@/shared/i18n/correos";
 
@@ -83,12 +84,18 @@ export const usersService = {
      * token de restablecimiento, con otra caducidad, y `resetPassword` verifica la cuenta al
      * usarlo: abrirlo demuestra que el buzón es suyo.
      */
-    async invite(datos: { name: string; email: string; role: RolAsignable }, idioma: Idioma) {
+    async invite(datos: { name: string; email: string; role: RolAsignable }, idioma: Idioma, invitadoPor: string) {
         // Antes de crear nada: una cuenta creada y sin correo no se podría volver a invitar.
         requireSmtp();
 
         const existente = await prisma.user.findUnique({ where: { email: datos.email } });
         if (existente) throw correoYaRegistrado();
+
+        // AUD-020 — el correo dice quién invita y a qué negocio: «Ana te ha invitado a…».
+        const [quien, negocio] = await Promise.all([
+            prisma.user.findUnique({ where: { id: invitadoPor }, select: { name: true } }),
+            settingsService.negocio(),
+        ]);
 
         // `password` es obligatorio. Nace con el hash de un secreto que nadie conoce —ni se
         // devuelve ni se guarda en claro—, no con una cadena vacía.
@@ -99,7 +106,7 @@ export const usersService = {
         let user;
         try {
             user = await prisma.user.create({
-                data: { ...datos, password, idioma, resetToken: hash, resetExpires },
+                data: { ...datos, password, idioma, resetToken: hash, resetExpires, invitedById: invitadoPor },
                 select: USER_SELECT,
             });
         } catch (error) {
@@ -112,7 +119,10 @@ export const usersService = {
         // aviso accesorio, es la única forma de entrar. Si no sale, la cuenta se retira para que
         // el administrador pueda repetir la invitación, y se devuelve el error del envío.
         try {
-            await sendInvitationEmail(user.email, user.name, raw, DIAS_DE_INVITACION, idioma);
+            await sendInvitationEmail(user.email, user.name, raw, DIAS_DE_INVITACION, idioma, {
+                invitador: quien?.name ?? null,
+                negocio: negocio.name.trim() || null,
+            });
         } catch (error) {
             await prisma.user.deleteMany({ where: { id: user.id, resetToken: hash } });
             throw error;

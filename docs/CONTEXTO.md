@@ -52,11 +52,11 @@ Medido el 2026-11-06 con `pnpm verify` en los dos repositorios, en la rama de la
 | | Backend | Frontend |
 |---|---|---|
 | `pnpm verify` | ✅ exit 0 | ✅ exit 0 |
-| Tests | **1887** en 74 archivos *(2026-11-18, al cerrar `AUD-014`)* | **1159** en 98 archivos *(+1 omitido; 2026-11-18, al cerrar `AUD-014`)* |
-| Cobertura de sentencias | 96.98 % *(suelo 85 %; 2026-11-18)* | 83.63 % *(suelo 45 %; 2026-11-18)* |
+| Tests | **1899** en 74 archivos *(2026-11-19, al cerrar `AUD-020`)* | **1182** en 98 archivos *(+1 omitido; 2026-11-19, al cerrar `AUD-020`)* |
+| Cobertura de sentencias | 96.97 % *(suelo 85 %; 2026-11-19)* | 83.84 % *(suelo 45 %; 2026-11-19)* |
 | Lint | — *(no existe: `pnpm check`)* | 0 errores, 0 avisos |
 | Dependencias de producción | 159, sin avisos | 114, sin avisos |
-| E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` *(2026-11-18: 38 y uno de los primeros en frío, verde repetido solo)* |
+| E2E (Playwright) | — | **39 pasados**, 3 omitidos, en `chromium` y `Mobile Chrome` *(2026-11-19: `chromium` 21 de 21 en la pasada completa; `Mobile Chrome` en rojo por 429 —el backend tenía el límite en 1 000, gastado por las críticas— y 18 pasados y 3 omitidos repetido con el de 100 000)* |
 
 **Re-auditoría del 2026-10-31** ([informe](auditoria/2026-10-31/INFORME.md), veredicto
 *bloqueado*): seis tareas, `AUD-001` a `AUD-006`, en el [ROADMAP](ROADMAP.md); **todas cerradas**.
@@ -575,6 +575,13 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
 - **Los ítems de menú son cajas delimitadas** y salen de `clasesDeItemDeMenu()` y
   `CLASES_PANEL_DE_MENU`. El borde se pinta en `focus-visible`, nunca en `focus` a secas, y el
   `gap-1` entre ítems no es estético: sin él los recuadros parecen solaparse.
+- **Un color de texto se mide contra todas las superficies donde va, no solo contra blanco**
+  (`AUD-019`): `foreground-muted` daba 4,8:1 sobre blanco y 4,28:1 sobre `surface-muted`, que es
+  donde van las cabeceras de tabla y las insignias neutras. `theme.test.ts` lo mide contra las tres
+  superficies neutras; aclararlo otra vez lo pone en rojo. Ya le pasó antes a `danger`.
+- **Sin red, una consulta falla; no se pausa** (`networkMode: "always"` en `queryClient`,
+  `AUD-015`). Con el modo por defecto, TanStack la pausaba y la pantalla enseñaba el esqueleto para
+  siempre, sin `ErrorDeCarga`. Al volver la red, `refetchOnReconnect` la repite sola.
 - **La fila de la tabla de productos mide 48 px**, no los 36 del perfil denso: relleno, nombre y
   SKU ya los suman. Bajar es una decisión de producto.
 - **Una tabla que se usa con el móvil en la mano no lleva `CLASES_TABLA`**: su ancho mínimo deja
@@ -619,6 +626,9 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   recuperen su posición.
 - **Un desplegable de navegación no es un `menu`**: con ese rol los enlaces dejan de anunciarse
   como enlaces. `UserMenu` sí lo lleva, porque dentro hay un comando.
+- **Una pantalla que aparece sola enfoca su título** (`enfocarTitulo` de `MarcoDeAcceso`): la
+  espera de aprobación y la invitación (`AUD-020`). Con el `autoFocus` en el primer campo, el
+  lector se saltaba quién invita y con qué cuenta.
 - **Al añadir una ruta hay que darle título** en `shared/lib/titulos.ts`, o `titulos.test.ts`
   falla: sin entrada se anunciaría «Página no encontrada».
 

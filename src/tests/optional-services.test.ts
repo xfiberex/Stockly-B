@@ -48,7 +48,7 @@ describe("Servicios opcionales sin configurar", () => {
             const crear = jest.spyOn(prisma.user, "create");
 
             try {
-                await expect(usersService.invite({ name: "Ana", email, role: "USER" }, "ES")).rejects.toMatchObject({
+                await expect(usersService.invite({ name: "Ana", email, role: "USER" }, "ES", "admin-que-invita")).rejects.toMatchObject({
                     statusCode: 503,
                     code: "EMAIL_NOT_CONFIGURED",
                 });

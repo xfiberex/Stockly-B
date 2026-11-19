@@ -16,8 +16,11 @@ minimumReleaseAgeExclude:
 # express, mirar con `pnpm why <paquete>` si ya traen una versión corregida y retirar la línea.
 # AUD-004 (2026-11-01) subió los suelos de `fast-uri` y `qs` por avisos nuevos: express 5.3.0
 # sigue pidiendo `qs@^6.16.0`, que admite la vulnerable.
+# 2026-11-19: `effect` (ReDoS, GHSA-7589-6fvf-x4pw, corregido en 3.22.1). Lo fija a 3.20.0
+# exacta `@prisma/config` 7.9.1, del CLI `prisma`; retirarla cuando Prisma traiga ≥3.22.1.
 overrides:
   deepmerge-ts: ^8.0.2
+  effect: ^3.22.1
   fast-uri: ^3.1.9
   mysql2: ^3.23.1
   qs: ^6.16.1

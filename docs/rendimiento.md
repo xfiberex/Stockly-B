@@ -720,3 +720,45 @@ una copia del archivo de antes (`git show <commit anterior>:src/shared/lib/stock
 antes hay que aplicar la migración **sin** el cambio de índice, medir, y cambiarlo después.
 `Stockly_carga` quedó con la migración aplicada y con lotes de prueba en 200 productos;
 `pnpm carga:sembrar` la rehace.
+
+---
+
+## 17. AUD-010 — el panel con una petición de atención, bajo carga
+
+Medido el 2026-11-19 en el PC (32 GB de RAM, 17 libres), sobre `Stockly_carga` recién sembrada
+(100 000 productos, 1,2 millones de movimientos, 330 000 ventas, 1 153 MB) y con el backend
+compilado. `node load/ejecutar.js --panel=ahora` y `--panel=antes`, **cuatro pasadas alternas**
+sin otra carga en la máquina: las dos variantes miden el mismo minuto y veinte de carga
+sostenida con diez usuarios, y solo cambia lo que el paso «dashboard» pide junto a `/reports`
+(§15 y la cabecera de `load/movimientos.js`).
+
+| | `antes` (cinco peticiones: `/reports` y cuatro listados con `limit=1`) | `ahora` (dos: `/reports` y `/reports/attention`) |
+|---|---:|---:|
+| Panel entero (`ruta_panel`), media · p(95) | 1,36 · 2,26 s — 1,24 · 2,00 s | 1,26 · 2,06 s — 1,33 · 2,05 s |
+| Solo `/reports` (`ruta_dashboard`), p(95) | 2,20 · 1,99 s | 2,04 · 2,05 s |
+| Catálogo, p(95) | 1,11 · 1,23 s | 1,21 · 1,14 s |
+| Escritura, p(95) | 1,51 · 1,36 s | 1,46 · 1,43 s |
+| Histórico, p(95) | 597 · 720 ms | 780 · 729 ms |
+| Peticiones por segundo | 31,7 · 32,6 | 19,5 · 20,8 |
+| Comprobaciones por segundo (iteraciones) | 21,1 · 21,7 | 19,4 · 20,8 |
+| Errores | 0 % | 0 % |
+
+**El criterio de `AUD-010` se cumple: el panel no empeora.** Las dos variantes caen dentro de la
+dispersión de la otra en todas las rutas; lo que cambia es que el panel hace dos peticiones en
+vez de cinco —de ahí las 12 peticiones por segundo menos con el mismo trabajo— y que cada carga
+en frío gasta menos del límite de 100 peticiones por IP. Lo que tarda el panel lo marca
+`/reports`, el más lento de los que van en paralelo, en las dos variantes.
+
+**Lo que no se cumple, y no es de esta tarea:** frente a §15 (2026-10-10), el catálogo pasa de
+674–718 ms de p(95) a 1,1–1,3 s, la escritura de 1,33 a 1,4–1,5 s y el histórico de 428–960 a
+600–780 ms, **igual en las dos variantes**. Es lo que ya decía la fila de «Sin tarea» del
+ROADMAP: el resumen de `/reports` satura la base con diez usuarios y arrastra a todo lo demás,
+y desde octubre la base de carga tiene más órdenes y consultas que recorren `sale_order_items`
+entera. Cuatro de los cinco umbrales siguen en rojo, como en §15.
+
+**Pasadas que no valen, para no repetirlas:**
+- Docker Desktop se cerró solo entre la comprobación del entorno y la primera pasada, y las
+  cuatro primeras acabaron en `failed to connect to the docker API` sin medir nada.
+- Una pasada `ahora` pudo coincidir con el arranque de `vitest` del frontend (dio 2,23 s de p(95)
+  del panel, en la misma franja) y otra `antes` con un segundo `ejecutar.js` en el mismo puerto
+  (99,8 % de errores). Se descartaron y se repitieron solas.

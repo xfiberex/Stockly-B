@@ -402,9 +402,15 @@ model User {
   // que ya no está en `refreshToken` pero sí aquí, alguien está reutilizando un token ya
   // gastado: la sesión se cierra entera y queda constancia en la auditoría.
   previousRefreshToken String?   @unique
+  // AUD-020 — quién la invitó, si nació de una invitación (T6-10). Lo lee la pantalla de elegir
+  // la contraseña para decir «Ana te ha invitado a…». Si esa cuenta se borra, se queda en nulo y
+  // la invitación vuelve a decir «te han invitado».
+  invitedById          String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  invitedBy     User?          @relation("Invitaciones", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitados     User[]         @relation("Invitaciones")
   notifications Notification[]
 
   // El buscador de usuarios mira **nombre y correo** con el mismo `ILIKE '%…%'`, así que

@@ -45,10 +45,13 @@ export const correosEs = {
     "cuentaExistente.nota": "Si no has sido tú, puedes ignorar este correo: tu cuenta sigue igual.",
 
     // ── Invitación a una cuenta (T6-10) ──────────────────────────────────────
-    "invitacion.asunto": "Te han invitado a {marca}",
+    // AUD-020 — `{negocio}` es el nombre del negocio de Configuración, o la marca si no lo hay.
+    "invitacion.asunto": "Te han invitado a {negocio}",
+    "invitacion.asuntoDe": "{invitador} te ha invitado a {negocio}",
     "invitacion.preencabezado": "Elige tu contraseña para entrar en {marca}.",
     "invitacion.titulo": "Tu cuenta está lista",
-    "invitacion.cuerpo": "Un administrador te ha creado una cuenta en {marca}. Elige tu contraseña para empezar a usarla.",
+    "invitacion.cuerpo": "Un administrador te ha creado una cuenta en {negocio}. Elige tu contraseña para empezar a usarla.",
+    "invitacion.cuerpoDe": "<strong>{invitador}</strong> te ha creado una cuenta en {negocio}. Elige tu contraseña para empezar a usarla.",
     "invitacion.boton": "Elegir mi contraseña",
     "invitacion.nota": "El enlace expira en {dias} días. Si caduca, usa «¿Olvidaste tu contraseña?» en la página de inicio de sesión para recibir otro.",
 

@@ -17,7 +17,7 @@ export const usersController = {
             const { name, email, role } = req.body as { name: string; email: string; role: RolAsignable };
             // De la persona invitada no se conoce ningún idioma: va el de quien la invita, y se
             // corrige solo en su primer inicio de sesión (T4-12).
-            const user = await usersService.invite({ name, email, role }, idiomaDePeticion(req));
+            const user = await usersService.invite({ name, email, role }, idiomaDePeticion(req), req.userId!);
             await auditService.log({ userId: req.userId, userEmail: req.userEmail }, "CREATE", "User", user.id, { email: user.email, role: user.role });
             res.status(201).json({ success: true, message: "Invitación enviada", data: user });
         } catch (error) { next(error); }

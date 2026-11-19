@@ -6,6 +6,15 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-19, noche (PC): ninguna tarea abierta.** Se cerraron las cuatro que
+> quedaban. `AUD-010`, con la prueba de carga medida por fin en el PC: el panel nuevo no empeora
+> (rendimiento.md §17). `AUD-015` y `AUD-019`, con sus críticas de cierre: Reportes 26/40 sin P1;
+> los bloques de `AUD-019`, 29 y 30/40, con sus dos P2 abiertos arreglados en el acto (el contraste
+> de las cabeceras de tabla y la lista de conteos, que no era a ciegas). Y `AUD-020`, hecha y
+> criticada: la cuenta pendiente tiene pantalla propia y la invitación dice quién invita y a qué
+> negocio (Acceso 30/40). Fuera de tarea, `effect` por `overrides` (un aviso alto del mismo día).
+> Lo que las críticas dejaron sin hacer, por ser rediseño y no pulido, está en «Sin tarea».
+>
 > **Estado al 2026-11-19: cuatro tareas abiertas; `AUD-015` con su crítica de cierre hecha y
 > arreglada.** La crítica dio cuatro P1 —el más serio, que cualquier rol veía los importes del
 > informe por periodo, contra `AUD-009`—, y los cuatro, el P2 y lo menor están arreglados: el
@@ -176,22 +185,21 @@ esta tabla y la fila del índice; si no coinciden, manda el recuento:
 ```bash
 grep -c '^- \[ \] \*\*\[T' docs/ROADMAP.md    # abiertas: 0
 grep -c '^| T[0-9]-[0-9]* |' docs/ROADMAP.md  # cerradas: 139
-grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 4
-grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 16
+grep -c '^- \[ \] \*\*AUD-' docs/ROADMAP.md    # AUD abiertas: 0
+grep -c '^| AUD-[0-9]* |' docs/ROADMAP.md     # AUD cerradas: 20
 ```
 
 ---
 
 ## Tareas abiertas
 
-Cuatro. `AUD-009` (ya cerrada) y `AUD-010` salieron el 2026-11-03 y 04 de la crítica del
-panel. `AUD-020` sale de la crítica de cierre de `AUD-014` (2026-11-18), en el Tier 4. `AUD-011` a `AUD-019` salen de la crítica de todas las pantallas del 2026-11-07
-([informe](auditoria/2026-11-07-critica/INFORME.md)): `AUD-011` y `AUD-012` (ya cerradas) en el Tier 2, el
-resto en el Tier 3. Las seis de la re-auditoría del 2026-10-31 están cerradas. Las tareas van en los Tiers 0 a 4 de más abajo. El tier lo da la severidad, y dentro de cada tier van en el orden en que conviene
-atacarlas. Las observaciones
-de severidad Medio o Bajo de esa auditoría no tienen tarea, porque fue una pasada rápida: están
-en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se abre con su
-ficha, como dice «Una tarea nueva», más abajo.
+Ninguna. Las últimas, `AUD-010`, `AUD-015`, `AUD-019` y `AUD-020`, se cerraron el 2026-11-19.
+`AUD-009` y `AUD-010` salieron de la crítica del panel (2026-11-03 y 04); `AUD-011` a `AUD-019`, de
+la crítica de todas las pantallas del 2026-11-07 ([informe](auditoria/2026-11-07-critica/INFORME.md));
+`AUD-020`, de la crítica de cierre de `AUD-014`. Las seis de la re-auditoría del 2026-10-31 están
+cerradas; sus observaciones de severidad Medio o Bajo no tienen tarea, porque fue una pasada
+rápida: están en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se
+abre con su ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
 **Última actualización:** 2026-11-19 · **Siguiente ID libre:** AUD-021 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
@@ -201,11 +209,11 @@ ficha, como dice «Una tarea nueva», más abajo.
 | 0 · Crítico | 0 | 1 | — |
 | 1 · Alto | 0 | 5 | — |
 | 2 · Medio | 0 | 3 | — |
-| 3 · Bajo | 3 | 7 | 0 · 3 · 0 |
-| 4 · Propuestas | 1 | 0 | 0 · 1 · 0 |
-| **Total** | **4** | **16** | **0 · 4 · 0** |
+| 3 · Bajo | 0 | 10 | — |
+| 4 · Propuestas | 0 | 1 | — |
+| **Total** | **0** | **20** | — |
 
-**Abiertas por área:** Diseño 3 (`AUD-015`, `AUD-019`, `AUD-020`) · Rendimiento 1 (`AUD-010`)
+**Abiertas por área:** ninguna
 <!-- indice:fin -->
 
 ### Sin tarea: lo que hay que decidir, no consultar
@@ -221,10 +229,11 @@ decisiones de producto o mediciones sin repetir, y por eso no tienen ficha.
 | **El trozo `vendor` del frontend sigue por encima de 250 kB** (346 kB el 2026-10-05). Separar React lo empeora, medido | comentario de `manualChunks` en `Stockly-F/vite.config.ts` |
 | **La fila de la tabla de productos mide 48 px**, no los 36 del perfil denso: bajar exige quitar el SKU o encoger la miniatura | [CONTEXTO.md §6](CONTEXTO.md) |
 | **La clase ABC podría filtrar al abrir un conteo físico**; hoy solo filtra la categoría | — |
-| **Las cinco consultas de ventas del resumen recorren `sale_order_items` entera.** Margen (tres), ventas por día y lo más vendido: el plan hace `Parallel Seq Scan` de las 660 000 líneas para quedarse con las de 24 414 ventas del mes (367 ms la de margen por categoría, sola). En paralelo y sin caché, `/reports` sube a ~1 s en el portátil. Medido el 2026-11-18 en `Stockly_carga`; candidata a tarea si la prueba de carga del PC confirma que es lo que satura | `reports.service.ts` (`consultarMargen`, `ventasPorDia`, `masVendidoEntre`) |
-| **La prueba de carga ya no cumple sus umbrales**, y no es de `T5-14`: repetida el 2026-10-10 con el código de antes, el panel da 2,2 s de p(95) (límite, 2 s; eran 337 ms tras `T4-16`) y arrastra a las demás rutas. Son las consultas que `getSummary` ganó en los Tiers 5 y 6, que solas no ordenan en disco y juntas, con diez usuarios, saturan la base. Pide tarea propia. **Auditoría del 2026-10-31:** Medio tras la verificación independiente (0 % de errores; que el cuello sea el pool y no la CPU no está medido); sin tarea por ser una pasada rápida | [rendimiento.md §15](rendimiento.md) · [informe](auditoria/2026-10-31/INFORME.md) |
+| **Las cinco consultas de ventas del resumen recorren `sale_order_items` entera.** Margen (tres), ventas por día y lo más vendido: el plan hace `Parallel Seq Scan` de las 660 000 líneas para quedarse con las de 24 414 ventas del mes (367 ms la de margen por categoría, sola). En paralelo y sin caché, `/reports` sube a ~1 s en el portátil. Medido el 2026-11-18 en `Stockly_carga`. **La prueba de carga del PC (2026-11-19, [rendimiento.md §17](rendimiento.md)) es coherente con ello** —`/reports` marca lo que tarda el panel y las demás rutas empeoran igual con las dos variantes del panel—, pero no aísla qué consulta satura: para abrir tarea, medir `/reports` sin estas cinco | `reports.service.ts` (`consultarMargen`, `ventasPorDia`, `masVendidoEntre`) |
+| **La prueba de carga ya no cumple sus umbrales**, y no es de `T5-14`: repetida el 2026-10-10 con el código de antes, el panel da 2,2 s de p(95) (límite, 2 s; eran 337 ms tras `T4-16`) y arrastra a las demás rutas. Son las consultas que `getSummary` ganó en los Tiers 5 y 6, que solas no ordenan en disco y juntas, con diez usuarios, saturan la base. Pide tarea propia. **Auditoría del 2026-10-31:** Medio tras la verificación independiente (0 % de errores; que el cuello sea el pool y no la CPU no está medido); sin tarea por ser una pasada rápida. **Repetida el 2026-11-19 en el PC** (§17, al cerrar `AUD-010`): cuatro de cinco umbrales siguen en rojo y el catálogo, la escritura y el histórico están peor que en §15 | [rendimiento.md §15](rendimiento.md) · [informe](auditoria/2026-10-31/INFORME.md) |
 | **Los lotes no tienen retirada, ni se eligen al vender, ni entran por CSV** (`T5-15`). De qué lote salió cada venta está guardado (`sale_order_item_lots`), pero no hay pantalla que liste a quién se vendió un lote; el lote lo elige siempre el orden de caducidad; la importación crea productos sin lotes; y el resumen semanal no habla de caducidades | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
 | **El conteo físico es por producto, no por lote** (`T5-15`): lo que sobra queda «sin lote» y lo que falta sale por orden de caducidad | [ADR 0011](adr/0011-lotes-como-dimension-del-nivel.md) |
+| **Lo que las críticas de cierre del 2026-11-19 dejaron sin hacer**, por ser rediseño y no pulido (ninguno es P1). Reportes: las cifras de los gráficos solo se leen en el tooltip o en la tabla del lector, los nombres largos se cortan en el eje, y el informe no tiene jerarquía ni índice para sus ocho secciones (5 000 px en escritorio). Productos pide desplazamiento lateral a 1280 px (la tabla mide 1 058 en 975). Compras no se busca por número, como Ventas. Escape cierra «Nueva transferencia» con líneas sin preguntar. Caducidades dice «$0.00 a coste» por un coste desconocido. El estado «espera aprobación» se pierde al recargar. Los datos del E2E (`E2E-…`) ensucian la base de desarrollo que se enseña | Instantáneas de `Stockly-F/.impeccable/critique/` del 2026-11-19 |
 | **Lo legal que falta antes de tener usuarios reales o de cobrar**: privacidad, plazos de conservación, condiciones, marca | [legal.md §2](legal.md) |
 
 ## Tier 0 · Crítico
@@ -243,336 +252,11 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
 
 ## Tier 3 · Bajo
 
-- [ ] **AUD-010 · Los recuentos de «Necesita atención» en `/reports`: el panel de ADMIN pasó de 1 petición a 6**
-  - **Área:** Rendimiento · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** `AUD-008`. Para no tocar el backend, el bloque lee cada recuento de un listado con
-    `limit: 1` y su `meta.total`: caducidades, conteos abiertos, compras `PENDING`, compras
-    `PARTIALLY_RECEIVED` y ventas `PENDING`. Contra el límite global de la API —100 peticiones por
-    IP cada 15 minutos— pesa: con la caché de 30 s, volver al panel no las repite, pero cada carga
-    en frío son seis.
-  - **Ubicación:** `Stockly-F/src/modules/dashboard/hooks/useAtencionDeHoy.ts`;
-    `src/modules/reports/reports.service.ts` (`getSummary`) y `src/contratos/api.ts`.
-  - **Qué hacer:** que el backend devuelva esos cinco recuentos (declarados en el contrato) y que
-    `useAtencionDeHoy` los lea de ahí. **Medir antes**: la prueba de carga del panel ya no cumple
-    sus umbrales (fila de «Sin tarea»), y cinco `COUNT` más en `getSummary` pueden empeorarla; si
-    es así, una ruta propia y ligera es mejor que engordar `/reports`.
-  - **Criterio de aceptación:** el panel de ADMIN hace una petición de datos (dos como mucho) en
-    vez de seis, con las mismas cifras; la prueba de carga no empeora respecto a
-    [rendimiento.md §15](rendimiento.md).
-  - **Dependencias:** `AUD-008` ya fijó las filas (cerrada el 2026-11-07: stock, caducidades —con
-    `summary.expiredCount`—, conteos, compras y ventas). Junto con `AUD-009`, que
-    recorta la misma respuesta.
-  - **Hecho el 2026-11-09, a falta de la prueba de carga:** `GET /reports/attention` (contrato
-    `atencionDeHoySchema`, `PERMISOS` para todos, Swagger) devuelve las cinco cifras y los primeros
-    productos de stock bajo —la misma consulta que el resumen, ahora `productosConStockBajo`—, y
-    `useAtencionDeHoy` las lee de ahí. **Se eligió la ruta propia y no engordar `getSummary`**, como
-    la ficha prefería si el resumen ya iba lento. Con `AUD-009`, el resumen solo se le pide a ADMIN:
-    **USER y WAREHOUSE hacen una petición de datos en el panel (antes cinco y cuatro); ADMIN, dos
-    (antes seis).** Como ya no se reutilizan las claves de cada lista, la invalidación va en el
-    `MutationCache` de `queryClient.ts`: cualquier mutación que sale bien deja vieja la atención.
-    Medido sobre la base de desarrollo (mediana de siete): `attention` 10,5 ms; el resumen con
-    importes 9,7 ms y sin ellos 2,9 ms. **Comprobado:** tests de backend que comparan cada cifra
-    con la de su lista filtrada; en el navegador, ADMIN pide `/reports/attention` y `/reports`, y
-    WAREHOUSE solo la primera, con las mismas cifras que antes (16, 8, 1, 5, 4).
-  - **Falta:** repetir la prueba de carga contra `Stockly_carga` ([rendimiento.md §15](rendimiento.md)).
-    En el PC no está `k6`. El resumen de ADMIN no cambió y el de los demás roles adelgazó, así que
-    no se espera que empeore, pero el criterio pide medirlo.
-  - **Intento del 2026-11-18 (portátil), sin validez como medición.** Queda preparado:
-    - **La prueba ya mide el panel de verdad.** El paso «dashboard» de `load/movimientos.js` solo
-      pedía `/reports`; ahora `--panel=antes` le suma los cuatro listados con `limit=1` que leía
-      `useAtencionDeHoy` antes de esta tarea, y `--panel=ahora`, `GET /reports/attention`, en
-      paralelo como el navegador. `ruta_dashboard` sigue siendo solo `/reports` (comparable con
-      §15) y `ruta_panel`, el panel entero. Sin `--panel`, la prueba de siempre.
-    - **`pnpm carga:sembrar` volvía a funcionar:** no rellenaba `purchase_orders.number`, que es
-      obligatorio desde la tanda de Órdenes de `AUD-019`. Ahora numera por fecha, deja el contador
-      y escribe las notas de recepción con el número, como la aplicación.
-    - **Lo medido no vale:** con 7,2 GB de RAM y 1,4 libres, la VM de Docker y la base de 1,1 GB,
-      cuatro pasadas alternas dieron 1,0 · 2,0 · 3,9 · 7,4 req/s, subiendo en cada una sin cambiar
-      nada, con esperas de 60 s en unas y ninguna en otras. Sin concurrencia sí es estable:
-      `/reports` 1 045 ms de mediana, `/reports/attention` 198 ms y los cuatro listados de antes
-      118 + 8 + 14 + 14 ms. En paralelo, el panel tarda lo que `/reports` con las dos variantes.
-    - **Para cerrarla:** `pnpm build`, `pnpm carga:sembrar` y `node load/ejecutar.js --panel=ahora`
-      y `--panel=antes`, dos veces cada una y alternando, **en una máquina con memoria de sobra**
-      (el PC, donde se midió §15).
-- [ ] **AUD-015 · Reportes: tarjetas que no cuadran, gráficos sin alternativa y un informe por periodo que abre vacío**
-  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** crítica del 2026-11-07, bloque Reportes (25 y 28/40). Tres P1.
-  - **Ubicación:** `Stockly-F/src/modules/reports/components/ReportsPage.tsx` (tarjetas,
-    `:126-128`; gráficos, `:137-201`; meses, `:49`) e `InformePorPeriodoPage.tsx` (`:57`, `:171`).
-  - **Qué hacer:**
-    - Que las tres cifras de valor se puedan comparar: la exclusión de los productos sin coste
-      dentro de cada tarjeta afectada, o el valor a precio de venta solo de los que tienen coste
-      (el panel ya lo explica en una línea), y el aviso enlazado a `?aviso=sinCoste`.
-    - Los tres gráficos con el patrón del informe por periodo: `aria-hidden` y una tabla
-      equivalente.
-    - El periodo en la URL; sin datos, ofrecer «Mes anterior» o «Este año» y desactivar exportar.
-    - Los seis meses siempre en el eje; fuera la tarta de 9 categorías con 8 colores; ejes con
-      token.
-  - **Criterio de aceptación:** sin P1 en la crítica repetida del bloque; con el lector de
-    pantalla del árbol de accesibilidad, ningún gráfico es una parada sin nombre.
-  - **Dependencias:** conviene después de `AUD-009`, que puede cambiar qué importes ve cada rol en
-    esta pantalla.
-  - **Estado al 2026-11-10: hecha, a falta de la crítica repetida** (queda con las críticas de
-    cierre, al final). En `main`, sin commitear al escribir esto.
-    - **Tarjetas que cuadran:** `GET /reports` trae `costedSaleValue` (la venta de los productos
-      con coste, solo ADMIN), de la que sale el margen potencial. La tarjeta del margen enseña la
-      resta («$X a venta − $Y a coste») y la del coste dice «Solo los productos con coste» cuando
-      hay alguno sin él; el aviso enlaza a `?aviso=sinCoste`, como en el panel.
-    - **Gráficos:** los tres en `aria-hidden`, con `accessibilityLayer={false}` (ningún SVG con
-      `role="application"` ni en el orden de tabulación) y una tabla `sr-only` con las mismas
-      cifras, con su título como `caption`. La tarta de 9 categorías con 8 colores pasa a barras
-      horizontales ordenadas; el valor por categoría, también ordenado. Ejes con
-      `TEXTO_DE_EJE`, que se muda del panel a `shared/lib/grafico.ts`.
-    - **Meses:** `GET /reports` trae `movementMonths`, los seis meses de la ventana aunque no
-      tengan movimientos (`LEFT JOIN LATERAL`); el eje y la tabla los enseñan todos.
-    - **Informe por periodo:** el periodo en la URL (`?preset=…` o `?from=…&to=…`; lo que no se
-      entiende se ignora y queda este mes); vacío, ofrece «Mes anterior» y «Este año» (menos el
-      que ya está) y desactiva exportar CSV y PDF.
-    - **Comprobado:** tests nuevos en `margen.test.ts`, `reports.test.ts` y
-      `dashboard-consultas.test.ts` (backend) y en `resumen.test.tsx` e
-      `InformePorPeriodo.test.tsx` (frontend); `pnpm verify` en verde en los dos (backend 1850
-      tests; frontend 1079 y 1 omitido); E2E contra `Stockly_e2e`, 39 pasados y 3 omitidos. En el
-      navegador, con los datos del seed: barras ordenadas, julio a cero en el eje, ningún
-      `role="application"` fuera de `aria-hidden`, ningún elemento del gráfico con
-      `tabindex` ≥ 0, y `/reports/period?from=2025-01-01&to=2025-01-31` abre ese rango, vacío,
-      con exportar desactivado y las dos alternativas.
-  - **Crítica de cierre (2026-11-18, dual-agent): 23,5/40, cuatro P1** (Reportes 23, Por periodo
-    24; la del 2026-11-07, 25 y 28). Lo de esta tarea se sostiene —ningún gráfico es una parada sin
-    nombre, el periodo vive en la URL, el vacío ofrece alternativas—; la nota baja porque esta
-    pasada miró estados que la primera no: otro rol, red lenta y fallo de carga. Los P1: **cualquier
-    rol veía los importes en Por periodo** (`GET /reports/period` es `TODOS` y no recortaba, contra
-    la decisión de `AUD-009`); Por periodo podía enseñar cifras de otro periodo sin decirlo (campos
-    que no se sincronizaban, sin `isFetching` ni `isError`, exportar el periodo anterior); Reportes
-    en blanco si fallaba la carga; y el % de margen sin decir que salía del 38 % de lo vendido.
-    Detector: CLI limpia; en el navegador, cabeceras de tabla a 4,3:1 en claro (de todo el sistema:
-    pasa a `AUD-019`), siete tablas sin nombre y tres enlaces pequeños. Instantánea en
-    `Stockly-F/.impeccable/critique/2026-11-19T00-31-44Z__src-modules-reports.md`.
-  - **Hecho, tanda de la crítica de cierre (2026-11-18; el propietario decidió «todo» y recortar los
-    importes):**
-    - **Importes, solo ADMIN, también en Por periodo** (backend y contrato): `salesRevenue` y
-      `purchaseAmount` pasan a opcionales en `cifrasDePeriodo` y no vienen para los demás roles,
-      ni en el JSON, ni en el CSV (sin esas columnas), ni en el PDF (en unidades). La pantalla se
-      queda en unidades: sin tarjetas, columnas ni gráficos de dinero.
-    - **Por periodo, nunca cifras de otro periodo:** los campos de fecha dicen el rango que se ve
-      (o el que se está escribiendo); mientras llega el pedido, lo de antes se atenúa con
-      `aria-busy`, el subtítulo —región viva— dice «Cargando el periodo elegido…» y exportar espera,
-      diciendo por qué (`aria-describedby`); sin datos, `ErrorDeCarga` con «Reintentar»; con datos
-      viejos, «No se pudo actualizar».
-    - **Reportes ya no queda en blanco:** `ErrorDeCarga` sin datos y el aviso de datos viejos con
-      datos (`ReintentoEnLinea`, que pasa del panel a `shared/components`).
-    - **El % de margen dice su cobertura** («Sobre el 38 % de lo vendido: el resto no tiene coste»),
-      en ámbar por debajo del 80 %; el margen potencial dice «Solo los productos con coste».
-    - **Jerarquía:** el stock bajo y la rotación suben justo bajo las cifras; la rotación enseña 10
-      y el resto con «Ver los N»; «Ver la reposición sugerida» para ADMIN cuando algo hay que
-      reabastecer.
-    - **Menores:** las dos filas de tarjetas iguales (sin el icono de adorno; el stock bajo, en ámbar
-      con su icono); el eje de meses sin «Jun 26»; leyenda en el orden de las barras; «Cuántos
-      movimientos hubo, no cuántas unidades»; la ayuda de la rotación dice qué son las salidas
-      (ventas enviadas y salidas a mano; ni transferencias ni ajustes); fuera la columna «#»; la
-      última marca de Distribución ya no se corta; tablas con nombre (`aria-labelledby` al `h2`) y
-      las de los gráficos sin el `caption` que repetía el título; enlaces de producto y «Ver cuáles»
-      con 44 px en táctil. En Por periodo: un gráfico por serie, cada uno con su escala (las ventas
-      ya no son astillas al lado de las compras), con `TEXTO_DE_EJE`; hasta hoy y no hasta el final
-      del atajo (sin meses futuros, «a hoy, 18 nov»); la zona con espacios; las tarjetas sin
-      decimales, como en Reportes; sin las seis tarjetas a cero sobre el vacío; nombres de producto
-      enlazados; «Volver a reportes» con 44 px; en el móvil, las fechas a mano plegadas tras «Otras
-      fechas».
-    - **Comprobado:** backend, tests nuevos en `informe-periodo.test.ts` (WAREHOUSE, USER y SELLER
-      sin un importe en el JSON; ADMIN con ellos; CSV sin las columnas; PDF que sale); `pnpm
-      verify` en verde (1893). Frontend, tests nuevos en `InformePorPeriodo.test.tsx` y
-      `resumen.test.tsx`. En el navegador: Reportes a 1280 como ADMIN y Por periodo a 390; la cuenta
-      de almacén, contra un backend recién arrancado, recibe el informe en unidades (JSON y CSV).
-      **Lo que el portátil dejó a medias:** procesos `node` de un `pnpm dev` anterior seguían
-      sirviendo el puerto 3000 con código viejo (`TaskStop` no mata a los hijos), y el navegador
-      enseñó importes a almacén hasta comprobarlo aparte.
-    - **Sin hacer, por ser funcionalidad nueva y no pulido:** ordenar las tablas, CSV del resumen
-      de Reportes, margen en Por periodo y ventanas configurables (30 días, 6 meses). En el móvil,
-      las tablas de importes siguen desplazándose a lo ancho, con el borde que lo avisa (`AUD-013`).
-  - **Falta:** repetir la crítica del bloque (criterio: sin P1).
-
-- [ ] **AUD-019 · Pulido restante de la crítica del 2026-11-07 (P2 y P3 sin tarea propia)**
-  - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** el resto de P2 y P3 del [informe](auditoria/2026-11-07-critica/INFORME.md), que
-    no comparten causa con otra tarea. Hacer por bloques, repitiendo la crítica de cada uno.
-  - **Qué hacer**, por pantalla:
-    - **Panel:** «Mis ventas de hoy» visible en la tableta de SELLER (se resuelve con las dos
-      columnas de `AUD-013`); `/expiry` dice los lotes, no solo las unidades.
-    - **Catálogo:** la ficha que abre el escáner con «Registrar movimiento» y «Escanear otro»; el
-      formulario de edición sin «Stock inicial»; filtros de Productos en la URL; spinner de borrado
-      solo en su fila; notas de proveedor legibles.
-    - **Órdenes:** importes en las sugerencias (subtotal, total por proveedor y en la confirmación);
-      la ficha de cliente rotula «Subtotal» lo que lo es, y el número de venta enlaza a la venta;
-      números de compra que se puedan dictar; emoji de contacto por Heroicons; filtros de Ventas
-      plegados en móvil.
-    - **Inventario:** vacíos que dicen el filtro; categorías ya en conteo marcadas en «Nuevo
-      conteo»; «Quedan X» como «Tras la transferencia»; escáner en el formulario de transferencia;
-      filtro «Solo caducado»; jerarquía de botones del conteo; conteo a ciegas que no enseña
-      sobrante ni faltante mientras se cuenta.
-    - **Administración:** la 404 dentro de la app sin `<main>` anidado ni «Dashboard»; zona horaria
-      con búsqueda; logo que avisa de que se guarda al subirlo.
-    - **Contraste de las cabeceras de tabla** (detector, crítica de cierre de `AUD-015`, decisión del
-      propietario de traerlo aquí): `text-foreground-muted` sobre `bg-surface-muted` da 4,3:1 en
-      tema claro, por debajo de 4,5:1. Es el mismo patrón en todas las tablas de la aplicación:
-      ajustar el token o la clase y vigilarlo en `tokens.test.ts`.
-    - **Tipografía (detector):** `text-pretty` o espacios no separables donde quedan palabras
-      sueltas a 390 px (`/sale-orders`, `/expiry`, `/settings`, `/profile`) y `text-balance` en los
-      dos títulos de `/reports`.
-  - **Criterio de aceptación:** cada bloque, con su crítica repetida, sin P2 de esta lista.
-  - **Dependencias:** después de `AUD-011` a `AUD-018`, que cambian varias de estas pantallas.
-  - **Hecho, tanda 1 (2026-11-14): Panel y Catálogo**, todo en el frontend.
-    - **Panel.** «Mis ventas de hoy» **ya se veía** sin desplazar en la tableta de SELLER desde
-      `AUD-013`, como suponía la ficha: medido en el navegador, a 1024×768 empieza a 523 px y a
-      820×1180, a 631 (encima de la barra de cobro). Sin cambio. `/expiry` dice los lotes delante
-      de las unidades («1 lote · 6 uds. · …»), con `expiredCount` y `meta.total`, que ya llegaban.
-    - **Catálogo.** La ficha que abre el escáner ofrece «Registrar movimiento» (si se puede mover
-      stock; pasa a ser la acción principal) y «Escanear otro». El formulario de edición ya no
-      tiene «Stock inicial»: enseña el stock actual y dice que se mueve con un movimiento, y no
-      manda `stock` (CONTEXTO §6). Los filtros de Productos viven en la URL (`buscar`,
-      `categoria`, `etiqueta`, `abc`, `almacen`, `activos`), con `replace` y sin pisar `aviso` ni
-      `escanear`; el `?activos=todos` del panel lo lee ya el propio filtro. **El spinner por fila
-      era el de Restaurar**, no el de borrar: desde `AUD-012` el borrado confirma en un diálogo y
-      su spinner está allí; el de Restaurar giraba en todas las inactivas y ahora solo en la suya.
-      Las notas de proveedor y, por el mismo defecto, la descripción de Categorías y Marcas se leen
-      enteras en vez de cortarse con `truncate`.
-    - **Comprobado:** tests nuevos en `Lotes.test.tsx` (lotes en la cabecera, acciones del
-      escáner y que fuera de él no salen, edición sin stock), `ProductForm.test.tsx`,
-      `ProductFilters.test.tsx` (abrir con la URL, escribirla sin pisar parámetros, `activos=todos`),
-      `ProductTable.test.tsx` y `PlazoDeEntrega.test.tsx`. `pnpm verify` del frontend en verde
-      (1123 tests y 1 omitido); E2E, 38 pasados y 3 omitidos, con el intermitente del interruptor
-      de Configuración en rojo en la pasada completa y en verde repetido solo. En el navegador:
-      los filtros sobreviven a ir a Movimientos y volver, y el formulario de edición enseña el
-      stock como texto.
-    - **Sin comprobar:** el escaneo con cámara real (la ficha se probó montada con las props); la
-      crítica repetida de los dos bloques, que va con las críticas de cierre.
-  - **Hecho, tanda 2 (2026-11-14, en el PC): Órdenes.** Backend, contrato y frontend.
-    - **Número de compra correlativo** (decisión del propietario: correlativo, como las ventas de
-      `T6-04`, y no solo partir el UUID en grupos). Columna `purchase_orders.number`, única; la
-      migración `20261114120000_aud_019_numero_de_compra` numera las existentes por fecha y deja la
-      fila `purchaseOrder` en `counters`. `siguienteNumeroDeCompra` (`shared/lib/numeroDeCompra.ts`)
-      se llama dentro de la transacción que crea la orden: crear a mano y generar desde sugerencias,
-      que pasó de `$transaction([...])` a una transacción interactiva para numerar cada orden. El
-      contrato gana `ordenCompraSchema.number`, `escribirNumeroDeCompra`, `orderNumber` (opcional)
-      en el aviso `PURCHASE_OVERDUE` y `purchaseOrderNumber` en el historial de costes. Lo usan las
-      notas de recibir y cancelar, el resumen semanal, la exportación (columna `orderNumber`, al
-      final), la lista, la recepción, la cancelación, la campana y el origen del coste en
-      Movimientos. Los avisos anteriores, sin número, se siguen nombrando por el id. El seed numera
-      por fecha, como las ventas.
-    - **Sugerencias:** cada línea dice su subtotal (atenuado si no está marcada), la cabecera de
-      cada proveedor lo marcado de su grupo y el resumen el total. Con una línea marcada a medio
-      escribir no se enseña un total que solo sume las demás. «Generar órdenes» abre
-      `ConfirmarAccion` con cada orden, sus líneas, su importe y el total, y dice que una orden de
-      compra no se edita después (y a qué almacén, si hay varios). Es solo frontend: el precio
-      propuesto ya llegaba y la pantalla es de ADMIN, así que `AUD-009` no entra.
-    - **Ficha de cliente:** la columna dice «Subtotal», que es lo que suma, y el número de cada
-      venta lleva a `/sale-orders?numero=…&venta=…`, desplegada.
-    - **Ventas:** el contacto del cliente, con `EnvelopeIcon` y `PhoneIcon` y su rótulo para el
-      lector, en vez de emoji. En el móvil, estado, fechas y almacén se pliegan tras «Filtros (n)»,
-      como en Productos; el número de venta queda a la vista. Los textos del botón pasan a
-      `filtro.plegados` y lo usan las dos pantallas; el patrón queda en `design-system.md`.
-    - **Comprobado:** backend, `numero-de-compra.test.ts` nuevo (serie, veinte a la vez, rollback,
-      contador ausente, series separadas, generar, notas, historial, aviso, exportación y la parte
-      de datos de la migración) y el correo semanal con el número; frontend, tests de Sugerencias
-      (subtotales, totales, confirmación), ficha de cliente, campana, lista de compras y Ventas
-      (iconos, plegado y recuento). La base de desarrollo, migrada: 18 compras numeradas del 1 al
-      18 y el contador en 18; `prisma migrate diff` contra el esquema, vacío. `pnpm verify` en verde
-      en los dos (backend 1884 tests; frontend 1130 y 1 omitido); E2E completo, 39 pasados y 3
-      omitidos, con el flujo de `T5-05` confirmando en el diálogo (54,00) y los tres de compras
-      nombrándolas por `escribirNumeroDeCompra`.
-    - **En el navegador:** a 1280 px la tabla de Sugerencias ya medía 1052 px en 975, y la columna
-      nueva y el «Marcado» de cada proveedor (alineado a la derecha de la fila) quedaban fuera de la
-      vista. Se arregló poniendo el «Marcado» junto al nombre del proveedor, estrechando los campos
-      de cantidad y precio y bajando el relleno de las celdas a `px-2`: ahora mide 975 en 975. Las
-      cifras cuadran (40.300 + 23.400 = 63.700) y la confirmación dice el almacén. En Ventas, a 500 px
-      (el mínimo de la ventana; por debajo de `md` es lo mismo), la primera venta empieza a 370 px.
-  - **Hecho, tanda 3 (2026-11-17, en el PC): Inventario.** Los siete puntos de la ficha.
-    - **Vacíos que dicen el filtro:** `VacioDeLista` (`shared/components`) en Conteos, Transferencias
-      y Caducidades: con un filtro puesto, «Ningún conteo coincide con el filtro.» y «Quitar los
-      filtros» al lado; sin filtro, el «Todavía no hay…» de siempre. Regla en `design-system.md` §8.
-    - **«Nuevo conteo» no ofrece lo ocupado:** lee los conteos abiertos del almacén elegido y marca
-      «— ya en un conteo abierto» (opción desactivada; `Select` admite ahora `disabled` por opción)
-      las categorías con conteo abierto, y «Todo el catálogo» si hay cualquiera. Arranca en la
-      primera libre; con un conteo del catálogo entero abierto, no deja abrir y enlaza a él. El
-      servidor sigue decidiendo producto a producto (409 `PRODUCTS_IN_OPEN_COUNT`): esto evita el
-      viaje, no lo sustituye.
-    - **Transferencias:** el desglose dice «Tras la transferencia: X en … y Y en …» en vez de
-      «Quedan», que se leía como el stock de hoy. El formulario tiene «Escanear», con
-      `GET /products/lookup` (trae el desglose por almacén que la línea necesita): avisa de un código
-      desconocido, de un producto inactivo y del tope de líneas; dos lecturas, dos unidades.
-    - **Caducidades, «Solo lo ya caducado»:** filtro del servidor, `GET /reports/expiring?expired=true`
-      (solo `true`; otro valor, 400 `INVALID_FILTER_VALUE`), que recorta `data` y `meta` y **no** el
-      resumen. El contrato gana `summary.expiringCount`: la tarjeta «Caduca en el plazo» lo deducía
-      de `meta.total − expiredCount` y con el filtro habría dicho 0. Plazo, almacén y el filtro nuevo
-      viven en la URL (`?dias=`, `?almacen=`, `?caducado=1`), con `replace`.
-    - **Un conteo, jerarquía:** Contar/Revisar y los filtros de Revisar son `<Pestanas>` (`tablist`),
-      no botones con el elegido en primario. «Cerrar conteo» es secundario mientras se cuenta y
-      primario en Revisar: un solo primario a la vez («Guardar» o «Cerrar conteo»).
-    - **Un conteo, a ciegas también en las cifras:** en Contar solo se ve el avance («2 de 6
-      contados») y una nota de por qué; «Con diferencia», «Sobrante» y «Faltante» salen en Revisar.
-    - **Comprobado:** backend, dos tests nuevos en `lotes.test.ts` (el filtro con el resumen igual,
-      y los valores que se rechazan). Frontend, tests nuevos en `Conteo.test.tsx` (a ciegas, pestañas
-      y un primario, vacío con filtro, categorías marcadas), `Transferencias.test.tsx` (escáner,
-      avisos, vacío con filtro) y `Lotes.test.tsx` (el filtro en la URL y la consulta, el resumen,
-      el vacío). `pnpm verify` en verde en los dos (backend 1886; frontend 1145 y 1 omitido); E2E
-      completo, 39 pasados y 3 omitidos, con dos flujos ajustados (la pestaña «Revisar» y «Tras la
-      transferencia»). En el navegador, con el seed: «Electrónica» y «Todo el catálogo» marcadas en
-      Tienda Central y nada en Santiago; el conteo a ciegas y la revisión; el formulario de
-      transferencia y Caducidades a 500 px (el mínimo de la ventana), con 2 filas caducadas y la
-      tarjeta «Caduca en el plazo» en 6 lotes.
-  - **Hecho, tanda 4 (2026-11-18): Administración y Tipografía.** Solo frontend.
-    - **La 404 dentro de la app** (`NotFoundPage dentroDeLaApp`) ya no anida un `<main>` en el de
-      `App.tsx` ni repite la marca, que está en la barra; fuera de la sesión conserva los dos y
-      ahora pasa por `Acceso`, así que también pone el título de la pestaña. El botón dice «Volver
-      al inicio», no «Volver al Dashboard»: `/` no es el panel para SELLER.
-    - **Zona horaria con búsqueda:** `SelectorDeZonaHoraria`, combobox de ARIA 1.2 como
-      `BuscadorDeCliente`, en lugar del `<select>` de ~420 zonas. Busca por cualquier palabra, sin
-      tildes ni guiones bajos, y por el desfase de hoy, que cada opción enseña («santo utc-4»).
-      Abre con la zona puesta centrada; Escape o salir sin elegir devuelven la que había, sin
-      dejar cambios pendientes; sin coincidencias, lo dice.
-    - **Después (2026-11-19):** la lista de zonas calculaba los ~420 desfases al montar
-      Configuración y pintaba todas las opciones al abrir, y sus tests agotaban los 5 s en la pasada
-      completa del portátil. Ahora los desfases se calculan al abrirla por primera vez (y valen para
-      la sesión) y se pinta una ventana de 60 alrededor de la activa, que se mueve cuando la activa
-      sale de ella, con «Hay N zonas más: escribe para encontrar la tuya». Test nuevo de la ventana.
-    - **El logo avisa** de que se guarda al elegir el archivo, sin «Guardar cambios», con el
-      texto atado al botón por `aria-describedby`.
-    - **Tipografía, por regla y no pantalla a pantalla:** `index.css` da `text-wrap-style: pretty`
-      a `p`, `li`, `dd`, `figcaption` y `label`, y `balance` a `h1`–`h3`, en `@layer base`. La
-      propiedad larga y no el atajo `text-wrap`, que desharía los `truncate`. Regla en
-      `design-system.md` §2, guardia en `tipografia.test.ts`.
-    - **Comprobado:** tests nuevos en `NotFoundPage.test.tsx` (un solo `<main>` dentro, marca
-      solo fuera, enlace al inicio) y `SettingsPage.test.tsx` (búsqueda y Enter, desfase,
-      apertura por la zona puesta, Escape y Tab sin cambios, vacío, aviso del logo). `pnpm verify`
-      del frontend en verde (1157 y 1 omitido); E2E completo 35 pasados, 3 omitidos y los 4
-      primeros de chromium en rojo por el login lento en frío, en verde repetidos solos. En el
-      navegador (Chrome DevTools, 1280 px y 390 px táctil): la 404 con un solo `main`, la lista de
-      zonas filtrando por «utc-4», el aviso del logo y `pretty` aplicado.
-    - **Sin hacer:** la crítica repetida de los seis bloques, que va con las críticas de cierre;
-      «Quitar logo» sigue sin confirmar (la crítica no lo marcó; `AUD-012` no lo incluía).
-  - **Falta:** solo la crítica repetida, con las de cierre.
+*Ninguna abierta.*
 
 ## Tier 4 · Propuestas
 
-- [ ] **AUD-020 · Acceso: una pantalla propia para «pendiente de aprobación» y una invitación que diga quién invita**
-  - **Área:** Diseño y producto · **Severidad:** Bajo · **Esfuerzo:** Medio
-  - **Origen:** las preguntas de la crítica de cierre de `AUD-014` (2026-11-18); el propietario
-    decidió abrirlas como tarea.
-  - **Qué hacer:**
-    - **«Pendiente de aprobación» con pantalla propia.** Es el estado más frecuente de una cuenta
-      recién registrada y hoy es un aviso dentro del formulario del login, que invita a seguir
-      pulsando «Entrar». Lo que la crítica proponía: la misma tarjeta que enseña Confirmar —qué
-      falta, quién lo decide, a quién preguntar— cuando el login responde
-      `ACCOUNT_PENDING_APPROVAL`, sin el formulario debajo.
-    - **La invitación dice quién invita y a qué negocio.** Hoy el correo y la pantalla dicen «Te
-      han invitado a Stockly». El backend conoce a quien invita y el nombre del negocio (ajustes
-      de `T6-03`): «Ana te ha invitado a Ferretería López». Toca el correo de invitación
-      (`correos.es.ts` y su par en inglés), `POST /auth/reset-password/check` (que tendría que
-      devolver quién invitó, solo para el enlace de invitación) y `ResetPasswordPage`.
-  - **Decisión previa:** si la pantalla de espera sustituye al aviso del login o se añade; y qué
-    datos de quien invita se enseñan a alguien que todavía no tiene cuenta (el nombre, no el
-    correo, parece suficiente).
-  - **Criterio de aceptación:** las dos, con tests de componente y de la ruta, y una crítica del
-    bloque Acceso que no baje de la de cierre de `AUD-014` (29,3/40, sin P1).
-  - **Dependencias:** ninguna.
+*Ninguna abierta.*
 
 ---
 
@@ -829,3 +513,7 @@ etiqueta—; el estado activo de las categorías y la casilla «Mantener sesión
 | AUD-017 | Tier 3 · Diseño: la bitácora no decía sobre quién se actuó ni se filtraba por usuario y fecha, y la campana no ordenaba por urgencia (crítica del 2026-11-07) | 2026-11-13 | **Bitácora.** Cada fila dice a quién o a qué afectó: `GET /audit-logs` añade `entityLabel` (el nombre del producto, la persona, el número de venta, el proveedor de una compra, el almacén y la categoría de un conteo, «origen → destino» de una transferencia), resuelto al leer con una consulta por tipo de entidad, y `entityExists` (solo se enlaza lo que sigue existiendo). Clientes, compras y ventas se borran de verdad: su controlador guarda la etiqueta en `details.label` **antes** de borrar (`auditService.etiquetaDe`). Filtros por usuario y por rango de días **del negocio** (`userId`, `from`, `to`, con `rangoDeDias`), en la URL de la pantalla (`?usuario=&desde=&hasta=&accion=&entidad=&pagina=`); `GET /audit-logs/actors` da las cuentas con registros, también las que ya no existen (por su correo), para el filtro; `GET /audit-logs/export` exporta lo filtrado por lotes con `enviarExportacion`. Los detalles se pintan como pares traducidos (`modules/audit-logs/detalles.ts`: rol, tipo de movimiento y estado con su rótulo; un cambio `{ de, a }` como «antes → después»; sin repetir el nombre que ya sale en la columna), no como JSON. **Campana.** Los sin leer van **por gravedad** —cuenta esperando rol, venta que no se puede enviar, lote ya caducado, agotado, compra atrasada, lote que caduca pronto, resto del stock bajo— y después los leídos por fecha; se ordena en la consulta (`notificationsService.getAll`), así lo grave pero antiguo no se queda fuera de los 30. El lote caducado tiene su texto («caducado: retíralo»), en rojo; el aviso de lote trae `warehouses` (dónde queda). La venta y la compra llevan a esa orden: `/sale-orders?numero=&venta=` y `/purchase-orders?compra=` (nuevo filtro `id` en `GET /purchase-orders`, con su aviso «Solo una compra»). **Usuarios y Bitácora**, con `ErrorDeCarga` y «Reintentar» si la carga falla; Usuarios abre ya buscado con `?buscar=`. **Comprobado** (también en el navegador, con los datos del seed: cada fila nombrada, los detalles traducidos y la campana con la cuenta pendiente arriba, después los lotes caducados): backend — `audit-logs.test.ts` (etiquetas y contrato, la etiqueta de un cliente borrado, un usuario y un día devuelven solo sus filas con el día de Santo Domingo, 400 con rango al revés o fecha inexistente, `/actors` con la cuenta que ya no existe, la exportación en CSV con los filtros, 403 para USER), `avisos.test.ts` (el orden por gravedad, y que lo grave y antiguo entra en los 30), `lotes.test.ts` (`warehouses`), `purchase-orders.test.ts` (`?id=`); frontend — `AuditLogsPage.test.tsx`, `CampanaDeAvisos.test.tsx`, `UsersPage.test.tsx`, `PurchaseOrdersPage.test.tsx`. `pnpm verify` en verde en los dos (backend 1869 tests; frontend 1102 y 1 omitido); E2E, 39 pasados y 3 omitidos (en una primera pasada, recién terminados los dos `verify`, los ocho primeros de chromium se quedaron en el login a los 5 s; la segunda pasó entera). |
 | AUD-018 | Tier 3 · Accesibilidad: filas desplegables sin teclado, pestañas sin rol, enlace verde a 3,8:1 y botones de icono sin el nombre de su fila (crítica del 2026-11-07) | 2026-11-14 | Todo en el frontend. **Filas.** En Compras y Ventas, el número de la orden es un `<button aria-expanded>` con chevron (`shared/components/BotonDeDesplegar.tsx`); la cabecera no puede ser el botón porque lleva dentro el enlace al cliente y las acciones, y el `div` sigue respondiendo al clic. En Transferencias, la fila entera ya era botón: se le quita el `aria-label` («Ver los productos de…»), que tapaba los almacenes, la fecha y las unidades, y gana chevron. **Pestañas** de Movimientos: `shared/components/Pestanas.tsx`, con `tablist`/`tab`/`aria-selected`/`tabpanel`, una sola parada de tabulador, flechas, Inicio y Fin; la lista se desplaza por dentro a 390 px (`contain-paint sin-barra`, con la línea gris en un envoltorio para que el recorte no se coma el subrayado). **Contraste:** los tres enlaces en `text-accent` (Ventas, Clientes, Transferencias) pasan a `text-accent-strong`, 5,5:1 en claro y ≥ 4,5:1 también sobre `surface-muted`. **Nombres:** Editar/Eliminar de Catálogo y Proveedores (`comun.editarNombre`), Activar/Desactivar de Usuarios («Desactivar a Laura Gómez», con el texto visible delante), quitar línea en los formularios de compra y de venta («Quitar la línea de Monitor LG» o «Quitar la línea 2»), y `aria-label` en el buscador de Productos. **Escape** cierra el menú móvil y devuelve el foco a la hamburguesa. **La ficha estaba en parte desfasada:** los botones de las filas de Compras (`:685, 696`) y los de Clientes ya nombraban su fila; el resto, como decía. **Comprobado:** dos guardias nuevas en `accesibilidad.test.ts` —ningún `<Button>`/`<button>` de solo icono sin `aria-label`, y el acento suave solo en iconos—, cada una probada con una mutación que la hace saltar; `theme.test.ts` mide el acento fuerte contra tarjeta, fondo y `surface-muted` **en los dos temas**; tests de rol, nombre y teclado en `Pestanas.test.tsx` (nuevo), `PurchaseOrdersForm.test.tsx`, `SaleOrdersPage.test.tsx`, `Transferencias.test.tsx`, `App.test.tsx` y `ProductFilters.test.tsx`, y los de Catálogo, Proveedores, Usuarios y Movimientos buscan ya por el nombre nuevo. `pnpm verify` del frontend en verde (1115 tests y 1 omitido; cobertura 82,95 %); el backend no cambia de código. E2E contra `Stockly_e2e`, 39 pasados y 3 omitidos, tras cambiar en `flows.spec.ts` el selector del desplegable de Transferencias (`{ expanded: false }`). En el navegador, en tema oscuro: las flechas mueven y eligen, el anillo de foco se ve en la pestaña y en el número de la venta, Enter despliega la fila y el enlace sale en `#34d399`; a 486 px (Windows no estrecha más la ventana) el documento no desborda y las pestañas se desplazan dentro. **Sin comprobar:** con lector de pantalla real (sigue el listón de `T4-17`: teclado y árbol de accesibilidad), y la vista a 390 px exactos. |
 | AUD-014 | Tier 3 · Diseño: pantallas de acceso — errores que duraban 3 s, la aprobación que no se anticipaba y enlaces caducados sin salida (crítica del 2026-11-07) | 2026-11-18 | **Cuatro críticas dual-agent, media 24 → 25,2 → 27,8 → 29,3/40**; la de cierre (2026-11-18), sin P0 ni P1 y ninguna por debajo de 24 (Login 29, Registro 28, Olvidé 32, Restablecer 29, Confirmar 29, Reenviar 29): el criterio. Las tres tandas están en el historial de git de este documento (fichas del 2026-11-07 y 09). **De la crítica de cierre, sus cinco P2, arreglados (decisión del propietario):** la cuenta pendiente de aprobación ya no sale como error rojo sino como aviso informativo (`AvisoDeAcceso tono="info"`, `role=status`, con a quién acudir); `POST /auth/reset-password` devuelve `pendingApproval` (contrato `contrasenaRestablecidaSchema`, Swagger) y el login deja de decir «Ya puedes entrar» a una cuenta sin aprobar; el enlace de confirmación caducado y la invitación caducada dicen que, si la cuenta ya está lista, basta con iniciar sesión, y lo ofrecen como botón (`EnlaceCaducado iniciarSesionComoBoton`): «Reenviar» no manda nada a una cuenta confirmada; el éxito del registro pone la pestaña en «Revisa tu correo», enseña el correo en su línea (cortado delante de la arroba) y ofrece «Corregir el correo», que vuelve al formulario con lo escrito; los enlaces del aviso de error del login miden 44 px en táctil (medían 20). **Comprobado:** backend, test nuevo en `auth.test.ts` (una cuenta pendiente recibe `pendingApproval: true` y el login la sigue rechazando) y `pnpm verify` en verde (1887); frontend, tests nuevos y ajustados en `pantallasDeAcceso.test.tsx` y `VerifyEmailPage.test.tsx`, `pnpm verify` en verde (1159 y 1 omitido); E2E 38 pasados y 3 omitidos, con uno de los primeros de chromium en rojo por el arranque en frío y en verde repetido solo. En el navegador, a 390 px en oscuro: el aviso informativo de la cuenta pendiente, el enlace de 44 px, el enlace caducado con sus dos salidas y el registro con un correo largo y «Corregir el correo». **Sin hacer:** lo menor de la crítica (en desarrollo, StrictMode hace que el primer enlace de confirmación diga «ya estaba confirmada»; «Enviar instrucciones» cuando se manda un enlace; «Elegir»/«Elige tu contraseña»; el `autoFocus` del login en táctil; el botón secundario que en oscuro casi no se distingue de la tarjeta, que es de todo el sistema); y las dos decisiones de producto, que pasan a `AUD-020`. Instantánea en `Stockly-F/.impeccable/critique/2026-11-18T22-34-22Z__src-modules-auth-components.md`. |
+| AUD-010 | Tier 3 · Rendimiento: los recuentos de «Necesita atención» en `/reports` — el panel de ADMIN pasó de 1 petición a 6 | 2026-11-19 | **Hecho el 2026-11-09:** `GET /reports/attention` (contrato `atencionDeHoySchema`, para todos los roles) devuelve las cinco cifras —caducidades, conteos abiertos, compras pendientes y parciales, ventas pendientes— y los primeros productos de stock bajo, y `useAtencionDeHoy` las lee de ahí. Se eligió **una ruta propia y no engordar `getSummary`**, como la ficha prefería si el resumen ya iba lento. Con `AUD-009` el resumen solo se le pide a ADMIN: USER y WAREHOUSE hacen **una** petición de datos en el panel (antes cinco y cuatro) y ADMIN **dos** (antes seis); la invalidación va en el `MutationCache` de `queryClient.ts`. **La prueba de carga, en el PC el 2026-11-19** ([rendimiento.md §17](rendimiento.md)): `Stockly_carga` resembrada (1 153 MB) y `load/ejecutar.js --panel=ahora` y `--panel=antes`, cuatro pasadas alternas sin otra carga. El panel entero da 2,06 y 2,05 s de p(95) con la ruta nueva frente a 2,26 y 2,00 s con los cuatro listados de antes, y el resto de rutas cae en la misma dispersión: **no empeora**, que es el criterio, con 2 peticiones en vez de 5 (32 → 20 peticiones por segundo para el mismo trabajo). **Lo que sigue en rojo no es de esta tarea:** frente a §15 el catálogo, la escritura y el histórico salen peor **en las dos variantes**; es el resumen de `/reports` saturando la base, la fila de «Sin tarea», ahora con cifra nueva. **Pasadas descartadas:** Docker Desktop se cerró solo antes de la primera (las cuatro primeras no midieron nada), una pudo coincidir con `vitest` y otra con un segundo `ejecutar.js` en el mismo puerto; se repitieron solas. En el portátil (2026-11-18) no se pudo medir por memoria; de aquel intento quedan `--panel` en la prueba y `carga:sembrar` arreglado para `purchase_orders.number`. |
+| AUD-015 | Tier 3 · Diseño: Reportes — tarjetas que no cuadraban, gráficos sin alternativa y un informe por periodo que abría vacío (crítica del 2026-11-07) | 2026-11-19 | **Hecho el 2026-11-10** (tarjetas que cuadran con `costedSaleValue`, los tres gráficos `aria-hidden` con su tabla, los seis meses en el eje, el periodo en la URL y el vacío con alternativas) y **la tanda de la crítica de cierre del 2026-11-18** (23,5/40, cuatro P1): los importes de Por periodo, solo para ADMIN también en CSV y PDF; Por periodo nunca enseña cifras de otro periodo; Reportes no queda en blanco al fallar; el % de margen dice su cobertura. **Crítica repetida (2026-11-19, dual-agent, en el PC): 26/40, sin P1** —el criterio— y ningún gráfico es una parada sin nombre (comprobado en el árbol: dibujo `aria-hidden`, tabla con el nombre del `h2`, nada con `tabindex` ≥ 0 ni `role="application"`); detector CLI limpio. De sus P2 se arreglaron dos al cerrarla: **sin red una consulta falla** en vez de pausarse (`networkMode: "always"` en `queryClient`: el esqueleto ya no late para siempre y sale `ErrorDeCarga`, en todas las pantallas) y **las descargas giran y no admiten un segundo clic**; y el P3 de `MargenRealizado` (región con nombre, total en `th`, la tabla del top con nombre, enlaces de 44 px). **Quedan, en «Sin tarea»:** las cifras de los gráficos solo se leen en el tooltip, y el informe no tiene jerarquía ni índice para sus ocho secciones. Instantánea en `Stockly-F/.impeccable/critique/2026-11-19T23-25-46Z__src-modules-reports.md`. |
+| AUD-019 | Tier 3 · Diseño: pulido restante de la crítica del 2026-11-07 — Panel, Catálogo, Órdenes, Inventario, Administración, contraste y tipografía | 2026-11-19 | Cuatro tandas: **Panel y Catálogo** (2026-11-14: `/expiry` dice lotes; la ficha del escáner lleva a registrar un movimiento o escanear otro; el formulario de edición ya no mueve stock; filtros de Productos en la URL), **Órdenes** (2026-11-14, PC: número de compra correlativo con migración y contador; importes y confirmación en Sugerencias; «Subtotal» y enlace a la venta en la ficha de cliente; iconos de contacto; filtros de Ventas plegados), **Inventario** (2026-11-17: `VacioDeLista`; «Nuevo conteo» marca lo ocupado; escáner y «Tras la transferencia»; `GET /reports/expiring?expired=true` con `expiringCount`; pestañas y un primario en el conteo, a ciegas en las cifras) y **Administración y Tipografía** (2026-11-18: la 404 sin `<main>` anidado; zona horaria con búsqueda; el logo avisa; `pretty`/`balance` por regla en `index.css`). **Críticas de cierre (2026-11-19, dual-agent, en el PC), en dos tandas:** Panel, Catálogo y Órdenes, **29/40, los 11 puntos de la ficha resueltos**; Inventario, Administración y Tipografía, **30/40**, con dos P2 abiertos que se arreglaron en el acto: **el contraste de las cabeceras de tabla** (`text-foreground-muted` sobre `surface-muted`, 4,28:1 en claro: el token pasa de `#64748b` a `#5f6b7e`, 4,9:1 sobre esa superficie y 5,4 sobre blanco; `theme.test.ts` mide ahora el texto atenuado contra las tres superficies neutras, cuando antes solo lo medía contra la tarjeta) y, nuevo, **la lista de conteos decía «N con diferencia» de un conteo abierto**, contra el conteo a ciegas (solo en los cerrados, con test). También se arreglaron las dos regresiones P2 del móvil que vio la primera tanda —la ficha del escáner dejaba sus acciones a 1 056 px (ahora las dos del escaneo van fijas al pie del modal; con las cinco tapaba media pantalla, visto en el navegador) y las tablas de líneas de las órdenes escondían cantidad, precio y subtotal a 390 px (sin ancho mínimo en el móvil y con hueco entre columnas: 316 px en 316; la ficha de cliente oculta Fecha y Vendida a)— y el SKU partido por el guion en `/expiry`. Detector CLI limpio en los dos bloques. **Quedan, en «Sin tarea»:** Productos pide desplazamiento a 1280 px; Compras no se busca por número; Escape cierra «Nueva transferencia» con líneas; «$0.00 a coste» por coste desconocido en Caducidades. Instantáneas `…__src-modules-purchase-orders.md` y `…__src-modules-inventory-counts.md` del 2026-11-19. |
+| AUD-020 | Tier 4 · Diseño y producto: una pantalla propia para «pendiente de aprobación» y una invitación que diga quién invita | 2026-11-19 | **Decisiones del propietario (2026-11-19):** la pantalla **sustituye** al aviso del login, y de quien invita se enseña **el nombre y el negocio**, no el correo. **Pendiente:** con `ACCOUNT_PENDING_APPROVAL`, `LoginPage` pinta `EsperaDeAprobacion` —reloj, qué falta, quién lo decide, a quién preguntar y «Cuenta: …»—, sin el formulario, con el foco y el título de la pestaña en «Tu cuenta espera aprobación»; «Volver al inicio de sesión» deja lo escrito. **Invitación:** columna `users.invitedById` (migración `20261119120000_aud_020_quien_invita`, `ON DELETE SET NULL`) que guarda `POST /users`; el correo dice «Ana te ha invitado a Ferretería López» (sin negocio, la marca; sin quien invita, el texto de antes) y `POST /auth/reset-password/check` devuelve `invitation: { inviterName, businessName }` **solo si la cuenta nació de una invitación y aún no está verificada**: un «olvidé» posterior ya no se presenta como invitación. La pantalla dice «X te ha invitado a N.» (sin negocio, «a su equipo en Stockly») y, en su línea, «Entrarás con …»; el foco va al título para que el lector lo lea antes del campo, y la salida dice «Ya tengo contraseña: iniciar sesión». **Comprobado:** backend, seis tests nuevos en `invitacion.test.ts` (se guarda quién invita y no sale en la respuesta; correo con el negocio y escapado; la comprobación sin el correo de quien invita; `businessName` nulo; usada, ya no es invitación; un restablecer normal sin `invitation`), `pnpm verify` en verde (1899); frontend, tests de la pantalla de espera, la vuelta con el correo, la invitación con y sin negocio, el foco y la salida; en el navegador las dos pantallas a 1280 y 390 px. **Crítica del bloque Acceso (2026-11-19, dual-agent): 30/40, sin P1** (criterio: no bajar de 29,3); sus tres P2 —un correo largo desbordaba la tarjeta a 390 px, el lector se saltaba quién invita, la frase forzada— se arreglaron al cerrarla. **Sin comprobar:** el correo de invitación real (no hay SMTP en el PC; el texto lo comprueban los tests sobre el transporte simulado). **Queda en «Sin tarea»:** el estado de espera se pierde al recargar. |

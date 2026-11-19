@@ -207,7 +207,20 @@ export const rutasAdicionales: Record<string, Ruta> = {
             description: "La pantalla lo pregunta al abrirse, para decir que el enlace caducó antes de que se escriba la contraseña. El token va en el cuerpo para que no quede en los registros de acceso.",
             requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["token"], properties: { token: { type: "string" } } } } } },
             responses: {
-                "200": JSON_OK({ type: "object", properties: { email: { type: "string", format: "email" } } }, "El enlace sirve; `email` es el de la cuenta"),
+                "200": JSON_OK(
+                    {
+                        type: "object",
+                        properties: {
+                            email: { type: "string", format: "email" },
+                            invitation: {
+                                type: "object",
+                                description: "AUD-020 — solo en una invitación sin usar: quién invita (nombre) y el negocio, `null` si Configuración no lo tiene",
+                                properties: { inviterName: { type: "string" }, businessName: { type: "string", nullable: true } },
+                            },
+                        },
+                    },
+                    "El enlace sirve; `email` es el de la cuenta",
+                ),
                 "400": ERROR("Enlace inválido o caducado (`INVALID_OR_EXPIRED_TOKEN`)"),
             },
         },
