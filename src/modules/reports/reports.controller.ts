@@ -44,6 +44,8 @@ export const reportsController = {
     async getPeriod(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
             const format = (req.query.format as string | undefined) ?? "json";
+            // AUD-015 — los importes, solo para ADMIN (la regla de AUD-009), en los tres formatos.
+            const conImportes = req.userRole === "ADMIN";
 
             if (format === "csv") {
                 const { periodo, filas } = await reportsService.getPeriodProducts(req.query);
@@ -53,21 +55,22 @@ export const reportsController = {
                     mensaje: "Informe por periodo exportado",
                     total: filas.length,
                     lotes: (async function* () {
+                        // Sin importes, las columnas no se ponen vacías: no van.
                         yield filas.map((f) => ({
                             productName: f.name,
                             productSku: f.sku ?? "",
                             category: f.category ?? "",
                             salesUnits: f.salesUnits,
-                            salesRevenue: f.salesRevenue,
+                            ...(conImportes && { salesRevenue: f.salesRevenue }),
                             purchaseUnits: f.purchaseUnits,
-                            purchaseAmount: f.purchaseAmount,
+                            ...(conImportes && { purchaseAmount: f.purchaseAmount }),
                         }));
                     })(),
                 });
                 return;
             }
 
-            const informe = await reportsService.getPeriod(req.query);
+            const informe = await reportsService.getPeriod(req.query, { conImportes });
 
             if (format === "pdf") {
                 const generatedAt = new Date().toLocaleString("es-MX", {

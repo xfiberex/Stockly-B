@@ -6,6 +6,14 @@ identificador `T{tier}-{nº}` que se cita en commits y documentos:
 2026-10-31, las tareas nuevas llevan `AUD-NNN`, un identificador permanente que no cambia si
 cambia el tier (`fix(AUD-005): …`). Las 139 `T` conservan el suyo.
 
+> **Estado al 2026-11-19: cuatro tareas abiertas; `AUD-015` con su crítica de cierre hecha y
+> arreglada.** La crítica dio cuatro P1 —el más serio, que cualquier rol veía los importes del
+> informe por periodo, contra `AUD-009`—, y los cuatro, el P2 y lo menor están arreglados: el
+> informe recorta los importes a quien no es ADMIN (JSON, CSV y PDF), nunca enseña cifras de otro
+> periodo sin decirlo, Reportes no queda en blanco al fallar y el margen dice sobre cuánto se
+> calcula. Para cerrarla falta repetir la crítica. El contraste de las cabeceras de tabla pasa a
+> `AUD-019`. Lo siguiente: esa crítica repetida y las de los bloques de `AUD-019`.
+>
 > **Estado al 2026-11-18, noche: cuatro tareas abiertas; `AUD-014` cerrada y `AUD-020` abierta.**
 > La crítica de cierre del acceso dio 29,3/40, sin P1 y ninguna pantalla por debajo de 28: se
 > cerró `AUD-014`, con sus cinco P2 arreglados (la cuenta pendiente ya no sale en rojo, «Ya puedes
@@ -186,7 +194,7 @@ en el [informe](auditoria/2026-10-31/INFORME.md), apartado 3. Una tarea nueva se
 ficha, como dice «Una tarea nueva», más abajo.
 
 <!-- indice:inicio -->
-**Última actualización:** 2026-11-18 · **Siguiente ID libre:** AUD-021 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
+**Última actualización:** 2026-11-19 · **Siguiente ID libre:** AUD-021 · **Último informe:** [2026-11-07, crítica de diseño](auditoria/2026-11-07-critica/INFORME.md)
 
 | Tier | Abiertas | Cerradas | Esfuerzo de las abiertas (Bajo · Medio · Alto) |
 |---|---|---|---|
@@ -328,7 +336,59 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       `role="application"` fuera de `aria-hidden`, ningún elemento del gráfico con
       `tabindex` ≥ 0, y `/reports/period?from=2025-01-01&to=2025-01-31` abre ese rango, vacío,
       con exportar desactivado y las dos alternativas.
-    - **Falta:** la crítica repetida del bloque Reportes (criterio: sin P1).
+  - **Crítica de cierre (2026-11-18, dual-agent): 23,5/40, cuatro P1** (Reportes 23, Por periodo
+    24; la del 2026-11-07, 25 y 28). Lo de esta tarea se sostiene —ningún gráfico es una parada sin
+    nombre, el periodo vive en la URL, el vacío ofrece alternativas—; la nota baja porque esta
+    pasada miró estados que la primera no: otro rol, red lenta y fallo de carga. Los P1: **cualquier
+    rol veía los importes en Por periodo** (`GET /reports/period` es `TODOS` y no recortaba, contra
+    la decisión de `AUD-009`); Por periodo podía enseñar cifras de otro periodo sin decirlo (campos
+    que no se sincronizaban, sin `isFetching` ni `isError`, exportar el periodo anterior); Reportes
+    en blanco si fallaba la carga; y el % de margen sin decir que salía del 38 % de lo vendido.
+    Detector: CLI limpia; en el navegador, cabeceras de tabla a 4,3:1 en claro (de todo el sistema:
+    pasa a `AUD-019`), siete tablas sin nombre y tres enlaces pequeños. Instantánea en
+    `Stockly-F/.impeccable/critique/2026-11-19T00-31-44Z__src-modules-reports.md`.
+  - **Hecho, tanda de la crítica de cierre (2026-11-18; el propietario decidió «todo» y recortar los
+    importes):**
+    - **Importes, solo ADMIN, también en Por periodo** (backend y contrato): `salesRevenue` y
+      `purchaseAmount` pasan a opcionales en `cifrasDePeriodo` y no vienen para los demás roles,
+      ni en el JSON, ni en el CSV (sin esas columnas), ni en el PDF (en unidades). La pantalla se
+      queda en unidades: sin tarjetas, columnas ni gráficos de dinero.
+    - **Por periodo, nunca cifras de otro periodo:** los campos de fecha dicen el rango que se ve
+      (o el que se está escribiendo); mientras llega el pedido, lo de antes se atenúa con
+      `aria-busy`, el subtítulo —región viva— dice «Cargando el periodo elegido…» y exportar espera,
+      diciendo por qué (`aria-describedby`); sin datos, `ErrorDeCarga` con «Reintentar»; con datos
+      viejos, «No se pudo actualizar».
+    - **Reportes ya no queda en blanco:** `ErrorDeCarga` sin datos y el aviso de datos viejos con
+      datos (`ReintentoEnLinea`, que pasa del panel a `shared/components`).
+    - **El % de margen dice su cobertura** («Sobre el 38 % de lo vendido: el resto no tiene coste»),
+      en ámbar por debajo del 80 %; el margen potencial dice «Solo los productos con coste».
+    - **Jerarquía:** el stock bajo y la rotación suben justo bajo las cifras; la rotación enseña 10
+      y el resto con «Ver los N»; «Ver la reposición sugerida» para ADMIN cuando algo hay que
+      reabastecer.
+    - **Menores:** las dos filas de tarjetas iguales (sin el icono de adorno; el stock bajo, en ámbar
+      con su icono); el eje de meses sin «Jun 26»; leyenda en el orden de las barras; «Cuántos
+      movimientos hubo, no cuántas unidades»; la ayuda de la rotación dice qué son las salidas
+      (ventas enviadas y salidas a mano; ni transferencias ni ajustes); fuera la columna «#»; la
+      última marca de Distribución ya no se corta; tablas con nombre (`aria-labelledby` al `h2`) y
+      las de los gráficos sin el `caption` que repetía el título; enlaces de producto y «Ver cuáles»
+      con 44 px en táctil. En Por periodo: un gráfico por serie, cada uno con su escala (las ventas
+      ya no son astillas al lado de las compras), con `TEXTO_DE_EJE`; hasta hoy y no hasta el final
+      del atajo (sin meses futuros, «a hoy, 18 nov»); la zona con espacios; las tarjetas sin
+      decimales, como en Reportes; sin las seis tarjetas a cero sobre el vacío; nombres de producto
+      enlazados; «Volver a reportes» con 44 px; en el móvil, las fechas a mano plegadas tras «Otras
+      fechas».
+    - **Comprobado:** backend, tests nuevos en `informe-periodo.test.ts` (WAREHOUSE, USER y SELLER
+      sin un importe en el JSON; ADMIN con ellos; CSV sin las columnas; PDF que sale); `pnpm
+      verify` en verde (1893). Frontend, tests nuevos en `InformePorPeriodo.test.tsx` y
+      `resumen.test.tsx`. En el navegador: Reportes a 1280 como ADMIN y Por periodo a 390; la cuenta
+      de almacén, contra un backend recién arrancado, recibe el informe en unidades (JSON y CSV).
+      **Lo que el portátil dejó a medias:** procesos `node` de un `pnpm dev` anterior seguían
+      sirviendo el puerto 3000 con código viejo (`TaskStop` no mata a los hijos), y el navegador
+      enseñó importes a almacén hasta comprobarlo aparte.
+    - **Sin hacer, por ser funcionalidad nueva y no pulido:** ordenar las tablas, CSV del resumen
+      de Reportes, margen en Por periodo y ventanas configurables (30 días, 6 meses). En el móvil,
+      las tablas de importes siguen desplazándose a lo ancho, con el borde que lo avisa (`AUD-013`).
+  - **Falta:** repetir la crítica del bloque (criterio: sin P1).
 
 - [ ] **AUD-019 · Pulido restante de la crítica del 2026-11-07 (P2 y P3 sin tarea propia)**
   - **Área:** Diseño · **Severidad:** Bajo · **Esfuerzo:** Medio
@@ -350,6 +410,10 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       sobrante ni faltante mientras se cuenta.
     - **Administración:** la 404 dentro de la app sin `<main>` anidado ni «Dashboard»; zona horaria
       con búsqueda; logo que avisa de que se guarda al subirlo.
+    - **Contraste de las cabeceras de tabla** (detector, crítica de cierre de `AUD-015`, decisión del
+      propietario de traerlo aquí): `text-foreground-muted` sobre `bg-surface-muted` da 4,3:1 en
+      tema claro, por debajo de 4,5:1. Es el mismo patrón en todas las tablas de la aplicación:
+      ajustar el token o la clase y vigilarlo en `tokens.test.ts`.
     - **Tipografía (detector):** `text-pretty` o espacios no separables donde quedan palabras
       sueltas a 390 px (`/sale-orders`, `/expiry`, `/settings`, `/profile`) y `text-balance` en los
       dos títulos de `/reports`.
@@ -464,6 +528,11 @@ Las observaciones de severidad Medio de la auditoría del 2026-10-31 están en s
       tildes ni guiones bajos, y por el desfase de hoy, que cada opción enseña («santo utc-4»).
       Abre con la zona puesta centrada; Escape o salir sin elegir devuelven la que había, sin
       dejar cambios pendientes; sin coincidencias, lo dice.
+    - **Después (2026-11-19):** la lista de zonas calculaba los ~420 desfases al montar
+      Configuración y pintaba todas las opciones al abrir, y sus tests agotaban los 5 s en la pasada
+      completa del portátil. Ahora los desfases se calculan al abrirla por primera vez (y valen para
+      la sesión) y se pinta una ventana de 60 alrededor de la activa, que se mueve cuando la activa
+      sale de ella, con «Hay N zonas más: escribe para encontrar la tuya». Test nuevo de la ventana.
     - **El logo avisa** de que se guarda al elegir el archivo, sin «Guardar cambios», con el
       texto atado al botón por `aria-describedby`.
     - **Tipografía, por regla y no pantalla a pantalla:** `index.css` da `text-wrap-style: pretty`

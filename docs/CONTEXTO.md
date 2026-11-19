@@ -670,9 +670,11 @@ La referencia es [`Stockly-F/docs/design-system.md`](../../Stockly-F/docs/design
   2026-11-09): valor a coste, a precio de venta, margen, valor por categoría, top por valor y
   ventas de la semana. `GET /reports` sigue abierta a todos, pero para los demás roles la respuesta
   llega **sin** esos campos (opcionales en el contrato) y el servidor ni los calcula; el PDF, igual.
-  Devolverlos «a cero» o calcularlos y ocultarlos en la pantalla deshace la tarea. Aún llegan a
-  todos los importes de `GET /reports/period` y el valor a coste de `/reports/expiring`: si la
-  decisión vale para ellos, es una tarea nueva.
+  Devolverlos «a cero» o calcularlos y ocultarlos en la pantalla deshace la tarea. **Desde
+  `AUD-015` (2026-11-18) vale también para `GET /reports/period`**: sin `salesRevenue` ni
+  `purchaseAmount` para quien no es ADMIN, en el JSON, el CSV (sin las columnas) y el PDF (en
+  unidades). Aún llega a todos el valor a coste de `/reports/expiring`: si la decisión vale para él,
+  es una tarea nueva.
 
 - **Ninguna contraseña viaja por correo, y una cuenta no nace con una vacía.** A quien un
   administrador da de alta (`POST /users`) le llega un enlace para elegirla; la cuenta se crea con

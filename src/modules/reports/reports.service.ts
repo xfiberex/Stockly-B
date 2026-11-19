@@ -266,6 +266,18 @@ function cifras<T extends CifrasDelPeriodo>(fila: T) {
 export const PRODUCTOS_POR_PERIODO = 50;
 
 /**
+ * AUD-015 — una fila del informe por periodo **sin sus importes**, para quien no es ADMIN (la
+ * regla de AUD-009). Se quitan las claves, no se ponen a cero: un cero se leería como «no se
+ * vendió nada». El orden de los desgloses sigue siendo el de las ventas; las cifras, no.
+ */
+type ConImportesOpcionales<T> = Omit<T, "salesRevenue" | "purchaseAmount"> & { salesRevenue?: number; purchaseAmount?: number };
+
+function sinImportes<T extends { salesRevenue: number; purchaseAmount: number }>(fila: T): ConImportesOpcionales<T> {
+    const { salesRevenue: _venta, purchaseAmount: _compra, ...resto } = fila;
+    return resto;
+}
+
+/**
  * Por producto, ventas y compras en la misma fila: un producto que solo se compró en el
  * periodo, o que solo se vendió, tiene que salir igual.
  *
@@ -655,7 +667,7 @@ export const reportsService = {
      * mismo: así «la suma de los meses coincide con el trimestre», que es el criterio de la
      * ficha, compara dos cálculos y no uno consigo mismo.
      */
-    async getPeriod(query: { preset?: unknown; from?: unknown; to?: unknown }) {
+    async getPeriod(query: { preset?: unknown; from?: unknown; to?: unknown }, { conImportes }: { conImportes: boolean }) {
         const zona = await settingsService.zonaHoraria();
         const periodo = resolverPeriodo(query, hoyEn(zona));
         const tramo = extremos(periodo.from, periodo.to, zona);
@@ -798,20 +810,29 @@ export const reportsService = {
             productosDelPeriodo(tramo, PRODUCTOS_POR_PERIODO + 1),
         ]);
 
+        const totals = {
+            salesOrders: Number(ventas[0]?.orders ?? 0),
+            salesUnits: Number(ventas[0]?.units ?? 0),
+            salesRevenue: Number(ventas[0]?.importe ?? 0),
+            purchaseOrders: Number(compras[0]?.orders ?? 0),
+            purchaseUnits: Number(compras[0]?.units ?? 0),
+            purchaseAmount: Number(compras[0]?.importe ?? 0),
+        };
+        const byMonth = porMes.map((m) => cifras(m));
+        const byCategory = porCategoria.map((c) => cifras(c));
+        const byProduct = productos.slice(0, PRODUCTOS_POR_PERIODO).map((p) => cifras(p));
+        // AUD-015 — sin importes para quien no es ADMIN. El tipo los da por opcionales, como el
+        // contrato: el PDF y quien lo lea tienen que contar con que falten.
+        const quitar = <T extends { salesRevenue: number; purchaseAmount: number }>(f: T): ConImportesOpcionales<T> =>
+            conImportes ? f : sinImportes(f);
+
         return {
             ...periodo,
             timezone: zona,
-            totals: {
-                salesOrders: Number(ventas[0]?.orders ?? 0),
-                salesUnits: Number(ventas[0]?.units ?? 0),
-                salesRevenue: Number(ventas[0]?.importe ?? 0),
-                purchaseOrders: Number(compras[0]?.orders ?? 0),
-                purchaseUnits: Number(compras[0]?.units ?? 0),
-                purchaseAmount: Number(compras[0]?.importe ?? 0),
-            },
-            byMonth: porMes.map((m) => cifras(m)),
-            byCategory: porCategoria.map((c) => cifras(c)),
-            byProduct: productos.slice(0, PRODUCTOS_POR_PERIODO).map((p) => cifras(p)),
+            totals: quitar(totals),
+            byMonth: byMonth.map(quitar),
+            byCategory: byCategory.map(quitar),
+            byProduct: byProduct.map(quitar),
             moreProducts: productos.length > PRODUCTOS_POR_PERIODO,
         };
     },

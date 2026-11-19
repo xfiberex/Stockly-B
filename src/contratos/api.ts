@@ -1769,12 +1769,18 @@ export const atencionDeHoySchema = z.object({
 /**
  * T5-09 — unidades e importe de lo vendido (enviado) y lo comprado (recibido). Cada fila de
  * los desgloses por periodo lleva las cuatro cifras.
+ *
+ * AUD-015 — **los importes, solo para ADMIN**, como en `GET /reports` (AUD-009): para los demás
+ * roles `salesRevenue` y `purchaseAmount` no vienen —ni en el JSON, ni en el CSV, ni en el PDF—, y
+ * el informe queda en unidades. La ruta estaba abierta a todos desde antes de esa decisión.
  */
 const cifrasDePeriodo = {
     salesUnits: z.number(),
-    salesRevenue: z.number(),
+    /** Solo ADMIN (AUD-015). */
+    salesRevenue: z.number().optional(),
     purchaseUnits: z.number(),
-    purchaseAmount: z.number(),
+    /** Solo ADMIN (AUD-015). */
+    purchaseAmount: z.number().optional(),
 };
 
 export const atajoDePeriodoSchema = z.enum(["this-month", "last-month", "this-quarter", "this-year"]);

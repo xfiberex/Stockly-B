@@ -4,6 +4,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { hoyEn, ZONA_HORARIA_POR_DEFECTO } from "@/shared/lib/zonaHoraria";
 import { mesesDe, periodoDeAtajo, resolverPeriodo } from "@/modules/reports/reports.periodo";
 import { cleanDb, createUser, getAuthCookie, numeroDeVenta, ALMACEN, crearProducto } from "./helpers";
+import { informePorPeriodoSchema } from "@/contratos/api";
 
 jest.mock("@/shared/lib/nodemailer", () => ({
     sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
@@ -386,6 +387,70 @@ describe("Informes por periodo (T5-09)", () => {
             const datos = await informe("preset=this-month");
 
             expect(datos.timezone).toBe(ZONA_HORARIA_POR_DEFECTO);
+        });
+    });
+
+    describe("Los importes, solo para ADMIN (AUD-015)", () => {
+        // La regla de AUD-009 para `GET /reports`, que la ruta del periodo no seguía: con
+        // `almacen@…` se leían las ventas, las compras y el desglose en dinero, y se descargaban.
+        async function conRol(role: "WAREHOUSE" | "USER" | "SELLER") {
+            const u = await createUser({ email: `periodo_${role.toLowerCase()}_${Date.now()}@example.com`, role });
+            return getAuthCookie(u.id);
+        }
+
+        it.each(["WAREHOUSE", "USER", "SELLER"] as const)("%s recibe el informe en unidades, sin un solo importe", async (role) => {
+            const p = await producto("Mesa");
+            await venta("2026-07-10T12:00:00Z", [{ productId: p.id, productName: p.name, quantity: 2, unitPrice: 50 }]);
+
+            const res = await request(app).get(`${PERIODO}?from=2026-07-01&to=2026-07-31`).set("Cookie", await conRol(role));
+
+            expect(res.status).toBe(200);
+            const data = informePorPeriodoSchema.parse(res.body.data);
+            expect(data.totals.salesUnits).toBe(2);
+            for (const fila of [data.totals, ...data.byMonth, ...data.byCategory, ...data.byProduct]) {
+                expect(fila).not.toHaveProperty("salesRevenue");
+                expect(fila).not.toHaveProperty("purchaseAmount");
+            }
+        });
+
+        it("ADMIN sí los recibe", async () => {
+            const p = await producto("Mesa");
+            await venta("2026-07-10T12:00:00Z", [{ productId: p.id, productName: p.name, quantity: 2, unitPrice: 50 }]);
+
+            const data = informePorPeriodoSchema.parse(await informe("from=2026-07-01&to=2026-07-31"));
+
+            expect(data.totals.salesRevenue).toBe(100);
+            expect(data.byProduct[0]?.salesRevenue).toBe(100);
+        });
+
+        it("el CSV de quien no es ADMIN no lleva las columnas de importe", async () => {
+            const p = await producto("Lámpara");
+            await venta("2026-07-10T12:00:00Z", [{ productId: p.id, productName: p.name, quantity: 3, unitPrice: 12.5 }]);
+
+            const res = await request(app).get(`${PERIODO}?from=2026-07-01&to=2026-07-31&format=csv`).set("Cookie", await conRol("WAREHOUSE"));
+
+            expect(res.status).toBe(200);
+            const [cabecera, fila] = res.text.replace(/^﻿/, "").split("\n");
+            expect(cabecera).toBe("productName,productSku,category,salesUnits,purchaseUnits");
+            expect(fila).toBe("Lámpara,,,3,0");
+        });
+
+        it("el PDF de quien no es ADMIN también sale, en unidades", async () => {
+            const p = await producto("Silla");
+            await venta("2026-07-10T12:00:00Z", [{ productId: p.id, productName: p.name, quantity: 1, unitPrice: 80 }]);
+
+            const res = await request(app)
+                .get(`${PERIODO}?from=2026-07-01&to=2026-07-31&format=pdf`)
+                .set("Cookie", await conRol("WAREHOUSE"))
+                .buffer(true)
+                .parse((r, cb) => {
+                    const trozos: Buffer[] = [];
+                    r.on("data", (t: Buffer) => trozos.push(t));
+                    r.on("end", () => cb(null, Buffer.concat(trozos)));
+                });
+
+            expect(res.status).toBe(200);
+            expect((res.body as Buffer).subarray(0, 5).toString()).toBe("%PDF-");
         });
     });
 

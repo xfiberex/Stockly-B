@@ -462,21 +462,30 @@ function mesLargo(texto: string): string {
     return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${y}`;
 }
 
-type FilaDePeriodo = { salesUnits: number; salesRevenue: number; purchaseUnits: number; purchaseAmount: number };
+// AUD-015 — los importes solo vienen para ADMIN: sin ellos, el PDF es el de las unidades.
+type FilaDePeriodo = { salesUnits: number; salesRevenue?: number; purchaseUnits: number; purchaseAmount?: number };
 
-const COLUMNAS_DE_CIFRAS: Column[] = [
+const COLUMNAS_CON_IMPORTES: Column[] = [
     { header: "Uds. vendidas", width: 80, align: "right" },
     { header: "Ventas", width: 95, align: "right" },
     { header: "Uds. compradas", width: 85, align: "right" },
     { header: "Compras", width: 95, align: "right" },
 ];
 
-function celdasDeCifras(f: FilaDePeriodo, money: (n: number) => string, total = false): Cell[] {
+const COLUMNAS_DE_UNIDADES: Column[] = [
+    { header: "Uds. vendidas", width: 177, align: "right" },
+    { header: "Uds. compradas", width: 178, align: "right" },
+];
+
+function celdasDeCifras(f: FilaDePeriodo, money: (n: number) => string, conImportes: boolean, total = false): Cell[] {
+    const vendidas: Cell = { text: int(f.salesUnits), align: "right", color: total || !conImportes ? INK : MUTED, bold: total };
+    const compradas: Cell = { text: int(f.purchaseUnits), align: "right", color: total || !conImportes ? INK : MUTED, bold: total };
+    if (!conImportes) return [vendidas, compradas];
     return [
-        { text: int(f.salesUnits), align: "right", color: total ? INK : MUTED, bold: total },
-        { text: money(f.salesRevenue), align: "right", color: INK, bold: total },
-        { text: int(f.purchaseUnits), align: "right", color: total ? INK : MUTED, bold: total },
-        { text: money(f.purchaseAmount), align: "right", color: INK, bold: total },
+        vendidas,
+        { text: money(f.salesRevenue ?? 0), align: "right", color: INK, bold: total },
+        compradas,
+        { text: money(f.purchaseAmount ?? 0), align: "right", color: INK, bold: total },
     ];
 }
 
@@ -486,11 +495,13 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
     let y = drawHeader(doc, generatedAt, "Ventas y compras por periodo", `${rango} · zona horaria ${informe.timezone}`);
 
     const { totals } = informe;
+    const conImportes = totals.salesRevenue !== undefined && totals.purchaseAmount !== undefined;
+    const columnas = conImportes ? COLUMNAS_CON_IMPORTES : COLUMNAS_DE_UNIDADES;
     y = sectionHeading(doc, "Resumen del periodo", y, "Ventas enviadas y compras recibidas en el periodo");
     y = drawKpis(
         doc,
         [
-            { label: "Ventas", value: moneyShort(totals.salesRevenue) },
+            ...(conImportes ? [{ label: "Ventas", value: moneyShort(totals.salesRevenue ?? 0) }] : []),
             { label: "Unidades vendidas", value: int(totals.salesUnits) },
             { label: "Órdenes enviadas", value: int(totals.salesOrders) },
         ],
@@ -500,7 +511,7 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
     y = drawKpis(
         doc,
         [
-            { label: "Compras", value: moneyShort(totals.purchaseAmount) },
+            ...(conImportes ? [{ label: "Compras", value: moneyShort(totals.purchaseAmount ?? 0) }] : []),
             { label: "Unidades compradas", value: int(totals.purchaseUnits) },
             { label: "Órdenes con recepción", value: int(totals.purchaseOrders) },
         ],
@@ -511,7 +522,7 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
     // Por mes. Una fila por mes también sin actividad: un hueco se leería como un mes que falta.
     y = ensureSpace(doc, y, 90);
     y = sectionHeading(doc, "Por mes", y);
-    const filasDeMes: Row[] = informe.byMonth.map((m) => ({ cells: [{ text: mesLargo(m.month), color: INK }, ...celdasDeCifras(m, money)] }));
+    const filasDeMes: Row[] = informe.byMonth.map((m) => ({ cells: [{ text: mesLargo(m.month), color: INK }, ...celdasDeCifras(m, money, conImportes)] }));
     filasDeMes.push({
         topRule: true,
         cells: [
@@ -519,20 +530,21 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
             ...celdasDeCifras(
                 { salesUnits: totals.salesUnits, salesRevenue: totals.salesRevenue, purchaseUnits: totals.purchaseUnits, purchaseAmount: totals.purchaseAmount },
                 money,
+                conImportes,
                 true,
             ),
         ],
     });
-    y = drawTable(doc, [{ header: "Mes", width: 160 }, ...COLUMNAS_DE_CIFRAS], filasDeMes, y, 22);
+    y = drawTable(doc, [{ header: "Mes", width: 160 }, ...columnas], filasDeMes, y, 22);
     y += 22;
 
     if (informe.byCategory.length > 0) {
         y = ensureSpace(doc, y, 90);
         y = sectionHeading(doc, "Por categoría", y, "Por la categoría actual de cada producto");
         const filas: Row[] = informe.byCategory.map((c) => ({
-            cells: [{ text: c.name ?? "Sin categoría", color: c.name ? INK : MUTED }, ...celdasDeCifras(c, money)],
+            cells: [{ text: c.name ?? "Sin categoría", color: c.name ? INK : MUTED }, ...celdasDeCifras(c, money, conImportes)],
         }));
-        y = drawTable(doc, [{ header: "Categoría", width: 160 }, ...COLUMNAS_DE_CIFRAS], filas, y, 22);
+        y = drawTable(doc, [{ header: "Categoría", width: 160 }, ...columnas], filas, y, 22);
         y += 22;
     }
 
@@ -543,9 +555,9 @@ export function renderPeriodReportPdf(doc: Doc, informe: PeriodReport, generated
             : "Ordenados por ventas";
         y = sectionHeading(doc, "Por producto", y, sub);
         const filas: Row[] = informe.byProduct.map((p) => ({
-            cells: [{ text: p.name, sub: p.sku ?? undefined, color: INK }, ...celdasDeCifras(p, money)],
+            cells: [{ text: p.name, sub: p.sku ?? undefined, color: INK }, ...celdasDeCifras(p, money, conImportes)],
         }));
-        drawTable(doc, [{ header: "Producto", width: 160 }, ...COLUMNAS_DE_CIFRAS], filas, y, 30);
+        drawTable(doc, [{ header: "Producto", width: 160 }, ...columnas], filas, y, 30);
     }
 
     drawFooters(doc, "Stockly · Ventas y compras por periodo");
